@@ -1,186 +1,90 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
-import { fetchAllSets, fetchSetCards } from "@/lib/optcgapi";
 
-export const maxDuration = 300; // allow up to 5 min on Vercel
-
-interface ApiCard {
-  card_image_id: string;
-  card_set_id: string;
-  card_name: string;
-  set_name: string;
-  set_id: string;
-  rarity: string;
-  card_type: string;
-  card_color: string;
-  card_text: string | null;
-  card_cost: string | null;
-  card_power: string | null;
-  life: number | null;
-  sub_types: string | null;
-  counter_amount: number | null;
-  attribute: string | null;
-  card_image: string | null;
-  inventory_price: number | null;
-  market_price: number | null;
-}
-
-function parseIntSafe(val: string | number | null | undefined): number | null {
-  if (val == null || val === "" || val === "NULL") return null;
-  const n = typeof val === "string" ? parseInt(val, 10) : val;
-  return isNaN(n) ? null : n;
-}
-
-function deriveVariantLabel(cardImageId: string): string | null {
-  return /_p\d+$/.test(cardImageId) ? "Parallel" : null;
-}
-
-function deriveNameBase(cardName: string | null): string | null {
-  if (!cardName) return null;
-  return cardName.replace(/\s*\(Parallel\)\s*$/i, "").trim();
-}
-
-function parseSingleColor(color: string | null): string[] {
-  if (!color) return [];
-  // Colors can be slash-separated e.g. "Red/Green"
-  return color.split("/").map((c) => c.trim()).filter(Boolean);
-}
-
-function parseSubTypes(subTypes: string | null): string[] {
-  if (!subTypes) return [];
-  return subTypes.split(/\s+/).filter(Boolean);
-}
-
-export async function POST(req: NextRequest) {
-  // Auth check
-  const secret = req.headers.get("x-cron-secret");
-  if (secret !== process.env.CRON_SECRET) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+export async function GET() {
   const supabase = createServiceClient();
-  const errors: string[] = [];
-  let synced = 0;
 
-  // 1. Fetch all sets from optcgapi
-  const sets = await fetchAllSets() as { set_id: string; set_name: string }[];
-  if (sets.length === 0) {
-    return NextResponse.json({ synced: 0, errors: ["Failed to fetch sets"] });
-  }
+  // Fetch all sets with card_count
+  const { data: sets, error } = await supabase
+    .from("sets")
+    .select("id, slug, code, name, series, card_count")
+    .order("code");
 
-  // 2. Ensure sets exist in DB
-  for (const s of sets) {
-    const slug = s.set_id.replace(/\s+/g, "-").toLowerCase();
-    const code = s.set_id.replace(/-/g, "").toUpperCase();
-    const series = slug.split("-")[0].toUpperCase();
-    const { error: setErr } = await supabase.from("sets").upsert(
-      { slug, code, name: s.set_name, series },
-      { onConflict: "slug" }
-    );
-    if (setErr) {
-      errors.push(`Set upsert failed [${slug}]: ${setErr.message}`);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Get card IDs per set in parallel
+  const setsWithIds = await Promise.all(
+    sets.map(async (set) => {
+      const { data } = await supabase
+        .from("cards")
+        .select("id")
+        .eq("set_id", set.id);
+      return { set, cardIds: data?.map((c) => c.id) ?? [] };
+    })
+  );
+
+  // Get top 5 cards by price per set in parallel
+  const setsWithTopCards = await Promise.all(
+    setsWithIds.map(async ({ set, cardIds }) => {
+      if (!cardIds.length) return { set, topCards: [], topCardIds: [] };
+
+      const { data: priceRows } = await supabase
+        .from("price_stats")
+        .select(`
+          card_id, tcg_market, market_avg,
+          chg_1d, chg_7d, chg_30d,
+          card:card_id (name, rarity)
+        `)
+        .in("card_id", cardIds)
+        .not("tcg_market", "is", null)
+        .order("tcg_market", { ascending: false })
+        .limit(5);
+
+      return {
+        set,
+        topCards: priceRows ?? [],
+        topCardIds: priceRows?.map((r) => r.card_id) ?? [],
+      };
+    })
+  );
+
+  // Batch-fetch sparkline history for all top cards in one query
+  const allTopIds = setsWithTopCards.flatMap((s) => s.topCardIds);
+  const { data: historyRows } = allTopIds.length
+    ? await supabase
+        .from("price_history")
+        .select("card_id, tcg_market, recorded_at")
+        .in("card_id", allTopIds)
+        .order("recorded_at", { ascending: false })
+        .limit(allTopIds.length * 9)
+    : { data: [] };
+
+  // Group history by card_id — 9 points each, oldest-first
+  const historyMap: Record<string, number[]> = {};
+  for (const row of historyRows ?? []) {
+    if (!historyMap[row.card_id]) historyMap[row.card_id] = [];
+    if (historyMap[row.card_id].length < 9) {
+      historyMap[row.card_id].unshift(row.tcg_market ?? 0);
     }
   }
 
-  // 3. Process each set
-  for (const s of sets) {
-    const slug = s.set_id.replace(/\s+/g, "-").toLowerCase();
+  // Build response
+  const result = setsWithTopCards.map(({ set, topCards }) => ({
+    slug: set.slug,
+    code: set.code,
+    name: set.name,
+    cards: set.card_count ?? 0,
+    topCards: topCards.map((ps) => ({
+      n:   (ps.card as { name: string; rarity: string })?.name ?? "",
+      rl:  (ps.card as { name: string; rarity: string })?.rarity ?? "",
+      tcg: ps.tcg_market ?? 0,
+      avg: ps.market_avg ?? 0,
+      d1:  ps.chg_1d ?? 0,
+      d7:  ps.chg_7d ?? 0,
+      d30: ps.chg_30d ?? 0,
+      sp:  historyMap[ps.card_id] ?? [ps.tcg_market ?? 0, ps.tcg_market ?? 0],
+    })),
+  }));
 
-    // Look up set_id in our DB
-    const { data: setRow } = await supabase
-      .from("sets")
-      .select("id")
-      .eq("slug", slug)
-      .single();
-
-    if (!setRow) {
-      errors.push(`Set not found in DB: ${slug}`);
-      continue;
-    }
-
-    const cards = (await fetchSetCards(s.set_id)) as ApiCard[];
-    if (cards.length === 0) continue;
-
-    // Update card_count on the set
-    await supabase
-      .from("sets")
-      .update({ card_count: cards.length })
-      .eq("id", setRow.id);
-
-    for (const card of cards) {
-      try {
-        // Upsert card
-        const cardRow = {
-          card_image_id: card.card_image_id,
-          card_number: card.card_set_id,
-          name: card.card_name,
-          name_base: deriveNameBase(card.card_name),
-          variant_label: deriveVariantLabel(card.card_image_id),
-          set_id: setRow.id,
-          rarity: card.rarity,
-          card_type: card.card_type,
-          color: parseSingleColor(card.card_color),
-          power: parseIntSafe(card.card_power),
-          cost: parseIntSafe(card.card_cost),
-          life: parseIntSafe(card.life),
-          counter: parseIntSafe(card.counter_amount),
-          attribute: card.attribute,
-          types: parseSubTypes(card.sub_types),
-          effect: card.card_text,
-          image_url: card.card_image,
-        };
-
-        const { data: upserted, error: cardErr } = await supabase
-          .from("cards")
-          .upsert(cardRow, { onConflict: "card_image_id" })
-          .select("id")
-          .single();
-
-        if (cardErr || !upserted) {
-          errors.push(`Card upsert failed [${card.card_image_id}]: ${cardErr?.message}`);
-          continue;
-        }
-
-        const cardId = upserted.id;
-        const marketPrice = card.market_price ?? null;
-        const inventoryPrice = card.inventory_price ?? null;
-
-        // Upsert price_stats
-        const { error: priceErr } = await supabase
-          .from("price_stats")
-          .upsert(
-            {
-              card_id: cardId,
-              tcg_market: marketPrice,
-              tcg_low: inventoryPrice,
-              market_avg: marketPrice,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "card_id" }
-          );
-
-        if (priceErr) {
-          errors.push(`price_stats upsert failed [${card.card_image_id}]: ${priceErr.message}`);
-        }
-
-        // Insert price_history snapshot
-        const { error: histErr } = await supabase.from("price_history").insert({
-          card_id: cardId,
-          tcg_market: marketPrice,
-          market_avg: marketPrice,
-          recorded_at: new Date().toISOString(),
-        });
-
-        if (histErr) {
-          errors.push(`price_history insert failed [${card.card_image_id}]: ${histErr.message}`);
-        }
-
-        synced++;
-      } catch (err) {
-        errors.push(`Exception on [${card.card_image_id}]: ${err}`);
-      }
-    }
-  }
-
-  return NextResponse.json({ synced, errors: errors.slice(0, 50) });
+  return NextResponse.json(result);
 }
