@@ -60,7 +60,21 @@ export default async function MarketsPage() {
     (a, b) => (b.price_stats?.market_avg ?? 0) - (a.price_stats?.market_avg ?? 0)
   );
 
-  const sets = (setsRes.data as SetInfo[] | null) ?? [];
+  // Sort sets: OP01-14, then EB01-03, then PRB01-02, then everything else
+  const PREFIX_ORDER: Record<string, number> = { OP: 0, EB: 1, PRB: 2 };
+  const sets = ((setsRes.data as SetInfo[] | null) ?? []).sort((a, b) => {
+    const parseCode = (code: string | null) => {
+      const m = code?.match(/^([A-Z]+)(\d+)/);
+      if (!m) return { prefix: "ZZZ", num: 999 };
+      return { prefix: m[1], num: parseInt(m[2], 10) };
+    };
+    const pa = parseCode(a.code);
+    const pb = parseCode(b.code);
+    const oa = PREFIX_ORDER[pa.prefix] ?? 99;
+    const ob = PREFIX_ORDER[pb.prefix] ?? 99;
+    if (oa !== ob) return oa - ob;
+    return pa.num - pb.num;
+  });
 
   return (
     <section className="max-w-[1400px] mx-auto px-4 py-8">
