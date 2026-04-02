@@ -1,0 +1,281 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Backgrounds */
+  --void: #03050D;
+  --deep: #060A16;
+  --surface: #0A1020;
+  --surf2: #0E1628;
+  --surf3: #121D32;
+
+  /* Borders */
+  --border: rgba(255, 255, 255, 0.055);
+  --border2: rgba(255, 255, 255, 0.10);
+
+  /* Brand */
+  --owl: #E8A020;
+  --owl2: #F5BE50;
+
+  /* Semantic */
+  --green: #00D68F;
+  --red: #FF4560;
+  --blue: #4F8EF7;
+  --purple: #9B72FF;
+
+  /* Text */
+  --text: #E4EAF6;
+  --text2: #7A88A8;
+  --text3: #3D4D6A;
+
+  /* Derived */
+  --owl-d: rgba(232, 160, 32, 0.12);
+  --green-d: rgba(0, 214, 143, 0.10);
+  --red-d: rgba(255, 69, 96, 0.10);
+
+  /* Layout */
+  --nav-h: 54px;
+  --bar-h: 28px;
+  --top: 82px;
+}
+
+body {
+  color: var(--text);
+  background: var(--void);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--deep);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--surf3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text3);
+}
+
+/* ── Animations ── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.15; }
+}
+
+@keyframes ticker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ══════════════════════════════
+   NAV
+══════════════════════════════ */
+nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  background: rgba(3, 5, 13, 0.94);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-row {
+  height: var(--nav-h);
+  padding: 0 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.logo-owl {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--owl);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  box-shadow: 0 0 18px rgba(232, 160, 32, 0.45);
+  flex-shrink: 0;
+}
+
+.logo-name {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: var(--text);
+}
+
+.logo-name span {
+  color: var(--owl);
+}
+
+.nav-mid {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.nav-link {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 10px;
+  color: var(--text2);
+  text-decoration: none;
+  padding: 5px 12px;
+  border-radius: 5px;
+  letter-spacing: 0.03em;
+  transition: all 0.14s;
+}
+
+.nav-link:hover {
+  color: var(--text);
+  background: var(--surf2);
+}
+
+.nav-link.active {
+  color: var(--owl);
+  background: var(--owl-d);
+  border: 1px solid rgba(232, 160, 32, 0.22);
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.live-badge {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 11px;
+  color: var(--green);
+  background: var(--green-d);
+  border: 1px solid rgba(0, 214, 143, 0.22);
+  padding: 4px 10px;
+  border-radius: 3px;
+  letter-spacing: 0.09em;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.live-dot {
+  width: 5px;
+  height: 5px;
+  background: var(--green);
+  border-radius: 50%;
+  animation: blink 1.5s infinite;
+}
+
+.btn-login {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text2);
+  background: transparent;
+  border: 1px solid var(--border2);
+  padding: 7px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  text-decoration: none;
+  transition: all 0.14s;
+}
+
+.btn-login:hover {
+  color: var(--text);
+  background: var(--surf2);
+}
+
+.btn-signup {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--void);
+  background: var(--owl);
+  border: none;
+  padding: 7px 18px;
+  border-radius: 5px;
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  transition: all 0.2s;
+}
+
+.btn-signup:hover {
+  background: var(--owl2);
+  transform: translateY(-1px);
+}
+
+/* ══════════════════════════════
+   TICKER BAR
+══════════════════════════════ */
+.ticker-bar {
+  width: 100%;
+  height: var(--bar-h);
+  background: var(--surf2);
+  border-top: 1px solid var(--border);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.ticker-track {
+  display: flex;
+  animation: ticker 55s linear infinite;
+  width: max-content;
+}
+
+.ti {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px;
+  border-right: 1px solid var(--border);
+  white-space: nowrap;
+  height: var(--bar-h);
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 10px;
+}
+
+.ti-name {
+  color: var(--text2);
+}
+
+.ti-price {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.ti-up {
+  color: var(--green);
+}
+
+.ti-dn {
+  color: var(--red);
+}
