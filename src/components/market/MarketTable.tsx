@@ -98,6 +98,7 @@ export default function MarketTable({ cards, sets }: MarketTableProps) {
                 {/* Thumbnail */}
                 <td className="py-2 px-1">
                   {card.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={card.image_url_small ?? card.image_url}
                       alt={card.name ?? ""}
