@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sets - OWL Market</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root{--void:#03050D;--surface:#0A1020;--surf2:#0E1628;--surf3:#121D32;--border:rgba(255,255,255,0.055);--border2:rgba(255,255,255,0.10);--owl:#E8A020;--owl2:#F5BE50;--owl-d:rgba(232,160,32,0.12);--green:#00D68F;--green-d:rgba(0,214,143,0.10);--red:#FF4560;--text:#E4EAF6;--text2:#7A88A8;--text3:#3D4D6A;--mono:'IBM Plex Mono',monospace;--display:'Inter',sans-serif;--sans:'Inter',sans-serif;--nav-h:54px;--bar-h:28px;--top:82px;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--void);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6;overflow-x:hidden;}
+body::after{content:'';position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(232,160,32,0.016) 1px,transparent 1px),linear-gradient(90deg,rgba(232,160,32,0.016) 1px,transparent 1px);background-size:56px 56px;pointer-events:none;}
+.z1{position:relative;z-index:1;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.15}}
+@keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+nav{position:fixed;top:0;left:0;right:0;z-index:500;display:flex;flex-direction:column;background:rgba(3,5,13,0.94);backdrop-filter:blur(28px);border-bottom:1px solid var(--border);}
+.nav-row{height:var(--nav-h);padding:0 22px;display:flex;align-items:center;justify-content:space-between;}
+.logo{display:flex;align-items:center;gap:9px;text-decoration:none;}
+.logo-owl{width:32px;height:32px;border-radius:7px;background:var(--owl);display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 0 16px rgba(232,160,32,0.4);}
+.logo-name{font-family:var(--display);font-size:18px;font-weight:800;color:var(--text);}
+.logo-name span{color:var(--owl);}
+.nav-mid{display:flex;align-items:center;gap:2px;}
+.nav-link{font-family:var(--mono);font-size:10px;color:var(--text2);text-decoration:none;padding:5px 12px;border-radius:5px;letter-spacing:0.03em;transition:all .14s;}
+.nav-link:hover{color:var(--text);background:var(--surf2);}
+.nav-link.active{color:var(--owl);background:var(--owl-d);border:1px solid rgba(232,160,32,0.2);}
+.nav-right{display:flex;align-items:center;gap:10px;}
+.live-badge{font-family:var(--mono);font-size:11px;color:var(--green);background:var(--green-d);border:1px solid rgba(0,214,143,0.22);padding:4px 10px;border-radius:3px;letter-spacing:0.03em;display:flex;align-items:center;gap:5px;}
+.live-dot{width:5px;height:5px;background:var(--green);border-radius:50%;animation:blink 1.5s infinite;}
+.btn-login{font-family:var(--mono);font-size:10px;font-weight:500;color:var(--text2);background:transparent;border:1px solid var(--border2);padding:7px 16px;border-radius:5px;cursor:pointer;letter-spacing:0.03em;text-decoration:none;transition:all .14s;}
+.btn-login:hover{color:var(--text);background:var(--surf2);}
+.btn-signup{font-family:var(--mono);font-size:10px;font-weight:500;color:var(--void);background:var(--owl);border:none;padding:7px 18px;border-radius:5px;cursor:pointer;letter-spacing:0.03em;}
+.ticker-bar{width:100%;height:var(--bar-h);background:var(--surf2);border-top:1px solid var(--border);overflow:hidden;display:flex;align-items:center;flex-shrink:0;}
+.ticker-track{display:flex;animation:ticker 55s linear infinite;width:max-content;}
+.ti{display:flex;align-items:center;gap:8px;padding:0 20px;border-right:1px solid var(--border);white-space:nowrap;height:var(--bar-h);font-family:var(--mono);font-size:10px;}
+.ti-name{color:var(--text2);}.ti-price{color:var(--text);font-weight:500;}.ti-up{color:var(--green);}.ti-dn{color:var(--red);}
+.page{padding-top:calc(var(--top) + 24px);max-width:1280px;margin:0 auto;padding-left:24px;padding-right:24px;padding-bottom:80px;}
+.breadcrumb{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--text2);margin-bottom:20px;}
+.breadcrumb a{color:var(--text2);text-decoration:none;}.bsep{color:var(--text3);}
+.ph-eyebrow{font-family:var(--mono);font-size:11px;color:var(--owl);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:8px;}
+.ph-title{font-family:var(--display);font-size:36px;font-weight:800;letter-spacing:-0.5px;color:var(--text);margin-bottom:6px;line-height:1;}
+.ph-title span{color:var(--owl);}
+.ph-sub{font-size:13px;color:var(--text2);font-weight:300;margin-bottom:24px;}
+.set-index-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px;animation:fadeUp .4s .05s ease both;}
+.sic{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 12px 10px;cursor:pointer;transition:all .18s;position:relative;overflow:hidden;}
+.sic::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--sic-color,#E8A020),transparent);opacity:0;transition:opacity .18s;}
+.sic:hover{border-color:var(--border2);transform:translateY(-1px);}
+.sic:hover::before,.sic.active::before{opacity:1;}
+.sic-header{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:4px;}
+.sic-code{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text);}
+.sic-badge{font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:3px;font-weight:600;letter-spacing:0.05em;display:inline-block;flex-shrink:0;}
+.sic-name{font-size:10px;color:var(--text2);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sic-price{font-family:var(--display);font-size:15px;font-weight:800;color:var(--text);letter-spacing:-0.3px;line-height:1;margin-bottom:2px;}
+.sic-chg{font-family:var(--mono);font-size:14px;font-weight:700;margin-bottom:5px;letter-spacing:-0.3px;}
+.sic-spark{height:28px;width:100%;display:block;}
+.set-pill-strip{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:22px;animation:fadeUp .4s .08s ease both;}
+.set-pill{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:6px 12px 6px 10px;cursor:pointer;transition:all .16s;}
+.set-pill:hover{border-color:var(--border2);transform:translateY(-1px);background:var(--surf2);}
+.set-pill.active{border-color:var(--owl);background:var(--owl-d);}
+.set-pill-code{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text);}
+.set-pill-name{font-size:11px;color:var(--text2);}
+.set-pill-val{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text);}
+.set-pill-chg{font-family:var(--mono);font-size:11px;font-weight:700;}
+.detail-section{display:grid;grid-template-columns:320px 1fr;gap:20px;margin-bottom:28px;animation:fadeUp .4s .1s ease both;}
+.set-detail-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.sdc-box-art{width:100%;height:150px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--border);}
+.sdc-box-img{width:78px;height:108px;border-radius:6px;border:2px solid rgba(255,255,255,0.14);display:flex;align-items:center;justify-content:center;font-size:38px;position:relative;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.6);z-index:1;}
+.sdc-box-label{font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.35);letter-spacing:0.1em;text-transform:uppercase;margin-top:6px;z-index:1;}
+.sdc-header{padding:16px 18px;border-bottom:1px solid var(--border);position:relative;overflow:hidden;}
+.sdc-code{font-family:var(--mono);font-size:11px;padding:3px 10px;border-radius:3px;font-weight:600;letter-spacing:0.07em;display:inline-block;margin-bottom:10px;}
+.sdc-name{font-family:var(--display);font-size:22px;font-weight:800;color:var(--text);margin-bottom:4px;letter-spacing:-0.2px;}
+.sdc-desc{font-size:13px;color:var(--text2);line-height:1.6;font-weight:300;}
+.sdc-row{display:flex;align-items:center;justify-content:space-between;padding:10px 18px;border-bottom:1px solid var(--border);}
+.sdc-row:last-child{border-bottom:none;}
+.sdc-key{font-family:var(--mono);font-size:11px;color:var(--text2);}
+.sdc-val{font-family:var(--mono);font-size:11px;color:var(--text);font-weight:500;text-align:right;}
+.index-chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.icc-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);}
+.icc-title{font-family:var(--display);font-size:16px;font-weight:700;color:var(--text);}
+.icc-price{font-family:var(--display);font-size:28px;font-weight:800;color:var(--text);letter-spacing:-0.5px;line-height:1;margin-top:4px;}
+.icc-sub{font-family:var(--mono);font-size:11px;color:var(--text2);margin-top:3px;}
+.icc-right{display:flex;gap:2px;}
+.icc-time{font-family:var(--mono);font-size:10px;color:var(--text2);padding:4px 9px;border-radius:3px;cursor:pointer;border:none;background:transparent;transition:all .14s;}
+.icc-time:hover{color:var(--text);background:var(--surf2);}
+.icc-time.on{background:var(--owl-d);color:var(--owl);border:1px solid rgba(232,160,32,0.25);}
+.perf-strip{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;border-top:1px solid var(--border);}
+.perf-cell{background:var(--surf2);padding:12px;text-align:center;}
+.perf-period{font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.06em;margin-bottom:4px;text-transform:uppercase;}
+.perf-val{font-family:var(--mono);font-size:14px;font-weight:700;}
+.top-cards-section{margin-bottom:28px;animation:fadeUp .4s .15s ease both;}
+.section-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;}
+.section-title{font-family:var(--display);font-size:20px;font-weight:700;color:var(--text);}
+.section-title span{color:var(--owl);}
+.section-sub{font-family:var(--mono);font-size:11px;color:var(--text2);margin-top:2px;}
+.section-action{font-family:var(--mono);font-size:11px;color:var(--owl);background:var(--owl-d);border:1px solid rgba(232,160,32,0.25);padding:3px 10px;border-radius:3px;text-decoration:none;flex-shrink:0;}
+.set-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+.stab{font-family:var(--mono);font-size:11px;padding:5px 12px;border-radius:4px;border:1px solid var(--border);color:var(--text);cursor:pointer;letter-spacing:0.02em;transition:all .14s;background:transparent;font-weight:600;}
+.stab:hover{border-color:var(--border2);background:var(--surf2);}
+.cards-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.cards-table{width:100%;border-collapse:collapse;table-layout:fixed;}
+.cards-table col.c0{width:44px;}.cards-table col.c1{width:240px;}.cards-table col.c2{width:100px;}.cards-table col.c3{width:95px;}.cards-table col.c4{width:95px;}.cards-table col.c5{width:68px;}.cards-table col.c6{width:68px;}.cards-table col.c7{width:68px;}.cards-table col.c8{width:110px;}
+.cards-table th{font-family:var(--mono);font-size:11px;color:var(--text2);letter-spacing:0.06em;text-transform:uppercase;padding:10px 12px;border-bottom:1px solid var(--border);text-align:left;font-weight:500;background:var(--surf2);white-space:nowrap;}
+.cards-table th.r{text-align:right;}
+.cards-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle;overflow:hidden;}
+.cards-table tr:last-child td{border-bottom:none;}
+.cards-table tbody tr{cursor:pointer;transition:background .1s;}
+.cards-table tbody tr:hover td{background:rgba(255,255,255,0.022);}
+.rank-n{font-family:var(--mono);font-size:11px;color:var(--text2);text-align:center;}
+.card-cell{display:flex;align-items:center;gap:10px;}
+.card-art{width:28px;height:38px;border-radius:3px;background:var(--surf3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.card-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.card-set-tag{font-family:var(--mono);font-size:10px;color:var(--text2);font-weight:600;}
+.rb{font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:2px;font-weight:600;letter-spacing:0.03em;white-space:nowrap;display:inline-block;}
+.rb-mr{background:rgba(232,160,32,0.18);color:#E8A020;border:1px solid rgba(232,160,32,0.3);}
+.rb-sp{background:rgba(155,114,255,0.18);color:#B89AFF;border:1px solid rgba(155,114,255,0.3);}
+.rb-sec{background:rgba(255,69,96,0.18);color:#FF8FA0;border:1px solid rgba(255,69,96,0.3);}
+.rb-tr{background:rgba(234,179,8,0.18);color:#FDE047;border:1px solid rgba(234,179,8,0.3);}
+.rb-aa{background:rgba(79,142,247,0.18);color:#7FB0FA;border:1px solid rgba(79,142,247,0.3);}
+.rb-sr{background:rgba(0,214,143,0.15);color:#00D68F;border:1px solid rgba(0,214,143,0.28);}
+.rb-gmr{background:rgba(245,190,80,0.25);color:#F5BE50;border:1px solid rgba(245,190,80,0.5);}
+.price-r{text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--text);}
+.chg-r{text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;}
+.up{color:var(--green);}.dn{color:var(--red);}
+.comparison-section{margin-bottom:28px;animation:fadeUp .4s .2s ease both;}
+.comp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.comp-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;transition:all .18s;cursor:pointer;}
+.comp-card:hover{border-color:var(--border2);transform:translateY(-1px);}
+.comp-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;gap:6px;}
+.comp-code-row{display:flex;align-items:center;gap:7px;flex:1;min-width:0;}
+.comp-code{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text);}
+.comp-badge{font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:3px;letter-spacing:0.05em;flex-shrink:0;}
+.comp-chg{font-family:var(--mono);font-size:18px;font-weight:700;letter-spacing:-0.3px;flex-shrink:0;}
+.comp-name{font-size:13px;color:var(--text2);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.comp-val{font-family:var(--display);font-size:24px;font-weight:800;color:var(--text);letter-spacing:-0.3px;margin-bottom:2px;line-height:1;}
+.comp-meta{font-family:var(--mono);font-size:11px;color:var(--text2);margin-bottom:10px;}
+.comp-spark{width:100%;height:52px;display:block;margin-bottom:10px;}
+.comp-footer{display:flex;justify-content:space-between;padding-top:10px;border-top:1px solid var(--border);}
+.comp-stat{font-family:var(--mono);font-size:11px;color:var(--text2);}
+.comp-stat-val{color:var(--text);}
+.pull-rates-section{margin-bottom:28px;animation:fadeUp .4s .25s ease both;}
+.pr-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.pr-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;}
+.pr-badge{font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:3px;display:inline-block;margin-bottom:10px;letter-spacing:0.06em;font-weight:600;}
+.pr-name{font-family:var(--display);font-size:14px;font-weight:700;color:var(--text);margin-bottom:10px;}
+.pr-rate-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.pr-rate-label{font-family:var(--mono);font-size:11px;color:var(--text2);width:90px;flex-shrink:0;}
+.pr-rate-track{flex:1;height:5px;background:var(--surf3);border-radius:3px;overflow:hidden;}
+.pr-rate-fill{height:100%;border-radius:3px;}
+.pr-rate-num{font-family:var(--mono);font-size:11px;color:var(--text2);width:52px;text-align:right;flex-shrink:0;}
+.pr-note{font-family:var(--mono);font-size:11px;color:var(--text2);line-height:1.5;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
+
+</style>
+</head>
+<body>
+<nav>
+  <div class="nav-row">
+    <a href="#" class="logo"><div class="logo-owl">🦉</div><span class="logo-name">OWL<span> Market</span></span></a>
+    <div class="nav-mid">
+      <a href="#" class="nav-link">HOME</a>
+      <a href="owl-market.html" class="nav-link">MARKETS</a>
+      <a href="owl-rarities.html" class="nav-link">RARITIES</a>
+      <a href="#" class="nav-link active">SETS</a>
+      <a href="owl-characters.html" class="nav-link">CHARACTERS</a>
+      <a href="#" class="nav-link">PORTFOLIO</a>
+    </div>
+    <div class="nav-right">
+      <div class="live-badge"><span class="live-dot"></span>LIVE</div>
+      <a href="#" class="btn-login">Login</a>
+      <button class="btn-signup">Sign Up</button>
+    </div>
+  </div>
+  <div class="ticker-bar"><div class="ticker-track" id="ticker"></div></div>
+</nav>
+<div class="page z1">
+  <div class="breadcrumb"><a href="#">OWL Market</a><span class="bsep"> › </span><span style="color:var(--text)">Sets</span></div>
+  <div class="ph-eyebrow">One Piece TCG</div>
+  <div class="ph-title">Set <span>Index</span></div>
+  <div class="ph-sub">21 sets tracked · Top 5 ranked by 7D momentum · Updates with live data</div>
+  <div class="set-index-row" id="set-index-row"></div>
+  <div class="set-pill-strip" id="set-pill-strip"></div>
+  <div class="detail-section">
+    <div class="set-detail-card" id="set-detail-card"></div>
+    <div class="index-chart-card">
+      <div class="icc-header">
+        <div>
+          <div class="icc-title" id="chart-title">OP01 Romance Dawn Index</div>
+          <div class="icc-price" id="chart-price">$4,840</div>
+          <div class="icc-sub" id="chart-sub">Total card value · 115 cards tracked</div>
+        </div>
+        <div class="icc-right">
+          <button class="icc-time on" onclick="setChartTime(this,'7d')">7D</button>
+          <button class="icc-time" onclick="setChartTime(this,'1m')">1M</button>
+          <button class="icc-time" onclick="setChartTime(this,'3m')">3M</button>
+          <button class="icc-time" onclick="setChartTime(this,'1y')">1Y</button>
+          <button class="icc-time" onclick="setChartTime(this,'max')">Max</button>
+        </div>
+      </div>
+      <div><canvas id="idx-chart" style="height:240px"></canvas></div>
+      <div class="perf-strip" id="perf-strip"></div>
+    </div>
+  </div>
+  <div class="top-cards-section">
+    <div class="section-header">
+      <div><div class="section-title">Top Cards — <span id="top-cards-title">OP01</span></div><div class="section-sub" id="top-cards-sub">Ranked by current market value</div></div>
+      <a href="owl-market.html" class="section-action">View all in markets →</a>
+    </div>
+    <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:2px;background:var(--surf2);border:1px solid var(--border2);border-radius:6px;padding:3px">
+        <button class="icc-time" onclick="setTopTime(this)">24H</button>
+        <button class="icc-time" onclick="setTopTime(this)">7D</button>
+        <button class="icc-time on" onclick="setTopTime(this)">30D</button>
+        <button class="icc-time" onclick="setTopTime(this)">ALL</button>
+      </div>
+      <select style="font-family:var(--mono);font-size:11px;color:var(--text2);background:var(--surface);border:1px solid var(--border);padding:6px 10px;border-radius:5px;outline:none;cursor:pointer"><option>Sort: Market Value</option><option>Sort: 7D Change</option></select>
+    </div>
+    <div class="set-tabs" id="set-tabs"></div>
+    <div class="cards-table-wrap">
+      <table class="cards-table">
+        <colgroup><col class="c0"><col class="c1"><col class="c2"><col class="c3"><col class="c4"><col class="c5"><col class="c6"><col class="c7"><col class="c8"></colgroup>
+        <thead><tr><th>#</th><th>Card</th><th>Rarity</th><th class="r">Avg Price</th><th class="r">TCGPlayer</th><th class="r">24H</th><th class="r">7D</th><th class="r">30D</th><th class="r">Last 7 Days</th></tr></thead>
+        <tbody id="top-cards-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- PULL RATES — dynamic per set -->
+  <div class="pull-rates-section">
+    <div class="section-header" style="margin-bottom:14px">
+      <div>
+        <div class="section-title" id="pr-title">Pull Rates <span>— OP01</span></div>
+        <div class="section-sub">Est. odds per box (24 packs) · Community data</div>
+      </div>
+    </div>
+    <div class="pr-grid" id="pr-grid"></div>
+  </div>
+
+  <div class="comparison-section">
+    <div class="section-header"><div><div class="section-title">All Set <span>Indexes</span></div><div class="section-sub">30-day performance across every set</div></div></div>
+    <div class="comp-grid" id="comp-grid"></div>
+  </div>
+</div>
+<script>
+const SETS=[{slug:'op01',code:'OP01',name:'Romance Dawn',year:2022,color:'#FF4560',colorD:'rgba(255,69,96,0.14)',colorBd:'rgba(255,69,96,0.3)',price:4840,chg7d:5.6,chg1d:1.2,chg30d:18.4,chgMax:142,cards:115,volume:'$42.6K',ath:'$5,200',atl:'$1,840',up:true,spark:[4,5,5,6,6,7,8,8,9,10,11,12,12],perf:{h1:'+0.2%',h24:'+1.2%',d7:'+5.6%',m1:'+18.4%',y1:'+142%',max:'+142%'},perfUp:[true,true,true,true,true,true],topCards:[{e:'\u2620',n:'Monkey D. Luffy MR',rb:'rb-mr',rl:'MANGA RARE',tcg:1240,avg:1310,d1:8.2,d7:12.4,d30:41,sp:[4,5,6,6,8,10,11,12,13]},{e:'\uD83D\uDD25',n:'Luffy SP',rb:'rb-sp',rl:'SPECIAL RARE',tcg:180,avg:187,d1:34.5,d7:41.2,d30:85,sp:[4,5,6,8,10,14,17,18,18]},{e:'\uD83D\uDD34',n:'Shanks SEC',rb:'rb-sec',rl:'SECRET RARE',tcg:41.2,avg:47,d1:-2.1,d7:-5.4,d30:18,sp:[6,6,5,5,4,4,4,4,4]},{e:'\uD83D\uDC8E',n:'Boa Hancock SP',rb:'rb-sp',rl:'SPECIAL RARE',tcg:95,avg:96,d1:2.1,d7:6.3,d30:28,sp:[4,5,5,6,7,8,9,9,9]},{e:'\uD83D\uDC09',n:'Doflamingo SP',rb:'rb-sp',rl:'SPECIAL RARE',tcg:145,avg:148,d1:3.1,d7:8.4,d30:19,sp:[5,5,6,7,8,9,9,10,10]}]},{slug:'op02',code:'OP02',name:'Paramount War',year:2023,color:'#4F8EF7',colorD:'rgba(79,142,247,0.14)',colorBd:'rgba(79,142,247,0.3)',price:2840,chg7d:2.1,chg1d:0.4,chg30d:8.2,chgMax:88,cards:116,volume:'$28.4K',ath:'$3,100',atl:'$820',up:true,spark:[4,4,4,5,5,5,5,6,6,6,6,6,6],perf:{h1:'+0.1%',h24:'+0.4%',d7:'+2.1%',m1:'+8.2%',y1:'+88%',max:'+88%'},perfUp:[true,true,true,true,true,true],topCards:[{e:'\uD83C\uDFD4',n:'Whitebeard MR',rb:'rb-mr',rl:'MANGA RARE',tcg:380,avg:395,d1:1.2,d7:3.8,d30:12,sp:[4,4,4,5,5,5,5,6,6]},{e:'\u26A1',n:'Trafalgar Law MR',rb:'rb-mr',rl:'MANGA RARE',tcg:290,avg:305,d1:1.8,d7:4.2,d30:18,sp:[4,4,5,5,6,6,7,7,7]},{e:'\uD83C\uDFF4',n:'Blackbeard TR',rb:'rb-tr',rl:'TREAS. RARE',tcg:22,avg:23,d1:1.5,d7:5.8,d30:11,sp:[4,4,4,5,5,5,6,6,6]},{e:'\uD83D\uDDE1',n:'Roronoa Zoro AA',rb:'rb-aa',rl:'ALT ART',tcg:62,avg:60,d1:-3.4,d7:-5.1,d30:-12,sp:[7,7,6,6,5,5,4,4,4]},{e:'\uD83C\uDF0A',n:'Ace SEC',rb:'rb-sec',rl:'SECRET RARE',tcg:38,avg:40,d1:-1.2,d7:-2.8,d30:6,sp:[5,5,5,4,4,4,4,4,4]}]},{slug:'op05',code:'OP05',name:'Awakening New Era',year:2023,color:'#9B72FF',colorD:'rgba(155,114,255,0.14)',colorBd:'rgba(155,114,255,0.3)',price:2280,chg7d:-0.8,chg1d:-0.3,chg30d:6.8,chgMax:74,cards:119,volume:'$22.8K',ath:'$2,640',atl:'$740',up:false,spark:[5,5,5,4,4,4,5,5,5,5,5,5,5],perf:{h1:'-0.1%',h24:'-0.3%',d7:'-0.8%',m1:'+6.8%',y1:'+74%',max:'+74%'},perfUp:[false,false,false,true,true,true],topCards:[{e:'\u26A1',n:'Yamato SEC',rb:'rb-sec',rl:'SECRET RARE',tcg:68,avg:70,d1:4.8,d7:9.1,d30:32,sp:[4,4,5,5,6,7,7,7,7]},{e:'\uD83C\uDF0A',n:'Katakuri MR',rb:'rb-mr',rl:'MANGA RARE',tcg:380,avg:395,d1:2.8,d7:6.1,d30:24,sp:[5,5,6,6,7,7,8,8,8]},{e:'\u26A1',n:'Yamato SP',rb:'rb-sp',rl:'SPECIAL RARE',tcg:72,avg:74,d1:6.2,d7:14.1,d30:38,sp:[3,4,4,5,6,7,8,9,9]},{e:'\uD83C\uDF38',n:'Boa Hancock SR',rb:'rb-sr',rl:'SUPER RARE',tcg:16,avg:17,d1:0.4,d7:1.8,d30:6,sp:[4,4,4,4,4,4,5,5,5]},{e:'\uD83D\uDC09',n:'Kaido SR',rb:'rb-sr',rl:'SUPER RARE',tcg:18,avg:19,d1:0.8,d7:2.4,d30:8,sp:[4,4,4,4,5,5,5,5,5]}]},{slug:'op09',code:'OP09',name:'Emperors New World',year:2024,color:'#00D68F',colorD:'rgba(0,214,143,0.14)',colorBd:'rgba(0,214,143,0.3)',price:3640,chg7d:7.3,chg1d:1.8,chg30d:22.4,chgMax:96,cards:118,volume:'$34.2K',ath:'$3,800',atl:'$1,200',up:true,spark:[5,5,6,7,7,8,9,10,10,11,11,11,12],perf:{h1:'+0.3%',h24:'+1.8%',d7:'+7.3%',m1:'+22.4%',y1:'+96%',max:'+96%'},perfUp:[true,true,true,true,true,true],topCards:[{e:'\uD83D\uDC51',n:'Gol D. Roger GMR',rb:'rb-gmr',rl:'GOLDEN MR',tcg:680,avg:700,d1:-1.2,d7:3.4,d30:22,sp:[6,6,7,7,7,7,7,7,8]},{e:'\uD83D\uDD34',n:'Shanks MR',rb:'rb-mr',rl:'MANGA RARE',tcg:520,avg:540,d1:4.1,d7:9.8,d30:31,sp:[4,5,5,6,7,8,8,9,9]},{e:'\uD83D\uDD34',n:'Shanks Leader SR',rb:'rb-sr',rl:'LEADER SR',tcg:28,avg:29,d1:2.4,d7:6.2,d30:18,sp:[4,4,4,5,5,6,6,6,7]},{e:'\u2699',n:'Vegapunk SR',rb:'rb-sr',rl:'SUPER RARE',tcg:14,avg:14,d1:0.2,d7:0.8,d30:4,sp:[4,4,4,4,4,4,4,5,5]},{e:'\uD83C\uDF0A',n:'Jinbe SR',rb:'rb-sr',rl:'SUPER RARE',tcg:12,avg:12,d1:-0.3,d7:0.4,d30:2,sp:[4,4,4,4,4,4,4,4,4]}]},{slug:'op14',code:'OP14',name:"Azure Sea's Seven",year:2025,color:'#E8A020',colorD:'rgba(232,160,32,0.18)',colorBd:'rgba(232,160,32,0.38)',price:2140,chg7d:18.4,chg1d:4.2,chg30d:48.6,chgMax:48.6,cards:120,volume:'$28.8K',ath:'$2,140',atl:'$420',up:true,spark:[3,3,4,5,6,8,10,12,14,16,18,19,20],perf:{h1:'+0.8%',h24:'+4.2%',d7:'+18.4%',m1:'+48.6%',y1:'+48.6%',max:'+48.6%'},perfUp:[true,true,true,true,true,true],topCards:[{e:'\u2694',n:'Mihawk MR',rb:'rb-mr',rl:'MANGA RARE',tcg:420,avg:440,d1:12.4,d7:28.6,d30:62,sp:[3,4,5,7,9,12,15,18,20]},{e:'\uD83E\uDD81',n:'Luffy SEC',rb:'rb-sec',rl:'SECRET RARE',tcg:84,avg:88,d1:8.2,d7:18.4,d30:42,sp:[3,3,4,5,7,9,11,13,14]},{e:'\uD83C\uDF0A',n:'Zoro TR',rb:'rb-tr',rl:'TREAS. RARE',tcg:58,avg:60,d1:6.4,d7:14.2,d30:38,sp:[3,3,4,5,6,8,9,11,12]},{e:'\uD83C\uDFB4',n:'Nami SP',rb:'rb-sp',rl:'SPECIAL RARE',tcg:46,avg:48,d1:4.8,d7:11.2,d30:28,sp:[3,3,4,4,5,6,7,8,9]},{e:'\u2694',n:'Mihawk SEC AA',rb:'rb-aa',rl:'ALT ART',tcg:28,avg:26,d1:-6.7,d7:-9.2,d30:-14,sp:[8,8,7,6,5,4,3,3,3]}]}];
+const ALL_SETS_EXTRA=[{slug:'op03',code:'OP03',name:'Pillars of Strength',year:2023,color:'#00C9A7',price:1920,chg7d:-0.4,up:false},{slug:'op04',code:'OP04',name:'Kingdom of Intrigue',year:2023,color:'#00D68F',price:1640,chg7d:1.2,up:true},{slug:'op06',code:'OP06',name:'Wings of Captain',year:2024,color:'#E8A020',price:2180,chg7d:3.4,up:true},{slug:'op07',code:'OP07',name:'500 Years Future',year:2024,color:'#F472B6',price:1920,chg7d:1.8,up:true},{slug:'op08',code:'OP08',name:'Two Legends',year:2024,color:'#FF4560',price:2640,chg7d:4.2,up:true},{slug:'op10',code:'OP10',name:'Royal Blood',year:2024,color:'#4F8EF7',price:1480,chg7d:2.6,up:true},{slug:'op11',code:'OP11',name:'Straw Hat Crew',year:2024,color:'#9B72FF',price:1340,chg7d:-0.2,up:false},{slug:'op12',code:'OP12',name:'New Era',year:2024,color:'#E8A020',price:1580,chg7d:1.1,up:true},{slug:'op13',code:'OP13',name:'Red Dragon',year:2025,color:'#00D68F',price:1820,chg7d:3.9,up:true},{slug:'op15',code:'OP15',name:'Grand Final',year:2025,color:'#F472B6',price:1960,chg7d:9.1,up:true},{slug:'op16',code:'OP16',name:'Void Century',year:2025,color:'#4F8EF7',price:1740,chg7d:5.7,up:true},{slug:'op17',code:'OP17',name:'Dawn of the World',year:2025,color:'#00C9A7',price:1420,chg7d:2.3,up:true},{slug:'eb01',code:'EB01',name:'Memorial Collection',year:2023,color:'#4F8EF7',price:980,chg7d:6.2,up:true},{slug:'eb02',code:'EB02',name:"Dragon's Call",year:2024,color:'#9B72FF',price:860,chg7d:4.1,up:true},{slug:'eb03',code:'EB03',name:'Side Characters',year:2024,color:'#E8A020',price:740,chg7d:1.8,up:true},{slug:'eb04',code:'EB04',name:'Emperors Saga',year:2025,color:'#00D68F',price:820,chg7d:3.3,up:true}];
+const TICKER_D=[{n:'OP14 Index',p:'$2,140',c:'+18.4%',u:true},{n:'OP01 Index',p:'$4,840',c:'+5.6%',u:true},{n:'OP09 Index',p:'$3,640',c:'+7.3%',u:true},{n:'Roger GMR',p:'$680',c:'-1.2%',u:false},{n:'Luffy MR',p:'$1,240',c:'+8.2%',u:true},{n:'Mihawk MR',p:'$420',c:'+12.4%',u:true}];
+let activeSet='op01',activeTime='7d',idxChart=null;
+(function(){const el=document.getElementById('ticker');const d=[...TICKER_D,...TICKER_D];el.innerHTML=d.map(t=>`<div class="ti"><span class="ti-name">${t.n}</span><span class="ti-price">${t.p}</span><span class="${t.u?'ti-up':'ti-dn'}">${t.c}</span></div>`).join('');})();
+function SP(data,up,W,H,pad){const mn=Math.min(...data),mx=Math.max(...data),rng=mx-mn||1;const c=data.map((v,i)=>{const x=pad+(i/(data.length-1))*(W-pad*2);const y=H-pad-((v-mn)/rng)*(H-pad*2);return[x.toFixed(1),y.toFixed(1)];});const poly=c.map(p=>p.join(',')).join(' ');const fill=`${c[0][0]},${H} ${poly} ${c[c.length-1][0]},${H}`;const s=up?'#00D68F':'#FF4560';const f=up?'rgba(0,214,143,0.13)':'rgba(255,69,96,0.11)';const[lx,ly]=c[c.length-1];return{poly,fill,s,f,lx,ly};}
+function ricLineSparkWide(data,color,up){const{poly,fill,s,f,lx,ly}=SP(data,up,200,28,3);return`<svg width="100%" height="28" viewBox="0 0 200 28" preserveAspectRatio="none" style="display:block;overflow:visible"><polygon points="${fill}" fill="${f}"/><polyline points="${poly}" fill="none" stroke="${s}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><circle cx="${lx}" cy="${ly}" r="3.5" fill="${s}" vector-effect="non-scaling-stroke"/></svg>`;}
+function ricLineSparkFull(data,color,up){const{poly,fill,s,f,lx,ly}=SP(data,up,200,52,4);return`<svg width="100%" height="52" viewBox="0 0 200 52" preserveAspectRatio="none" style="display:block;overflow:visible"><polygon points="${fill}" fill="${f}"/><polyline points="${poly}" fill="none" stroke="${s}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><circle cx="${lx}" cy="${ly}" r="4" fill="${s}" vector-effect="non-scaling-stroke"/></svg>`;}
+function rowSpark(data,up){const{poly,fill,s,f,lx,ly}=SP(data,up,88,22,2);return`<div style="display:flex;justify-content:flex-end"><svg width="88" height="22" viewBox="0 0 88 22" style="display:block;overflow:visible"><polygon points="${fill}" fill="${f}"/><polyline points="${poly}" fill="none" stroke="${s}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${lx}" cy="${ly}" r="2.5" fill="${s}"/></svg></div>`;}
+function buildIndexRow(){const ranked=[...SETS].sort((a,b)=>b.chg7d-a.chg7d).slice(0,5);document.getElementById('set-index-row').innerHTML=ranked.map(s=>`<div class="sic ${activeSet===s.slug?'active':''}" style="--sic-color:${s.color};${activeSet===s.slug?'border-color:'+s.color+';box-shadow:0 0 0 1px '+s.color+',0 6px 20px rgba(0,0,0,0.35)':''}" onclick="selectSet('${s.slug}')"><div class="sic-header"><div class="sic-code">${s.code}</div><span class="sic-badge" style="background:${s.colorD};color:${s.color};border:1px solid ${s.colorBd}">${s.year}</span></div><div class="sic-name">${s.name}</div><div class="sic-price">$${s.price.toLocaleString()}</div><div class="sic-chg" style="color:${s.up?'var(--green)':'var(--red)'}">${s.up?'&#x2191;':'&#x2193;'} ${Math.abs(s.chg7d)}%</div><div class="sic-spark">${ricLineSparkWide(s.spark,s.color,s.up)}</div></div>`).join('');}
+function buildPillStrip(){const top5=[...SETS].sort((a,b)=>b.chg7d-a.chg7d).slice(0,5).map(s=>s.slug);const rem=[...SETS.filter(s=>!top5.includes(s.slug)),...ALL_SETS_EXTRA].sort((a,b)=>a.code.localeCompare(b.code));document.getElementById('set-pill-strip').innerHTML=rem.map(s=>`<div class="set-pill ${activeSet===s.slug?'active':''}" onclick="selectSet('${s.slug}')"><span class="set-pill-code" style="color:${s.color}">${s.code}</span><span class="set-pill-name">${s.name}</span><span class="set-pill-val">$${s.price.toLocaleString()}</span><span class="set-pill-chg" style="color:${s.up?'var(--green)':'var(--red)'}">${s.up?'+':'-'}${Math.abs(s.chg7d)}%</span></div>`).join('');}
+function buildDetail(s){const art=s.code==='OP01'?'&#x1F3F4;&#x200D;&#x2620;&#xFE0F;':s.code==='OP02'?'&#x2694;&#xFE0F;':s.code==='OP05'?'&#x26A1;':s.code==='OP09'?'&#x1F451;':s.code==='OP14'?'&#x1F30A;':'&#x1F3B4;';document.getElementById('set-detail-card').innerHTML=`<div class="sdc-box-art" style="background:linear-gradient(135deg,${s.colorD} 0%,rgba(3,5,13,0.9) 100%)"><div style="position:absolute;inset:0;background:radial-gradient(ellipse at center,${s.color}18 0%,transparent 70%)"></div><div style="display:flex;flex-direction:column;align-items:center"><div class="sdc-box-img" style="background:linear-gradient(145deg,${s.colorD},var(--surf3))">${art}</div><div class="sdc-box-label">Booster Box &middot; ${s.code}</div></div></div><div class="sdc-header" style="background:linear-gradient(135deg,${s.colorD},transparent)"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${s.color},transparent)"></div><span class="sdc-code" style="background:${s.colorD};color:${s.color};border:1px solid ${s.colorBd}">${s.code} &middot; ${s.year}</span><div class="sdc-name">${s.name}</div><div class="sdc-desc">One Piece TCG ${s.code} booster set &mdash; ${s.cards} cards including Commons, Rares, Super Rares, Secret Rares and chase variants.</div></div><div><div class="sdc-row"><span class="sdc-key">Set Index Value</span><span class="sdc-val" style="color:${s.color}">$${s.price.toLocaleString()}</span></div><div class="sdc-row"><span class="sdc-key">24H Change</span><span class="sdc-val" style="color:${s.up?'var(--green)':'var(--red)'}">${s.up?'+':''}${s.chg1d}%</span></div><div class="sdc-row"><span class="sdc-key">7D Change</span><span class="sdc-val" style="color:${s.up?'var(--green)':'var(--red)'}">${s.up?'+':''}${s.chg7d}%</span></div><div class="sdc-row"><span class="sdc-key">30D Change</span><span class="sdc-val" style="color:${s.chg30d>=0?'var(--green)':'var(--red)'}">${s.chg30d>=0?'+':''}${s.chg30d}%</span></div><div class="sdc-row"><span class="sdc-key">All-Time High</span><span class="sdc-val">${s.ath}</span></div><div class="sdc-row"><span class="sdc-key">All-Time Low</span><span class="sdc-val">${s.atl}</span></div><div class="sdc-row"><span class="sdc-key">Cards Tracked</span><span class="sdc-val">${s.cards}</span></div><div class="sdc-row"><span class="sdc-key">24H Volume</span><span class="sdc-val">${s.volume}</span></div></div>`;}
+function buildChart(s,period){const days={'7d':7,'1m':30,'3m':90,'1y':365,'max':500}[period]||7;const base=s.price,vol=base*0.03,trend=s.chg7d/100;const pts=[];let p=base*(1-trend*0.9);for(let i=days;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const noise=(Math.random()-0.46)*vol;p=Math.max(p+(trend*base/days)+noise,base*0.2);pts.push({x:d.toLocaleDateString('en-US',{month:'short',day:'numeric'}),y:+p.toFixed(2)});}pts[pts.length-1].y=base;document.getElementById('chart-title').textContent=`${s.code} ${s.name} Index`;document.getElementById('chart-price').textContent=`$${base.toLocaleString()}`;document.getElementById('chart-sub').textContent=`Total card value &middot; ${s.cards} cards tracked`;if(idxChart){idxChart.destroy();}const ctx=document.getElementById('idx-chart');ctx.style.height='240px';idxChart=new Chart(ctx,{type:'line',data:{labels:pts.map(p=>p.x),datasets:[{data:pts.map(p=>p.y),borderColor:s.color,borderWidth:1.8,fill:true,backgroundColor:(ctx)=>{const{ctx:c,chartArea}=ctx.chart;if(!chartArea)return s.colorD;const g=c.createLinearGradient(0,chartArea.top,0,chartArea.bottom);g.addColorStop(0,s.color+'30');g.addColorStop(1,'rgba(0,0,0,0)');return g;},tension:0.35,pointRadius:0,pointHoverRadius:5}]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:12,right:12,bottom:8,left:8}},interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(14,22,40,0.95)',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleFont:{family:'IBM Plex Mono',size:10},bodyFont:{family:'IBM Plex Mono',size:11},titleColor:'#7A88A8',bodyColor:'#E4EAF6',padding:10,callbacks:{label:v=>`  $${v.parsed.y.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`}}},scales:{x:{grid:{color:'rgba(255,255,255,0.03)'},ticks:{font:{family:'IBM Plex Mono',size:10},color:'#7A88A8',maxTicksLimit:6,maxRotation:0},border:{display:false}},y:{position:'right',grid:{color:'rgba(255,255,255,0.035)'},ticks:{font:{family:'IBM Plex Mono',size:10},color:'#7A88A8',callback:v=>'$'+v.toLocaleString()},border:{display:false}}}}});}
+function buildPerf(s){const p=[{k:'h1',l:'1H'},{k:'h24',l:'24H'},{k:'d7',l:'7D'},{k:'m1',l:'1M'},{k:'y1',l:'1Y'},{k:'max',l:'Max'}];document.getElementById('perf-strip').innerHTML=p.map((pp,i)=>`<div class="perf-cell"><div class="perf-period">${pp.l}</div><div class="perf-val" style="color:${s.perfUp[i]?'var(--green)':'var(--red)'}">${s.perf[pp.k]}</div></div>`).join('');}
+function buildSetTabs(slug){document.getElementById('set-tabs').innerHTML=SETS.map(s=>`<button class="stab ${slug===s.slug?'active':''}" style="${slug===s.slug?'background:'+s.colorD+';color:'+s.color+';border-color:'+s.colorBd:''}" onclick="switchTopCards('${s.slug}')">${s.code}</button>`).join('');}
+function buildTopCards(s){document.getElementById('top-cards-title').textContent=s.code;document.getElementById('top-cards-sub').textContent=`Top ${s.topCards.length} cards &middot; ${s.cards} total in ${s.code}`;document.getElementById('top-cards-tbody').innerHTML=s.topCards.map((c,i)=>`<tr><td class="rank-n">${i+1}</td><td><div class="card-cell"><div class="card-art">${c.e}</div><div style="min-width:0"><div class="card-name">${c.n}</div><div style="display:flex;align-items:center;gap:5px;margin-top:1px"><span class="card-set-tag">${s.code}</span></div></div></div></td><td><span class="rb ${c.rb}">${c.rl}</span></td><td class="price-r">$${c.avg.toFixed(2)}</td><td class="price-r">$${c.tcg}</td><td class="chg-r ${c.d1>=0?'up':'dn'}">${c.d1>=0?'+':''}${c.d1}%</td><td class="chg-r ${c.d7>=0?'up':'dn'}">${c.d7>=0?'+':''}${c.d7}%</td><td class="chg-r ${c.d30>=0?'up':'dn'}">${c.d30>=0?'+':''}${c.d30}%</td><td>${rowSpark(c.sp,c.d7>=0)}</td></tr>`).join('');}
+function switchTopCards(slug){const s=SETS.find(x=>x.slug===slug);if(!s)return;buildSetTabs(slug);buildTopCards(s);}
+function buildComparison(){document.getElementById('comp-grid').innerHTML=SETS.map(s=>`<div class="comp-card" onclick="selectSet('${s.slug}')" style="${activeSet===s.slug?'border-color:'+s.color+';box-shadow:0 0 0 1px '+s.color:''}"><div class="comp-top"><div class="comp-code-row"><span class="comp-code">${s.code}</span><span class="comp-badge" style="background:${s.colorD};color:${s.color};border:1px solid ${s.colorBd}">${s.year}</span></div><span class="comp-chg" style="color:${s.chg30d>=0?'var(--green)':'var(--red)'}">${s.chg30d>=0?'+':''}${s.chg30d}%</span></div><div class="comp-name">${s.name}</div><div class="comp-val">$${s.price.toLocaleString()}</div><div class="comp-meta">${s.cards} cards &middot; ${s.volume} vol</div><div class="comp-spark">${ricLineSparkFull(s.spark,s.color,s.up)}</div><div class="comp-footer"><div class="comp-stat">7D <span class="comp-stat-val" style="color:${s.up?'var(--green)':'var(--red)'}">${s.up?'+':''}${s.chg7d}%</span></div><div class="comp-stat">ATH <span class="comp-stat-val">${s.ath}</span></div><div class="comp-stat">Max <span class="comp-stat-val" style="color:var(--green)">+${s.chgMax}%</span></div></div></div>`).join('');}
+
+/* ── PULL RATES PER SET ── */
+const PULL_RATES = {
+  op01:[
+    {code:'MR',  name:'Manga Rare',   color:'#E8A020',colorD:'rgba(232,160,32,0.18)',colorBd:'rgba(232,160,32,0.3)', perPack:1.4, perBox:1, perCase:6,  note:'~1 MR per box guaranteed'},
+    {code:'SP',  name:'Special Rare', color:'#9B72FF',colorD:'rgba(155,114,255,0.18)',colorBd:'rgba(155,114,255,0.3)',perPack:4.2, perBox:1, perCase:6,  note:'~1 SP per box'},
+    {code:'SEC', name:'Secret Rare',  color:'#FF4560',colorD:'rgba(255,69,96,0.18)',colorBd:'rgba(255,69,96,0.3)',  perPack:1.4, perBox:1, perCase:6,  note:'~1 per case (6 boxes)'},
+    {code:'SR',  name:'Super Rare',   color:'#00D68F',colorD:'rgba(0,214,143,0.15)',colorBd:'rgba(0,214,143,0.28)',perPack:16.7,perBox:4, perCase:24, note:'~4 per box on average'},
+  ],
+  op02:[
+    {code:'MR',  name:'Manga Rare',   color:'#E8A020',colorD:'rgba(232,160,32,0.18)',colorBd:'rgba(232,160,32,0.3)', perPack:1.4, perBox:1, perCase:6,  note:'~1 MR per box guaranteed'},
+    {code:'TR',  name:'Treas. Rare',  color:'#FDE047',colorD:'rgba(234,179,8,0.18)',colorBd:'rgba(234,179,8,0.3)',  perPack:1.4, perBox:1, perCase:6,  note:'~1 TR per box'},
+    {code:'SEC', name:'Secret Rare',  color:'#FF4560',colorD:'rgba(255,69,96,0.18)',colorBd:'rgba(255,69,96,0.3)',  perPack:1.4, perBox:1, perCase:6,  note:'~1 per case (6 boxes)'},
+    {code:'SR',  name:'Super Rare',   color:'#00D68F',colorD:'rgba(0,214,143,0.15)',colorBd:'rgba(0,214,143,0.28)',perPack:16.7,perBox:4, perCase:24, note:'~4 per box on average'},
+  ],
+  op09:[
+    {code:'GMR', name:'Golden MR',    color:'#F5BE50',colorD:'rgba(245,190,80,0.25)',colorBd:'rgba(245,190,80,0.5)',perPack:0.7, perBox:1, perCase:3,  note:'~1 per 2 boxes'},
+    {code:'MR',  name:'Manga Rare',   color:'#E8A020',colorD:'rgba(232,160,32,0.18)',colorBd:'rgba(232,160,32,0.3)', perPack:1.4, perBox:1, perCase:6,  note:'~1 MR per box'},
+    {code:'SEC', name:'Secret Rare',  color:'#FF4560',colorD:'rgba(255,69,96,0.18)',colorBd:'rgba(255,69,96,0.3)',  perPack:1.4, perBox:1, perCase:6,  note:'~1 per case'},
+    {code:'SR',  name:'Super Rare',   color:'#00D68F',colorD:'rgba(0,214,143,0.15)',colorBd:'rgba(0,214,143,0.28)',perPack:16.7,perBox:4, perCase:24, note:'~4 per box'},
+  ],
+  op14:[
+    {code:'MR',  name:'Manga Rare',   color:'#E8A020',colorD:'rgba(232,160,32,0.18)',colorBd:'rgba(232,160,32,0.3)', perPack:1.4, perBox:1, perCase:6,  note:'~1 MR per box'},
+    {code:'SEC', name:'Secret Rare',  color:'#FF4560',colorD:'rgba(255,69,96,0.18)',colorBd:'rgba(255,69,96,0.3)',  perPack:1.4, perBox:1, perCase:6,  note:'~1 per case'},
+    {code:'AA',  name:'Alt Art',      color:'#7FB0FA',colorD:'rgba(79,142,247,0.18)',colorBd:'rgba(79,142,247,0.3)',perPack:2.8, perBox:1, perCase:6,  note:'~1 per box'},
+    {code:'SR',  name:'Super Rare',   color:'#00D68F',colorD:'rgba(0,214,143,0.15)',colorBd:'rgba(0,214,143,0.28)',perPack:16.7,perBox:4, perCase:24, note:'~4 per box'},
+  ],
+};
+// Default pull rates for sets without specific data
+const DEFAULT_PULL_RATES = [
+  {code:'MR',  name:'Manga Rare',   color:'#E8A020',colorD:'rgba(232,160,32,0.18)',colorBd:'rgba(232,160,32,0.3)', perPack:1.4, perBox:1, perCase:6,  note:'~1 MR per box'},
+  {code:'SP',  name:'Special Rare', color:'#9B72FF',colorD:'rgba(155,114,255,0.18)',colorBd:'rgba(155,114,255,0.3)',perPack:4.2, perBox:1, perCase:6,  note:'~1 SP per box'},
+  {code:'SEC', name:'Secret Rare',  color:'#FF4560',colorD:'rgba(255,69,96,0.18)',colorBd:'rgba(255,69,96,0.3)',  perPack:1.4, perBox:1, perCase:6,  note:'~1 per case'},
+  {code:'SR',  name:'Super Rare',   color:'#00D68F',colorD:'rgba(0,214,143,0.15)',colorBd:'rgba(0,214,143,0.28)',perPack:16.7,perBox:4, perCase:24, note:'~4 per box'},
+];
+
+function buildPullRates(s) {
+  document.getElementById('pr-title').innerHTML = `Pull Rates <span>— ${s.code} ${s.name}</span>`;
+  const rates = PULL_RATES[s.slug] || DEFAULT_PULL_RATES;
+  const maxPerPack = Math.max(...rates.map(r=>r.perPack));
+  document.getElementById('pr-grid').innerHTML = rates.map(r => {
+    const packPct  = (r.perPack / maxPerPack * 100).toFixed(0);
+    const boxPct   = Math.min(r.perBox / 24 * 100, 100).toFixed(0);
+    const casePct  = Math.min(r.perCase / 144 * 100, 100).toFixed(0);
+    return `<div class="pr-card">
+      <div class="pr-badge" style="background:${r.colorD};color:${r.color};border:1px solid ${r.colorBd}">${r.code}</div>
+      <div class="pr-name">${r.name}</div>
+      <div class="pr-rate-row">
+        <span class="pr-rate-label">Per pack</span>
+        <div class="pr-rate-track"><div class="pr-rate-fill" style="width:${packPct}%;background:${r.color}"></div></div>
+        <span class="pr-rate-num">${r.perPack.toFixed(1)}%</span>
+      </div>
+      <div class="pr-rate-row">
+        <span class="pr-rate-label">Per box</span>
+        <div class="pr-rate-track"><div class="pr-rate-fill" style="width:${boxPct}%;background:${r.color}"></div></div>
+        <span class="pr-rate-num">~${r.perBox}</span>
+      </div>
+      <div class="pr-rate-row">
+        <span class="pr-rate-label">Per case</span>
+        <div class="pr-rate-track"><div class="pr-rate-fill" style="width:${casePct}%;background:${r.color}"></div></div>
+        <span class="pr-rate-num">~${r.perCase}</span>
+      </div>
+      <div class="pr-note">${r.note}</div>
+    </div>`;
+  }).join('');
+}
+function selectSet(slug){activeSet=slug;const s=SETS.find(x=>x.slug===slug);buildIndexRow();buildPillStrip();if(s){buildDetail(s);buildChart(s,activeTime);buildPerf(s);buildTopCards(s);buildSetTabs(slug);buildPullRates(s);}buildComparison();}
+function setChartTime(el,period){document.querySelectorAll('.icc-right .icc-time').forEach(b=>b.classList.remove('on'));el.classList.add('on');activeTime=period;const s=SETS.find(x=>x.slug===activeSet);if(s)buildChart(s,period);}
+function setTopTime(el){el.closest('div').querySelectorAll('.icc-time').forEach(b=>b.classList.remove('on'));el.classList.add('on');}
+buildIndexRow();buildPillStrip();
+const init=SETS[0];
+buildDetail(init);buildChart(init,'7d');buildPerf(init);buildTopCards(init);buildSetTabs('op01');buildComparison();buildPullRates(init);
+async function hydrateLiveData() {
+  try {
+    const res = await fetch('/api/sets');
+    if (!res.ok) return;
+    const dbSets = await res.json();
+
+    const dbMap = Object.fromEntries(dbSets.map(s => [s.slug, s]));
+
+    SETS.forEach(s => {
+      const db = dbMap[s.slug];
+      if (!db) return;
+
+      // Dynamic fields from DB
+      s.cards = db.cards;
+
+      if (db.topCards.length > 0) {
+        s.topCards = s.topCards.map((tc, i) => {
+          const live = db.topCards[i];
+          if (!live) return tc;
+          return {
+            ...tc,                          // keep emoji (e), rb, and static fields
+            n:   live.n  || tc.n,
+            rl:  live.rl || tc.rl,
+            tcg: live.tcg || tc.tcg,
+            avg: live.avg || tc.avg,
+            d1:  live.d1  ?? tc.d1,
+            d7:  live.d7  ?? tc.d7,
+            d30: live.d30 ?? tc.d30,
+            sp:  live.sp.length >= 2 ? live.sp : tc.sp,
+          };
+        });
+      }
+    });
+
+    // Re-render with live data
+    selectSet(activeSet);
+    buildComparison();
+
+  } catch (e) {
+    console.warn('[OWL] Live data unavailable, using static fallback', e);
+  }
+}
+
+// Existing init block stays the same, just add hydration after:
+buildIndexRow(); buildPillStrip();
+const init = SETS[0];
+buildDetail(init); buildChart(init, '7d'); buildPerf(init);
+buildTopCards(init); buildSetTabs('op01'); buildComparison(); buildPullRates(init);
+
+hydrateLiveData(); // <-- add this
+</script>
+</body>
+</html>
