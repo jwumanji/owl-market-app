@@ -2,7 +2,7 @@ import { createServiceClient } from "@/lib/supabase-server";
 import { CardRow, SetInfo } from "@/lib/types";
 import MarketTable from "@/components/market/MarketTable";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Markets — OWL Market",
