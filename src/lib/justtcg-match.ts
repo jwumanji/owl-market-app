@@ -28,14 +28,18 @@ export const SET_SLUG_MAP: Record<string, string> = {
   "carrying-on-his-will-one-piece-card-game":            "OP13",
   "the-azure-seas-seven-one-piece-card-game":            "OP14",
   "adventure-on-kamis-island-one-piece-card-game":       "OP15",
+  "the-time-of-battle-one-piece-card-game":              "OP16",
 
   // ── Extra Boosters (EB) ─────────────────────────────────────────────────
   "memorial-collection-one-piece-card-game":             "EB01",
   "extra-booster-memorial-collection-eb-01-one-piece-card-game": "EB01",
   "extra-booster-one-piece-card-game":                   "EB02",
   "eb-02-one-piece-card-game":                           "EB02",
+  "anime-25th-collection-one-piece-card-game":           "EB02",
+  "extra-booster-anime-25th-collection-one-piece-card-game": "EB02",
   "extra-booster-eb-03-one-piece-card-game":             "EB03",
   "eb-03-one-piece-card-game":                           "EB03",
+  "one-piece-heroines-edition-one-piece-card-game":      "EB03",
   "eb-04-one-piece-card-game":                           "EB04",
 
   // ── Premium Boosters (PRB) ──────────────────────────────────────────────
@@ -74,6 +78,16 @@ export const SET_SLUG_MAP: Record<string, string> = {
   "charlotte-katakuri-one-piece-card-game":              "ST20",
   "gear-5-one-piece-card-game":                          "ST21",
   "starter-deck-ex-gear-5-one-piece-card-game":          "ST21",
+  "ace-and-newgate-one-piece-card-game":                 "ST22",
+  "red-shanks-one-piece-card-game":                      "ST23",
+  "green-jewelry-bonney-one-piece-card-game":            "ST24",
+  "blue-buggy-one-piece-card-game":                      "ST25",
+  "purple-black-monkey-d-luffy-one-piece-card-game":     "ST26",
+  "black-marshall-d-teach-one-piece-card-game":          "ST27",
+  "green-yellow-yamato-one-piece-card-game":             "ST28",
+  "egghead-one-piece-card-game":                         "ST29",
+  "luffy-and-ace-one-piece-card-game":                   "ST30",
+  "starter-deck-ex-luffy-and-ace-one-piece-card-game":   "ST30",
 
   // ── Promo / Collection sets (all → 'P') ─────────────────────────────────
   "one-piece-promotion-cards-one-piece-card-game":                        "P",
