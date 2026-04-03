@@ -7,6 +7,8 @@
  * and add any missing slugs.
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 // ---------------------------------------------------------------------------
 // SET_SLUG_MAP — JustTCG set slug → our set code
 // ---------------------------------------------------------------------------
@@ -189,4 +191,77 @@ export function extractVariantLabel(name: string): string | null {
  */
 export function resolveSetCode(justTcgSlug: string): string | null {
   return SET_SLUG_MAP[justTcgSlug] ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Auto-create helpers
+// ---------------------------------------------------------------------------
+
+function classifySeries(code: string): string {
+  if (code.startsWith("OP")) return "BOOSTER";
+  if (code.startsWith("EB")) return "EXTRA_BOOSTER";
+  if (code.startsWith("PRB")) return "PREMIUM_BOOSTER";
+  if (code.startsWith("ST")) return "STARTER";
+  return "PROMO";
+}
+
+function humanNameFromSlug(slug: string): string {
+  return slug
+    .replace(/-one-piece-card-game$/, "")
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// ---------------------------------------------------------------------------
+// ensureSetExists — auto-create a set row if it doesn't exist yet
+// ---------------------------------------------------------------------------
+
+/**
+ * Ensure a set row exists in the database for the given code.
+ * If it doesn't exist, inserts a new row with metadata derived from the slug.
+ * Returns the set UUID.
+ */
+export async function ensureSetExists(
+  supabase: SupabaseClient,
+  justTcgSlug: string,
+  setCode: string
+): Promise<string | null> {
+  const slug = setCode.toLowerCase();
+
+  // Check if set already exists
+  const { data: existing } = await supabase
+    .from("sets")
+    .select("id")
+    .eq("slug", slug)
+    .limit(1)
+    .single();
+
+  if (existing) return existing.id;
+
+  // Insert new set
+  const { data: inserted, error } = await supabase
+    .from("sets")
+    .insert({
+      slug,
+      code: setCode,
+      name: humanNameFromSlug(justTcgSlug),
+      series: classifySeries(setCode),
+    })
+    .select("id")
+    .single();
+
+  if (inserted) return inserted.id;
+
+  // Conflict (race condition) — re-query
+  if (error?.code === "23505") {
+    const { data: raced } = await supabase
+      .from("sets")
+      .select("id")
+      .eq("slug", slug)
+      .limit(1)
+      .single();
+    return raced?.id ?? null;
+  }
+
+  return null;
 }
