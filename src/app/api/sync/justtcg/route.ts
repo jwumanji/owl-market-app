@@ -16,17 +16,19 @@ for (const [slug, code] of Object.entries(SET_SLUG_MAP)) {
 const GAME = "one-piece-card-game";
 
 // ---------------------------------------------------------------------------
-// POST /api/sync/justtcg — pull latest prices from JustTCG and upsert to DB
+// POST|GET /api/sync/justtcg — pull latest prices from JustTCG and upsert to DB
+// Vercel Cron triggers GET; manual triggers can use POST.
 // ---------------------------------------------------------------------------
 
-export async function POST(request: Request) {
-  // Optional: protect with a secret token
+async function syncPrices(request: Request) {
+  // Verify Vercel Cron or token auth
+  const isVercelCron =
+    request.headers.get("authorization") === `Bearer ${process.env.CRON_SECRET}`;
   const { searchParams } = new URL(request.url);
   const token = searchParams.get("token");
-  if (
-    process.env.SYNC_SECRET &&
-    token !== process.env.SYNC_SECRET
-  ) {
+  const hasTokenAuth = process.env.SYNC_SECRET && token === process.env.SYNC_SECRET;
+
+  if (process.env.CRON_SECRET && !isVercelCron && !hasTokenAuth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -278,3 +280,9 @@ async function upsertPrice(
     recorded_at: now,
   });
 }
+
+// ---------------------------------------------------------------------------
+// Route exports — GET for Vercel Cron, POST for manual triggers
+// ---------------------------------------------------------------------------
+
+export { syncPrices as GET, syncPrices as POST };
