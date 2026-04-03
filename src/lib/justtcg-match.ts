@@ -27,6 +27,7 @@ export const SET_SLUG_MAP: Record<string, string> = {
   "legacy-of-the-master-one-piece-card-game":            "OP12",
   "carrying-on-his-will-one-piece-card-game":            "OP13",
   "the-azure-seas-seven-one-piece-card-game":            "OP14",
+  "adventure-on-kamis-island-one-piece-card-game":       "OP15",
 
   // ── Extra Boosters (EB) ─────────────────────────────────────────────────
   "memorial-collection-one-piece-card-game":             "EB01",
@@ -48,22 +49,31 @@ export const SET_SLUG_MAP: Record<string, string> = {
   "worst-generation-one-piece-card-game":                "ST02",
   "the-seven-warlords-of-the-sea-one-piece-card-game":   "ST03",
   "animal-kingdom-pirates-one-piece-card-game":          "ST04",
+  "beasts-pirates-one-piece-card-game":                  "ST04",
   "one-piece-film-edition-one-piece-card-game":          "ST05",
+  "absolute-justice-one-piece-card-game":                "ST06",
   "navy-one-piece-card-game":                            "ST06",
   "big-mom-pirates-one-piece-card-game":                 "ST07",
   "monkey-d-luffy-one-piece-card-game":                  "ST08",
   "yamato-one-piece-card-game":                          "ST09",
   "the-three-captains-one-piece-card-game":              "ST10",
+  "ultimate-deck-the-three-captains-one-piece-card-game": "ST10",
   "uta-one-piece-card-game":                             "ST11",
   "zoro-and-sanji-one-piece-card-game":                  "ST12",
   "the-three-brothers-one-piece-card-game":              "ST13",
+  "ultra-deck-the-three-brothers-one-piece-card-game":   "ST13",
   "3d2y-one-piece-card-game":                            "ST14",
-  "red-haired-pirates-one-piece-card-game":              "ST15",
-  "boa-hancock-one-piece-card-game":                     "ST16",
+  "red-edward-newgate-one-piece-card-game":              "ST15",
+  "green-uta-one-piece-card-game":                       "ST16",
+  "blue-donquixote-doflamingo-one-piece-card-game":      "ST17",
   "donquixote-doflamingo-one-piece-card-game":           "ST17",
-  "monkey-d-garp-one-piece-card-game":                   "ST18",
+  "purple-monkey-d-luffy-one-piece-card-game":           "ST18",
+  "black-smoker-one-piece-card-game":                    "ST19",
   "smoker-one-piece-card-game":                          "ST19",
-  "jewelry-bonney-one-piece-card-game":                  "ST20",
+  "yellow-charlotte-katakuri-one-piece-card-game":       "ST20",
+  "charlotte-katakuri-one-piece-card-game":              "ST20",
+  "gear-5-one-piece-card-game":                          "ST21",
+  "starter-deck-ex-gear-5-one-piece-card-game":          "ST21",
 
   // ── Promo / Collection sets (all → 'P') ─────────────────────────────────
   "one-piece-promotion-cards-one-piece-card-game":                        "P",
@@ -80,6 +90,8 @@ export const SET_SLUG_MAP: Record<string, string> = {
   "premium-card-collection-25th-edition-one-piece-card-game":             "P",
   "premium-card-collection-live-action-edition-one-piece-card-game":      "P",
   "premium-card-collection-film-red-edition-one-piece-card-game":         "P",
+  "premium-card-collection-uta-one-piece-card-game":                      "P",
+  "premium-card-collection-yamato-one-piece-card-game":                   "P",
 
   // Anniversary sets
   "english-version-1st-anniversary-set-one-piece-card-game":              "P",
@@ -106,11 +118,21 @@ export const SET_SLUG_MAP: Record<string, string> = {
 
   // Sealed / bundle promos
   "double-pack-set-one-piece-card-game":                                  "P",
+  "double-pack-set-vol-1-one-piece-card-game":                            "P",
+  "double-pack-set-vol-2-one-piece-card-game":                            "P",
+  "double-pack-set-vol-3-one-piece-card-game":                            "P",
+  "double-pack-set-vol-4-one-piece-card-game":                            "P",
   "super-pre-release-starter-deck-one-piece-card-game":                   "P",
   "demo-deck-one-piece-card-game":                                        "P",
   "gift-collection-one-piece-card-game":                                  "P",
+  "gift-collection-2023-one-piece-card-game":                             "P",
   "gift-collection-2024-one-piece-card-game":                             "P",
   "treasure-pack-one-piece-card-game":                                    "P",
+  "treasure-cruise-one-piece-card-game":                                  "P",
+  "official-tournament-store-one-piece-card-game":                        "P",
+  "event-cards-one-piece-card-game":                                      "P",
+  "winner-cards-one-piece-card-game":                                     "P",
+  "participation-cards-one-piece-card-game":                               "P",
 };
 
 // ---------------------------------------------------------------------------
