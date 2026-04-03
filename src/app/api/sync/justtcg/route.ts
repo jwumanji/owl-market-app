@@ -222,12 +222,17 @@ async function syncOneSet(
         }
       }
 
-      if (priceUpserts.length > 0) {
+      // Deduplicate by card_id (keep last entry — higher price variant wins)
+      const dedupedPrices = Array.from(
+        new Map(priceUpserts.map((p) => [p.card_id, p])).values()
+      );
+
+      if (dedupedPrices.length > 0) {
         const { error: upErr } = await supabase
           .from("price_stats")
-          .upsert(priceUpserts, { onConflict: "card_id" });
+          .upsert(dedupedPrices, { onConflict: "card_id" });
         if (upErr) setErrors.push(`price_stats batch: ${upErr.message}`);
-        else updatedCount += priceUpserts.length;
+        else updatedCount += dedupedPrices.length;
       }
 
       if (historyInserts.length > 0) {
