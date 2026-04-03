@@ -9,6 +9,7 @@ export const maxDuration = 60;
 const EXCLUSIONS: Record<string, string[]> = {
   roger: ["jolly roger"],
   king: ["king kong", "king pistol", "king punch", "king cobra", "king bazooka"],
+  dragon: ["dragon twister", "dragon seal", "dragon claw", "dragon breath", "dragon damnation"],
 };
 
 // ---------------------------------------------------------------------------
