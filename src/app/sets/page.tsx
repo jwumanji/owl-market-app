@@ -151,8 +151,8 @@ function DetailCard({ s }: { s: SetData }) {
       <div>
         {[
           ["Set Index Value", `$${s.price.toLocaleString()}`, s.color],
-          ["24H Change", `${s.up ? "+" : ""}${s.chg1d}%`, s.up ? "var(--green)" : "var(--red)"],
-          ["7D Change", `${s.up ? "+" : ""}${s.chg7d}%`, s.up ? "var(--green)" : "var(--red)"],
+          ["24H Change", `${s.chg1d >= 0 ? "+" : ""}${s.chg1d}%`, s.chg1d >= 0 ? "var(--green)" : "var(--red)"],
+          ["7D Change", `${s.chg7d >= 0 ? "+" : ""}${s.chg7d}%`, s.chg7d >= 0 ? "var(--green)" : "var(--red)"],
           ["30D Change", `${s.chg30d >= 0 ? "+" : ""}${s.chg30d}%`, s.chg30d >= 0 ? "var(--green)" : "var(--red)"],
           ["All-Time High", s.ath, undefined],
           ["All-Time Low", s.atl, undefined],

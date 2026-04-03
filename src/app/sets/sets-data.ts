@@ -89,24 +89,24 @@ export const PULL_RATES: Record<string, PullRate[]> = {
   op01: [
     {code:'MR',name:'Manga Rare',color:'#E8A020',colorD:'rgba(232,160,32,0.18)',colorBd:'rgba(232,160,32,0.3)',perPack:1.4,perBox:1,perCase:6,note:'~1 MR per box guaranteed'},
     {code:'SP',name:'Special Rare',color:'#9B72FF',colorD:'rgba(155,114,255,0.18)',colorBd:'rgba(155,114,255,0.3)',perPack:4.2,perBox:1,perCase:6,note:'~1 SP per box'},
-    {code:'SEC',name:'Secret Rare',color:'#FF4560',colorD:'rgba(255,69,96,0.18)',colorBd:'rgba(255,69,96,0.3)',perPack:1.4,perBox:1,perCase:6,note:'~1 per case (6 boxes)'},
+    {code:'SEC',name:'Secret Rare',color:'#FF4560',colorD:'rgba(255,69,96,0.18)',colorBd:'rgba(255,69,96,0.3)',perPack:0.7,perBox:0.17,perCase:1,note:'~1 per case (6 boxes)'},
     {code:'SR',name:'Super Rare',color:'#00D68F',colorD:'rgba(0,214,143,0.15)',colorBd:'rgba(0,214,143,0.28)',perPack:16.7,perBox:4,perCase:24,note:'~4 per box on average'},
   ],
   op02: [
     {code:'MR',name:'Manga Rare',color:'#E8A020',colorD:'rgba(232,160,32,0.18)',colorBd:'rgba(232,160,32,0.3)',perPack:1.4,perBox:1,perCase:6,note:'~1 MR per box guaranteed'},
     {code:'TR',name:'Treas. Rare',color:'#FDE047',colorD:'rgba(234,179,8,0.18)',colorBd:'rgba(234,179,8,0.3)',perPack:1.4,perBox:1,perCase:6,note:'~1 TR per box'},
-    {code:'SEC',name:'Secret Rare',color:'#FF4560',colorD:'rgba(255,69,96,0.18)',colorBd:'rgba(255,69,96,0.3)',perPack:1.4,perBox:1,perCase:6,note:'~1 per case (6 boxes)'},
+    {code:'SEC',name:'Secret Rare',color:'#FF4560',colorD:'rgba(255,69,96,0.18)',colorBd:'rgba(255,69,96,0.3)',perPack:0.7,perBox:0.17,perCase:1,note:'~1 per case (6 boxes)'},
     {code:'SR',name:'Super Rare',color:'#00D68F',colorD:'rgba(0,214,143,0.15)',colorBd:'rgba(0,214,143,0.28)',perPack:16.7,perBox:4,perCase:24,note:'~4 per box on average'},
   ],
   op09: [
-    {code:'GMR',name:'Golden MR',color:'#F5BE50',colorD:'rgba(245,190,80,0.25)',colorBd:'rgba(245,190,80,0.5)',perPack:0.7,perBox:1,perCase:3,note:'~1 per 2 boxes'},
+    {code:'GMR',name:'Golden MR',color:'#F5BE50',colorD:'rgba(245,190,80,0.25)',colorBd:'rgba(245,190,80,0.5)',perPack:0.7,perBox:0.5,perCase:3,note:'~1 per 2 boxes'},
     {code:'MR',name:'Manga Rare',color:'#E8A020',colorD:'rgba(232,160,32,0.18)',colorBd:'rgba(232,160,32,0.3)',perPack:1.4,perBox:1,perCase:6,note:'~1 MR per box'},
-    {code:'SEC',name:'Secret Rare',color:'#FF4560',colorD:'rgba(255,69,96,0.18)',colorBd:'rgba(255,69,96,0.3)',perPack:1.4,perBox:1,perCase:6,note:'~1 per case'},
+    {code:'SEC',name:'Secret Rare',color:'#FF4560',colorD:'rgba(255,69,96,0.18)',colorBd:'rgba(255,69,96,0.3)',perPack:0.7,perBox:0.17,perCase:1,note:'~1 per case'},
     {code:'SR',name:'Super Rare',color:'#00D68F',colorD:'rgba(0,214,143,0.15)',colorBd:'rgba(0,214,143,0.28)',perPack:16.7,perBox:4,perCase:24,note:'~4 per box'},
   ],
   op14: [
     {code:'MR',name:'Manga Rare',color:'#E8A020',colorD:'rgba(232,160,32,0.18)',colorBd:'rgba(232,160,32,0.3)',perPack:1.4,perBox:1,perCase:6,note:'~1 MR per box'},
-    {code:'SEC',name:'Secret Rare',color:'#FF4560',colorD:'rgba(255,69,96,0.18)',colorBd:'rgba(255,69,96,0.3)',perPack:1.4,perBox:1,perCase:6,note:'~1 per case'},
+    {code:'SEC',name:'Secret Rare',color:'#FF4560',colorD:'rgba(255,69,96,0.18)',colorBd:'rgba(255,69,96,0.3)',perPack:0.7,perBox:0.17,perCase:1,note:'~1 per case'},
     {code:'AA',name:'Alt Art',color:'#7FB0FA',colorD:'rgba(79,142,247,0.18)',colorBd:'rgba(79,142,247,0.3)',perPack:2.8,perBox:1,perCase:6,note:'~1 per box'},
     {code:'SR',name:'Super Rare',color:'#00D68F',colorD:'rgba(0,214,143,0.15)',colorBd:'rgba(0,214,143,0.28)',perPack:16.7,perBox:4,perCase:24,note:'~4 per box'},
   ],
@@ -115,6 +115,6 @@ export const PULL_RATES: Record<string, PullRate[]> = {
 export const DEFAULT_PULL_RATES: PullRate[] = [
   {code:'MR',name:'Manga Rare',color:'#E8A020',colorD:'rgba(232,160,32,0.18)',colorBd:'rgba(232,160,32,0.3)',perPack:1.4,perBox:1,perCase:6,note:'~1 MR per box'},
   {code:'SP',name:'Special Rare',color:'#9B72FF',colorD:'rgba(155,114,255,0.18)',colorBd:'rgba(155,114,255,0.3)',perPack:4.2,perBox:1,perCase:6,note:'~1 SP per box'},
-  {code:'SEC',name:'Secret Rare',color:'#FF4560',colorD:'rgba(255,69,96,0.18)',colorBd:'rgba(255,69,96,0.3)',perPack:1.4,perBox:1,perCase:6,note:'~1 per case'},
+  {code:'SEC',name:'Secret Rare',color:'#FF4560',colorD:'rgba(255,69,96,0.18)',colorBd:'rgba(255,69,96,0.3)',perPack:0.7,perBox:0.17,perCase:1,note:'~1 per case'},
   {code:'SR',name:'Super Rare',color:'#00D68F',colorD:'rgba(0,214,143,0.15)',colorBd:'rgba(0,214,143,0.28)',perPack:16.7,perBox:4,perCase:24,note:'~4 per box'},
 ];
