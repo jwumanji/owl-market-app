@@ -6,8 +6,8 @@ import {
   extractVariantLabel,
 } from "@/lib/justtcg-match";
 
-// Vercel Pro allows up to 300s
-export const maxDuration = 300;
+// Vercel Hobby: 10s default, this raises it to 60s
+export const maxDuration = 60;
 
 // Reverse map: internal code → first JustTCG set slug
 const CODE_TO_SLUG: Record<string, string> = {};
@@ -18,9 +18,11 @@ for (const [slug, code] of Object.entries(SET_SLUG_MAP)) {
 const GAME = "one-piece-card-game";
 
 // ---------------------------------------------------------------------------
-// GET|POST /api/sync/justtcg?sets=OP01  (one set per request for reliability)
+// GET|POST /api/sync/justtcg?sets=OP01  (ONE set per request)
 //
-// For cron: chains through all sets automatically using ?_index param
+// ?sets=OP01       → sync one set
+// ?sets=OP01,OP02  → sync multiple (may timeout on Hobby)
+// no sets param    → returns list of available set codes to sync
 // ---------------------------------------------------------------------------
 
 async function syncPrices(request: Request) {
@@ -37,7 +39,6 @@ async function syncPrices(request: Request) {
   }
 
   const supabase = createServiceClient();
-  const client = new JustTCG();
 
   // Fetch all sets from DB
   const { data: dbSets, error: setsErr } = await supabase
@@ -49,101 +50,36 @@ async function syncPrices(request: Request) {
     return NextResponse.json({ error: setsErr.message }, { status: 500 });
   }
 
-  // Determine which sets to sync
+  const syncableSets = dbSets.filter((s) => s.code && CODE_TO_SLUG[s.code]);
+
+  // If no sets param, return available sets (useful for chaining)
   const setsParam = searchParams.get("sets");
-  const allowedCodes = setsParam
-    ? setsParam.split(",").map((s) => s.trim().toUpperCase())
-    : null;
+  if (!setsParam) {
+    // For Vercel Cron: auto-chain through sets one at a time
+    const indexParam = searchParams.get("_index");
+    if (indexParam !== null || isVercelCron) {
+      return await syncByIndex(request, syncableSets, parseInt(indexParam ?? "0", 10));
+    }
 
-  const setsToSync = allowedCodes
-    ? dbSets.filter((s) => s.code && allowedCodes.includes(s.code))
-    : dbSets.filter((s) => s.code && CODE_TO_SLUG[s.code]);
+    return NextResponse.json({
+      message: "Provide ?sets=OP01 or use ?_index=0 to chain through all sets",
+      available: syncableSets.map((s) => s.code),
+      total: syncableSets.length,
+    });
+  }
 
+  // Sync the specified set(s)
+  const allowedCodes = setsParam.split(",").map((s) => s.trim().toUpperCase());
+  const setsToSync = dbSets.filter(
+    (s) => s.code && allowedCodes.includes(s.code)
+  );
+
+  const client = new JustTCG();
   const results: { code: string; updated: number; errors: string[] }[] = [];
 
   for (const dbSet of setsToSync) {
-    const setCode = dbSet.code;
-    if (!setCode) continue;
-
-    const justTcgSlug = CODE_TO_SLUG[setCode];
-    if (!justTcgSlug) {
-      results.push({
-        code: setCode,
-        updated: 0,
-        errors: ["No JustTCG slug mapping"],
-      });
-      continue;
-    }
-
-    const setErrors: string[] = [];
-    let updatedCount = 0;
-
-    try {
-      // Paginate through all cards in the set
-      let offset = 0;
-      const limit = 100;
-      let hasMore = true;
-
-      while (hasMore) {
-        const response = await client.v1.cards.get({
-          game: GAME,
-          set: justTcgSlug,
-          include_statistics: ["30d"],
-          include_null_prices: false,
-          limit,
-          offset,
-        });
-
-        const cards = response.data;
-        if (!cards || cards.length === 0) break;
-
-        // Batch: collect all upserts for this page
-        const priceUpserts: PriceUpsert[] = [];
-        const historyInserts: HistoryInsert[] = [];
-
-        for (const jtCard of cards) {
-          try {
-            await collectPriceData(
-              supabase,
-              jtCard,
-              dbSet.id,
-              priceUpserts,
-              historyInserts
-            );
-          } catch (err) {
-            setErrors.push(
-              `Card ${jtCard.name}: ${err instanceof Error ? err.message : String(err)}`
-            );
-          }
-        }
-
-        // Batch upsert price_stats
-        if (priceUpserts.length > 0) {
-          const { error: upErr } = await supabase
-            .from("price_stats")
-            .upsert(priceUpserts, { onConflict: "card_id" });
-          if (upErr) setErrors.push(`price_stats batch: ${upErr.message}`);
-          else updatedCount += priceUpserts.length;
-        }
-
-        // Batch insert price_history
-        if (historyInserts.length > 0) {
-          const { error: hiErr } = await supabase
-            .from("price_history")
-            .insert(historyInserts);
-          if (hiErr) setErrors.push(`price_history batch: ${hiErr.message}`);
-        }
-
-        hasMore = response.pagination?.hasMore ?? false;
-        offset += limit;
-      }
-    } catch (err) {
-      setErrors.push(
-        `Set fetch failed: ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
-
-    results.push({ code: setCode, updated: updatedCount, errors: setErrors });
+    const result = await syncOneSet(client, supabase, dbSet);
+    results.push(result);
   }
 
   const totalUpdated = results.reduce((sum, r) => sum + r.updated, 0);
@@ -157,7 +93,135 @@ async function syncPrices(request: Request) {
 }
 
 // ---------------------------------------------------------------------------
-// Types for batch operations
+// syncByIndex — Vercel Cron auto-chain: sync set at index, then trigger next
+// ---------------------------------------------------------------------------
+
+async function syncByIndex(
+  request: Request,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  syncableSets: any[],
+  index: number
+) {
+  if (index >= syncableSets.length) {
+    return NextResponse.json({
+      message: "All sets synced",
+      total: syncableSets.length,
+    });
+  }
+
+  const dbSet = syncableSets[index];
+  const client = new JustTCG();
+  const supabase = createServiceClient();
+  const result = await syncOneSet(client, supabase, dbSet);
+
+  // Trigger next set in the chain (fire-and-forget)
+  const nextIndex = index + 1;
+  if (nextIndex < syncableSets.length) {
+    const baseUrl = new URL(request.url);
+    baseUrl.searchParams.set("_index", String(nextIndex));
+
+    fetch(baseUrl.toString(), {
+      method: "GET",
+      headers: request.headers,
+    }).catch(() => {
+      // fire-and-forget; if it fails the cron will pick up next time
+    });
+  }
+
+  return NextResponse.json({
+    current: `${index + 1}/${syncableSets.length}`,
+    ...result,
+    next: nextIndex < syncableSets.length ? syncableSets[nextIndex]?.code : null,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// syncOneSet — sync a single set from JustTCG
+// ---------------------------------------------------------------------------
+
+async function syncOneSet(
+  client: JustTCG,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  dbSet: any
+): Promise<{ code: string; updated: number; errors: string[] }> {
+  const setCode = dbSet.code;
+  const justTcgSlug = CODE_TO_SLUG[setCode];
+
+  if (!justTcgSlug) {
+    return { code: setCode, updated: 0, errors: ["No JustTCG slug mapping"] };
+  }
+
+  const setErrors: string[] = [];
+  let updatedCount = 0;
+
+  try {
+    let offset = 0;
+    const limit = 100;
+    let hasMore = true;
+
+    while (hasMore) {
+      const response = await client.v1.cards.get({
+        game: GAME,
+        set: justTcgSlug,
+        include_statistics: ["30d"],
+        include_null_prices: false,
+        limit,
+        offset,
+      });
+
+      const cards = response.data;
+      if (!cards || cards.length === 0) break;
+
+      const priceUpserts: PriceUpsert[] = [];
+      const historyInserts: HistoryInsert[] = [];
+
+      for (const jtCard of cards) {
+        try {
+          await collectPriceData(
+            supabase,
+            jtCard,
+            dbSet.id,
+            priceUpserts,
+            historyInserts
+          );
+        } catch (err) {
+          setErrors.push(
+            `Card ${jtCard.name}: ${err instanceof Error ? err.message : String(err)}`
+          );
+        }
+      }
+
+      if (priceUpserts.length > 0) {
+        const { error: upErr } = await supabase
+          .from("price_stats")
+          .upsert(priceUpserts, { onConflict: "card_id" });
+        if (upErr) setErrors.push(`price_stats batch: ${upErr.message}`);
+        else updatedCount += priceUpserts.length;
+      }
+
+      if (historyInserts.length > 0) {
+        const { error: hiErr } = await supabase
+          .from("price_history")
+          .insert(historyInserts);
+        if (hiErr) setErrors.push(`price_history batch: ${hiErr.message}`);
+      }
+
+      hasMore = response.pagination?.hasMore ?? false;
+      offset += limit;
+    }
+  } catch (err) {
+    setErrors.push(
+      `Set fetch failed: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+
+  return { code: setCode, updated: updatedCount, errors: setErrors };
+}
+
+// ---------------------------------------------------------------------------
+// Types
 // ---------------------------------------------------------------------------
 
 interface PriceUpsert {
