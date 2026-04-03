@@ -37,17 +37,31 @@ export async function POST(request: Request) {
   //    (e.g. "Monkey D. Luffy" matches before "Luffy")
   const sortedChars = [...characters].sort((a, b) => b.name.length - a.name.length);
 
-  // 3. Fetch all cards that don't have a character_id yet
-  const { data: cards, error: cardsErr } = await supabase
-    .from("cards")
-    .select("id, name, name_base")
-    .is("character_id", null);
+  // 3. Fetch ALL cards that don't have a character_id yet (paginate past Supabase 1000-row limit)
+  const allCards: { id: string; name: string; name_base: string | null }[] = [];
+  const pageSize = 1000;
+  let from = 0;
 
-  if (cardsErr) {
-    return NextResponse.json({ error: cardsErr.message }, { status: 500 });
+  while (true) {
+    const { data: batch, error: cardsErr } = await supabase
+      .from("cards")
+      .select("id, name, name_base")
+      .is("character_id", null)
+      .range(from, from + pageSize - 1);
+
+    if (cardsErr) {
+      return NextResponse.json({ error: cardsErr.message }, { status: 500 });
+    }
+
+    if (!batch || batch.length === 0) break;
+    allCards.push(...batch);
+    if (batch.length < pageSize) break;
+    from += pageSize;
   }
 
-  if (!cards || cards.length === 0) {
+  const cards = allCards;
+
+  if (cards.length === 0) {
     return NextResponse.json({ message: "All cards already tagged", updated: 0 });
   }
 
