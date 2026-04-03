@@ -139,6 +139,13 @@ async function syncByIndex(
 // syncOneSet — sync a single set from JustTCG
 // ---------------------------------------------------------------------------
 
+interface DbCard {
+  id: string;
+  card_number: string | null;
+  name: string | null;
+  variant_label: string | null;
+}
+
 async function syncOneSet(
   client: JustTCG,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -155,6 +162,34 @@ async function syncOneSet(
 
   const setErrors: string[] = [];
   let updatedCount = 0;
+
+  // Pre-load ALL cards for this set in one query
+  const { data: allDbCards, error: cardsErr } = await supabase
+    .from("cards")
+    .select("id, card_number, name, variant_label")
+    .eq("set_id", dbSet.id);
+
+  if (cardsErr) {
+    return { code: setCode, updated: 0, errors: [cardsErr.message] };
+  }
+
+  // Build lookup maps (in-memory, zero DB queries per card)
+  const byNumber = new Map<string, DbCard[]>();
+  const byNameLower = new Map<string, DbCard[]>();
+
+  for (const card of (allDbCards ?? []) as DbCard[]) {
+    if (card.card_number) {
+      const arr = byNumber.get(card.card_number) ?? [];
+      arr.push(card);
+      byNumber.set(card.card_number, arr);
+    }
+    if (card.name) {
+      const key = card.name.toLowerCase();
+      const arr = byNameLower.get(key) ?? [];
+      arr.push(card);
+      byNameLower.set(key, arr);
+    }
+  }
 
   try {
     let offset = 0;
@@ -179,13 +214,7 @@ async function syncOneSet(
 
       for (const jtCard of cards) {
         try {
-          await collectPriceData(
-            supabase,
-            jtCard,
-            dbSet.id,
-            priceUpserts,
-            historyInserts
-          );
+          matchAndCollect(jtCard, byNumber, byNameLower, priceUpserts, historyInserts);
         } catch (err) {
           setErrors.push(
             `Card ${jtCard.name}: ${err instanceof Error ? err.message : String(err)}`
@@ -281,17 +310,16 @@ interface JTVariant {
 }
 
 // ---------------------------------------------------------------------------
-// collectPriceData — match a JustTCG card and add to batch arrays
+// matchAndCollect — match JustTCG card to DB card using in-memory maps
 // ---------------------------------------------------------------------------
 
-async function collectPriceData(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any,
+function matchAndCollect(
   jtCard: JTCard,
-  setId: string,
+  byNumber: Map<string, DbCard[]>,
+  byNameLower: Map<string, DbCard[]>,
   priceUpserts: PriceUpsert[],
   historyInserts: HistoryInsert[]
-): Promise<void> {
+): void {
   const nmVariant = jtCard.variants.find(
     (v) => v.condition === "Near Mint" && v.printing === "Normal"
   );
@@ -301,15 +329,9 @@ async function collectPriceData(
 
   if (!nmVariant && !foilVariant) return;
 
-  const cardNumber = jtCard.number;
-
-  if (cardNumber) {
-    const { data: dbCards } = await supabase
-      .from("cards")
-      .select("id, name, variant_label")
-      .eq("set_id", setId)
-      .eq("card_number", cardNumber);
-
+  // Match by card number first (most reliable)
+  if (jtCard.number) {
+    const dbCards = byNumber.get(jtCard.number);
     if (dbCards && dbCards.length > 0) {
       for (const dbCard of dbCards) {
         const variant = dbCard.variant_label
@@ -325,20 +347,13 @@ async function collectPriceData(
 
   // Fallback: match by name
   const variantLabel = extractVariantLabel(jtCard.name);
-  const baseName = jtCard.name.replace(/\s*\([^)]*\)\s*$/, "").trim();
-
-  const { data: nameMatches } = await supabase
-    .from("cards")
-    .select("id, variant_label")
-    .eq("set_id", setId)
-    .ilike("name", baseName);
+  const baseName = jtCard.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase();
+  const nameMatches = byNameLower.get(baseName);
 
   if (nameMatches && nameMatches.length > 0) {
     const target =
-      nameMatches.find(
-        (c: { variant_label: string | null }) =>
-          (c.variant_label ?? null) === variantLabel
-      ) ?? nameMatches[0];
+      nameMatches.find((c) => (c.variant_label ?? null) === variantLabel) ??
+      nameMatches[0];
 
     const variant = nmVariant ?? foilVariant;
     if (variant) {
