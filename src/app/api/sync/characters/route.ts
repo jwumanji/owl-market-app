@@ -4,14 +4,34 @@ import { createServiceClient } from "@/lib/supabase-server";
 export const maxDuration = 60;
 
 // ---------------------------------------------------------------------------
+// Word-boundary aware matching (prevents "Nami" matching "Tsunami" etc.)
+// ---------------------------------------------------------------------------
+function nameMatchesCard(pattern: string, cardName: string): boolean {
+  const patLower = pattern.toLowerCase();
+  const idx = cardName.indexOf(patLower);
+  if (idx === -1) return false;
+
+  // Left boundary: start of string or non-alphanumeric before match
+  if (idx > 0 && /[a-z0-9]/i.test(cardName[idx - 1])) return false;
+
+  // Right boundary: end of string or non-alphanumeric after match
+  const end = idx + patLower.length;
+  if (end < cardName.length && /[a-z0-9]/i.test(cardName[end])) return false;
+
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // POST /api/sync/characters — backfill cards with character_id
-// Matches card name/name_base against character names from the DB.
+// Matches card name/name_base against character names + aliases from the DB.
+// Supports ?reset=true to clear all character_id values and re-run.
 // Safe to run multiple times (idempotent).
 // ---------------------------------------------------------------------------
 
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
   const token = searchParams.get("token");
+  const reset = searchParams.get("reset") === "true";
 
   if (process.env.SYNC_SECRET && token !== process.env.SYNC_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -19,10 +39,22 @@ export async function POST(request: Request) {
 
   const supabase = createServiceClient();
 
-  // 1. Fetch all characters
+  // 0. If reset mode, clear all character_id values first
+  if (reset) {
+    const { error: resetErr } = await supabase
+      .from("cards")
+      .update({ character_id: null })
+      .not("character_id", "is", null);
+
+    if (resetErr) {
+      return NextResponse.json({ error: `Reset failed: ${resetErr.message}` }, { status: 500 });
+    }
+  }
+
+  // 1. Fetch all characters with aliases
   const { data: characters, error: charErr } = await supabase
     .from("characters")
-    .select("id, name, slug")
+    .select("id, name, slug, aliases")
     .order("name");
 
   if (charErr) {
@@ -33,11 +65,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No characters in DB. Run schema-migration-v5.sql first." }, { status: 400 });
   }
 
-  // 2. Build match patterns: sort by name length descending so longer names match first
-  //    (e.g. "Monkey D. Luffy" matches before "Luffy")
-  const sortedChars = [...characters].sort((a, b) => b.name.length - a.name.length);
+  // 2. Build flat pattern list from names + aliases, sorted longest-first
+  type MatchPattern = { characterId: string; pattern: string };
+  const patterns: MatchPattern[] = [];
 
-  // 3. Fetch ALL cards that don't have a character_id yet (paginate past Supabase 1000-row limit)
+  for (const char of characters) {
+    patterns.push({ characterId: char.id, pattern: char.name });
+    for (const alias of (char.aliases as string[]) ?? []) {
+      patterns.push({ characterId: char.id, pattern: alias });
+    }
+  }
+  patterns.sort((a, b) => b.pattern.length - a.pattern.length);
+
+  // 3. Fetch ALL cards without character_id (paginate past 1000-row limit)
   const allCards: { id: string; name: string; name_base: string | null }[] = [];
   const pageSize = 1000;
   let from = 0;
@@ -59,30 +99,27 @@ export async function POST(request: Request) {
     from += pageSize;
   }
 
-  const cards = allCards;
-
-  if (cards.length === 0) {
+  if (allCards.length === 0) {
     return NextResponse.json({ message: "All cards already tagged", updated: 0 });
   }
 
-  // 4. Match cards to characters in memory
+  // 4. Match cards to characters using word-boundary matching
   const updates: { id: string; character_id: string }[] = [];
 
-  for (const card of cards) {
+  for (const card of allCards) {
     const cardName = (card.name_base || card.name || "").toLowerCase();
     if (!cardName) continue;
 
-    for (const char of sortedChars) {
-      const charNameLower = char.name.toLowerCase();
-      if (cardName.includes(charNameLower)) {
-        updates.push({ id: card.id, character_id: char.id });
+    for (const pat of patterns) {
+      if (nameMatchesCard(pat.pattern, cardName)) {
+        updates.push({ id: card.id, character_id: pat.characterId });
         break; // first (longest) match wins
       }
     }
   }
 
   if (updates.length === 0) {
-    return NextResponse.json({ message: "No matches found", updated: 0, total_cards: cards.length });
+    return NextResponse.json({ message: "No matches found", updated: 0, total_cards: allCards.length });
   }
 
   // 5. Batch update in chunks of 500
@@ -92,7 +129,6 @@ export async function POST(request: Request) {
   for (let i = 0; i < updates.length; i += chunkSize) {
     const chunk = updates.slice(i, i + chunkSize);
 
-    // Use individual updates since Supabase JS doesn't support batch update by different IDs
     const promises = chunk.map((u) =>
       supabase
         .from("cards")
@@ -105,11 +141,11 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
-    message: "Backfill complete",
-    total_cards: cards.length,
+    message: reset ? "Reset + backfill complete" : "Backfill complete",
+    total_cards: allCards.length,
     matched: updates.length,
     updated,
-    unmatched: cards.length - updates.length,
+    unmatched: allCards.length - updates.length,
   });
 }
 
