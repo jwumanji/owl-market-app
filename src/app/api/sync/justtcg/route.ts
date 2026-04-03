@@ -6,36 +6,40 @@ import {
   extractVariantLabel,
 } from "@/lib/justtcg-match";
 
+// Vercel Pro allows up to 300s
+export const maxDuration = 300;
+
 // Reverse map: internal code → first JustTCG set slug
 const CODE_TO_SLUG: Record<string, string> = {};
 for (const [slug, code] of Object.entries(SET_SLUG_MAP)) {
   if (!CODE_TO_SLUG[code]) CODE_TO_SLUG[code] = slug;
 }
 
-// Game identifier for JustTCG
 const GAME = "one-piece-card-game";
 
 // ---------------------------------------------------------------------------
-// POST|GET /api/sync/justtcg — pull latest prices from JustTCG and upsert to DB
-// Vercel Cron triggers GET; manual triggers can use POST.
+// GET|POST /api/sync/justtcg?sets=OP01  (one set per request for reliability)
+//
+// For cron: chains through all sets automatically using ?_index param
 // ---------------------------------------------------------------------------
 
 async function syncPrices(request: Request) {
-  // Verify Vercel Cron or token auth
+  // Auth check
   const isVercelCron =
     request.headers.get("authorization") === `Bearer ${process.env.CRON_SECRET}`;
   const { searchParams } = new URL(request.url);
   const token = searchParams.get("token");
-  const hasTokenAuth = process.env.SYNC_SECRET && token === process.env.SYNC_SECRET;
+  const hasTokenAuth =
+    process.env.SYNC_SECRET && token === process.env.SYNC_SECRET;
 
   if (process.env.CRON_SECRET && !isVercelCron && !hasTokenAuth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const supabase = createServiceClient();
-  const client = new JustTCG(); // reads JUSTTCG_API_KEY from env
+  const client = new JustTCG();
 
-  // 1. Fetch all sets from our DB
+  // Fetch all sets from DB
   const { data: dbSets, error: setsErr } = await supabase
     .from("sets")
     .select("id, slug, code, name, series")
@@ -45,7 +49,7 @@ async function syncPrices(request: Request) {
     return NextResponse.json({ error: setsErr.message }, { status: 500 });
   }
 
-  // Optional: limit to specific sets via query param (e.g. ?sets=OP01,OP02)
+  // Determine which sets to sync
   const setsParam = searchParams.get("sets");
   const allowedCodes = setsParam
     ? setsParam.split(",").map((s) => s.trim().toUpperCase())
@@ -53,22 +57,24 @@ async function syncPrices(request: Request) {
 
   const setsToSync = allowedCodes
     ? dbSets.filter((s) => s.code && allowedCodes.includes(s.code))
-    : dbSets;
+    : dbSets.filter((s) => s.code && CODE_TO_SLUG[s.code]);
 
   const results: { code: string; updated: number; errors: string[] }[] = [];
 
-  // 2. Process each set
   for (const dbSet of setsToSync) {
     const setCode = dbSet.code;
     if (!setCode) continue;
 
     const justTcgSlug = CODE_TO_SLUG[setCode];
     if (!justTcgSlug) {
-      results.push({ code: setCode, updated: 0, errors: ["No JustTCG slug mapping"] });
+      results.push({
+        code: setCode,
+        updated: 0,
+        errors: ["No JustTCG slug mapping"],
+      });
       continue;
     }
 
-    // The set ID for JustTCG is the slug itself
     const setErrors: string[] = [];
     let updatedCount = 0;
 
@@ -91,16 +97,41 @@ async function syncPrices(request: Request) {
         const cards = response.data;
         if (!cards || cards.length === 0) break;
 
-        // 3. Process each card from JustTCG
+        // Batch: collect all upserts for this page
+        const priceUpserts: PriceUpsert[] = [];
+        const historyInserts: HistoryInsert[] = [];
+
         for (const jtCard of cards) {
           try {
-            const count = await processCard(supabase, jtCard, dbSet.id);
-            updatedCount += count;
+            await collectPriceData(
+              supabase,
+              jtCard,
+              dbSet.id,
+              priceUpserts,
+              historyInserts
+            );
           } catch (err) {
             setErrors.push(
               `Card ${jtCard.name}: ${err instanceof Error ? err.message : String(err)}`
             );
           }
+        }
+
+        // Batch upsert price_stats
+        if (priceUpserts.length > 0) {
+          const { error: upErr } = await supabase
+            .from("price_stats")
+            .upsert(priceUpserts, { onConflict: "card_id" });
+          if (upErr) setErrors.push(`price_stats batch: ${upErr.message}`);
+          else updatedCount += priceUpserts.length;
+        }
+
+        // Batch insert price_history
+        if (historyInserts.length > 0) {
+          const { error: hiErr } = await supabase
+            .from("price_history")
+            .insert(historyInserts);
+          if (hiErr) setErrors.push(`price_history batch: ${hiErr.message}`);
         }
 
         hasMore = response.pagination?.hasMore ?? false;
@@ -126,8 +157,32 @@ async function syncPrices(request: Request) {
 }
 
 // ---------------------------------------------------------------------------
-// processCard — match a JustTCG card to our DB and upsert price data
+// Types for batch operations
 // ---------------------------------------------------------------------------
+
+interface PriceUpsert {
+  card_id: string;
+  tcg_market: number;
+  tcg_low: number | null;
+  tcg_mid: number | null;
+  tcg_high: number | null;
+  market_avg: number;
+  chg_1d: number | null;
+  chg_7d: number | null;
+  chg_30d: number | null;
+  ath: number | null;
+  ath_date: string | null;
+  atl: number | null;
+  atl_date: string | null;
+  updated_at: string;
+}
+
+interface HistoryInsert {
+  card_id: string;
+  tcg_market: number;
+  market_avg: number;
+  recorded_at: string;
+}
 
 interface JTCard {
   id: string;
@@ -161,30 +216,30 @@ interface JTVariant {
   maxPriceAllTimeDate?: string | null;
 }
 
-async function processCard(
+// ---------------------------------------------------------------------------
+// collectPriceData — match a JustTCG card and add to batch arrays
+// ---------------------------------------------------------------------------
+
+async function collectPriceData(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
   jtCard: JTCard,
-  setId: string
-): Promise<number> {
-  // Find the Near Mint, Normal printing variant as the primary price
+  setId: string,
+  priceUpserts: PriceUpsert[],
+  historyInserts: HistoryInsert[]
+): Promise<void> {
   const nmVariant = jtCard.variants.find(
     (v) => v.condition === "Near Mint" && v.printing === "Normal"
   );
-
-  // Also check for foil/alternate art variant
   const foilVariant = jtCard.variants.find(
     (v) => v.condition === "Near Mint" && v.printing !== "Normal"
   );
 
-  if (!nmVariant && !foilVariant) return 0;
+  if (!nmVariant && !foilVariant) return;
 
-  // Try to match by card number first (most reliable), then by name
   const cardNumber = jtCard.number;
-  let updatedCount = 0;
 
   if (cardNumber) {
-    // Match by card_number within this set
     const { data: dbCards } = await supabase
       .from("cards")
       .select("id, name, variant_label")
@@ -192,27 +247,21 @@ async function processCard(
       .eq("card_number", cardNumber);
 
     if (dbCards && dbCards.length > 0) {
-      // If we have multiple DB cards for the same number (base + variants),
-      // match NM/Normal to the base card, foil to the variant
       for (const dbCard of dbCards) {
         const variant = dbCard.variant_label
           ? foilVariant ?? nmVariant
           : nmVariant ?? foilVariant;
-
         if (variant) {
-          await upsertPrice(supabase, dbCard.id, variant);
-          updatedCount++;
+          addToBatch(dbCard.id, variant, priceUpserts, historyInserts);
         }
       }
-      return updatedCount;
+      return;
     }
   }
 
-  // Fallback: match by name within this set
+  // Fallback: match by name
   const variantLabel = extractVariantLabel(jtCard.name);
-  const baseName = jtCard.name
-    .replace(/\s*\([^)]*\)\s*$/, "")
-    .trim();
+  const baseName = jtCard.name.replace(/\s*\([^)]*\)\s*$/, "").trim();
 
   const { data: nameMatches } = await supabase
     .from("cards")
@@ -221,59 +270,45 @@ async function processCard(
     .ilike("name", baseName);
 
   if (nameMatches && nameMatches.length > 0) {
-    // Match variant labels
-    const target = nameMatches.find(
-      (c: { variant_label: string | null }) =>
-        (c.variant_label ?? null) === variantLabel
-    ) ?? nameMatches[0];
+    const target =
+      nameMatches.find(
+        (c: { variant_label: string | null }) =>
+          (c.variant_label ?? null) === variantLabel
+      ) ?? nameMatches[0];
 
     const variant = nmVariant ?? foilVariant;
     if (variant) {
-      await upsertPrice(supabase, target.id, variant);
-      updatedCount++;
+      addToBatch(target.id, variant, priceUpserts, historyInserts);
     }
   }
-
-  return updatedCount;
 }
 
-// ---------------------------------------------------------------------------
-// upsertPrice — write price_stats + price_history for a card
-// ---------------------------------------------------------------------------
-
-async function upsertPrice(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any,
+function addToBatch(
   cardId: string,
-  variant: JTVariant
-): Promise<void> {
+  variant: JTVariant,
+  priceUpserts: PriceUpsert[],
+  historyInserts: HistoryInsert[]
+): void {
   const now = new Date().toISOString();
 
-  // Upsert price_stats
-  await supabase
-    .from("price_stats")
-    .upsert(
-      {
-        card_id: cardId,
-        tcg_market: variant.price,
-        tcg_low: variant.minPrice30d ?? variant.minPrice7d ?? null,
-        tcg_mid: variant.avgPrice30d ?? variant.avgPrice ?? null,
-        tcg_high: variant.maxPrice30d ?? variant.maxPrice7d ?? null,
-        market_avg: variant.avgPrice30d ?? variant.avgPrice ?? variant.price,
-        chg_1d: variant.priceChange24hr ?? null,
-        chg_7d: variant.priceChange7d ?? null,
-        chg_30d: variant.priceChange30d ?? null,
-        ath: variant.maxPriceAllTime ?? null,
-        ath_date: variant.maxPriceAllTimeDate ?? null,
-        atl: variant.minPriceAllTime ?? null,
-        atl_date: variant.minPriceAllTimeDate ?? null,
-        updated_at: now,
-      },
-      { onConflict: "card_id" }
-    );
+  priceUpserts.push({
+    card_id: cardId,
+    tcg_market: variant.price,
+    tcg_low: variant.minPrice30d ?? variant.minPrice7d ?? null,
+    tcg_mid: variant.avgPrice30d ?? variant.avgPrice ?? null,
+    tcg_high: variant.maxPrice30d ?? variant.maxPrice7d ?? null,
+    market_avg: variant.avgPrice30d ?? variant.avgPrice ?? variant.price,
+    chg_1d: variant.priceChange24hr ?? null,
+    chg_7d: variant.priceChange7d ?? null,
+    chg_30d: variant.priceChange30d ?? null,
+    ath: variant.maxPriceAllTime ?? null,
+    ath_date: variant.maxPriceAllTimeDate ?? null,
+    atl: variant.minPriceAllTime ?? null,
+    atl_date: variant.minPriceAllTimeDate ?? null,
+    updated_at: now,
+  });
 
-  // Insert price_history snapshot
-  await supabase.from("price_history").insert({
+  historyInserts.push({
     card_id: cardId,
     tcg_market: variant.price,
     market_avg: variant.avgPrice30d ?? variant.avgPrice ?? variant.price,
@@ -282,7 +317,7 @@ async function upsertPrice(
 }
 
 // ---------------------------------------------------------------------------
-// Route exports — GET for Vercel Cron, POST for manual triggers
+// Route exports
 // ---------------------------------------------------------------------------
 
 export { syncPrices as GET, syncPrices as POST };
