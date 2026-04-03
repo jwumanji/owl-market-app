@@ -6,7 +6,7 @@
 <title>Rarities — OWL Market</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 :root {
@@ -35,6 +35,7 @@
   --sans:    'Inter', sans-serif;
   --nav-h:   54px;
   --bar-h:   28px;
+  --grid-bg-size: 56px 56px;
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
@@ -52,7 +53,7 @@ body::after {
   background-image:
     linear-gradient(rgba(232,160,32,0.016) 1px, transparent 1px),
     linear-gradient(90deg, rgba(232,160,32,0.016) 1px, transparent 1px);
-  background-size: 56px 56px;
+  background-size: var(--grid-bg-size);
   pointer-events: none;
 }
 .z1 { position: relative; z-index: 1; }
@@ -625,11 +626,65 @@ nav {
 
 <script>
 /* ══════════════════════════════
-   DATA
+   CONFIGURATION
+   Tuning constants extracted from inline hard-coded values.
+   In production, market data (RARITIES, TICKER_DATA, SEALED,
+   SET_RARITY_OVERRIDES) would be fetched from an API.
+══════════════════════════════ */
+
+const CHART_CONFIG = {
+  volatility: 0.04,
+  noiseBias: 0.46,
+  priceFloorPct: 0.2,
+  tension: 0.35,
+  borderWidth: 1.8,
+  pointHoverRadius: 5,
+  pointHoverBorderColor: 'rgba(3,5,13,0.8)',
+  pointHoverBorderWidth: 2,
+  periods: { h1:1, d7:7, '7d':7, '1m':30, '3m':90, '1y':365, max:500 },
+  tooltip: {
+    bg: 'rgba(14,22,40,0.95)',
+    border: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    font: 'JetBrains Mono',
+    titleSize: 9,
+    bodySize: 11,
+    bodyWeight: '500',
+    titleColor: '#7A88A8',
+    bodyColor: '#E4EAF6',
+    padding: 10,
+  },
+  axis: {
+    gridX: 'rgba(255,255,255,0.03)',
+    gridY: 'rgba(255,255,255,0.035)',
+    tickColor: '#7A88A8',
+    tickFont: 'JetBrains Mono',
+    tickSize: 9,
+    maxTicksLimit: 6,
+  },
+  gradientStopOpacity: '30',
+  gradientBottom: 'rgba(0,0,0,0)',
+};
+
+const SPARK_COLORS = {
+  up: '#00D68F',
+  down: '#FF4560',
+  upFill: 'rgba(0,214,143,0.13)',
+  downFill: 'rgba(255,69,96,0.11)',
+  upFillLight: 'rgba(0,214,143,0.12)',
+  downFillLight: 'rgba(255,69,96,0.10)',
+  upBar: 'rgba(0,214,143,0.5)',
+  downBar: 'rgba(255,69,96,0.45)',
+};
+
+/* ══════════════════════════════
+   MARKET DATA
+   In production these come from an API response.
 ══════════════════════════════ */
 const RARITIES = [
   {
     slug:'mr', code:'MR', label:'★ Manga Rare', shortName:'Manga Rare',
+    tier:'premium',
     color:'#E8A020', colorD:'rgba(232,160,32,0.15)', colorBd:'rgba(232,160,32,0.3)',
     price:842, chg7d:8.2, chg1d:2.1, chg30d:24.6, chgMax:184,
     cardCount:13, volume:'$28.4K', allTimeHigh:'$1,020', allTimeLow:'$180',
@@ -649,6 +704,7 @@ const RARITIES = [
   },
   {
     slug:'promo', code:'PROMO', label:'PROMO · Tournament', shortName:'Promo',
+    tier:'premium',
     color:'#F472B6', colorD:'rgba(244,114,182,0.14)', colorBd:'rgba(244,114,182,0.3)',
     price:380, chg7d:6.1, chg1d:1.8, chg30d:19.4, chgMax:240,
     cardCount:68, volume:'$14.2K', allTimeHigh:'$2,400', allTimeLow:'$8',
@@ -668,6 +724,7 @@ const RARITIES = [
   },
   {
     slug:'sp', code:'SP', label:'SP · Special Rare', shortName:'Special Rare',
+    tier:'premium',
     color:'#9B72FF', colorD:'rgba(155,114,255,0.15)', colorBd:'rgba(155,114,255,0.3)',
     price:138, chg7d:12.4, chg1d:4.8, chg30d:32.1, chgMax:210,
     cardCount:28, volume:'$18.6K', allTimeHigh:'$220', allTimeLow:'$38',
@@ -687,6 +744,7 @@ const RARITIES = [
   },
   {
     slug:'sec', code:'SEC', label:'SEC · Secret Rare', shortName:'Secret Rare',
+    tier:'premium',
     color:'#FF4560', colorD:'rgba(255,69,96,0.15)', colorBd:'rgba(255,69,96,0.3)',
     price:64, chg7d:-1.8, chg1d:-2.1, chg30d:8.4, chgMax:95,
     cardCount:42, volume:'$24.1K', allTimeHigh:'$110', allTimeLow:'$12',
@@ -706,6 +764,7 @@ const RARITIES = [
   },
   {
     slug:'tr', code:'TR', label:'TR · Treasure Rare', shortName:'Treasure Rare',
+    tier:'premium',
     color:'#FDE047', colorD:'rgba(253,224,71,0.12)', colorBd:'rgba(253,224,71,0.3)',
     price:31, chg7d:4.1, chg1d:0.8, chg30d:11.2, chgMax:68,
     cardCount:38, volume:'$12.8K', allTimeHigh:'$58', allTimeLow:'$8',
@@ -725,6 +784,7 @@ const RARITIES = [
   },
   {
     slug:'aa', code:'AA', label:'AA · Alternate Art', shortName:'Alt Art',
+    tier:'premium',
     color:'#4F8EF7', colorD:'rgba(79,142,247,0.15)', colorBd:'rgba(79,142,247,0.3)',
     price:48, chg7d:2.9, chg1d:1.2, chg30d:14.8, chgMax:112,
     cardCount:96, volume:'$31.2K', allTimeHigh:'$180', allTimeLow:'$6',
@@ -744,6 +804,7 @@ const RARITIES = [
   },
   {
     slug:'sr', code:'SR', label:'SR · Super Rare', shortName:'Super Rare',
+    tier:'more',
     price:18, chg7d:1.4, chg1d:0.3, chg30d:6.2, chgMax:44,
     color:'#00D68F', colorD:'rgba(0,214,143,0.12)', colorBd:'rgba(0,214,143,0.28)',
     cardCount:180, volume:'$42.6K', allTimeHigh:'$48', allTimeLow:'$4',
@@ -763,6 +824,7 @@ const RARITIES = [
   },
   {
     slug:'l', code:'L', label:'L · Leader', shortName:'Leader',
+    tier:'more',
     price:12.4, chg7d:3.2, chg1d:0.6, chg30d:9.8, chgMax:54,
     color:'#00C9A7', colorD:'rgba(0,201,167,0.12)', colorBd:'rgba(0,201,167,0.28)',
     cardCount:72, volume:'$8.6K', allTimeHigh:'$180', allTimeLow:'$2',
@@ -782,6 +844,7 @@ const RARITIES = [
   },
   {
     slug:'r', code:'R', label:'R · Rare', shortName:'Rare',
+    tier:'more',
     price:4.2, chg7d:0.8, chg1d:0.1, chg30d:2.4, chgMax:18,
     color:'#7A88A8', colorD:'rgba(122,136,168,0.12)', colorBd:'rgba(122,136,168,0.25)',
     cardCount:420, volume:'$18.4K', allTimeHigh:'$28', allTimeLow:'$0.5',
@@ -801,6 +864,7 @@ const RARITIES = [
   },
 ];
 
+/* In production, TICKER_DATA would come from a live feed / API */
 const TICKER_DATA = [
   {n:'Luffy MR',p:'$1,240',c:'+8.2%',u:true},{n:'Shanks SEC',p:'$41.20',c:'-2.1%',u:false},
   {n:'Luffy SP',p:'$180',c:'+34.5%',u:true},{n:'Roger GMR',p:'$680',c:'-1.2%',u:false},
@@ -808,177 +872,42 @@ const TICKER_DATA = [
   {n:'Ace Trophy',p:'$2,100',c:'+5.3%',u:true},{n:'Zoro AA',p:'$62',c:'-3.4%',u:false},
 ];
 
-let activeRarity = 'mr';
-let activeSetCtx = 'all'; // 'all' or a set slug like 'op01'
-
-/* ── SET CONTEXT DATA ── */
-const SET_CTX_LIST = [
-  {slug:'all',  name:'All Sets',          sub:'Global rarity averages'},
-  {slug:'op01', name:'OP01 Romance Dawn',  sub:'2022 · 115 cards', color:'#FF4560'},
-  {slug:'op02', name:'OP02 Paramount War', sub:'2023 · 116 cards', color:'#4F8EF7'},
-  {slug:'op03', name:'OP03 Pillars',       sub:'2023 · 118 cards', color:'#00C9A7'},
-  {slug:'op05', name:'OP05 Awakening',     sub:'2023 · 119 cards', color:'#9B72FF'},
-  {slug:'op08', name:'OP08 Two Legends',   sub:'2024 · 120 cards', color:'#FF4560'},
-  {slug:'op09', name:'OP09 Emperors',      sub:'2024 · 118 cards', color:'#00D68F'},
-  {slug:'op14', name:'OP14 Azure Sea',     sub:'2025 · 120 cards', color:'#E8A020'},
-  {slug:'op15', name:'OP15 Grand Final',   sub:'2025 · 120 cards', color:'#F472B6'},
+/* ── SET DATA (single source of truth — was previously defined 3 times) ── */
+const SET_OPTIONS = [
+  {slug:'all',  code:'All Sets', name:'Global averages',     color:'#7A88A8', chg7d:null},
+  {slug:'op01', code:'OP01',     name:'Romance Dawn',        color:'#FF4560', chg7d:5.6},
+  {slug:'op02', code:'OP02',     name:'Paramount War',       color:'#4F8EF7', chg7d:2.1},
+  {slug:'op03', code:'OP03',     name:'Pillars of Strength', color:'#00C9A7', chg7d:-0.4},
+  {slug:'op05', code:'OP05',     name:'Awakening New Era',   color:'#9B72FF', chg7d:-0.8},
+  {slug:'op08', code:'OP08',     name:'Two Legends',         color:'#FF4560', chg7d:4.2},
+  {slug:'op09', code:'OP09',     name:"Emperors New World",  color:'#00D68F', chg7d:7.3},
+  {slug:'op14', code:'OP14',     name:"Azure Sea's Seven",   color:'#E8A020', chg7d:18.4},
+  {slug:'op15', code:'OP15',     name:'Grand Final',         color:'#F472B6', chg7d:9.1},
+];
+const EB_OPTIONS = [
+  {slug:'eb01', code:'EB01', name:'Memorial Collection', color:'#4F8EF7', chg7d:6.2},
+  {slug:'eb02', code:'EB02', name:"Dragon's Call",       color:'#9B72FF', chg7d:4.1},
 ];
 
-/* Per-set rarity index overrides — in production these come from the API */
+/* Per-set rarity price overrides (single merged definition — was previously defined twice with different values) */
 const SET_RARITY_OVERRIDES = {
   op01: { mr:{price:1310,chg1d:8.2,chg7d:12.4,chg30d:41,up:true}, sp:{price:148,chg1d:34.5,chg7d:41.2,chg30d:85,up:true}, sec:{price:47,chg1d:-2.1,chg7d:-5.4,chg30d:18,up:false}, sr:{price:18,chg1d:0.4,chg7d:1.2,chg30d:6,up:true} },
+  op02: { mr:{price:395,chg1d:1.2,chg7d:3.8}, tr:{price:23,chg1d:1.5,chg7d:5.8}, sec:{price:40,chg1d:-1.2,chg7d:-2.8}, sr:{price:14,chg1d:0.2,chg7d:1.2} },
   op09: { mr:{price:520,chg1d:4.1,chg7d:9.8,chg30d:31,up:true}, sec:{price:29,chg1d:2.4,chg7d:6.2,chg30d:18,up:true}, gmr:{price:680,chg1d:-1.2,chg7d:3.4,chg30d:22,up:true} },
   op14: { mr:{price:440,chg1d:12.4,chg7d:28.6,chg30d:62,up:true}, sec:{price:88,chg1d:8.2,chg7d:18.4,chg30d:42,up:true}, aa:{price:26,chg1d:-6.7,chg7d:-9.2,chg30d:-14,up:false} },
 };
 
-function buildSetDrop() {
-  const el = document.getElementById('set-context-drop');
-  el.innerHTML = `
-    <div class="scd-section">Filter by Set</div>
-    ${SET_CTX_LIST.map(s=>`
-      <div class="scd-item ${activeSetCtx===s.slug?'active':''}" onclick="selectSetCtx('${s.slug}')">
-        <div style="display:flex;align-items:center;gap:8px">
-          ${s.color?`<div style="width:8px;height:8px;border-radius:50%;background:${s.color};flex-shrink:0"></div>`:'<div style="width:8px;height:8px;border-radius:50%;background:var(--owl);flex-shrink:0"></div>'}
-          <div>
-            <div style="font-family:var(--display);font-size:13px;font-weight:600;color:${activeSetCtx===s.slug?'var(--owl)':'var(--text)'}">${s.name}</div>
-            <div style="font-family:var(--mono);font-size:10px;color:var(--text2)">${s.sub}</div>
-          </div>
-        </div>
-        ${activeSetCtx===s.slug?'<span style="color:var(--owl);font-size:12px">✓</span>':''}
-      </div>`).join('')}`;
-}
+/* Derived from rarity tier metadata (was previously hard-coded arrays) */
+const PREMIUM_SLUGS = RARITIES.filter(r => r.tier === 'premium').map(r => r.slug);
+const MORE_SLUGS    = RARITIES.filter(r => r.tier === 'more').map(r => r.slug);
 
-function toggleSetDrop() {
-  const drop = document.getElementById('set-context-drop');
-  const btn  = document.getElementById('set-context-btn');
-  const isOpen = drop.classList.contains('open');
-  if (!isOpen) {
-    const rect = btn.getBoundingClientRect();
-    drop.style.top  = (rect.bottom + 6) + 'px';
-    drop.style.right = (window.innerWidth - rect.right) + 'px';
-    drop.style.left = 'auto';
-    buildSetDrop();
-  }
-  drop.classList.toggle('open', !isOpen);
-  btn.classList.toggle('open', !isOpen);
-}
-
-function selectSetCtx(slug) {
-  activeSetCtx = slug;
-  const s = SET_CTX_LIST.find(x=>x.slug===slug);
-
-  // Update button label
-  document.getElementById('set-ctx-name').textContent = s.name;
-  document.getElementById('set-ctx-sub').textContent  = s.sub;
-
-  // Close dropdown
-  document.getElementById('set-context-drop').classList.remove('open');
-  document.getElementById('set-context-btn').classList.remove('open');
-
-  // Rebuild index row with set-filtered data
-  buildIndexRow();
-
-  // Rebuild top cards filtered to this set
-  const activeR = RARITIES.find(r=>r.slug===activeRarity);
-  if (activeR) buildTopCards(activeR);
-}
-
-document.addEventListener('click', e => {
-  if (!e.target.closest('.set-context-wrap') && !e.target.closest('.set-context-drop')) {
-    document.getElementById('set-context-drop')?.classList.remove('open');
-    document.getElementById('set-context-btn')?.classList.remove('open');
-  }
-});
+/* ── STATE ── */
+let activeRarity = 'mr';
+let activeSetCtx = 'all';
 let activeTime   = '7d';
 let idxChart     = null;
-let activeSetCtx = 'all'; // 'all' or a set slug
-
-/* ── SET CONTEXT DATA ── */
-const SET_CTX_LIST = [
-  {slug:'all',  code:'All Sets', name:'Global rarity averages', color:'var(--owl)'},
-  {slug:'op01', code:'OP01',     name:'Romance Dawn',           color:'#FF4560'},
-  {slug:'op02', code:'OP02',     name:'Paramount War',          color:'#4F8EF7'},
-  {slug:'op03', code:'OP03',     name:'Pillars of Strength',    color:'#00C9A7'},
-  {slug:'op05', code:'OP05',     name:'Awakening New Era',      color:'#9B72FF'},
-  {slug:'op08', code:'OP08',     name:'Two Legends',            color:'#FF4560'},
-  {slug:'op09', code:'OP09',     name:'Emperors New World',     color:'#00D68F'},
-  {slug:'op14', code:'OP14',     name:"Azure Sea's Seven",      color:'#E8A020'},
-  {slug:'op15', code:'OP15',     name:'Grand Final',            color:'#F472B6'},
-];
-
-// Per-set rarity price overrides — what changes when you pick a set
-const SET_RARITY_OVERRIDES = {
-  op01: { mr:{price:1310,chg7d:12.4,chg1d:8.2}, sp:{price:145,chg7d:8.4,chg1d:3.1}, sec:{price:44,chg7d:-4.2,chg1d:-2.1}, sr:{price:18,chg7d:2.1,chg1d:0.4} },
-  op02: { mr:{price:395,chg7d:3.8,chg1d:1.2},   tr:{price:23,chg7d:5.8,chg1d:1.5},  sec:{price:40,chg7d:-2.8,chg1d:-1.2}, sr:{price:14,chg7d:1.2,chg1d:0.2} },
-  op09: { gmr:{price:700,chg7d:3.4,chg1d:-1.2}, mr:{price:540,chg7d:9.8,chg1d:4.1}, sec:{price:29,chg7d:6.2,chg1d:2.4},  sr:{price:12,chg7d:0.4,chg1d:-0.3} },
-  op14: { mr:{price:440,chg7d:28.6,chg1d:12.4}, aa:{price:26,chg7d:-9.2,chg1d:-6.7},sec:{price:88,chg7d:18.4,chg1d:8.2}, sr:{price:22,chg7d:4.8,chg1d:1.8} },
-};
-
-function buildSetContextDrop() {
-  const drop = document.getElementById('set-context-drop');
-  const btn  = document.getElementById('set-context-btn');
-  const rect = btn.getBoundingClientRect();
-  drop.style.top   = (rect.bottom + 8) + 'px';
-  drop.style.right = (window.innerWidth - rect.right) + 'px';
-  drop.style.left  = 'auto';
-  drop.innerHTML = SET_CTX_LIST.map(s => `
-    <div class="set-context-item ${activeSetCtx===s.slug?'active':''}"
-         onclick="selectSetContext('${s.slug}')"
-         style="${activeSetCtx===s.slug?'color:'+s.color+';background:rgba(255,255,255,0.04)':''}">
-      <div style="display:flex;align-items:center;gap:8px">
-        <div style="width:8px;height:8px;border-radius:50%;background:${s.color};flex-shrink:0"></div>
-        <div>
-          <div style="font-family:var(--display);font-size:13px;font-weight:700;color:${activeSetCtx===s.slug?s.color:'var(--text)'}">${s.code}</div>
-          <div style="font-family:var(--mono);font-size:10px;color:var(--text2)">${s.name}</div>
-        </div>
-      </div>
-      ${activeSetCtx===s.slug?'<span style="color:var(--owl);font-size:11px">✓</span>':''}
-    </div>`).join('');
-}
-
-let setDropOpen = false;
-function toggleSetDrop() {
-  setDropOpen = !setDropOpen;
-  const btn  = document.getElementById('set-context-btn');
-  const drop = document.getElementById('set-context-drop');
-  btn.classList.toggle('open', setDropOpen);
-  if (setDropOpen) {
-    buildSetContextDrop();
-    drop.classList.add('open');
-  } else {
-    drop.classList.remove('open');
-  }
-}
-document.addEventListener('click', e => {
-  if (!e.target.closest('.set-context-wrap') && !e.target.closest('.set-context-drop')) {
-    setDropOpen = false;
-    document.getElementById('set-context-btn')?.classList.remove('open');
-    document.getElementById('set-context-drop')?.classList.remove('open');
-  }
-});
-
-function selectSetContext(slug) {
-  activeSetCtx = slug;
-  setDropOpen  = false;
-  document.getElementById('set-context-btn').classList.remove('open');
-  document.getElementById('set-context-drop').classList.remove('open');
-
-  const ctx = SET_CTX_LIST.find(s => s.slug === slug);
-  document.getElementById('set-ctx-name').textContent = ctx.code;
-  document.getElementById('set-ctx-sub').textContent  = slug === 'all' ? 'Global rarity averages' : ctx.name;
-
-  // Re-render everything with set context applied
-  buildIndexRow();
-  // Re-render detail for active rarity with set-filtered data
-  const r = RARITIES.find(x => x.slug === activeRarity);
-  if (r) {
-    const overrides = slug !== 'all' ? (SET_RARITY_OVERRIDES[slug]?.[activeRarity] || {}) : {};
-    buildDetail({...r, ...overrides});
-    buildChart({...r, ...overrides}, activeTime);
-    buildPerf({...r, ...overrides});
-  }
-  buildTopCards(RARITIES.find(x=>x.slug===activeRarity) || RARITIES[0]);
-}
+let moreOpen     = false;
+let setDropOpen  = false;
 
 /* ── TICKER ── */
 (function(){
@@ -997,7 +926,7 @@ function sparkBars(data, up, cls='rc-bar') {
   const mn=Math.min(...data), mx=Math.max(...data), rng=mx-mn||1;
   return data.map(v => {
     const h = Math.round(3+(25)*(v-mn)/rng);
-    const bg = up ? 'rgba(0,214,143,0.5)' : 'rgba(255,69,96,0.45)';
+    const bg = up ? SPARK_COLORS.upBar : SPARK_COLORS.downBar;
     return `<div class="${cls}" style="height:${h}px;background:${bg}"></div>`;
   }).join('');
 }
@@ -1013,8 +942,8 @@ function rowSpark(data, up) {
   });
   const poly = coords.map(p=>p.join(',')).join(' ');
   const fill = `${coords[0][0]},${H} ${poly} ${coords[coords.length-1][0]},${H}`;
-  const color = up ? '#00D68F' : '#FF4560';
-  const fillC = up ? 'rgba(0,214,143,0.12)' : 'rgba(255,69,96,0.10)';
+  const color = up ? SPARK_COLORS.up : SPARK_COLORS.down;
+  const fillC = up ? SPARK_COLORS.upFillLight : SPARK_COLORS.downFillLight;
   const [lx,ly] = coords[coords.length-1];
   return `<div style="display:flex;justify-content:flex-end">
     <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;overflow:visible">
@@ -1037,8 +966,8 @@ function ricLineSparkWide(data, color, up) {
   });
   const poly=coords.map(p=>p.join(',')).join(' ');
   const fill=`${coords[0][0]},${VH} ${poly} ${coords[coords.length-1][0]},${VH}`;
-  const stroke=up?'#00D68F':'#FF4560';
-  const fillC=up?'rgba(0,214,143,0.13)':'rgba(255,69,96,0.11)';
+  const stroke=up?SPARK_COLORS.up:SPARK_COLORS.down;
+  const fillC=up?SPARK_COLORS.upFill:SPARK_COLORS.downFill;
   const [lx,ly]=coords[coords.length-1];
   return `<svg width="100%" height="28" viewBox="0 0 ${VW} ${VH}" preserveAspectRatio="none" style="display:block;overflow:visible">
     <polygon points="${fill}" fill="${fillC}"/>
@@ -1057,8 +986,8 @@ function ricLineSpark(data, color, up) {
   });
   const poly  = coords.map(p => p.join(',')).join(' ');
   const fill  = `${coords[0][0]},${H} ${poly} ${coords[coords.length-1][0]},${H}`;
-  const fillC = up ? 'rgba(0,214,143,0.12)' : 'rgba(255,69,96,0.10)';
-  const stroke = up ? '#00D68F' : '#FF4560';
+  const fillC = up ? SPARK_COLORS.upFillLight : SPARK_COLORS.downFillLight;
+  const stroke = up ? SPARK_COLORS.up : SPARK_COLORS.down;
   const [lx, ly] = coords[coords.length - 1];
   return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;overflow:visible">
     <polygon points="${fill}" fill="${fillC}"/>
@@ -1079,8 +1008,8 @@ function ricLineSparkFull(data, color, up) {
   });
   const poly  = coords.map(p => p.join(',')).join(' ');
   const fill  = `${coords[0][0]},${VH} ${poly} ${coords[coords.length-1][0]},${VH}`;
-  const fillC = up ? 'rgba(0,214,143,0.13)' : 'rgba(255,69,96,0.11)';
-  const stroke = up ? '#00D68F' : '#FF4560';
+  const fillC = up ? SPARK_COLORS.upFill : SPARK_COLORS.downFill;
+  const stroke = up ? SPARK_COLORS.up : SPARK_COLORS.down;
   const [lx, ly] = coords[coords.length - 1];
   return `<svg width="100%" height="56" viewBox="0 0 ${VW} ${VH}" preserveAspectRatio="none" style="display:block;overflow:visible">
     <polygon points="${fill}" fill="${fillC}"/>
@@ -1089,10 +1018,7 @@ function ricLineSparkFull(data, color, up) {
   </svg>`;
 }
 
-/* ── INDEX ROW ── */
-const PREMIUM_SLUGS = ['mr','promo','sp','sec','tr','aa'];
-const MORE_SLUGS    = ['sr','l','r'];
-
+/* ── SEALED DATA (in production from API) ── */
 const SEALED = {
   slug:'sealed', code:'SEALED', shortName:'Sealed Boxes',
   color:'#E8A020', up:true,
@@ -1107,8 +1033,18 @@ const SEALED = {
   ]
 };
 
-let moreOpen = false;
+/* Sealed detail data for the sealed box market view */
+const SEALED_DETAIL = {
+  price: SEALED.price, chg7d: SEALED.chg7d, color: '#E8A020',
+  colorD: 'rgba(232,160,32,0.15)', cardCount: 4,
+  spark: SEALED.spark, shortName: 'Sealed',
+  chg1d: 1.2, chg30d: 12,
+  allTimeHigh: '$280', allTimeLow: '$82', volume: '$8.4K',
+  perfUp: [true,true,true,true,true,true],
+  perf: {h1:'+0.2%',h24:'+1.2%',d7:'+3.8%',m1:'+12.0%',y1:'+68%',max:'+94%'},
+};
 
+/* ── INDEX ROW ── */
 function buildIndexRow() {
   const el = document.getElementById('rarity-index-row');
   const premiumCards = RARITIES.filter(r => PREMIUM_SLUGS.includes(r.slug));
@@ -1251,16 +1187,16 @@ function buildDetail(r) {
 
 /* ── INDEX CHART ── */
 function buildChart(r, period) {
-  const days = {h1:1,d7:7,'7d':7,'1m':30,'3m':90,'1y':365,'max':500}[period] || 7;
+  const days = CHART_CONFIG.periods[period] || 7;
   const base = r.price;
-  const vol  = base * 0.04;
+  const vol  = base * CHART_CONFIG.volatility;
   const trend = r.chg7d / 100;
   const pts = [];
   let p = base * (1 - trend * 0.9);
   for(let i=days; i>=0; i--) {
     const d = new Date(); d.setDate(d.getDate()-i);
-    const noise = (Math.random()-0.46)*vol;
-    p = Math.max(p + (trend*base/days) + noise, base*0.2);
+    const noise = (Math.random()-CHART_CONFIG.noiseBias)*vol;
+    p = Math.max(p + (trend*base/days) + noise, base*CHART_CONFIG.priceFloorPct);
     pts.push({x: d.toLocaleDateString('en-US',{month:'short',day:'numeric'}), y:+p.toFixed(2)});
   }
   pts[pts.length-1].y = base;
@@ -1278,22 +1214,22 @@ function buildChart(r, period) {
       datasets:[{
         data: pts.map(p=>p.y),
         borderColor: r.color,
-        borderWidth: 1.8,
+        borderWidth: CHART_CONFIG.borderWidth,
         fill: true,
         backgroundColor: (ctx) => {
           const {ctx:c,chartArea} = ctx.chart;
           if(!chartArea) return r.colorD;
           const g = c.createLinearGradient(0,chartArea.top,0,chartArea.bottom);
-          g.addColorStop(0, r.color+'30');
-          g.addColorStop(1, 'rgba(0,0,0,0)');
+          g.addColorStop(0, r.color+CHART_CONFIG.gradientStopOpacity);
+          g.addColorStop(1, CHART_CONFIG.gradientBottom);
           return g;
         },
-        tension: 0.35,
+        tension: CHART_CONFIG.tension,
         pointRadius: 0,
-        pointHoverRadius: 5,
+        pointHoverRadius: CHART_CONFIG.pointHoverRadius,
         pointHoverBackgroundColor: r.color,
-        pointHoverBorderColor: 'rgba(3,5,13,0.8)',
-        pointHoverBorderWidth: 2,
+        pointHoverBorderColor: CHART_CONFIG.pointHoverBorderColor,
+        pointHoverBorderWidth: CHART_CONFIG.pointHoverBorderWidth,
       }]
     },
     options:{
@@ -1303,19 +1239,19 @@ function buildChart(r, period) {
       plugins:{
         legend:{display:false},
         tooltip:{
-          backgroundColor:'rgba(14,22,40,0.95)',
-          borderColor:'rgba(255,255,255,0.1)',
-          borderWidth:1,
-          titleFont:{family:'JetBrains Mono',size:9},
-          bodyFont:{family:'JetBrains Mono',size:11,weight:'500'},
-          titleColor:'#7A88A8', bodyColor:'#E4EAF6',
-          padding:10,
+          backgroundColor:CHART_CONFIG.tooltip.bg,
+          borderColor:CHART_CONFIG.tooltip.border,
+          borderWidth:CHART_CONFIG.tooltip.borderWidth,
+          titleFont:{family:CHART_CONFIG.tooltip.font,size:CHART_CONFIG.tooltip.titleSize},
+          bodyFont:{family:CHART_CONFIG.tooltip.font,size:CHART_CONFIG.tooltip.bodySize,weight:CHART_CONFIG.tooltip.bodyWeight},
+          titleColor:CHART_CONFIG.tooltip.titleColor, bodyColor:CHART_CONFIG.tooltip.bodyColor,
+          padding:CHART_CONFIG.tooltip.padding,
           callbacks:{ label: v=>`  $${v.parsed.y.toFixed(2)}` }
         }
       },
       scales:{
-        x:{ grid:{color:'rgba(255,255,255,0.03)',drawBorder:false}, ticks:{font:{family:'JetBrains Mono',size:9},color:'#7A88A8',maxTicksLimit:6,maxRotation:0}, border:{display:false} },
-        y:{ position:'right', grid:{color:'rgba(255,255,255,0.035)',drawBorder:false}, ticks:{font:{family:'JetBrains Mono',size:9},color:'#7A88A8',callback:v=>'$'+v.toLocaleString()}, border:{display:false} }
+        x:{ grid:{color:CHART_CONFIG.axis.gridX,drawBorder:false}, ticks:{font:{family:CHART_CONFIG.axis.tickFont,size:CHART_CONFIG.axis.tickSize},color:CHART_CONFIG.axis.tickColor,maxTicksLimit:CHART_CONFIG.axis.maxTicksLimit,maxRotation:0}, border:{display:false} },
+        y:{ position:'right', grid:{color:CHART_CONFIG.axis.gridY,drawBorder:false}, ticks:{font:{family:CHART_CONFIG.axis.tickFont,size:CHART_CONFIG.axis.tickSize},color:CHART_CONFIG.axis.tickColor,callback:v=>'$'+v.toLocaleString()}, border:{display:false} }
       }
     }
   });
@@ -1482,9 +1418,8 @@ function buildSealedDetail() {
   document.getElementById('chart-sub').textContent = `Avg unopened booster box price · ${SEALED.boxes.length} sets tracked`;
   if(idxChart) idxChart.destroy();
   const ctx = document.getElementById('idx-chart');
-  const fakeR = { price:SEALED.price, chg7d:SEALED.chg7d, color:'#E8A020', colorD:'rgba(232,160,32,0.15)', cardCount:4 };
-  buildChart({ ...fakeR, spark:SEALED.spark, shortName:'Sealed', chg1d:1.2, chg30d:12, allTimeHigh:'$280', allTimeLow:'$82', volume:'$8.4K', perfUp:[true,true,true,true,true,true], perf:{h1:'+0.2%',h24:'+1.2%',d7:'+3.8%',m1:'+12.0%',y1:'+68%',max:'+94%'} }, activeTime);
-  buildPerf({ perfUp:[true,true,true,true,true,true], perf:{h1:'+0.2%',h24:'+1.2%',d7:'+3.8%',m1:'+12.0%',y1:'+68%',max:'+94%'} });
+  buildChart(SEALED_DETAIL, activeTime);
+  buildPerf(SEALED_DETAIL);
 }
 
 function setChartTime(el, period) {
@@ -1496,24 +1431,6 @@ function setChartTime(el, period) {
 }
 
 /* ── SET CONTEXT SELECTOR ── */
-const SET_OPTIONS = [
-  {slug:'all',  code:'All Sets', name:'Global averages',     color:'#7A88A8', chg7d:null},
-  {slug:'op01', code:'OP01',     name:'Romance Dawn',        color:'#FF4560', chg7d:5.6},
-  {slug:'op02', code:'OP02',     name:'Paramount War',       color:'#4F8EF7', chg7d:2.1},
-  {slug:'op03', code:'OP03',     name:'Pillars of Strength', color:'#00C9A7', chg7d:-0.4},
-  {slug:'op05', code:'OP05',     name:'Awakening New Era',   color:'#9B72FF', chg7d:-0.8},
-  {slug:'op08', code:'OP08',     name:'Two Legends',         color:'#FF4560', chg7d:4.2},
-  {slug:'op09', code:'OP09',     name:"Emperors New World",  color:'#00D68F', chg7d:7.3},
-  {slug:'op14', code:'OP14',     name:"Azure Sea's Seven",   color:'#E8A020', chg7d:18.4},
-  {slug:'op15', code:'OP15',     name:'Grand Final',         color:'#F472B6', chg7d:9.1},
-];
-const EB_OPTIONS = [
-  {slug:'eb01', code:'EB01', name:'Memorial Collection', color:'#4F8EF7', chg7d:6.2},
-  {slug:'eb02', code:'EB02', name:"Dragon's Call",       color:'#9B72FF', chg7d:4.1},
-];
-let activeSetCtx = 'all';
-let setDropOpen  = false;
-
 function buildSetDropdown() {
   const el = document.getElementById('set-context-drop');
   const sets = SET_OPTIONS.slice(1);
