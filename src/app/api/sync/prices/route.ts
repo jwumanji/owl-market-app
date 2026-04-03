@@ -75,8 +75,8 @@ export async function GET() {
     name: set.name,
     cards: set.card_count ?? 0,
     topCards: topCards.map((ps) => ({
-      n:   (ps.card as { name: string; rarity: string })?.name ?? "",
-      rl:  (ps.card as { name: string; rarity: string })?.rarity ?? "",
+      n:   (ps.card as unknown as { name: string; rarity: string })?.name ?? "",
+      rl:  (ps.card as unknown as { name: string; rarity: string })?.rarity ?? "",
       tcg: ps.tcg_market ?? 0,
       avg: ps.market_avg ?? 0,
       d1:  ps.chg_1d ?? 0,
