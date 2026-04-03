@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -18,8 +18,6 @@ import {
   PULL_RATES,
   DEFAULT_PULL_RATES,
   type SetData,
-  type TopCard,
-  type PullRate,
 } from "./sets-data";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip);

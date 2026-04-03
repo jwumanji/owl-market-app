@@ -513,3 +513,104 @@ nav {
 .pr-rate-fill { height: 100%; border-radius: 3px; }
 .pr-rate-num { font-family: var(--font-ibm-plex-mono), monospace; font-size: 11px; color: var(--text2); width: 52px; text-align: right; flex-shrink: 0; }
 .pr-note { font-family: var(--font-ibm-plex-mono), monospace; font-size: 11px; color: var(--text2); line-height: 1.5; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Characters Page
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.chars-page { max-width: 1280px; margin: 0 auto; padding: 24px 20px 60px; }
+
+/* ── Rank Cards Row (top 5) ── */
+.ch-rank-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px; }
+@media (max-width: 900px) { .ch-rank-row { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 600px) { .ch-rank-row { grid-template-columns: repeat(2, 1fr); } }
+
+.ch-rank-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px; cursor: pointer; transition: border-color .2s, box-shadow .2s;
+  position: relative; overflow: hidden;
+}
+.ch-rank-card:hover { border-color: var(--border2); }
+.ch-rank-card::before {
+  content: ''; position: absolute; inset: 0; opacity: 0;
+  background: radial-gradient(ellipse at top, var(--ch-color, #E8A020)10, transparent 70%);
+  transition: opacity .3s;
+}
+.ch-rank-card:hover::before { opacity: 1; }
+
+.ch-rank-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; position: relative; }
+.ch-rank-num { font-family: var(--font-ibm-plex-mono), monospace; font-size: 12px; color: var(--text2); font-weight: 600; }
+.ch-tier-badge { font-family: var(--font-ibm-plex-mono), monospace; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.5px; }
+.ch-rank-name { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: relative; }
+.ch-rank-sub { font-size: 11px; color: var(--text2); margin-bottom: 8px; position: relative; }
+.ch-rank-price { font-family: var(--font-ibm-plex-mono), monospace; font-size: 18px; font-weight: 700; color: var(--text); position: relative; }
+.ch-rank-chg { font-family: var(--font-ibm-plex-mono), monospace; font-size: 12px; margin-bottom: 8px; position: relative; }
+.ch-rank-period { color: var(--text2); font-size: 10px; }
+.ch-rank-spark { position: relative; }
+
+/* ── Character Pills ── */
+.ch-pill-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 24px; }
+.ch-pill {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 12px; cursor: pointer; font-size: 12px; transition: border-color .15s;
+}
+.ch-pill:hover { border-color: var(--border2); }
+.ch-pill.active { border-color: var(--owl); box-shadow: 0 0 0 1px var(--owl); }
+.ch-pill-rank { font-family: var(--font-ibm-plex-mono), monospace; color: var(--text2); font-weight: 600; width: 24px; }
+.ch-pill-name { color: var(--text); font-weight: 600; white-space: nowrap; }
+.ch-pill-faction { color: var(--text2); font-size: 11px; display: none; }
+@media (min-width: 768px) { .ch-pill-faction { display: inline; } }
+.ch-pill-val { font-family: var(--font-ibm-plex-mono), monospace; color: var(--text); margin-left: auto; }
+.ch-pill-chg { font-family: var(--font-ibm-plex-mono), monospace; font-size: 11px; width: 48px; text-align: right; }
+
+/* ── Detail Section ── */
+.ch-detail-section { display: grid; grid-template-columns: 320px 1fr; gap: 16px; margin-bottom: 32px; }
+@media (max-width: 900px) { .ch-detail-section { grid-template-columns: 1fr; } }
+
+.ch-detail {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  overflow: hidden;
+}
+.ch-detail-header {
+  position: relative; padding: 20px; border-bottom: 1px solid var(--border);
+}
+.ch-detail-badges { display: flex; gap: 8px; margin-bottom: 10px; }
+.ch-faction-badge { font-family: var(--font-ibm-plex-mono), monospace; font-size: 10px; color: var(--text2); background: var(--surf3); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border); }
+.ch-detail-name { font-size: 22px; font-weight: 700; color: var(--text); }
+.ch-detail-sub { font-size: 13px; color: var(--text2); margin-top: 2px; }
+
+.ch-detail-stats { padding: 0; }
+.ch-stat-row { display: flex; justify-content: space-between; padding: 12px 20px; border-bottom: 1px solid var(--border); }
+.ch-stat-row:last-child { border-bottom: none; }
+.ch-stat-key { font-family: var(--font-ibm-plex-mono), monospace; font-size: 12px; color: var(--text2); }
+.ch-stat-val { font-family: var(--font-ibm-plex-mono), monospace; font-size: 12px; font-weight: 600; color: var(--text); }
+
+/* ── Character Cards Section ── */
+.ch-cards-section {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  padding: 20px; overflow: hidden;
+}
+
+/* ── All Characters Grid ── */
+.ch-all-section { margin-top: 32px; }
+.ch-all-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin-top: 16px; }
+
+.ch-grid-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px; cursor: pointer; transition: border-color .2s, box-shadow .2s;
+}
+.ch-grid-card:hover { border-color: var(--border2); }
+
+.ch-grid-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.ch-grid-rank-row { display: flex; align-items: center; gap: 6px; }
+.ch-grid-rank { font-family: var(--font-ibm-plex-mono), monospace; font-size: 12px; color: var(--text2); font-weight: 600; }
+.ch-grid-chg { font-family: var(--font-ibm-plex-mono), monospace; font-size: 11px; }
+.ch-grid-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.ch-grid-sub { font-size: 11px; color: var(--text2); margin-bottom: 8px; }
+.ch-grid-val { font-family: var(--font-ibm-plex-mono), monospace; font-size: 18px; font-weight: 700; color: var(--text); }
+.ch-grid-meta { font-family: var(--font-ibm-plex-mono), monospace; font-size: 11px; color: var(--text2); margin-bottom: 8px; }
+.ch-grid-spark { margin-bottom: 8px; }
+.ch-grid-footer { display: flex; gap: 16px; border-top: 1px solid var(--border); padding-top: 10px; }
+.ch-grid-stat { font-family: var(--font-ibm-plex-mono), monospace; font-size: 11px; color: var(--text2); }
+.ch-grid-stat span { font-weight: 600; }

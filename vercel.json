@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/sync/justtcg?_index=0",
+      "schedule": "0 6 * * *"
+    }
+  ]
+}
