@@ -4,6 +4,14 @@ import { createServiceClient } from "@/lib/supabase-server";
 export const maxDuration = 60;
 
 // ---------------------------------------------------------------------------
+// False-positive exclusions: pattern → phrases that should NOT match
+// ---------------------------------------------------------------------------
+const EXCLUSIONS: Record<string, string[]> = {
+  roger: ["jolly roger"],
+  king: ["king kong", "king pistol", "king punch", "king cobra", "king bazooka"],
+};
+
+// ---------------------------------------------------------------------------
 // Word-boundary aware matching (prevents "Nami" matching "Tsunami" etc.)
 // ---------------------------------------------------------------------------
 function nameMatchesCard(pattern: string, cardName: string): boolean {
@@ -17,6 +25,10 @@ function nameMatchesCard(pattern: string, cardName: string): boolean {
   // Right boundary: end of string or non-alphanumeric after match
   const end = idx + patLower.length;
   if (end < cardName.length && /[a-z0-9]/i.test(cardName[end])) return false;
+
+  // Check exclusions
+  const excl = EXCLUSIONS[patLower];
+  if (excl && excl.some((phrase) => cardName.includes(phrase))) return false;
 
   return true;
 }
