@@ -1,0 +1,1593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rarities — OWL Market</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root {
+  --void:    #03050D;
+  --deep:    #060A16;
+  --surface: #0A1020;
+  --surf2:   #0E1628;
+  --surf3:   #121D32;
+  --border:  rgba(255,255,255,0.055);
+  --border2: rgba(255,255,255,0.10);
+  --owl:     #E8A020;
+  --owl2:    #F5BE50;
+  --owl-d:   rgba(232,160,32,0.12);
+  --green:   #00D68F;
+  --green-d: rgba(0,214,143,0.10);
+  --red:     #FF4560;
+  --red-d:   rgba(255,69,96,0.10);
+  --blue:    #4F8EF7;
+  --purple:  #9B72FF;
+  --teal:    #00C9A7;
+  --text:    #E4EAF6;
+  --text2:   #7A88A8;
+  --text3:   #3D4D6A;
+  --mono:    'IBM Plex Mono', monospace;
+  --display: 'Inter', sans-serif;
+  --sans:    'Inter', sans-serif;
+  --nav-h:   54px;
+  --bar-h:   28px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--void);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+body::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background-image:
+    linear-gradient(rgba(232,160,32,0.016) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232,160,32,0.016) 1px, transparent 1px);
+  background-size: 56px 56px;
+  pointer-events: none;
+}
+.z1 { position: relative; z-index: 1; }
+
+@keyframes blink   { 0%,100%{opacity:1} 50%{opacity:0.15} }
+@keyframes ticker  { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+@keyframes fadeUp  { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fadeIn  { from{opacity:0} to{opacity:1} }
+@keyframes shimmer { 0%{opacity:0.4} 50%{opacity:1} 100%{opacity:0.4} }
+
+/* ── NAV ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 500;
+  display: flex; flex-direction: column;
+  background: rgba(3,5,13,0.94); backdrop-filter: blur(28px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-row {
+  height: var(--nav-h); padding: 0 22px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.logo { display: flex; align-items: center; gap: 9px; text-decoration: none; }
+.logo-owl { width: 32px; height: 32px; border-radius: 7px; background: var(--owl); display: flex; align-items: center; justify-content: center; font-size: 17px; box-shadow: 0 0 16px rgba(232,160,32,0.4); flex-shrink: 0; }
+.logo-name { font-family: var(--display); font-size: 18px; font-weight: 800; color: var(--text); }
+.logo-name span { color: var(--owl); }
+.nav-mid { display: flex; align-items: center; gap: 2px; }
+.nav-link { font-family: var(--mono); font-size: 10px; color: var(--text2); text-decoration: none; padding: 5px 12px; border-radius: 5px; letter-spacing: 0.03em; transition: all .14s; }
+.nav-link:hover { color: var(--text); background: var(--surf2); }
+.nav-link.active { color: var(--owl); background: var(--owl-d); border: 1px solid rgba(232,160,32,0.2); }
+.nav-right { display: flex; align-items: center; gap: 10px; }
+.live-badge { font-family: var(--mono); font-size: 11px; color: var(--green); background: var(--green-d); border: 1px solid rgba(0,214,143,0.22); padding: 4px 10px; border-radius: 3px; letter-spacing: 0.09em; display: flex; align-items: center; gap: 5px; }
+.live-dot { width: 5px; height: 5px; background: var(--green); border-radius: 50%; animation: blink 1.5s infinite; }
+.btn-login {
+  font-family: var(--mono); font-size: 10px; font-weight: 500;
+  color: var(--text2); background: transparent;
+  border: 1px solid var(--border2); padding: 7px 16px;
+  border-radius: 5px; cursor: pointer; letter-spacing: 0.03em;
+  text-decoration: none; transition: all .14s;
+}
+.btn-login:hover { color: var(--text); background: var(--surf2); }
+.btn-signup { font-family: var(--mono); font-size: 10px; font-weight: 500; color: var(--void); background: var(--owl); border: none; padding: 7px 18px; border-radius: 5px; cursor: pointer; letter-spacing: 0.03em; }
+.btn-signup:hover { background: var(--owl2); }
+
+/* ── TICKER ── */
+.ticker-bar { width: 100%; height: var(--bar-h); background: var(--surf2); border-top: 1px solid var(--border); overflow: hidden; display: flex; align-items: center; flex-shrink: 0; }
+.ticker-track { display: flex; animation: ticker 55s linear infinite; width: max-content; }
+.ti { display: flex; align-items: center; gap: 8px; padding: 0 20px; border-right: 1px solid var(--border); white-space: nowrap; height: var(--bar-h); font-family: var(--mono); font-size: 10px; }
+.ti-name { color: var(--text2); } .ti-price { color: var(--text); font-weight: 500; }
+.ti-up { color: var(--green); } .ti-dn { color: var(--red); }
+
+/* ── PAGE ── */
+.page {
+  padding-top: calc(var(--nav-h) + var(--bar-h) + 24px);
+  max-width: 1280px; margin: 0 auto;
+  padding-left: 24px; padding-right: 24px;
+  padding-bottom: 80px;
+}
+
+/* ── BREADCRUMB ── */
+.breadcrumb { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px; color: var(--text2); margin-bottom: 20px; letter-spacing: 0.02em; }
+.breadcrumb a { color: var(--text2); text-decoration: none; transition: color .14s; }
+.breadcrumb a:hover { color: var(--text); }
+.breadcrumb-sep { color: var(--text2); }
+
+/* ── PAGE HEADER ── */
+.page-hero {
+  margin-bottom: 32px;
+  animation: fadeUp .4s ease both;
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;
+}
+.ph-left { flex: 1; }
+.ph-eyebrow { font-family: var(--mono); font-size: 11px; color: var(--owl); letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.ph-eyebrow::before { content: ''; width: 20px; height: 1px; background: var(--owl); }
+.ph-title { font-family: var(--display); font-size: 36px; font-weight: 800; letter-spacing: -0.3px; color: var(--text); margin-bottom: 8px; line-height: 1; }
+.ph-title span { color: var(--owl); }
+.ph-sub { font-family: var(--sans); font-size: 14px; color: var(--text2); font-weight: 300; max-width: 560px; line-height: 1.65; }
+
+/* ── SET CONTEXT SELECTOR ── */
+.set-context-wrap { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; padding-bottom: 4px; }
+.set-context-label { font-family: var(--mono); font-size: 10px; color: var(--text2); letter-spacing: 0.08em; text-transform: uppercase; }
+.set-context-btn {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: 8px; padding: 10px 14px; cursor: pointer;
+  transition: all .16s; min-width: 220px; justify-content: space-between;
+}
+.set-context-btn:hover { border-color: var(--owl); background: var(--surf2); }
+.set-context-btn.active { border-color: var(--owl); box-shadow: 0 0 0 1px rgba(232,160,32,0.2); }
+.set-context-name { font-family: var(--display); font-size: 14px; font-weight: 700; color: var(--text); }
+.set-context-sub  { font-family: var(--mono); font-size: 10px; color: var(--text2); margin-top: 1px; }
+.set-context-arrow { font-size: 11px; color: var(--text2); transition: transform .16s; }
+.set-context-btn.open .set-context-arrow { transform: rotate(180deg); }
+
+.set-context-drop {
+  position: fixed; z-index: 600;
+  background: var(--surf2); border: 1px solid var(--border2);
+  border-radius: 10px; padding: 8px;
+  width: 260px; box-shadow: 0 16px 48px rgba(0,0,0,0.7);
+  display: none; max-height: 420px; overflow-y: auto;
+}
+.set-context-drop.open { display: block; }
+.set-context-drop::-webkit-scrollbar { width: 3px; }
+.set-context-drop::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.set-context-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 10px; border-radius: 6px; cursor: pointer; transition: background .1s;
+}
+.set-context-item:hover { background: rgba(255,255,255,0.05); }
+.scd-section { font-family: var(--mono); font-size: 9px; color: var(--text2); letter-spacing: 0.1em; text-transform: uppercase; padding: 8px 8px 4px; }
+.scd-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 10px; border-radius: 6px; cursor: pointer; transition: background .1s;
+}
+.scd-item:hover { background: var(--surf3); }
+.scd-item.active { background: var(--owl-d); }
+.scd-item-left { display: flex; align-items: center; gap: 8px; }
+.scd-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.scd-code { font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--text); }
+.scd-name { font-size: 11px; color: var(--text2); }
+.scd-chg  { font-family: var(--mono); font-size: 11px; font-weight: 600; }
+
+/* ── RARITY INDEX ROW (all rarities, full width) ── */
+.rarity-index-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr) 1fr 80px;
+  gap: 8px;
+  margin-bottom: 24px;
+  animation: fadeUp .4s .05s ease both;
+  align-items: stretch;
+}
+
+.ric {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 12px 10px;
+  cursor: pointer;
+  transition: all .18s;
+  position: relative;
+  overflow: hidden;
+}
+.ric::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  border-radius: 8px 8px 0 0;
+  background: linear-gradient(90deg, transparent, var(--ric-color, #E8A020), transparent);
+  opacity: 0;
+  transition: opacity .18s;
+}
+.ric:hover { border-color: var(--border2); transform: translateY(-1px); }
+.ric:hover::before { opacity: 1; }
+.ric.active { transform: translateY(-1px); }
+.ric.active::before { opacity: 1; }
+
+.ric-badge { font-family: var(--mono); font-size: 10px; padding: 3px 8px; border-radius: 3px; font-weight: 600; letter-spacing: 0.06em; display: inline-block; flex-shrink: 0; }
+.ric-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; margin-bottom: 4px; }
+.ric-name  { font-family: var(--display); font-size: 13px; font-weight: 800; color: var(--text); letter-spacing: -0.1px; line-height: 1.2; white-space: normal; word-break: break-word; flex: 1; min-width: 0; }
+.ric-price { font-family: var(--display); font-size: 15px; font-weight: 800; color: var(--text); letter-spacing: -0.3px; line-height: 1; margin-bottom: 2px; }
+.ric-chg   { font-family: var(--mono); font-size: 16px; font-weight: 700; margin-bottom: 5px; letter-spacing: -0.3px; }
+.ric-spark { height: 28px; width: 100%; display: block; }
+
+/* SEALED index card — distinct locked-box style */
+.ric-sealed {
+  background: linear-gradient(135deg, rgba(232,160,32,0.08), rgba(14,22,40,0.6));
+  border: 1px solid rgba(232,160,32,0.25);
+  border-radius: 8px;
+  padding: 12px 12px 10px;
+  cursor: pointer;
+  transition: all .18s;
+  position: relative;
+  overflow: hidden;
+  --ric-color: #E8A020;
+}
+.ric-sealed::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  border-radius: 8px 8px 0 0;
+  background: linear-gradient(90deg, transparent, #E8A020, transparent);
+  opacity: 0.6;
+}
+.ric-sealed:hover { border-color: rgba(232,160,32,0.5); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(232,160,32,0.12); }
+.ric-sealed.active { border-color: #E8A020; box-shadow: 0 0 0 1px #E8A020, 0 6px 20px rgba(232,160,32,0.2); }
+
+/* MORE button + dropdown */
+.ric-more-wrap { position: relative; }
+.ric-more {
+  background: var(--surf2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 10px 8px;
+  cursor: pointer;
+  transition: all .18s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  min-height: 100px;
+}
+.ric-more:hover { border-color: var(--border3); background: var(--surface); }
+.ric-more-label { font-family: var(--mono); font-size: 11px; color: var(--text2); letter-spacing: 0.06em; text-transform: uppercase; text-align: center; line-height: 1.4; }
+.ric-more-dots { display: flex; gap: 3px; }
+.ric-more-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text3); }
+.ric-more-arrow { font-size: 10px; color: var(--text2); transition: transform .18s; }
+.ric-more:hover .ric-more-arrow { transform: rotate(180deg); color: var(--text2); }
+
+/* dropdown panel */
+.ric-dropdown {
+  position: fixed;
+  width: 200px;
+  background: var(--surf2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.8);
+  z-index: 600;
+  overflow: hidden;
+  display: none;
+}
+.ric-dropdown.open { display: block; }
+.ric-dd-header { font-family: var(--mono); font-size: 10px; color: var(--text2); letter-spacing: 0.03em; text-transform: uppercase; padding: 10px 14px 6px; border-bottom: 1px solid var(--border); }
+.ric-dd-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 14px; cursor: pointer; transition: background .1s;
+  border-bottom: 1px solid var(--border);
+}
+.ric-dd-item:last-child { border-bottom: none; }
+.ric-dd-item:hover { background: rgba(255,255,255,0.04); }
+.ric-dd-item.active { background: rgba(232,160,32,0.06); }
+.ric-dd-left { display: flex; align-items: center; gap: 8px; }
+.ric-dd-badge { font-family: var(--mono); font-size: 10px; padding: 2px 6px; border-radius: 3px; letter-spacing: 0.03em; }
+.ric-dd-name { font-family: var(--sans); font-size: 11px; color: var(--text); }
+.ric-dd-chg { font-family: var(--mono); font-size: 10px; }
+
+/* ── DETAIL SECTION ── */
+.detail-section {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 20px;
+  margin-bottom: 28px;
+  animation: fadeUp .4s .1s ease both;
+}
+
+/* LEFT: selected rarity detail */
+.rarity-detail-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+}
+.rdc-header {
+  padding: 16px 18px; border-bottom: 1px solid var(--border);
+  position: relative; overflow: hidden;
+}
+.rdc-header::before {
+  content: '';
+  position: absolute; inset: 0;
+  opacity: 0.06;
+}
+.rdc-badge { font-family: var(--mono); font-size: 10px; padding: 3px 10px; border-radius: 3px; font-weight: 500; letter-spacing: 0.03em; display: inline-block; margin-bottom: 10px; }
+.rdc-name { font-family: var(--display); font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 4px; letter-spacing: -0.2px; }
+.rdc-desc { font-family: var(--sans); font-size: 12px; color: var(--text2); line-height: 1.6; font-weight: 300; }
+.rdc-stats { padding: 0; }
+.rdc-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 18px; border-bottom: 1px solid var(--border); }
+.rdc-row:last-child { border-bottom: none; }
+.rdc-key { font-family: var(--mono); font-size: 10px; color: var(--text2); letter-spacing: 0.01em; }
+.rdc-val { font-family: var(--mono); font-size: 13px; color: var(--text); font-weight: 600; text-align: right; }
+.pull-rate-bar { display: flex; align-items: center; gap: 8px; }
+.pr-track { width: 80px; height: 4px; background: var(--surf3); border-radius: 2px; overflow: hidden; }
+.pr-fill  { height: 100%; border-radius: 2px; }
+
+/* RIGHT: index chart */
+.index-chart-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+}
+.icc-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+}
+.icc-left {}
+.icc-title { font-family: var(--display); font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: 0.2px; }
+.icc-price { font-family: var(--display); font-size: 28px; font-weight: 800; color: var(--text); letter-spacing: -0.3px; line-height: 1; margin-top: 4px; }
+.icc-sub { font-family: var(--mono); font-size: 10px; color: var(--text2); margin-top: 3px; }
+.icc-right { display: flex; gap: 2px; }
+.icc-time { font-family: var(--mono); font-size: 10px; color: var(--text2); padding: 4px 9px; border-radius: 3px; cursor: pointer; border: none; background: transparent; transition: all .14s; letter-spacing: 0.02em; }
+.icc-time:hover { color: var(--text); background: var(--surf2); }
+.icc-time.on { background: var(--owl-d); color: var(--owl); border: 1px solid rgba(232,160,32,0.25); }
+.icc-body { padding: 0; }
+.icc-chart { height: 260px; position: relative; }
+
+/* perf row */
+.perf-strip {
+  display: grid; grid-template-columns: repeat(6,1fr); gap: 1px;
+  border-top: 1px solid var(--border);
+}
+.perf-cell { background: var(--surf2); padding: 12px 12px; text-align: center; }
+.perf-period { font-family: var(--mono); font-size: 10px; color: var(--text2); letter-spacing: 0.08em; margin-bottom: 5px; text-transform: uppercase; }
+.perf-val { font-family: var(--mono); font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+
+/* ── TOP CARDS SECTION ── */
+.top-cards-section {
+  margin-bottom: 28px;
+  animation: fadeUp .4s .15s ease both;
+}
+.section-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.section-title { font-family: var(--display); font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: 0.2px; }
+.section-title span { color: var(--owl); }
+.section-sub { font-family: var(--mono); font-size: 10px; color: var(--text2); margin-top: 2px; }
+.section-action { font-family: var(--mono); font-size: 10px; color: var(--text2); text-decoration: none; transition: color .14s; margin-top: 4px; flex-shrink: 0; }
+.section-action:hover { color: var(--owl); }
+
+/* Horizontal rarity tag switcher */
+.rarity-tabs {
+  display: flex; align-items: center; gap: 6px;
+  flex-wrap: wrap; margin-bottom: 14px;
+}
+.rtab {
+  font-family: var(--mono); font-size: 10px;
+  padding: 5px 13px; border-radius: 4px;
+  border: 1px solid var(--border); color: var(--text2);
+  cursor: pointer; letter-spacing: 0.03em;
+  transition: all .14s; background: transparent;
+  white-space: nowrap;
+}
+.rtab:hover { border-color: var(--border2); color: var(--text); background: var(--surf2); }
+.rtab.active { font-weight: 500; }
+
+.cards-table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.cards-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.cards-table col.c0 { width: 44px; }
+.cards-table col.c1 { width: 240px; }
+.cards-table col.c2 { width: 100px; }
+.cards-table col.c3 { width: 95px; }
+.cards-table col.c4 { width: 95px; }
+.cards-table col.c5 { width: 68px; }
+.cards-table col.c6 { width: 68px; }
+.cards-table col.c7 { width: 68px; }
+.cards-table col.c8 { width: 110px; }
+
+.cards-table th {
+  font-family: var(--mono); font-size: 11px; color: var(--text2);
+  letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 9px 12px; border-bottom: 1px solid var(--border);
+  text-align: left; font-weight: 500; background: var(--surf2);
+  white-space: nowrap;
+}
+.cards-table th.r { text-align: right; }
+.cards-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; overflow: hidden; }
+.cards-table tr:last-child td { border-bottom: none; }
+.cards-table tbody tr { cursor: pointer; transition: background .1s; }
+.cards-table tbody tr:hover td { background: rgba(255,255,255,0.022); }
+
+.rank-n { font-family: var(--mono); font-size: 10px; color: var(--text2); text-align: center; }
+.card-cell { display: flex; align-items: center; gap: 10px; }
+.card-art { width: 28px; height: 38px; border-radius: 3px; background: var(--surf3); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+.card-name { font-size: 12px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-set  { font-family: var(--mono); font-size: 11px; color: var(--text2); margin-top: 1px; }
+.rb { font-family: var(--mono); font-size: 10px; padding: 2px 6px; border-radius: 2px; font-weight: 500; letter-spacing: 0.02em; white-space: nowrap; display: inline-block; }
+.rb-mr  { background: rgba(232,160,32,0.18); color: #E8A020; border: 1px solid rgba(232,160,32,0.3); }
+.rb-sp  { background: rgba(155,114,255,0.18); color: #B89AFF; border: 1px solid rgba(155,114,255,0.3); }
+.rb-sec { background: rgba(255,69,96,0.18); color: #FF8FA0; border: 1px solid rgba(255,69,96,0.3); }
+.rb-tr  { background: rgba(234,179,8,0.18); color: #FDE047; border: 1px solid rgba(234,179,8,0.3); }
+.rb-aa  { background: rgba(79,142,247,0.18); color: #7FB0FA; border: 1px solid rgba(79,142,247,0.3); }
+.rb-sr  { background: rgba(0,214,143,0.15); color: #00D68F; border: 1px solid rgba(0,214,143,0.28); }
+.rb-gmr { background: rgba(245,190,80,0.25); color: #F5BE50; border: 1px solid rgba(245,190,80,0.5); }
+.price-r { text-align: right; font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--text); }
+.chg-r   { text-align: right; font-family: var(--mono); font-size: 11px; }
+.up { color: var(--green); } .dn { color: var(--red); }
+.spark-r { display: flex; justify-content: flex-end; align-items: flex-end; gap: 2px; height: 22px; }
+.spk { border-radius: 1px; min-height: 2px; }
+
+/* ── ALL RARITIES COMPARISON ── */
+.comparison-section {
+  margin-bottom: 28px;
+  animation: fadeUp .4s .2s ease both;
+}
+.comp-grid {
+  display: grid; grid-template-columns: repeat(4,1fr); gap: 12px;
+}
+.comp-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 16px; transition: all .18s; cursor: pointer;
+}
+.comp-card:hover { border-color: var(--border2); transform: translateY(-1px); }
+.comp-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 4px; gap: 6px; }
+.comp-title-row { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0; }
+.comp-badge { font-family: var(--mono); font-size: 11px; padding: 2px 7px; border-radius: 3px; letter-spacing: 0.06em; flex-shrink: 0; }
+.comp-chg { font-family: var(--mono); font-size: 20px; font-weight: 700; letter-spacing: -0.3px; flex-shrink: 0; }
+.comp-name { font-family: var(--display); font-size: 14px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.comp-val { font-family: var(--display); font-size: 28px; font-weight: 800; color: var(--text); letter-spacing: -0.3px; margin-bottom: 2px; line-height: 1; }
+.comp-cards { font-family: var(--mono); font-size: 11px; color: var(--text2); margin-bottom: 10px; }
+.comp-spark { width: 100%; height: 56px; display: block; margin-bottom: 10px; }
+.comp-footer { display: flex; justify-content: space-between; padding-top: 10px; border-top: 1px solid var(--border); }
+.comp-stat { font-family: var(--mono); font-size: 11px; color: var(--text2); }
+.comp-stat-val { color: var(--text); }
+
+/* ── PULL RATES SECTION ── */
+.pullrates-section {
+  margin-bottom: 28px;
+  animation: fadeUp .4s .25s ease both;
+}
+.pr-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+.pr-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px;
+}
+.pr-badge { font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: 3px; display: inline-block; margin-bottom: 10px; letter-spacing: 0.06em; }
+.pr-name { font-family: var(--display); font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+.pr-rate-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.pr-rate-label { font-family: var(--mono); font-size: 11px; color: var(--text2); width: 90px; flex-shrink: 0; }
+.pr-rate-track { flex: 1; height: 5px; background: var(--surf3); border-radius: 3px; overflow: hidden; }
+.pr-rate-fill { height: 100%; border-radius: 3px; }
+.pr-rate-num { font-family: var(--mono); font-size: 11px; color: var(--text2); width: 52px; text-align: right; flex-shrink: 0; }
+.pr-note { font-family: var(--mono); font-size: 11px; color: var(--text2); line-height: 1.5; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-row">
+  <a href="#" class="logo">
+    <div class="logo-owl">🦉</div>
+    <span class="logo-name">OWL<span> Market</span></span>
+  </a>
+  <div class="nav-mid">
+    <a href="#" class="nav-link">HOME</a>
+    <a href="#" class="nav-link">MARKETS</a>
+    <a href="#" class="nav-link active">RARITIES</a>
+    <a href="#" class="nav-link">PROMOS</a>
+    <a href="#" class="nav-link">SETS</a>
+    <a href="#" class="nav-link">PORTFOLIO</a>
+    <a href="#" class="nav-link">ALERTS</a>
+  </div>
+  <div class="nav-right">
+    <div class="live-badge"><span class="live-dot"></span>LIVE</div>
+    <a href="#" class="btn-login">Login</a><button class="btn-signup">Sign Up</button>
+  </div></div>
+  <div class="ticker-bar"><div class="ticker-track" id="ticker"></div></div>
+</nav>
+</div>
+
+<!-- PAGE -->
+<div class="page z1">
+
+  <!-- BREADCRUMB -->
+  <div class="breadcrumb">
+    <a href="#">OWL Market</a>
+    <span class="breadcrumb-sep">›</span>
+    <span style="color:var(--text2)">Rarities</span>
+  </div>
+
+  <!-- PAGE HEADER -->
+  <div class="page-hero">
+    <div class="ph-left">
+      <div class="ph-eyebrow">One Piece TCG</div>
+      <div class="ph-title">Rarity <span>Indexes</span></div>
+      <div class="ph-sub">Track each rarity class as its own market index. Filter by set to see how each rarity performs within a specific release.</div>
+    </div>
+    <div class="set-context-wrap">
+      <div class="set-context-label">Viewing</div>
+      <div class="set-context-btn" id="set-context-btn" onclick="toggleSetDrop()">
+        <div>
+          <div class="set-context-name" id="set-ctx-name">All Sets</div>
+          <div class="set-context-sub" id="set-ctx-sub">Global rarity averages</div>
+        </div>
+        <span class="set-context-arrow">▾</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Set context dropdown (fixed position) -->
+  <div class="set-context-drop" id="set-context-drop"></div>
+
+  <!-- RARITY INDEX ROW — all 8 rarities -->
+  <div class="rarity-index-row" id="rarity-index-row"></div>
+
+  <!-- DETAIL + CHART -->
+  <div class="detail-section">
+    <!-- Left: selected rarity info -->
+    <div class="rarity-detail-card" id="detail-card"></div>
+
+    <!-- Right: index chart -->
+    <div class="index-chart-card">
+      <div class="icc-header">
+        <div class="icc-left">
+          <div class="icc-title" id="chart-title">Manga Rare Index</div>
+          <div class="icc-price" id="chart-price">$842.00</div>
+          <div class="icc-sub" id="chart-sub">Avg price of all Manga Rare cards · 13 cards tracked</div>
+        </div>
+        <div class="icc-right">
+          <button class="icc-time on"  onclick="setChartTime(this,'7d')">7D</button>
+          <button class="icc-time"     onclick="setChartTime(this,'1m')">1M</button>
+          <button class="icc-time"     onclick="setChartTime(this,'3m')">3M</button>
+          <button class="icc-time"     onclick="setChartTime(this,'1y')">1Y</button>
+          <button class="icc-time"     onclick="setChartTime(this,'max')">Max</button>
+        </div>
+      </div>
+      <div class="icc-body">
+        <div class="icc-chart"><canvas id="idx-chart"></canvas></div>
+      </div>
+      <div class="perf-strip" id="perf-strip"></div>
+    </div>
+  </div>
+
+  <!-- TOP CARDS FOR SELECTED RARITY -->
+  <div class="top-cards-section">
+    <div class="section-header">
+      <div>
+        <div class="section-title">Top Cards — <span id="top-cards-title">Manga Rare</span></div>
+        <div class="section-sub" id="top-cards-sub">Ranked by current market value</div>
+      </div>
+      <a href="#" class="section-action">View all in markets →</a>
+    </div>
+
+    <!-- Time range + sort above rarity tabs -->
+    <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:2px;background:var(--surf2);border:1px solid var(--border2);border-radius:6px;padding:3px">
+        <button class="icc-time" onclick="setTopCardsTime(this,'24h')">24H</button>
+        <button class="icc-time" onclick="setTopCardsTime(this,'7d')">7D</button>
+        <button class="icc-time on" onclick="setTopCardsTime(this,'30d')">30D</button>
+        <button class="icc-time" onclick="setTopCardsTime(this,'all')">ALL</button>
+      </div>
+      <select class="icc-sort-sel" onchange="doTopCardsSort(this.value)" style="font-family:var(--mono);font-size:10px;color:var(--text2);background:var(--surface);border:1px solid var(--border);padding:6px 10px;border-radius:5px;outline:none;cursor:pointer">
+        <option value="val">Sort: Market Value ↓</option>
+        <option value="d1">Sort: 24H Change</option>
+        <option value="d7">Sort: 7D Change</option>
+        <option value="d30">Sort: 30D Change</option>
+      </select>
+    </div>
+
+    <!-- Rarity tag switcher -->
+    <div class="rarity-tabs" id="rarity-tabs"></div>
+    <div class="cards-table-wrap">
+      <table class="cards-table">
+        <colgroup>
+          <col class="c0"><col class="c1"><col class="c2">
+          <col class="c3"><col class="c4"><col class="c5">
+          <col class="c6"><col class="c7"><col class="c8">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Card</th>
+            <th>Rarity</th>
+            <th class="r">Avg Price</th>
+            <th class="r">TCGPlayer</th>
+            <th class="r">24H</th>
+            <th class="r">7D</th>
+            <th class="r">30D</th>
+            <th class="r">Last 7 Days</th>
+          </tr>
+        </thead>
+        <tbody id="top-cards-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ALL RARITIES COMPARISON -->
+  <div class="comparison-section">
+    <div class="section-header">
+      <div>
+        <div class="section-title">All Rarity <span>Indexes</span></div>
+        <div class="section-sub">30-day performance across every rarity class</div>
+      </div>
+    </div>
+    <div class="comp-grid" id="comp-grid"></div>
+  </div>
+
+</div>
+
+<script>
+/* ══════════════════════════════
+   DATA
+══════════════════════════════ */
+const RARITIES = [
+  {
+    slug:'mr', code:'MR', label:'★ Manga Rare', shortName:'Manga Rare',
+    color:'#E8A020', colorD:'rgba(232,160,32,0.15)', colorBd:'rgba(232,160,32,0.3)',
+    price:842, chg7d:8.2, chg1d:2.1, chg30d:24.6, chgMax:184,
+    cardCount:13, volume:'$28.4K', allTimeHigh:'$1,020', allTimeLow:'$180',
+    desc:'The rarest cards in One Piece TCG — featuring original manga panel artwork by Eiichiro Oda. Appear approximately once per case and are the premier chase cards for collectors.',
+    pullRate:'~1 per case (6 boxes)', pullPct:1.4,
+    up:true,
+    spark:[4,5,5,6,6,7,8,9,10,11,12,12,13],
+    perf: {h1:'+0.4%',h24:'+2.1%',d7:'+8.2%',m1:'+18.4%',y1:'+142%',max:'+184%'},
+    perfUp:[true,true,true,true,true,true],
+    topCards:[
+      {e:'☠', n:'Monkey D. Luffy', set:'OP01', tcg:1240, avg:1310, d1:8.2, d7:12.4, d30:41, sp:[4,5,6,6,8,10,11,12,13], rb:'rb-mr', rl:'MANGA RARE'},
+      {e:'👑', n:'Gol D. Roger (Golden)', set:'OP09', tcg:680, avg:700, d1:-1.2, d7:3.4, d30:22, sp:[6,6,7,7,7,7,7,7,8], rb:'rb-gmr', rl:'GOLDEN MR'},
+      {e:'🌊', n:'Charlotte Katakuri', set:'OP05', tcg:380, avg:395, d1:2.8, d7:6.1, d30:24, sp:[5,5,6,6,7,7,8,8,8], rb:'rb-mr', rl:'MANGA RARE'},
+      {e:'🔥', n:'Shanks', set:'OP08', tcg:520, avg:540, d1:4.1, d7:9.8, d30:31, sp:[4,5,5,6,7,8,8,9,9], rb:'rb-mr', rl:'MANGA RARE'},
+      {e:'⚡', n:'Trafalgar Law', set:'OP02', tcg:290, avg:305, d1:1.8, d7:4.2, d30:18, sp:[4,4,5,5,6,6,7,7,7], rb:'rb-mr', rl:'MANGA RARE'},
+    ],
+  },
+  {
+    slug:'promo', code:'PROMO', label:'PROMO · Tournament', shortName:'Promo',
+    color:'#F472B6', colorD:'rgba(244,114,182,0.14)', colorBd:'rgba(244,114,182,0.3)',
+    price:380, chg7d:6.1, chg1d:1.8, chg30d:19.4, chgMax:240,
+    cardCount:68, volume:'$14.2K', allTimeHigh:'$2,400', allTimeLow:'$8',
+    desc:'Tournament and event exclusive cards — Treasure Cup prizes, regional winners, anniversary sets and serial-numbered trophies. The most collectible and scarcest cards in the entire game.',
+    pullRate:'Event / Tournament only', pullPct:0.2,
+    up:true,
+    spark:[4,5,5,6,7,8,8,9,10,10,11,11,12],
+    perf: {h1:'+0.3%',h24:'+1.8%',d7:'+6.1%',m1:'+19.4%',y1:'+168%',max:'+240%'},
+    perfUp:[true,true,true,true,true,true],
+    topCards:[
+      {e:'🌙', n:'Portgas D. Ace (Trophy)', set:'PROMO', tcg:2100, avg:2250, d1:5.3, d7:11.2, d30:62, sp:[5,6,7,8,9,11,13,15,16], rb:'rb-sec', rl:'TROPHY CARD'},
+      {e:'⚓', n:'Luffy Treasure Cup Prize', set:'PROMO', tcg:840, avg:880, d1:3.2, d7:8.4, d30:34, sp:[4,5,5,6,7,8,9,10,10], rb:'rb-sec', rl:'TREASURE CUP'},
+      {e:'🏆', n:'Shanks Regional Winner', set:'PROMO', tcg:420, avg:440, d1:2.1, d7:5.6, d30:22, sp:[4,4,5,5,6,7,7,8,8], rb:'rb-sec', rl:'REGIONAL'},
+      {e:'🎖', n:'Luffy 2nd Anniversary', set:'PROMO', tcg:280, avg:295, d1:1.4, d7:4.2, d30:18, sp:[4,4,4,5,5,6,6,7,7], rb:'rb-sec', rl:'ANNIVERSARY'},
+      {e:'⚡', n:'Zoro Participation Promo', set:'PROMO', tcg:38, avg:40, d1:0.8, d7:2.4, d30:8, sp:[4,4,4,4,4,5,5,5,5], rb:'rb-sec', rl:'PROMO'},
+    ],
+  },
+  {
+    slug:'sp', code:'SP', label:'SP · Special Rare', shortName:'Special Rare',
+    color:'#9B72FF', colorD:'rgba(155,114,255,0.15)', colorBd:'rgba(155,114,255,0.3)',
+    price:138, chg7d:12.4, chg1d:4.8, chg30d:32.1, chgMax:210,
+    cardCount:28, volume:'$18.6K', allTimeHigh:'$220', allTimeLow:'$38',
+    desc:'Alternate artwork cards with unique themed illustrations — Wanted Posters, character portraits, stained-glass mosaics. Each set from OP03 onwards has its own SP art theme.',
+    pullRate:'~1 per case (6 boxes)', pullPct:1.4,
+    up:true,
+    spark:[3,3,4,5,6,8,10,11,13,15,16,18,18],
+    perf: {h1:'+0.8%',h24:'+4.8%',d7:'+12.4%',m1:'+32.1%',y1:'+168%',max:'+210%'},
+    perfUp:[true,true,true,true,true,true],
+    topCards:[
+      {e:'🔥', n:'Monkey D. Luffy SP', set:'OP01', tcg:180, avg:187, d1:34.5, d7:41.2, d30:85, sp:[4,5,6,8,10,14,17,18,18], rb:'rb-sp', rl:'SPECIAL RARE'},
+      {e:'🐉', n:'Doflamingo SP', set:'OP01', tcg:145, avg:148, d1:3.1, d7:8.4, d30:19, sp:[5,5,6,7,8,9,9,10,10], rb:'rb-sp', rl:'SPECIAL RARE'},
+      {e:'💎', n:'Boa Hancock SP', set:'OP01', tcg:95, avg:96, d1:2.1, d7:6.3, d30:28, sp:[4,5,5,6,7,8,9,9,9], rb:'rb-sp', rl:'SPECIAL RARE'},
+      {e:'⚔', n:'Roronoa Zoro SP', set:'OP03', tcg:88, avg:90, d1:1.2, d7:5.6, d30:22, sp:[4,4,5,5,6,7,7,8,8], rb:'rb-sp', rl:'SPECIAL RARE'},
+      {e:'🌙', n:'Yamato SP', set:'OP05', tcg:72, avg:74, d1:6.2, d7:14.1, d30:38, sp:[3,4,4,5,6,7,8,9,9], rb:'rb-sp', rl:'SPECIAL RARE'},
+    ],
+  },
+  {
+    slug:'sec', code:'SEC', label:'SEC · Secret Rare', shortName:'Secret Rare',
+    color:'#FF4560', colorD:'rgba(255,69,96,0.15)', colorBd:'rgba(255,69,96,0.3)',
+    price:64, chg7d:-1.8, chg1d:-2.1, chg30d:8.4, chgMax:95,
+    cardCount:42, volume:'$24.1K', allTimeHigh:'$110', allTimeLow:'$12',
+    desc:'The highest base rarity in each set. Gold borders, textured finish. Approximately 1 per box. Includes powerful characters and highly collectible alternate art versions.',
+    pullRate:'~1 per box (24 packs)', pullPct:4.2,
+    up:false,
+    spark:[8,8,7,7,6,6,5,6,6,5,5,5,6],
+    perf: {h1:'-0.2%',h24:'-2.1%',d7:'-1.8%',m1:'+8.4%',y1:'+72%',max:'+95%'},
+    perfUp:[false,false,false,true,true,true],
+    topCards:[
+      {e:'⚡', n:'Yamato SEC', set:'OP05', tcg:68, avg:70, d1:4.8, d7:9.1, d30:32, sp:[4,4,5,5,6,7,7,7,7], rb:'rb-sec', rl:'SECRET RARE'},
+      {e:'🔴', n:'Shanks', set:'OP01', tcg:41.2, avg:47, d1:-2.1, d7:-5.4, d30:18, sp:[6,6,5,5,4,4,4,4,4], rb:'rb-sec', rl:'SECRET RARE'},
+      {e:'🏝', n:'Nico Robin SEC', set:'OP03', tcg:52, avg:54, d1:1.4, d7:3.2, d30:14, sp:[4,4,5,5,5,6,6,6,6], rb:'rb-sec', rl:'SECRET RARE'},
+      {e:'🌊', n:'Portgas D. Ace SEC', set:'OP02', tcg:38, avg:40, d1:-1.2, d7:-2.8, d30:6, sp:[5,5,5,4,4,4,4,4,4], rb:'rb-sec', rl:'SECRET RARE'},
+      {e:'⚔', n:'Mihawk SEC AA', set:'OP14', tcg:28, avg:26, d1:-6.7, d7:-9.2, d30:-14, sp:[8,8,7,6,5,4,3,3,3], rb:'rb-sec', rl:'SECRET RARE'},
+    ],
+  },
+  {
+    slug:'tr', code:'TR', label:'TR · Treasure Rare', shortName:'Treasure Rare',
+    color:'#FDE047', colorD:'rgba(253,224,71,0.12)', colorBd:'rgba(253,224,71,0.3)',
+    price:31, chg7d:4.1, chg1d:0.8, chg30d:11.2, chgMax:68,
+    cardCount:38, volume:'$12.8K', allTimeHigh:'$58', allTimeLow:'$8',
+    desc:'Premium alternate-art variants introduced in OP06. Same card effects with exclusive visual treatment. Collector-focused tier sitting between SEC and SP in terms of rarity.',
+    pullRate:'~1 per 2-3 boxes', pullPct:7.6,
+    up:true,
+    spark:[4,4,4,4,5,5,5,5,6,6,6,6,6],
+    perf: {h1:'+0.1%',h24:'+0.8%',d7:'+4.1%',m1:'+11.2%',y1:'+58%',max:'+68%'},
+    perfUp:[true,true,true,true,true,true],
+    topCards:[
+      {e:'🔴', n:'Shanks TR', set:'OP06', tcg:44, avg:46, d1:2.1, d7:6.2, d30:18, sp:[4,4,5,5,5,6,6,7,7], rb:'rb-tr', rl:'TREAS. RARE'},
+      {e:'🌊', n:'Monkey D. Garp TR', set:'OP06', tcg:38, avg:40, d1:0.4, d7:2.8, d30:9, sp:[4,4,4,5,5,5,5,5,6], rb:'rb-tr', rl:'TREAS. RARE'},
+      {e:'🏴', n:'Marshall D. Teach TR', set:'OP02', tcg:22, avg:23, d1:1.5, d7:5.8, d30:11, sp:[4,4,4,5,5,5,6,6,6], rb:'rb-tr', rl:'TREAS. RARE'},
+      {e:'⚡', n:'Kaido TR', set:'OP07', tcg:28, avg:29, d1:1.8, d7:4.1, d30:12, sp:[4,4,4,4,5,5,5,5,5], rb:'rb-tr', rl:'TREAS. RARE'},
+      {e:'💎', n:'Big Mom TR', set:'OP07', tcg:24, avg:25, d1:-0.4, d7:1.2, d30:7, sp:[4,4,4,4,4,4,5,5,5], rb:'rb-tr', rl:'TREAS. RARE'},
+    ],
+  },
+  {
+    slug:'aa', code:'AA', label:'AA · Alternate Art', shortName:'Alt Art',
+    color:'#4F8EF7', colorD:'rgba(79,142,247,0.15)', colorBd:'rgba(79,142,247,0.3)',
+    price:48, chg7d:2.9, chg1d:1.2, chg30d:14.8, chgMax:112,
+    cardCount:96, volume:'$31.2K', allTimeHigh:'$180', allTimeLow:'$6',
+    desc:'Full rainbow holofoil cards with unique alternate artwork. Approximately 1 per 12 packs. Alternate art exists for Rare, Super Rare, Secret Rare and Leader cards — marked with a ★ symbol.',
+    pullRate:'~1 per 12 packs', pullPct:8.3,
+    up:true,
+    spark:[4,4,4,5,5,5,5,6,6,6,6,6,6],
+    perf: {h1:'+0.2%',h24:'+1.2%',d7:'+2.9%',m1:'+14.8%',y1:'+88%',max:'+112%'},
+    perfUp:[true,true,true,true,true,true],
+    topCards:[
+      {e:'🦅', n:'Marco Alt Art', set:'OP02', tcg:45, avg:46, d1:1.2, d7:4.8, d30:16, sp:[4,4,5,5,5,6,6,6,6], rb:'rb-aa', rl:'ALT ART'},
+      {e:'🗡', n:'Roronoa Zoro AA', set:'OP02', tcg:62, avg:60, d1:-3.4, d7:-5.1, d30:-12, sp:[7,7,6,6,5,5,4,4,4], rb:'rb-aa', rl:'ALT ART'},
+      {e:'🎭', n:'Uta AA Leader', set:'OP04', tcg:38, avg:39, d1:0.8, d7:2.1, d30:10, sp:[4,4,4,4,5,5,5,5,5], rb:'rb-aa', rl:'ALT ART'},
+      {e:'🌺', n:'Nami Alt Art', set:'OP03', tcg:28, avg:26, d1:-1.8, d7:-3.2, d30:4, sp:[5,5,5,4,4,4,4,4,4], rb:'rb-aa', rl:'ALT ART'},
+      {e:'⚔', n:'Mihawk SEC Alt Art', set:'OP14', tcg:28, avg:26, d1:-6.7, d7:-9.2, d30:-14, sp:[8,8,7,6,5,4,3,3,3], rb:'rb-aa', rl:'ALT ART'},
+    ],
+  },
+  {
+    slug:'sr', code:'SR', label:'SR · Super Rare', shortName:'Super Rare',
+    price:18, chg7d:1.4, chg1d:0.3, chg30d:6.2, chgMax:44,
+    color:'#00D68F', colorD:'rgba(0,214,143,0.12)', colorBd:'rgba(0,214,143,0.28)',
+    cardCount:180, volume:'$42.6K', allTimeHigh:'$48', allTimeLow:'$4',
+    desc:'The most competitive tier for deck-builders. Foil treatment with rainbow border. Approximately 1-2 per box. Many meta-defining cards live at SR rarity.',
+    pullRate:'~1-2 per box', pullPct:12.5,
+    up:true,
+    spark:[4,4,4,4,4,5,5,5,5,5,5,5,5],
+    perf: {h1:'+0.1%',h24:'+0.3%',d7:'+1.4%',m1:'+6.2%',y1:'+38%',max:'+44%'},
+    perfUp:[true,true,true,true,true,true],
+    topCards:[
+      {e:'🏔', n:'Whitebeard SR', set:'OP02', tcg:22, avg:23, d1:1.2, d7:3.8, d30:12, sp:[4,4,4,5,5,5,5,6,6], rb:'rb-sr', rl:'SUPER RARE'},
+      {e:'🐉', n:'Kaido SR', set:'OP03', tcg:18, avg:19, d1:0.8, d7:2.4, d30:8, sp:[4,4,4,4,5,5,5,5,5], rb:'rb-sr', rl:'SUPER RARE'},
+      {e:'🌸', n:'Boa Hancock SR', set:'OP02', tcg:16, avg:17, d1:0.4, d7:1.8, d30:6, sp:[4,4,4,4,4,4,5,5,5], rb:'rb-sr', rl:'SUPER RARE'},
+      {e:'⚙', n:'Vegapunk SR', set:'OP07', tcg:14, avg:14, d1:0.2, d7:0.8, d30:4, sp:[4,4,4,4,4,4,4,5,5], rb:'rb-sr', rl:'SUPER RARE'},
+      {e:'🌊', n:'Jinbe SR', set:'OP06', tcg:12, avg:12, d1:-0.3, d7:0.4, d30:2, sp:[4,4,4,4,4,4,4,4,4], rb:'rb-sr', rl:'SUPER RARE'},
+    ],
+  },
+  {
+    slug:'l', code:'L', label:'L · Leader', shortName:'Leader',
+    price:12.4, chg7d:3.2, chg1d:0.6, chg30d:9.8, chgMax:54,
+    color:'#00C9A7', colorD:'rgba(0,201,167,0.12)', colorBd:'rgba(0,201,167,0.28)',
+    cardCount:72, volume:'$8.6K', allTimeHigh:'$180', allTimeLow:'$2',
+    desc:'The backbone of every deck. Leader cards define strategy and are separate from the main deck. Alt art Leaders are among the most coveted collectibles in the entire game.',
+    pullRate:'~1 per 2 packs', pullPct:50,
+    up:true,
+    spark:[4,4,4,4,5,5,5,5,5,6,6,6,6],
+    perf: {h1:'+0.1%',h24:'+0.6%',d7:'+3.2%',m1:'+9.8%',y1:'+42%',max:'+54%'},
+    perfUp:[true,true,true,true,true,true],
+    topCards:[
+      {e:'☠', n:'Luffy Leader (MR)', set:'OP01', tcg:1240, avg:1310, d1:8.2, d7:12.4, d30:41, sp:[4,5,6,6,8,10,11,12,13], rb:'rb-mr', rl:'LEADER MR'},
+      {e:'🎭', n:'Uta Leader AA', set:'OP04', tcg:42, avg:43, d1:1.2, d7:4.8, d30:16, sp:[4,4,5,5,5,6,6,6,6], rb:'rb-aa', rl:'LEADER AA'},
+      {e:'🔴', n:'Shanks Leader SR', set:'OP09', tcg:28, avg:29, d1:2.4, d7:6.2, d30:18, sp:[4,4,4,5,5,6,6,6,7], rb:'rb-sr', rl:'LEADER SR'},
+      {e:'⚡', n:'Yamato Leader SR', set:'OP05', tcg:22, avg:23, d1:1.8, d7:4.4, d30:14, sp:[4,4,4,5,5,5,6,6,6], rb:'rb-sr', rl:'LEADER SR'},
+      {e:'🌊', n:'Nami Leader AA', set:'OP07', tcg:18, avg:19, d1:0.8, d7:2.8, d30:9, sp:[4,4,4,4,5,5,5,5,5], rb:'rb-aa', rl:'LEADER AA'},
+    ],
+  },
+  {
+    slug:'r', code:'R', label:'R · Rare', shortName:'Rare',
+    price:4.2, chg7d:0.8, chg1d:0.1, chg30d:2.4, chgMax:18,
+    color:'#7A88A8', colorD:'rgba(122,136,168,0.12)', colorBd:'rgba(122,136,168,0.25)',
+    cardCount:420, volume:'$18.4K', allTimeHigh:'$28', allTimeLow:'$0.5',
+    desc:'The most accessible foil tier. Every pack contains at least one Rare. While lower in price individually, high-demand playable Rares can spike significantly with meta shifts.',
+    pullRate:'~1+ per pack', pullPct:100,
+    up:true,
+    spark:[4,4,4,4,4,4,4,4,4,4,4,4,4],
+    perf: {h1:'+0.0%',h24:'+0.1%',d7:'+0.8%',m1:'+2.4%',y1:'+14%',max:'+18%'},
+    perfUp:[false,true,true,true,true,true],
+    topCards:[
+      {e:'🃏', n:'Nami R', set:'OP09', tcg:8.2, avg:8.5, d1:2.1, d7:6.4, d30:18, sp:[4,4,4,5,5,6,6,7,7], rb:'rb-sr', rl:'RARE'},
+      {e:'🗡', n:'Zoro R (Regional)', set:'OP09', tcg:14, avg:14.5, d1:0.8, d7:2.4, d30:8, sp:[4,4,4,4,5,5,5,5,6], rb:'rb-sr', rl:'RARE'},
+      {e:'⚡', n:'Eustass Kid R', set:'OP01', tcg:6.4, avg:6.6, d1:0.4, d7:1.2, d30:4, sp:[4,4,4,4,4,4,5,5,5], rb:'rb-sr', rl:'RARE'},
+      {e:'🌊', n:'Sanji R', set:'OP03', tcg:5.8, avg:6.0, d1:0.2, d7:0.8, d30:2, sp:[4,4,4,4,4,4,4,5,5], rb:'rb-sr', rl:'RARE'},
+      {e:'🏔', n:'Crocodile R', set:'OP02', tcg:4.4, avg:4.6, d1:-0.2, d7:0.4, d30:1, sp:[4,4,4,4,4,4,4,4,4], rb:'rb-sr', rl:'RARE'},
+    ],
+  },
+];
+
+const TICKER_DATA = [
+  {n:'Luffy MR',p:'$1,240',c:'+8.2%',u:true},{n:'Shanks SEC',p:'$41.20',c:'-2.1%',u:false},
+  {n:'Luffy SP',p:'$180',c:'+34.5%',u:true},{n:'Roger GMR',p:'$680',c:'-1.2%',u:false},
+  {n:'Hancock SP',p:'$95',c:'+2.1%',u:true},{n:'Yamato SEC',p:'$68',c:'+4.8%',u:true},
+  {n:'Ace Trophy',p:'$2,100',c:'+5.3%',u:true},{n:'Zoro AA',p:'$62',c:'-3.4%',u:false},
+];
+
+let activeRarity = 'mr';
+let activeSetCtx = 'all'; // 'all' or a set slug like 'op01'
+
+/* ── SET CONTEXT DATA ── */
+const SET_CTX_LIST = [
+  {slug:'all',  name:'All Sets',          sub:'Global rarity averages'},
+  {slug:'op01', name:'OP01 Romance Dawn',  sub:'2022 · 115 cards', color:'#FF4560'},
+  {slug:'op02', name:'OP02 Paramount War', sub:'2023 · 116 cards', color:'#4F8EF7'},
+  {slug:'op03', name:'OP03 Pillars',       sub:'2023 · 118 cards', color:'#00C9A7'},
+  {slug:'op05', name:'OP05 Awakening',     sub:'2023 · 119 cards', color:'#9B72FF'},
+  {slug:'op08', name:'OP08 Two Legends',   sub:'2024 · 120 cards', color:'#FF4560'},
+  {slug:'op09', name:'OP09 Emperors',      sub:'2024 · 118 cards', color:'#00D68F'},
+  {slug:'op14', name:'OP14 Azure Sea',     sub:'2025 · 120 cards', color:'#E8A020'},
+  {slug:'op15', name:'OP15 Grand Final',   sub:'2025 · 120 cards', color:'#F472B6'},
+];
+
+/* Per-set rarity index overrides — in production these come from the API */
+const SET_RARITY_OVERRIDES = {
+  op01: { mr:{price:1310,chg1d:8.2,chg7d:12.4,chg30d:41,up:true}, sp:{price:148,chg1d:34.5,chg7d:41.2,chg30d:85,up:true}, sec:{price:47,chg1d:-2.1,chg7d:-5.4,chg30d:18,up:false}, sr:{price:18,chg1d:0.4,chg7d:1.2,chg30d:6,up:true} },
+  op09: { mr:{price:520,chg1d:4.1,chg7d:9.8,chg30d:31,up:true}, sec:{price:29,chg1d:2.4,chg7d:6.2,chg30d:18,up:true}, gmr:{price:680,chg1d:-1.2,chg7d:3.4,chg30d:22,up:true} },
+  op14: { mr:{price:440,chg1d:12.4,chg7d:28.6,chg30d:62,up:true}, sec:{price:88,chg1d:8.2,chg7d:18.4,chg30d:42,up:true}, aa:{price:26,chg1d:-6.7,chg7d:-9.2,chg30d:-14,up:false} },
+};
+
+function buildSetDrop() {
+  const el = document.getElementById('set-context-drop');
+  el.innerHTML = `
+    <div class="scd-section">Filter by Set</div>
+    ${SET_CTX_LIST.map(s=>`
+      <div class="scd-item ${activeSetCtx===s.slug?'active':''}" onclick="selectSetCtx('${s.slug}')">
+        <div style="display:flex;align-items:center;gap:8px">
+          ${s.color?`<div style="width:8px;height:8px;border-radius:50%;background:${s.color};flex-shrink:0"></div>`:'<div style="width:8px;height:8px;border-radius:50%;background:var(--owl);flex-shrink:0"></div>'}
+          <div>
+            <div style="font-family:var(--display);font-size:13px;font-weight:600;color:${activeSetCtx===s.slug?'var(--owl)':'var(--text)'}">${s.name}</div>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--text2)">${s.sub}</div>
+          </div>
+        </div>
+        ${activeSetCtx===s.slug?'<span style="color:var(--owl);font-size:12px">✓</span>':''}
+      </div>`).join('')}`;
+}
+
+function toggleSetDrop() {
+  const drop = document.getElementById('set-context-drop');
+  const btn  = document.getElementById('set-context-btn');
+  const isOpen = drop.classList.contains('open');
+  if (!isOpen) {
+    const rect = btn.getBoundingClientRect();
+    drop.style.top  = (rect.bottom + 6) + 'px';
+    drop.style.right = (window.innerWidth - rect.right) + 'px';
+    drop.style.left = 'auto';
+    buildSetDrop();
+  }
+  drop.classList.toggle('open', !isOpen);
+  btn.classList.toggle('open', !isOpen);
+}
+
+function selectSetCtx(slug) {
+  activeSetCtx = slug;
+  const s = SET_CTX_LIST.find(x=>x.slug===slug);
+
+  // Update button label
+  document.getElementById('set-ctx-name').textContent = s.name;
+  document.getElementById('set-ctx-sub').textContent  = s.sub;
+
+  // Close dropdown
+  document.getElementById('set-context-drop').classList.remove('open');
+  document.getElementById('set-context-btn').classList.remove('open');
+
+  // Rebuild index row with set-filtered data
+  buildIndexRow();
+
+  // Rebuild top cards filtered to this set
+  const activeR = RARITIES.find(r=>r.slug===activeRarity);
+  if (activeR) buildTopCards(activeR);
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.set-context-wrap') && !e.target.closest('.set-context-drop')) {
+    document.getElementById('set-context-drop')?.classList.remove('open');
+    document.getElementById('set-context-btn')?.classList.remove('open');
+  }
+});
+let activeTime   = '7d';
+let idxChart     = null;
+let activeSetCtx = 'all'; // 'all' or a set slug
+
+/* ── SET CONTEXT DATA ── */
+const SET_CTX_LIST = [
+  {slug:'all',  code:'All Sets', name:'Global rarity averages', color:'var(--owl)'},
+  {slug:'op01', code:'OP01',     name:'Romance Dawn',           color:'#FF4560'},
+  {slug:'op02', code:'OP02',     name:'Paramount War',          color:'#4F8EF7'},
+  {slug:'op03', code:'OP03',     name:'Pillars of Strength',    color:'#00C9A7'},
+  {slug:'op05', code:'OP05',     name:'Awakening New Era',      color:'#9B72FF'},
+  {slug:'op08', code:'OP08',     name:'Two Legends',            color:'#FF4560'},
+  {slug:'op09', code:'OP09',     name:'Emperors New World',     color:'#00D68F'},
+  {slug:'op14', code:'OP14',     name:"Azure Sea's Seven",      color:'#E8A020'},
+  {slug:'op15', code:'OP15',     name:'Grand Final',            color:'#F472B6'},
+];
+
+// Per-set rarity price overrides — what changes when you pick a set
+const SET_RARITY_OVERRIDES = {
+  op01: { mr:{price:1310,chg7d:12.4,chg1d:8.2}, sp:{price:145,chg7d:8.4,chg1d:3.1}, sec:{price:44,chg7d:-4.2,chg1d:-2.1}, sr:{price:18,chg7d:2.1,chg1d:0.4} },
+  op02: { mr:{price:395,chg7d:3.8,chg1d:1.2},   tr:{price:23,chg7d:5.8,chg1d:1.5},  sec:{price:40,chg7d:-2.8,chg1d:-1.2}, sr:{price:14,chg7d:1.2,chg1d:0.2} },
+  op09: { gmr:{price:700,chg7d:3.4,chg1d:-1.2}, mr:{price:540,chg7d:9.8,chg1d:4.1}, sec:{price:29,chg7d:6.2,chg1d:2.4},  sr:{price:12,chg7d:0.4,chg1d:-0.3} },
+  op14: { mr:{price:440,chg7d:28.6,chg1d:12.4}, aa:{price:26,chg7d:-9.2,chg1d:-6.7},sec:{price:88,chg7d:18.4,chg1d:8.2}, sr:{price:22,chg7d:4.8,chg1d:1.8} },
+};
+
+function buildSetContextDrop() {
+  const drop = document.getElementById('set-context-drop');
+  const btn  = document.getElementById('set-context-btn');
+  const rect = btn.getBoundingClientRect();
+  drop.style.top   = (rect.bottom + 8) + 'px';
+  drop.style.right = (window.innerWidth - rect.right) + 'px';
+  drop.style.left  = 'auto';
+  drop.innerHTML = SET_CTX_LIST.map(s => `
+    <div class="set-context-item ${activeSetCtx===s.slug?'active':''}"
+         onclick="selectSetContext('${s.slug}')"
+         style="${activeSetCtx===s.slug?'color:'+s.color+';background:rgba(255,255,255,0.04)':''}">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:8px;height:8px;border-radius:50%;background:${s.color};flex-shrink:0"></div>
+        <div>
+          <div style="font-family:var(--display);font-size:13px;font-weight:700;color:${activeSetCtx===s.slug?s.color:'var(--text)'}">${s.code}</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text2)">${s.name}</div>
+        </div>
+      </div>
+      ${activeSetCtx===s.slug?'<span style="color:var(--owl);font-size:11px">✓</span>':''}
+    </div>`).join('');
+}
+
+let setDropOpen = false;
+function toggleSetDrop() {
+  setDropOpen = !setDropOpen;
+  const btn  = document.getElementById('set-context-btn');
+  const drop = document.getElementById('set-context-drop');
+  btn.classList.toggle('open', setDropOpen);
+  if (setDropOpen) {
+    buildSetContextDrop();
+    drop.classList.add('open');
+  } else {
+    drop.classList.remove('open');
+  }
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.set-context-wrap') && !e.target.closest('.set-context-drop')) {
+    setDropOpen = false;
+    document.getElementById('set-context-btn')?.classList.remove('open');
+    document.getElementById('set-context-drop')?.classList.remove('open');
+  }
+});
+
+function selectSetContext(slug) {
+  activeSetCtx = slug;
+  setDropOpen  = false;
+  document.getElementById('set-context-btn').classList.remove('open');
+  document.getElementById('set-context-drop').classList.remove('open');
+
+  const ctx = SET_CTX_LIST.find(s => s.slug === slug);
+  document.getElementById('set-ctx-name').textContent = ctx.code;
+  document.getElementById('set-ctx-sub').textContent  = slug === 'all' ? 'Global rarity averages' : ctx.name;
+
+  // Re-render everything with set context applied
+  buildIndexRow();
+  // Re-render detail for active rarity with set-filtered data
+  const r = RARITIES.find(x => x.slug === activeRarity);
+  if (r) {
+    const overrides = slug !== 'all' ? (SET_RARITY_OVERRIDES[slug]?.[activeRarity] || {}) : {};
+    buildDetail({...r, ...overrides});
+    buildChart({...r, ...overrides}, activeTime);
+    buildPerf({...r, ...overrides});
+  }
+  buildTopCards(RARITIES.find(x=>x.slug===activeRarity) || RARITIES[0]);
+}
+
+/* ── TICKER ── */
+(function(){
+  const el = document.getElementById('ticker');
+  const d = [...TICKER_DATA,...TICKER_DATA];
+  el.innerHTML = d.map(t=>`
+    <div class="ti">
+      <span class="ti-name">${t.n}</span>
+      <span class="ti-price">${t.p}</span>
+      <span class="${t.u?'ti-up':'ti-dn'}">${t.c}</span>
+    </div>`).join('');
+})();
+
+/* ── SPARKLINE ── */
+function sparkBars(data, up, cls='rc-bar') {
+  const mn=Math.min(...data), mx=Math.max(...data), rng=mx-mn||1;
+  return data.map(v => {
+    const h = Math.round(3+(25)*(v-mn)/rng);
+    const bg = up ? 'rgba(0,214,143,0.5)' : 'rgba(255,69,96,0.45)';
+    return `<div class="${cls}" style="height:${h}px;background:${bg}"></div>`;
+  }).join('');
+}
+
+function rowSpark(data, up) {
+  const mn=Math.min(...data), mx=Math.max(...data), rng=mx-mn||1;
+  // SVG line chart like the markets page
+  const W=88, H=22, pad=2;
+  const coords = data.map((v,i)=>{
+    const x = pad + (i/(data.length-1))*(W-pad*2);
+    const y = H - pad - ((v-mn)/rng)*(H-pad*2);
+    return [x.toFixed(1),y.toFixed(1)];
+  });
+  const poly = coords.map(p=>p.join(',')).join(' ');
+  const fill = `${coords[0][0]},${H} ${poly} ${coords[coords.length-1][0]},${H}`;
+  const color = up ? '#00D68F' : '#FF4560';
+  const fillC = up ? 'rgba(0,214,143,0.12)' : 'rgba(255,69,96,0.10)';
+  const [lx,ly] = coords[coords.length-1];
+  return `<div style="display:flex;justify-content:flex-end">
+    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;overflow:visible">
+      <polygon points="${fill}" fill="${fillC}"/>
+      <polyline points="${poly}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${lx}" cy="${ly}" r="2.5" fill="${color}"/>
+    </svg>
+  </div>`;
+}
+
+/* ── RIC SVG LINE SPARK (fixed width, for index row) ── */
+/* ── FULL-WIDTH SPARK FOR INDEX CARDS ── */
+function ricLineSparkWide(data, color, up) {
+  const VW=200, VH=28, pad=3;
+  const mn=Math.min(...data), mx=Math.max(...data), rng=mx-mn||1;
+  const coords=data.map((v,i)=>{
+    const x=pad+(i/(data.length-1))*(VW-pad*2);
+    const y=VH-pad-((v-mn)/rng)*(VH-pad*2);
+    return [x.toFixed(1),y.toFixed(1)];
+  });
+  const poly=coords.map(p=>p.join(',')).join(' ');
+  const fill=`${coords[0][0]},${VH} ${poly} ${coords[coords.length-1][0]},${VH}`;
+  const stroke=up?'#00D68F':'#FF4560';
+  const fillC=up?'rgba(0,214,143,0.13)':'rgba(255,69,96,0.11)';
+  const [lx,ly]=coords[coords.length-1];
+  return `<svg width="100%" height="28" viewBox="0 0 ${VW} ${VH}" preserveAspectRatio="none" style="display:block;overflow:visible">
+    <polygon points="${fill}" fill="${fillC}"/>
+    <polyline points="${poly}" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+    <circle cx="${lx}" cy="${ly}" r="3.5" fill="${stroke}" vector-effect="non-scaling-stroke"/>
+  </svg>`;
+}
+
+function ricLineSpark(data, color, up) {
+  const W = 88, H = 28, pad = 2;
+  const mn = Math.min(...data), mx = Math.max(...data), rng = mx - mn || 1;
+  const coords = data.map((v, i) => {
+    const x = pad + (i / (data.length - 1)) * (W - pad * 2);
+    const y = H - pad - ((v - mn) / rng) * (H - pad * 2);
+    return [x.toFixed(1), y.toFixed(1)];
+  });
+  const poly  = coords.map(p => p.join(',')).join(' ');
+  const fill  = `${coords[0][0]},${H} ${poly} ${coords[coords.length-1][0]},${H}`;
+  const fillC = up ? 'rgba(0,214,143,0.12)' : 'rgba(255,69,96,0.10)';
+  const stroke = up ? '#00D68F' : '#FF4560';
+  const [lx, ly] = coords[coords.length - 1];
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;overflow:visible">
+    <polygon points="${fill}" fill="${fillC}"/>
+    <polyline points="${poly}" fill="none" stroke="${stroke}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${lx}" cy="${ly}" r="2.5" fill="${stroke}"/>
+  </svg>`;
+}
+
+/* ── RIC SVG LINE SPARK full-width (for comparison cards) ── */
+function ricLineSparkFull(data, color, up) {
+  // Uses a viewBox-based SVG that stretches 100% width
+  const VW = 200, VH = 56, pad = 4;
+  const mn = Math.min(...data), mx = Math.max(...data), rng = mx - mn || 1;
+  const coords = data.map((v, i) => {
+    const x = pad + (i / (data.length - 1)) * (VW - pad * 2);
+    const y = VH - pad - ((v - mn) / rng) * (VH - pad * 2);
+    return [x.toFixed(1), y.toFixed(1)];
+  });
+  const poly  = coords.map(p => p.join(',')).join(' ');
+  const fill  = `${coords[0][0]},${VH} ${poly} ${coords[coords.length-1][0]},${VH}`;
+  const fillC = up ? 'rgba(0,214,143,0.13)' : 'rgba(255,69,96,0.11)';
+  const stroke = up ? '#00D68F' : '#FF4560';
+  const [lx, ly] = coords[coords.length - 1];
+  return `<svg width="100%" height="56" viewBox="0 0 ${VW} ${VH}" preserveAspectRatio="none" style="display:block;overflow:visible">
+    <polygon points="${fill}" fill="${fillC}"/>
+    <polyline points="${poly}" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+    <circle cx="${lx}" cy="${ly}" r="4" fill="${stroke}" vector-effect="non-scaling-stroke"/>
+  </svg>`;
+}
+
+/* ── INDEX ROW ── */
+const PREMIUM_SLUGS = ['mr','promo','sp','sec','tr','aa'];
+const MORE_SLUGS    = ['sr','l','r'];
+
+const SEALED = {
+  slug:'sealed', code:'SEALED', shortName:'Sealed Boxes',
+  color:'#E8A020', up:true,
+  price:142, chg7d:3.8,
+  spark:[5,5,6,6,6,7,7,7,8,8,9,9,9],
+  desc:'Avg price of an unopened booster box across all active sets.',
+  boxes:[
+    {name:'OP01 Romance Dawn', price:820, chg:'+4.2%', up:true},
+    {name:'OP05 Awakening',    price:340, chg:'+2.1%', up:true},
+    {name:'OP09 Emperors',     price:185, chg:'+6.8%', up:true},
+    {name:'OP14 Azure Sea',    price:142, chg:'+18.4%',up:true},
+  ]
+};
+
+let moreOpen = false;
+
+function buildIndexRow() {
+  const el = document.getElementById('rarity-index-row');
+  const premiumCards = RARITIES.filter(r => PREMIUM_SLUGS.includes(r.slug));
+  const moreRarities = RARITIES.filter(r => MORE_SLUGS.includes(r.slug));
+
+  // Apply set overrides if a specific set is selected
+  const overrides = activeSetCtx !== 'all' ? (SET_RARITY_OVERRIDES[activeSetCtx] || {}) : {};
+
+  const premiumHTML = premiumCards.map(r => {
+    const ov = overrides[r.slug] || {};
+    const price = ov.price || r.price;
+    const chg7d = ov.chg7d !== undefined ? ov.chg7d : r.chg7d;
+    const up    = ov.up    !== undefined ? ov.up    : r.up;
+    return `
+    <div class="ric ${activeRarity===r.slug?'active':''}"
+         style="--ric-color:${r.color};${activeRarity===r.slug?'border-color:'+r.color+';box-shadow:0 0 0 1px '+r.color+',0 6px 20px rgba(0,0,0,0.35)':''}"
+         onclick="selectRarity('${r.slug}')">
+      <div class="ric-header">
+        <div class="ric-name">${r.shortName}</div>
+        <span class="ric-badge" style="background:${r.colorD};color:${r.color};border:1px solid ${r.colorBd}">${r.code}</span>
+      </div>
+      <div class="ric-price">$${price.toLocaleString()}</div>
+      <div class="ric-chg" style="color:${up?'var(--green)':'var(--red)'}">${up?'↑':'↓'} ${Math.abs(chg7d)}%</div>
+      <div class="ric-spark">${ricLineSparkWide(r.spark, r.color, up)}</div>
+    </div>`;
+  }).join('');
+
+  const sealedHTML = `
+    <div class="ric-sealed ${activeRarity==='sealed'?'active':''}" onclick="selectRarity('sealed')">
+      <div class="ric-header">
+        <div class="ric-name">Sealed Boxes</div>
+        <span class="ric-badge" style="background:rgba(232,160,32,0.18);color:#E8A020;border:1px solid rgba(232,160,32,0.35)">📦</span>
+      </div>
+      <div class="ric-price">$${SEALED.price}</div>
+      <div class="ric-chg" style="color:var(--green)">↑ ${SEALED.chg7d}%</div>
+      <div class="ric-spark">${ricLineSparkWide(SEALED.spark, '#E8A020', true)}</div>
+    </div>`;
+
+  const ddItems = moreRarities.map(r => `
+    <div class="ric-dd-item ${activeRarity===r.slug?'active':''}" onclick="selectRarity('${r.slug}');toggleMore(false)">
+      <div class="ric-dd-left">
+        <span class="ric-dd-badge" style="background:${r.colorD};color:${r.color};border:1px solid ${r.colorBd}">${r.code}</span>
+        <span class="ric-dd-name">${r.shortName}</span>
+      </div>
+      <span class="ric-dd-chg" style="color:${r.up?'var(--green)':'var(--red)'}">${r.up?'↑':'↓'}${Math.abs(r.chg7d)}%</span>
+    </div>`).join('');
+
+  const moreHTML = `
+    <div class="ric-more-wrap">
+      <div class="ric-more" onclick="toggleMore()">
+        <div class="ric-more-dots">
+          <div class="ric-more-dot"></div>
+          <div class="ric-more-dot"></div>
+          <div class="ric-more-dot"></div>
+        </div>
+        <div class="ric-more-label">More<br>Rarities</div>
+        <div class="ric-more-arrow">▾</div>
+      </div>
+      <div class="ric-dropdown ${moreOpen?'open':''}" id="ric-dropdown">
+        <div class="ric-dd-header">Additional Indexes</div>
+        ${ddItems}
+      </div>
+    </div>`;
+
+  el.innerHTML = premiumHTML + sealedHTML + moreHTML;
+}
+
+function toggleMore(force) {
+  moreOpen = force !== undefined ? force : !moreOpen;
+  const dd = document.getElementById('ric-dropdown');
+  if (!dd) return;
+  if (moreOpen) {
+    const btn = document.querySelector('.ric-more');
+    const rect = btn.getBoundingClientRect();
+    dd.style.top  = (rect.bottom + 6) + 'px';
+    dd.style.right = (window.innerWidth - rect.right) + 'px';
+    dd.style.left = 'auto';
+  }
+  dd.classList.toggle('open', moreOpen);
+}
+
+// Close dropdown on outside click
+document.addEventListener('click', e => {
+  if (!e.target.closest('.ric-more-wrap')) toggleMore(false);
+});
+
+/* ── DETAIL CARD ── */
+function buildDetail(r) {
+  const el = document.getElementById('detail-card');
+  const pullFill = Math.min(r.pullPct * 8, 100);
+  el.innerHTML = `
+    <div class="rdc-header" style="background:linear-gradient(135deg,${r.colorD},transparent)">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${r.color},transparent)"></div>
+      <span class="rdc-badge" style="background:${r.colorD};color:${r.color};border:1px solid ${r.colorBd}">${r.code} · ${r.label}</span>
+      <div class="rdc-name">${r.shortName}</div>
+      <div class="rdc-desc">${r.desc}</div>
+    </div>
+    <div class="rdc-stats">
+      <div class="rdc-row">
+        <span class="rdc-key">Index Value</span>
+        <span class="rdc-val" style="color:${r.color}">$${r.price.toLocaleString()}</span>
+      </div>
+      <div class="rdc-row">
+        <span class="rdc-key">24H Change</span>
+        <span class="rdc-val" style="color:${r.up?'var(--green)':'var(--red)'}">${r.up?'+':''}${r.chg1d}%</span>
+      </div>
+      <div class="rdc-row">
+        <span class="rdc-key">7D Change</span>
+        <span class="rdc-val" style="color:${r.up?'var(--green)':'var(--red)'}">${r.up?'+':''}${r.chg7d}%</span>
+      </div>
+      <div class="rdc-row">
+        <span class="rdc-key">30D Change</span>
+        <span class="rdc-val" style="color:${r.chg30d>=0?'var(--green)':'var(--red)'}">+${r.chg30d}%</span>
+      </div>
+      <div class="rdc-row">
+        <span class="rdc-key">All-Time High</span>
+        <span class="rdc-val">${r.allTimeHigh}</span>
+      </div>
+      <div class="rdc-row">
+        <span class="rdc-key">All-Time Low</span>
+        <span class="rdc-val">${r.allTimeLow}</span>
+      </div>
+      <div class="rdc-row">
+        <span class="rdc-key">Cards Tracked</span>
+        <span class="rdc-val">${r.cardCount}</span>
+      </div>
+      <div class="rdc-row">
+        <span class="rdc-key">24H Volume</span>
+        <span class="rdc-val">${r.volume}</span>
+      </div>
+      <div class="rdc-row">
+        <span class="rdc-key">Pull Rate</span>
+        <div class="pull-rate-bar">
+          <div class="pr-track"><div class="pr-fill" style="width:${pullFill}%;background:${r.color}"></div></div>
+          <span class="rdc-val">${r.pullRate}</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ── INDEX CHART ── */
+function buildChart(r, period) {
+  const days = {h1:1,d7:7,'7d':7,'1m':30,'3m':90,'1y':365,'max':500}[period] || 7;
+  const base = r.price;
+  const vol  = base * 0.04;
+  const trend = r.chg7d / 100;
+  const pts = [];
+  let p = base * (1 - trend * 0.9);
+  for(let i=days; i>=0; i--) {
+    const d = new Date(); d.setDate(d.getDate()-i);
+    const noise = (Math.random()-0.46)*vol;
+    p = Math.max(p + (trend*base/days) + noise, base*0.2);
+    pts.push({x: d.toLocaleDateString('en-US',{month:'short',day:'numeric'}), y:+p.toFixed(2)});
+  }
+  pts[pts.length-1].y = base;
+
+  document.getElementById('chart-title').textContent = `${r.shortName} Index`;
+  document.getElementById('chart-price').textContent = `$${base.toLocaleString()}.00`;
+  document.getElementById('chart-sub').textContent = `Avg price of all ${r.shortName} cards · ${r.cardCount} cards tracked`;
+
+  if(idxChart) { idxChart.destroy(); }
+  const ctx = document.getElementById('idx-chart');
+  idxChart = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: pts.map(p=>p.x),
+      datasets:[{
+        data: pts.map(p=>p.y),
+        borderColor: r.color,
+        borderWidth: 1.8,
+        fill: true,
+        backgroundColor: (ctx) => {
+          const {ctx:c,chartArea} = ctx.chart;
+          if(!chartArea) return r.colorD;
+          const g = c.createLinearGradient(0,chartArea.top,0,chartArea.bottom);
+          g.addColorStop(0, r.color+'30');
+          g.addColorStop(1, 'rgba(0,0,0,0)');
+          return g;
+        },
+        tension: 0.35,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        pointHoverBackgroundColor: r.color,
+        pointHoverBorderColor: 'rgba(3,5,13,0.8)',
+        pointHoverBorderWidth: 2,
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      layout:{ padding:{ top:12, right:12, bottom:8, left:8 } },
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'rgba(14,22,40,0.95)',
+          borderColor:'rgba(255,255,255,0.1)',
+          borderWidth:1,
+          titleFont:{family:'JetBrains Mono',size:9},
+          bodyFont:{family:'JetBrains Mono',size:11,weight:'500'},
+          titleColor:'#7A88A8', bodyColor:'#E4EAF6',
+          padding:10,
+          callbacks:{ label: v=>`  $${v.parsed.y.toFixed(2)}` }
+        }
+      },
+      scales:{
+        x:{ grid:{color:'rgba(255,255,255,0.03)',drawBorder:false}, ticks:{font:{family:'JetBrains Mono',size:9},color:'#7A88A8',maxTicksLimit:6,maxRotation:0}, border:{display:false} },
+        y:{ position:'right', grid:{color:'rgba(255,255,255,0.035)',drawBorder:false}, ticks:{font:{family:'JetBrains Mono',size:9},color:'#7A88A8',callback:v=>'$'+v.toLocaleString()}, border:{display:false} }
+      }
+    }
+  });
+}
+
+/* ── PERF STRIP ── */
+function buildPerf(r) {
+  const periods = [
+    {k:'h1',l:'1H'},{k:'h24',l:'24H'},{k:'d7',l:'7D'},
+    {k:'m1',l:'1M'},{k:'y1',l:'1Y'},{k:'max',l:'Max'}
+  ];
+  document.getElementById('perf-strip').innerHTML = periods.map((p,i) => `
+    <div class="perf-cell">
+      <div class="perf-period">${p.l}</div>
+      <div class="perf-val" style="color:${r.perfUp[i]?'var(--green)':'var(--red)'}">${r.perf[p.k]}</div>
+    </div>`).join('');
+}
+
+/* ── RARITY TABS (top cards switcher) ── */
+function buildRarityTabs(activeSlug) {
+  const el = document.getElementById('rarity-tabs');
+  el.innerHTML = RARITIES.map(r => `
+    <button class="rtab ${activeSlug===r.slug?'active':''}"
+      style="${activeSlug===r.slug?'background:'+r.colorD+';color:'+r.color+';border-color:'+r.colorBd:''}"
+      onclick="switchTopCards('${r.slug}', this)">
+      ${r.code} · ${r.shortName}
+    </button>`).join('');
+}
+
+/* ── TOP CARDS TABLE ── */
+function buildTopCards(r) {
+  // Filter cards by set if a set context is active
+  let cards = r.topCards;
+  if (activeSetCtx !== 'all') {
+    const setCode = activeSetCtx.toUpperCase(); // e.g. 'op01' → 'OP01'
+    const filtered = cards.filter(c => c.set === setCode);
+    cards = filtered.length > 0 ? filtered : cards; // fallback to all if no match
+  }
+
+  const setLabel = activeSetCtx === 'all' ? '' : ` · ${activeSetCtx.toUpperCase()}`;
+  document.getElementById('top-cards-title').textContent = r.shortName;
+  document.getElementById('top-cards-sub').textContent = `Top ${cards.length} cards by market value${setLabel} · ${r.cardCount} total tracked`;
+
+  const tb = document.getElementById('top-cards-tbody');
+  tb.innerHTML = cards.map((c,i)=>{
+    const avg = ((c.tcg * 1.05)).toFixed(2);
+    return `<tr>
+      <td class="rank-n">${i+1}</td>
+      <td>
+        <div class="card-cell">
+          <div class="card-art">${c.e}</div>
+          <div style="min-width:0">
+            <div class="card-name">${c.n}</div>
+            <div class="card-set">${c.set}</div>
+          </div>
+        </div>
+      </td>
+      <td><span class="rb ${c.rb}">${c.rl}</span></td>
+      <td class="price-r">$${parseFloat(avg).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td class="price-r">$${c.tcg.toLocaleString()}</td>
+      <td class="chg-r ${c.d1>=0?'up':'dn'}">${c.d1>=0?'+':''}${c.d1}%</td>
+      <td class="chg-r ${c.d7>=0?'up':'dn'}">${c.d7>=0?'+':''}${c.d7}%</td>
+      <td class="chg-r ${c.d30>=0?'up':'dn'}">${c.d30>=0?'+':''}${c.d30}%</td>
+      <td>${rowSpark(c.sp, c.d7>=0)}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── COMPARISON GRID ── */
+function buildComparison() {
+  const el = document.getElementById('comp-grid');
+  el.innerHTML = RARITIES.map(r=>`
+    <div class="comp-card" onclick="selectRarity('${r.slug}')" style="${activeRarity===r.slug?'border-color:'+r.color+';box-shadow:0 0 0 1px '+r.color:''}">
+      <div class="comp-top">
+        <div class="comp-title-row">
+          <span class="comp-name">${r.shortName}</span>
+          <span class="comp-badge" style="background:${r.colorD};color:${r.color};border:1px solid ${r.colorBd}">${r.code}</span>
+        </div>
+        <span class="comp-chg" style="color:${r.chg30d>=0?'var(--green)':'var(--red)'}">${r.chg30d>=0?'+':''}${r.chg30d}%</span>
+      </div>
+      <div class="comp-val">$${r.price.toLocaleString()}</div>
+      <div class="comp-cards">${r.cardCount} cards · ${r.volume} vol</div>
+      <div class="comp-spark">${ricLineSparkFull(r.spark, r.color, r.up)}</div>
+      <div class="comp-footer">
+        <div class="comp-stat">7D <span class="comp-stat-val" style="color:${r.up?'var(--green)':'var(--red)'}">${r.up?'+':''}${r.chg7d}%</span></div>
+        <div class="comp-stat">ATH <span class="comp-stat-val">${r.allTimeHigh}</span></div>
+        <div class="comp-stat">Max <span class="comp-stat-val" style="color:var(--green)">+${r.chgMax}%</span></div>
+      </div>
+    </div>`).join('');
+}
+
+/* ── PULL RATES ── */
+/* ── INIT ── */
+function setTopCardsTime(el, range) {
+  document.querySelectorAll('.icc-time').forEach(b => {
+    if (b.onclick && b.onclick.toString().includes('setTopCardsTime')) b.classList.remove('on');
+  });
+  el.classList.add('on');
+  // In production: refetch top cards data for selected time range
+}
+
+function doTopCardsSort(val) {
+  // In production: re-sort the top cards table by selected metric
+}
+
+function switchTopCards(slug, el) {
+  const r = RARITIES.find(x => x.slug === slug);
+  if (!r) return;
+  buildRarityTabs(slug);
+  buildTopCards(r);
+}
+
+/* ── SELECT RARITY (index card click — updates everything) ── */
+function selectRarity(slug) {
+  activeRarity = slug;
+  toggleMore(false);
+
+  if (slug === 'sealed') {
+    buildIndexRow();
+    buildSealedDetail();
+    buildRarityTabs('mr');
+    buildTopCards(RARITIES[0]);
+    buildComparison();
+    return;
+  }
+
+  const r = RARITIES.find(x=>x.slug===slug);
+  if(!r) return;
+  // Apply set context overrides if a set is selected
+  const ov = activeSetCtx !== 'all' ? (SET_RARITY_OVERRIDES[activeSetCtx]?.[slug] || {}) : {};
+  const rCtx = {...r, ...ov, up: ov.chg7d !== undefined ? ov.chg7d >= 0 : r.up};
+  buildIndexRow();
+  buildDetail(rCtx);
+  buildChart(rCtx, activeTime);
+  buildPerf(rCtx);
+  buildTopCards(r);
+  buildRarityTabs(slug);
+  buildComparison();
+}
+
+function buildSealedDetail() {
+  const el = document.getElementById('detail-card');
+  el.innerHTML = `
+    <div class="rdc-header" style="background:linear-gradient(135deg,rgba(232,160,32,0.10),transparent)">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#E8A020,transparent)"></div>
+      <span class="rdc-badge" style="background:rgba(232,160,32,0.18);color:#E8A020;border:1px solid rgba(232,160,32,0.35)">📦 SEALED</span>
+      <div class="rdc-name">Sealed Box Market</div>
+      <div class="rdc-desc">Unopened booster boxes tracked across all active sets. Sealed boxes appreciate as sets age and print runs deplete — a key long-term investment metric.</div>
+    </div>
+    <div class="rdc-stats">
+      <div class="rdc-row"><span class="rdc-key">Index Value (avg)</span><span class="rdc-val" style="color:#E8A020">$${SEALED.price}</span></div>
+      <div class="rdc-row"><span class="rdc-key">7D Change</span><span class="rdc-val" style="color:var(--green)">+${SEALED.chg7d}%</span></div>
+      <div class="rdc-row"><span class="rdc-key">Sets Tracked</span><span class="rdc-val">${SEALED.boxes.length} active sets</span></div>
+      ${SEALED.boxes.map(b=>`
+      <div class="rdc-row">
+        <span class="rdc-key" style="font-size:9px">${b.name}</span>
+        <span class="rdc-val">$${b.price} <span style="color:${b.up?'var(--green)':'var(--red)'};font-size:9px">${b.chg}</span></span>
+      </div>`).join('')}
+    </div>`;
+
+  // Reset chart to sealed spark
+  document.getElementById('chart-title').textContent = 'Sealed Box Index';
+  document.getElementById('chart-price').textContent = `$${SEALED.price}`;
+  document.getElementById('chart-sub').textContent = `Avg unopened booster box price · ${SEALED.boxes.length} sets tracked`;
+  if(idxChart) idxChart.destroy();
+  const ctx = document.getElementById('idx-chart');
+  const fakeR = { price:SEALED.price, chg7d:SEALED.chg7d, color:'#E8A020', colorD:'rgba(232,160,32,0.15)', cardCount:4 };
+  buildChart({ ...fakeR, spark:SEALED.spark, shortName:'Sealed', chg1d:1.2, chg30d:12, allTimeHigh:'$280', allTimeLow:'$82', volume:'$8.4K', perfUp:[true,true,true,true,true,true], perf:{h1:'+0.2%',h24:'+1.2%',d7:'+3.8%',m1:'+12.0%',y1:'+68%',max:'+94%'} }, activeTime);
+  buildPerf({ perfUp:[true,true,true,true,true,true], perf:{h1:'+0.2%',h24:'+1.2%',d7:'+3.8%',m1:'+12.0%',y1:'+68%',max:'+94%'} });
+}
+
+function setChartTime(el, period) {
+  document.querySelectorAll('.icc-time').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+  activeTime = period;
+  const r = RARITIES.find(x=>x.slug===activeRarity);
+  buildChart(r, period);
+}
+
+/* ── SET CONTEXT SELECTOR ── */
+const SET_OPTIONS = [
+  {slug:'all',  code:'All Sets', name:'Global averages',     color:'#7A88A8', chg7d:null},
+  {slug:'op01', code:'OP01',     name:'Romance Dawn',        color:'#FF4560', chg7d:5.6},
+  {slug:'op02', code:'OP02',     name:'Paramount War',       color:'#4F8EF7', chg7d:2.1},
+  {slug:'op03', code:'OP03',     name:'Pillars of Strength', color:'#00C9A7', chg7d:-0.4},
+  {slug:'op05', code:'OP05',     name:'Awakening New Era',   color:'#9B72FF', chg7d:-0.8},
+  {slug:'op08', code:'OP08',     name:'Two Legends',         color:'#FF4560', chg7d:4.2},
+  {slug:'op09', code:'OP09',     name:"Emperors New World",  color:'#00D68F', chg7d:7.3},
+  {slug:'op14', code:'OP14',     name:"Azure Sea's Seven",   color:'#E8A020', chg7d:18.4},
+  {slug:'op15', code:'OP15',     name:'Grand Final',         color:'#F472B6', chg7d:9.1},
+];
+const EB_OPTIONS = [
+  {slug:'eb01', code:'EB01', name:'Memorial Collection', color:'#4F8EF7', chg7d:6.2},
+  {slug:'eb02', code:'EB02', name:"Dragon's Call",       color:'#9B72FF', chg7d:4.1},
+];
+let activeSetCtx = 'all';
+let setDropOpen  = false;
+
+function buildSetDropdown() {
+  const el = document.getElementById('set-context-drop');
+  const sets = SET_OPTIONS.slice(1);
+  el.innerHTML = `
+    <div class="scd-section">Context</div>
+    <div class="scd-item ${activeSetCtx==='all'?'active':''}" onclick="selectSetCtx('all')">
+      <div class="scd-item-left"><div class="scd-dot" style="background:var(--text2)"></div><div><div class="scd-code">All Sets</div><div class="scd-name">Global rarity averages</div></div></div>
+    </div>
+    <div class="scd-section">Main Sets</div>
+    ${sets.map(s=>`<div class="scd-item ${activeSetCtx===s.slug?'active':''}" onclick="selectSetCtx('${s.slug}')">
+      <div class="scd-item-left"><div class="scd-dot" style="background:${s.color}"></div><div><div class="scd-code">${s.code}</div><div class="scd-name">${s.name}</div></div></div>
+      ${s.chg7d!==null?`<span class="scd-chg" style="color:${s.chg7d>=0?'var(--green)':'var(--red)'}">${s.chg7d>=0?'+':''}${s.chg7d}%</span>`:''}
+    </div>`).join('')}
+    <div class="scd-section">Extra Boosters</div>
+    ${EB_OPTIONS.map(s=>`<div class="scd-item ${activeSetCtx===s.slug?'active':''}" onclick="selectSetCtx('${s.slug}')">
+      <div class="scd-item-left"><div class="scd-dot" style="background:${s.color}"></div><div><div class="scd-code">${s.code}</div><div class="scd-name">${s.name}</div></div></div>
+      <span class="scd-chg" style="color:var(--green)">+${s.chg7d}%</span>
+    </div>`).join('')}`;
+}
+
+function toggleSetDrop() {
+  setDropOpen = !setDropOpen;
+  const btn  = document.getElementById('set-context-btn');
+  const drop = document.getElementById('set-context-drop');
+  btn.classList.toggle('open', setDropOpen);
+  if (setDropOpen) {
+    buildSetDropdown();
+    const rect = btn.getBoundingClientRect();
+    drop.style.top   = (rect.bottom + 6) + 'px';
+    drop.style.right = (window.innerWidth - rect.right) + 'px';
+    drop.style.left  = 'auto';
+    drop.classList.add('open');
+  } else {
+    drop.classList.remove('open');
+  }
+}
+
+function selectSetCtx(slug) {
+  activeSetCtx = slug;
+  setDropOpen  = false;
+  document.getElementById('set-context-drop').classList.remove('open');
+  document.getElementById('set-context-btn').classList.remove('open');
+  const opt = [...SET_OPTIONS, ...EB_OPTIONS].find(s => s.slug === slug);
+  if (opt) {
+    document.getElementById('set-ctx-name').textContent = opt.slug === 'all' ? 'All Sets' : `${opt.code} \u2014 ${opt.name}`;
+    document.getElementById('set-ctx-sub').textContent  = opt.slug === 'all' ? 'Global rarity averages' : `${opt.name} \u00b7 ${opt.chg7d >= 0 ? '+' : ''}${opt.chg7d}% 7D`;
+    const btn = document.getElementById('set-context-btn');
+    btn.style.borderColor = opt.slug === 'all' ? '' : opt.color;
+    btn.style.boxShadow   = opt.slug === 'all' ? '' : `0 0 0 1px ${opt.color}40`;
+  }
+  buildIndexRow();
+  buildTopCards(RARITIES.find(r => r.slug === activeRarity) || RARITIES[0]);
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#set-context-btn') && !e.target.closest('#set-context-drop')) {
+    if (setDropOpen) {
+      setDropOpen = false;
+      document.getElementById('set-context-drop').classList.remove('open');
+      document.getElementById('set-context-btn').classList.remove('open');
+    }
+  }
+});
+
+/* ── INIT ── */
+buildIndexRow();
+const initR = RARITIES[0];
+buildDetail(initR);
+buildChart(initR, '7d');
+buildPerf(initR);
+buildTopCards(initR);
+buildRarityTabs('mr');
+buildComparison();
+
+</script>
+</body>
+</html>
