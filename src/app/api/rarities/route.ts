@@ -2,46 +2,19 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { RARITY_META } from "@/app/rarities/rarities-data";
 
+export const dynamic = "force-dynamic";
+
 // ---------------------------------------------------------------------------
 // GET /api/rarities — returns rarity index data with top cards + prices
 // ---------------------------------------------------------------------------
 
-// Map long-form rarity names to short codes
-function normalizeRarity(raw: string): string {
-  const r = raw.toUpperCase().trim();
-  if (r.includes("GOLDEN") || r === "GMR") return "GMR";
-  if (r.includes("MANGA") || r === "MR") return "MR";
-  if (r === "SAR" || r.includes("SUPER ALT")) return "SAR";
-  if (r.includes("SECRET") || r === "SEC") return "SEC";
-  if (r.includes("SPECIAL") || r === "SP") return "SP";
-  if (r.includes("TREAS") || r === "TR") return "TR";
-  if (r.includes("ALT") || r === "AA") return "AA";
-  if (r.includes("SUPER") || r === "SR") return "SR";
-  if (r.includes("LEADER") || r === "L") return "L";
-  if (r.includes("UNCOMMON") || r === "UC") return "UC";
-  if (r.includes("COMMON") || r === "C") return "C";
-  if (r === "R" || r === "RARE") return "R";
-  return r; // return as-is if no match
-}
 
 export async function GET() {
   const supabase = createServiceClient();
 
-  // 1. Get distinct rarity values
-  const { data: allCards, error: err } = await supabase
-    .from("cards")
-    .select("rarity")
-    .not("rarity", "is", null);
-
-  if (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
-  }
-
-  const raritySet = new Set<string>();
-  for (const c of allCards ?? []) {
-    if (c.rarity) raritySet.add(normalizeRarity(c.rarity));
-  }
-  const distinctRarities = Array.from(raritySet);
+  // 1. Get distinct rarity values — use known codes from RARITY_META
+  // (Supabase default limit of 1000 rows can miss rare codes like MR with few cards)
+  const distinctRarities = Object.keys(RARITY_META);
 
   // 2. For each rarity, aggregate data
   const results = await Promise.all(
