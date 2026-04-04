@@ -43,7 +43,7 @@ export default async function MarketsGridPage() {
     .order("market_avg", { referencedTable: "price_stats", ascending: false })
     .limit(20);
 
-  const cards: CardRow[] = ((data as CardRow[]) ?? []).sort(
+  const cards: CardRow[] = ((data as unknown as CardRow[]) ?? []).sort(
     (a, b) => (b.price_stats?.market_avg ?? 0) - (a.price_stats?.market_avg ?? 0)
   );
 
