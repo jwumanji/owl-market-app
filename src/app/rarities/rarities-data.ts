@@ -8,6 +8,8 @@ export interface RarityCard {
   chg7d: number;
   chg30d: number;
   spark: number[];
+  cardImageId?: string;
+  imageSmall?: string | null;
 }
 
 export interface RarityData {

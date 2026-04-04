@@ -162,11 +162,16 @@ function RarityCards({ r }: { r: RarityData }) {
               </tr>
             </thead>
             <tbody>
-              {r.topCards.map((card, i) => (
-                <tr key={i}>
+              {r.topCards.map((card, i) => {
+                const href = card.cardImageId ? `/card/${card.cardImageId}` : undefined;
+                return (
+                <tr key={i} onClick={href ? () => window.location.href = href : undefined} style={href ? { cursor: "pointer" } : undefined} className={href ? "tr-link" : undefined}>
                   <td className="rank-n">{i + 1}</td>
                   <td>
                     <div className="card-cell">
+                      {card.imageSmall && (
+                        <img src={card.imageSmall} alt="" className="card-thumb" loading="lazy" />
+                      )}
                       <div style={{ minWidth: 0 }}>
                         <div className="card-name">{card.name}</div>
                         <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 1 }}>
@@ -182,7 +187,8 @@ function RarityCards({ r }: { r: RarityData }) {
                   <td className={`chg-r ${card.chg7d >= 0 ? "up" : "dn"}`}>{card.chg7d >= 0 ? "+" : ""}{card.chg7d}%</td>
                   <td className={`chg-r ${card.chg30d >= 0 ? "up" : "dn"}`}>{card.chg30d >= 0 ? "+" : ""}{card.chg30d}%</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -203,7 +209,7 @@ export default function RaritiesPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/rarities")
+    fetch("/api/rarities", { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {

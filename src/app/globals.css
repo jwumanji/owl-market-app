@@ -393,6 +393,182 @@ nav {
 .set-pill-val { font-family: var(--font-ibm-plex-mono), monospace; font-size: 11px; font-weight: 600; color: var(--text); }
 .set-pill-chg { font-family: var(--font-ibm-plex-mono), monospace; font-size: 11px; font-weight: 700; }
 
+/* ══════════════════════════════
+   MARKET DASHBOARD
+══════════════════════════════ */
+.dashboard-grid {
+  margin-bottom: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dashboard-top {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.dashboard-bottom {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+/* Card wrapper */
+.dash-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.dash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.dash-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dash-view-all {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 10px;
+  color: var(--text3);
+  text-decoration: none;
+  letter-spacing: 0.02em;
+  transition: color 0.14s;
+  white-space: nowrap;
+}
+.dash-view-all:hover {
+  color: var(--owl);
+}
+.dash-body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Row */
+.dash-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  transition: background 0.14s;
+  cursor: pointer;
+  min-height: 48px;
+}
+.dash-row:last-child { border-bottom: none; }
+.dash-row:hover { background: var(--surf2); }
+
+.dash-rank {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text3);
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.dash-thumb {
+  width: 32px;
+  height: 45px;
+  border-radius: 3px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.dash-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.dash-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 10px;
+  color: var(--text2);
+}
+.dash-badges {
+  gap: 3px;
+}
+.dash-set {
+  color: var(--text2);
+}
+.dash-rarity-inline {
+  display: inline-flex;
+}
+.dash-values {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  flex-shrink: 0;
+}
+.dash-price {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+.dash-chg {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 10px;
+  font-weight: 600;
+}
+.dash-chg-solo {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.dash-rarity-badge {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  letter-spacing: 0.04em;
+  min-width: 32px;
+  text-align: center;
+}
+.dash-empty {
+  padding: 24px 14px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text3);
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+  .dashboard-top { grid-template-columns: 1fr 1fr; }
+  .dashboard-bottom { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .dashboard-top,
+  .dashboard-bottom { grid-template-columns: 1fr; }
+}
+
 /* Detail Section */
 .detail-section {
   display: grid;
@@ -465,6 +641,8 @@ nav {
 .rank-n { font-family: var(--font-ibm-plex-mono), monospace; font-size: 11px; color: var(--text2); text-align: center; }
 .card-cell { display: flex; align-items: center; gap: 10px; }
 .card-art { width: 28px; height: 38px; border-radius: 3px; background: var(--surf3); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+.card-thumb { width: 28px; height: 38px; border-radius: 3px; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border); }
+.tr-link:hover td { background: rgba(255,255,255,0.04) !important; }
 .card-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-set-tag { font-family: var(--font-ibm-plex-mono), monospace; font-size: 10px; color: var(--text2); font-weight: 600; }
 

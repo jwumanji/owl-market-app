@@ -28,11 +28,12 @@ export async function GET() {
         .select("id", { count: "exact", head: true })
         .eq("rarity", code);
 
-      // Get top 5 cards by price
+      // Get top 10 cards by price
       const { data: topCards } = await supabase
         .from("cards")
         .select(`
           id, name, card_number, variant_label, rarity,
+          card_image_id, image_url, image_url_small,
           sets!inner (code, name),
           price_stats!inner (
             tcg_market, market_avg,
@@ -42,7 +43,7 @@ export async function GET() {
         .eq("rarity", code)
         .not("price_stats.tcg_market", "is", null)
         .order("price_stats(tcg_market)", { ascending: false })
-        .limit(5);
+        .limit(10);
 
       // Get sparkline history for top cards
       const topCardIds = (topCards ?? []).map((c) => c.id);
@@ -52,7 +53,7 @@ export async function GET() {
             .select("card_id, tcg_market, recorded_at")
             .in("card_id", topCardIds)
             .order("recorded_at", { ascending: false })
-            .limit(topCardIds.length * 9)
+            .limit(topCardIds.length * 10)
         : { data: [] };
 
       // Group history by card_id
@@ -135,6 +136,8 @@ export async function GET() {
             chg7d: ps?.chg_7d ?? 0,
             chg30d: ps?.chg_30d ?? 0,
             spark: historyMap[c.id] ?? [ps?.tcg_market ?? 0, ps?.tcg_market ?? 0],
+            cardImageId: (c as Record<string, unknown>).card_image_id as string ?? "",
+            imageSmall: ((c as Record<string, unknown>).image_url_small as string | null) || ((c as Record<string, unknown>).image_url as string | null) || null,
           };
         }),
       };
@@ -146,5 +149,7 @@ export async function GET() {
     .filter((r): r is NonNullable<typeof r> => r != null && r.indexValue > 0)
     .sort((a, b) => b.indexValue - a.indexValue);
 
-  return NextResponse.json(withCards);
+  return NextResponse.json(withCards, {
+    headers: { "Cache-Control": "no-store, max-age=0" },
+  });
 }
