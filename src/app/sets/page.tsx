@@ -12,6 +12,7 @@ import {
 } from "chart.js";
 import { Line } from "react-chartjs-2";
 import Link from "next/link";
+import Image from "next/image";
 import {
   SETS,
   ALL_SETS_EXTRA,
@@ -130,15 +131,28 @@ function SetPill({ s, active, onClick }: { s: { slug: string; code: string; name
   );
 }
 
+const SETS_WITH_IMAGES = new Set(['op01','op02','op03','op04','op05','op06','op07','op08','op09','op10','op11','op12','op13','op14']);
+
 function DetailCard({ s }: { s: SetData }) {
-  const artEmoji: Record<string, string> = { OP01: "\uD83C\uDFF4\u200D\u2620\uFE0F", OP02: "\u2694\uFE0F", OP05: "\u26A1", OP09: "\uD83D\uDC51", OP14: "\uD83C\uDF0A" };
-  const art = artEmoji[s.code] || "\uD83C\uDFB4";
+  const hasImage = SETS_WITH_IMAGES.has(s.slug);
   return (
     <div className="set-detail-card">
       <div className="sdc-box-art" style={{ background: `linear-gradient(135deg,${s.colorD} 0%,rgba(3,5,13,0.9) 100%)` }}>
         <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse at center,${s.color}18 0%,transparent 70%)` }} />
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-          <div className="sdc-box-img" style={{ background: `linear-gradient(145deg,${s.colorD},var(--surf3))` }}>{art}</div>
+          <div className="sdc-box-img" style={{ background: `linear-gradient(145deg,${s.colorD},var(--surf3))` }}>
+            {hasImage ? (
+              <Image
+                src={`/sets/${s.slug}.jpg`}
+                alt={`${s.code} ${s.name} Booster Box`}
+                fill
+                style={{ objectFit: "cover" }}
+                sizes="160px"
+              />
+            ) : (
+              <span style={{ fontSize: 38 }}>{"\uD83C\uDFB4"}</span>
+            )}
+          </div>
           <div className="sdc-box-label">Booster Box &middot; {s.code}</div>
         </div>
       </div>
