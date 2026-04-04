@@ -21,6 +21,7 @@ function rarityClass(rarity: string): string {
   if (r.includes("ALT") || r === "AA") return "rb-aa";
   if (r.includes("SUPER") || r === "SR") return "rb-sr";
   if (r.includes("LEADER")) return "rb-sr";
+  if (r === "SAR") return "rb-sar";
   if (r === "PROMO") return "rb-promo";
   if (r === "SEALED") return "rb-sealed";
   return "rb-r";

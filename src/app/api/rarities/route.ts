@@ -11,6 +11,7 @@ function normalizeRarity(raw: string): string {
   const r = raw.toUpperCase().trim();
   if (r.includes("GOLDEN") || r === "GMR") return "GMR";
   if (r.includes("MANGA") || r === "MR") return "MR";
+  if (r === "SAR" || r.includes("SUPER ALT")) return "SAR";
   if (r.includes("SECRET") || r === "SEC") return "SEC";
   if (r.includes("SPECIAL") || r === "SP") return "SP";
   if (r.includes("TREAS") || r === "TR") return "TR";

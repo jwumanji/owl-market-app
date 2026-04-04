@@ -634,7 +634,8 @@ nav {
 .ch-rank-card-sm .ch-rank-chg { font-size: 11px; margin-bottom: 0; }
 .ch-rank-card-sm .ch-rank-sub { display: none; }
 
-/* ── Rarity Badges: Promo & Sealed ── */
+/* ── Rarity Badges: SAR, Promo & Sealed ── */
+.rb-sar { background: rgba(255,107,157,0.14); color: #FF6B9D; border: 1px solid rgba(255,107,157,0.3); }
 .rb-promo { background: rgba(245,166,35,0.18); color: #F5A623; border: 1px solid rgba(245,166,35,0.38); }
 .rb-sealed { background: rgba(32,201,176,0.18); color: #20C9B0; border: 1px solid rgba(32,201,176,0.38); }
 

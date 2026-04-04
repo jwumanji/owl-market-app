@@ -44,6 +44,7 @@ export const RARITY_META: Record<string, { name: string; subtitle: string; color
   R:      { name: "Rare",          subtitle: "Core rare cards forming the backbone of decks",         color: "#4F8EF7", colorD: "rgba(79,142,247,0.14)",  colorBd: "rgba(79,142,247,0.3)" },
   UC:     { name: "Uncommon",      subtitle: "Mid-tier uncommons with steady utility",                color: "#7A88A8", colorD: "rgba(122,136,168,0.12)", colorBd: "rgba(122,136,168,0.25)" },
   C:      { name: "Common",        subtitle: "Bulk commons — high supply, low individual value",      color: "#555E6E", colorD: "rgba(85,94,110,0.12)",   colorBd: "rgba(85,94,110,0.25)" },
+  SAR:    { name: "Super Alt Art",  subtitle: "Ultra-rare super alternate art chase cards",              color: "#FF6B9D", colorD: "rgba(255,107,157,0.14)", colorBd: "rgba(255,107,157,0.3)" },
   PROMO:  { name: "Promos",        subtitle: "Promotional cards from events, pre-releases & exclusives", color: "#F5A623", colorD: "rgba(245,166,35,0.18)", colorBd: "rgba(245,166,35,0.38)" },
   SEALED: { name: "Sealed Boxes",  subtitle: "Sealed product cost index across all booster sets",     color: "#20C9B0", colorD: "rgba(32,201,176,0.18)", colorBd: "rgba(32,201,176,0.38)" },
 };
