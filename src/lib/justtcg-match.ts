@@ -152,6 +152,39 @@ export const SET_SLUG_MAP: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// classifyRarity — derive true rarity from card name + variant_label + base rarity
+// ---------------------------------------------------------------------------
+
+/**
+ * Classify a card's true rarity based on its name and variant_label.
+ * Cards in the DB may all be stored as "SEC" but actually be Manga Rares,
+ * Alt Arts, Special Rares, etc. This function inspects the name for
+ * keywords like (Manga), (Alternate Art), (SP), (Super Alternate Art).
+ *
+ * Returns the corrected rarity code: "MR", "SP", "AA", "SAR", or the
+ * original baseRarity if no variant keyword is found.
+ */
+export function classifyRarity(
+  name: string,
+  variantLabel: string | null,
+  baseRarity: string
+): string {
+  // Order matters: check more specific patterns first
+  if (/\(manga\)/i.test(name) || /\(alternate art\)\s*\(manga\)/i.test(name))
+    return "MR";
+  if (/\(red super alternate art\)/i.test(name) || /\(super alternate art\)/i.test(name))
+    return "SAR";
+  if (/\(sp\)/i.test(name) || /\(sp\)\s*\(gold\)/i.test(name) || /\(sp\)\s*\(wanted poster\)/i.test(name))
+    return "SP";
+  if (/\(alternate art\)/i.test(name))
+    return "AA";
+  if (/\(wanted poster\)/i.test(name))
+    return "SP";
+  // Parallel-only variants without other keywords stay as base rarity
+  return baseRarity;
+}
+
+// ---------------------------------------------------------------------------
 // extractVariantLabel — detect promo variant from card name suffix
 // ---------------------------------------------------------------------------
 

@@ -4,6 +4,7 @@ import { JustTCG } from "justtcg-js";
 import {
   SET_SLUG_MAP,
   extractVariantLabel,
+  classifyRarity,
 } from "@/lib/justtcg-match";
 
 // Vercel Hobby: 10s default, this raises it to 60s
@@ -144,6 +145,7 @@ interface DbCard {
   card_number: string | null;
   name: string | null;
   variant_label: string | null;
+  rarity: string | null;
 }
 
 async function syncOneSet(
@@ -166,7 +168,7 @@ async function syncOneSet(
   // Pre-load ALL cards for this set in one query
   const { data: allDbCards, error: cardsErr } = await supabase
     .from("cards")
-    .select("id, card_number, name, variant_label")
+    .select("id, card_number, name, variant_label, rarity")
     .eq("set_id", dbSet.id);
 
   if (cardsErr) {
@@ -211,10 +213,11 @@ async function syncOneSet(
 
       const priceUpserts: PriceUpsert[] = [];
       const historyInserts: HistoryInsert[] = [];
+      const rarityUpdates: RarityUpdate[] = [];
 
       for (const jtCard of cards) {
         try {
-          matchAndCollect(jtCard, byNumber, byNameLower, priceUpserts, historyInserts);
+          matchAndCollect(jtCard, byNumber, byNameLower, priceUpserts, historyInserts, rarityUpdates);
         } catch (err) {
           setErrors.push(
             `Card ${jtCard.name}: ${err instanceof Error ? err.message : String(err)}`
@@ -240,6 +243,23 @@ async function syncOneSet(
           .from("price_history")
           .insert(historyInserts);
         if (hiErr) setErrors.push(`price_history batch: ${hiErr.message}`);
+      }
+
+      // Apply rarity reclassifications
+      if (rarityUpdates.length > 0) {
+        const byRarity = new Map<string, string[]>();
+        for (const u of rarityUpdates) {
+          const ids = byRarity.get(u.rarity) ?? [];
+          ids.push(u.id);
+          byRarity.set(u.rarity, ids);
+        }
+        for (const [rarity, ids] of byRarity) {
+          const { error: rarErr } = await supabase
+            .from("cards")
+            .update({ rarity })
+            .in("id", ids);
+          if (rarErr) setErrors.push(`rarity update ${rarity}: ${rarErr.message}`);
+        }
       }
 
       hasMore = response.pagination?.hasMore ?? false;
@@ -280,6 +300,11 @@ interface HistoryInsert {
   tcg_market: number;
   market_avg: number;
   recorded_at: string;
+}
+
+interface RarityUpdate {
+  id: string;
+  rarity: string;
 }
 
 interface JTCard {
@@ -323,7 +348,8 @@ function matchAndCollect(
   byNumber: Map<string, DbCard[]>,
   byNameLower: Map<string, DbCard[]>,
   priceUpserts: PriceUpsert[],
-  historyInserts: HistoryInsert[]
+  historyInserts: HistoryInsert[],
+  rarityUpdates: RarityUpdate[]
 ): void {
   const nmVariant = jtCard.variants.find(
     (v) => v.condition === "Near Mint" && v.printing === "Normal"
@@ -337,8 +363,6 @@ function matchAndCollect(
   // Best variant: prefer foil for parallels/alt-arts, normal for base cards
   const bestVariant = nmVariant ?? foilVariant;
   if (!bestVariant) return;
-
-  const jtNameLower = jtCard.name.toLowerCase();
 
   // Normalize: strip card number like "(119)" from names for comparison
   // JustTCG: "Monkey.D.Luffy (Alternate Art) (Manga)"
@@ -369,7 +393,7 @@ function matchAndCollect(
           ? foilVariant ?? nmVariant
           : nmVariant ?? foilVariant;
         if (variant) {
-          addToBatch(dbCards[0].id, variant, priceUpserts, historyInserts);
+          addToBatch(dbCards[0].id, variant, priceUpserts, historyInserts, rarityUpdates, dbCards[0], jtCard.name);
         }
       } else {
         // Multiple DB cards share this number (base + alt art + manga etc.)
@@ -387,7 +411,7 @@ function matchAndCollect(
 
           // Count matching tags (alternate art, manga, parallel, sp, etc.)
           let matchingTags = 0;
-          let totalTags = Math.max(jtTags.length, dbTags.length);
+          const totalTags = Math.max(jtTags.length, dbTags.length);
           for (let t = 0; t < jtTags.length; t++) {
             if (dbTags.indexOf(jtTags[t]) >= 0) matchingTags++;
           }
@@ -408,7 +432,7 @@ function matchAndCollect(
             ? foilVariant ?? nmVariant
             : nmVariant ?? foilVariant;
           if (variant) {
-            addToBatch(best.card.id, variant, priceUpserts, historyInserts);
+            addToBatch(best.card.id, variant, priceUpserts, historyInserts, rarityUpdates, best.card, jtCard.name);
           }
         }
       }
@@ -428,7 +452,7 @@ function matchAndCollect(
 
     const variant = nmVariant ?? foilVariant;
     if (variant) {
-      addToBatch(target.id, variant, priceUpserts, historyInserts);
+      addToBatch(target.id, variant, priceUpserts, historyInserts, rarityUpdates, target, jtCard.name);
     }
   }
 }
@@ -437,8 +461,22 @@ function addToBatch(
   cardId: string,
   variant: JTVariant,
   priceUpserts: PriceUpsert[],
-  historyInserts: HistoryInsert[]
+  historyInserts: HistoryInsert[],
+  rarityUpdates?: RarityUpdate[],
+  dbCard?: DbCard,
+  jtCardName?: string
 ): void {
+  // Reclassify rarity if we have enough info
+  if (rarityUpdates && dbCard && jtCardName && dbCard.rarity) {
+    const newRarity = classifyRarity(
+      dbCard.name ?? jtCardName,
+      dbCard.variant_label ?? null,
+      dbCard.rarity
+    );
+    if (newRarity !== dbCard.rarity) {
+      rarityUpdates.push({ id: dbCard.id, rarity: newRarity });
+    }
+  }
   const now = new Date().toISOString();
 
   priceUpserts.push({
