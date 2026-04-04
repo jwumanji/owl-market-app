@@ -65,29 +65,40 @@ export async function GET() {
       }
 
       // Calculate rarity index (sum of all card market prices)
-      const { data: allPrices } = await supabase
-        .from("cards")
-        .select("price_stats (tcg_market, chg_7d, chg_30d)")
-        .eq("rarity", code)
-        .not("price_stats.tcg_market", "is", null);
-
+      // Paginate to avoid Supabase 1000-row default limit
       let indexValue = 0;
       let totalChg7d = 0;
       let totalChg30d = 0;
       let pricedCount = 0;
+      let priceFrom = 0;
+      const pricePageSize = 1000;
 
-      for (const card of allPrices ?? []) {
-        const ps = card.price_stats as unknown as {
-          tcg_market: number | null;
-          chg_7d: number | null;
-          chg_30d: number | null;
-        };
-        if (ps?.tcg_market) {
-          indexValue += ps.tcg_market;
-          totalChg7d += ps.chg_7d ?? 0;
-          totalChg30d += ps.chg_30d ?? 0;
-          pricedCount++;
+      while (true) {
+        const { data: pricePage } = await supabase
+          .from("cards")
+          .select("price_stats (tcg_market, chg_7d, chg_30d)")
+          .eq("rarity", code)
+          .not("price_stats.tcg_market", "is", null)
+          .range(priceFrom, priceFrom + pricePageSize - 1);
+
+        if (!pricePage || pricePage.length === 0) break;
+
+        for (const card of pricePage) {
+          const ps = card.price_stats as unknown as {
+            tcg_market: number | null;
+            chg_7d: number | null;
+            chg_30d: number | null;
+          };
+          if (ps?.tcg_market) {
+            indexValue += ps.tcg_market;
+            totalChg7d += ps.chg_7d ?? 0;
+            totalChg30d += ps.chg_30d ?? 0;
+            pricedCount++;
+          }
         }
+
+        if (pricePage.length < pricePageSize) break;
+        priceFrom += pricePageSize;
       }
 
       const avgChg7d = pricedCount > 0 ? +(totalChg7d / pricedCount).toFixed(1) : 0;

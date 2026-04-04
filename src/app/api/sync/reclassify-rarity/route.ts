@@ -20,15 +20,26 @@ export async function GET(request: Request) {
 
   const supabase = createServiceClient();
 
-  // Fetch all cards with rarity
-  const { data: cards, error } = await supabase
-    .from("cards")
-    .select("id, name, variant_label, rarity")
-    .not("rarity", "is", null);
+  // Fetch all cards with rarity (paginate to avoid Supabase 1000-row limit)
+  const allCards: { id: string; name: string; variant_label: string | null; rarity: string }[] = [];
+  let from = 0;
+  const pageSize = 1000;
+  while (true) {
+    const { data: page, error: pageErr } = await supabase
+      .from("cards")
+      .select("id, name, variant_label, rarity")
+      .not("rarity", "is", null)
+      .range(from, from + pageSize - 1);
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    if (pageErr) {
+      return NextResponse.json({ error: pageErr.message }, { status: 500 });
+    }
+    if (!page || page.length === 0) break;
+    allCards.push(...page);
+    if (page.length < pageSize) break;
+    from += pageSize;
   }
+  const cards = allCards;
 
   const changes: { id: string; name: string; from: string; to: string }[] = [];
 
