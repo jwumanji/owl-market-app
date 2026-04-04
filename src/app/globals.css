@@ -625,3 +625,32 @@ nav {
   font-size: 28px; font-weight: 800; letter-spacing: 0.05em;
   opacity: 0.12; position: absolute; top: 12px; right: 16px;
 }
+
+/* ── Tier 2 Smaller Rank Cards ── */
+.ch-rank-row-sm { margin-bottom: 24px; }
+.ch-rank-card-sm { padding: 10px; }
+.ch-rank-card-sm .ch-rank-name { font-size: 12px; }
+.ch-rank-card-sm .ch-rank-price { font-size: 14px; }
+.ch-rank-card-sm .ch-rank-chg { font-size: 11px; margin-bottom: 0; }
+.ch-rank-card-sm .ch-rank-sub { display: none; }
+
+/* ── Rarity Badges: Promo & Sealed ── */
+.rb-promo { background: rgba(245,166,35,0.18); color: #F5A623; border: 1px solid rgba(245,166,35,0.38); }
+.rb-sealed { background: rgba(32,201,176,0.18); color: #20C9B0; border: 1px solid rgba(32,201,176,0.38); }
+
+/* ── See All Cards Button ── */
+.rar-see-all { text-align: center; margin: 40px 0 16px; }
+.rar-see-all-btn {
+  display: inline-block; padding: 12px 32px;
+  border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text); font-size: 14px; font-weight: 600;
+  background: var(--surface); transition: border-color .2s, color .2s, box-shadow .2s;
+  text-decoration: none;
+}
+.rar-see-all-btn:hover { border-color: var(--owl); color: var(--owl); box-shadow: 0 0 0 1px var(--owl); }
+
+/* ── Coming Soon Placeholder ── */
+.rar-coming-soon {
+  display: flex; align-items: center; justify-content: center;
+  padding: 48px 20px; color: var(--text2); font-size: 14px;
+}
