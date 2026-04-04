@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Markets — OWL Market",
-  description: "Top 200 One Piece TCG cards ranked by market value.",
+  description: "Top 20 One Piece TCG cards ranked by market value.",
 };
 
 export default async function MarketsPage() {
@@ -47,7 +47,7 @@ export default async function MarketsPage() {
       `)
       .not("price_stats", "is", null)
       .order("market_avg", { referencedTable: "price_stats", ascending: false })
-      .limit(200),
+      .limit(20),
 
     supabase
       .from("sets")
@@ -80,7 +80,7 @@ export default async function MarketsPage() {
     <section className="max-w-[1400px] mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-1 tracking-tight">Markets</h1>
       <p className="text-text-2 text-sm mb-6">
-        Top 200 cards by market value
+        Top 20 cards by market value
       </p>
       <MarketTable cards={cards} sets={sets} />
     </section>
