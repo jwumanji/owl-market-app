@@ -14,11 +14,12 @@ import { Line } from "react-chartjs-2";
 import Link from "next/link";
 import Image from "next/image";
 import {
-  SETS,
-  ALL_SETS_EXTRA,
+  SETS as FALLBACK_SETS,
+  ALL_SETS_EXTRA as FALLBACK_EXTRA,
   PULL_RATES,
   DEFAULT_PULL_RATES,
   type SetData,
+  type ExtraSet,
 } from "./sets-data";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip);
@@ -133,8 +134,13 @@ function SetPill({ s, active, onClick }: { s: { slug: string; code: string; name
 
 const SETS_WITH_IMAGES = new Set(['op01','op02','op03','op04','op05','op06','op07','op08','op09','op10','op11','op12','op13','op14']);
 
+function setImageSlug(slug: string): string {
+  return slug.replace(/-/g, "");
+}
+
 function DetailCard({ s }: { s: SetData }) {
-  const hasImage = SETS_WITH_IMAGES.has(s.slug);
+  const imgSlug = setImageSlug(s.slug);
+  const hasImage = SETS_WITH_IMAGES.has(imgSlug);
   return (
     <div className="set-detail-card">
       <div className="sdc-box-art" style={{ background: `linear-gradient(135deg,${s.colorD} 0%,rgba(3,5,13,0.9) 100%)` }}>
@@ -143,7 +149,7 @@ function DetailCard({ s }: { s: SetData }) {
           <div className="sdc-box-img" style={{ background: `linear-gradient(145deg,${s.colorD},var(--surf3))` }}>
             {hasImage ? (
               <Image
-                src={`/sets/${s.slug}.jpg`}
+                src={`/sets/${imgSlug}.jpg`}
                 alt={`${s.code} ${s.name} Booster Box`}
                 fill
                 style={{ objectFit: "cover" }}
@@ -301,7 +307,7 @@ function IndexChart({ s, activeTime, onTimeChange }: { s: SetData; activeTime: s
   );
 }
 
-function TopCardsTable({ s, sets, activeTab, onTabChange }: { s: SetData; sets: typeof SETS; activeTab: string; onTabChange: (slug: string) => void }) {
+function TopCardsTable({ s, sets, activeTab, onTabChange }: { s: SetData; sets: SetData[]; activeTab: string; onTabChange: (slug: string) => void }) {
   const tabSet = sets.find((x) => x.slug === activeTab) || s;
   return (
     <div className="top-cards-section">
@@ -410,7 +416,7 @@ function PullRatesSection({ s }: { s: SetData }) {
   );
 }
 
-function ComparisonGrid({ activeSet, onSelect }: { activeSet: string; onSelect: (slug: string) => void }) {
+function ComparisonGrid({ sets, activeSet, onSelect }: { sets: SetData[]; activeSet: string; onSelect: (slug: string) => void }) {
   return (
     <div className="comparison-section">
       <div className="section-header">
@@ -420,7 +426,7 @@ function ComparisonGrid({ activeSet, onSelect }: { activeSet: string; onSelect: 
         </div>
       </div>
       <div className="comp-grid">
-        {SETS.map((s) => (
+        {sets.map((s) => (
           <div
             key={s.slug}
             className="comp-card"
@@ -457,20 +463,39 @@ function ComparisonGrid({ activeSet, onSelect }: { activeSet: string; onSelect: 
 /* ── Main Page ── */
 
 export default function SetsPage() {
+  const [sets, setSets] = useState<SetData[]>(FALLBACK_SETS);
+  const [extraSets, setExtraSets] = useState<ExtraSet[]>(FALLBACK_EXTRA);
   const [activeSet, setActiveSet] = useState("op01");
   const [activeTime, setActiveTime] = useState("7d");
   const [activeTab, setActiveTab] = useState("op01");
 
-  const s = SETS.find((x) => x.slug === activeSet) || SETS[0];
+  useEffect(() => {
+    fetch("/api/sets")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.sets?.length > 0) {
+          setSets(data.sets);
+          setExtraSets(data.extraSets ?? []);
+          // Default to the highest-value set
+          if (!data.sets.find((s: SetData) => s.slug === activeSet)) {
+            setActiveSet(data.sets[0].slug);
+            setActiveTab(data.sets[0].slug);
+          }
+        }
+      })
+      .catch(() => { /* keep fallback */ });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const s = sets.find((x) => x.slug === activeSet) || sets[0];
 
   const selectSet = useCallback((slug: string) => {
     setActiveSet(slug);
     setActiveTab(slug);
   }, []);
 
-  const top5 = [...SETS].sort((a, b) => b.chg7d - a.chg7d).slice(0, 5);
+  const top5 = [...sets].sort((a, b) => b.chg7d - a.chg7d).slice(0, 5);
   const top5Slugs = top5.map((x) => x.slug);
-  const remainingSets = [...SETS.filter((x) => !top5Slugs.includes(x.slug)), ...ALL_SETS_EXTRA].sort((a, b) =>
+  const remainingSets = [...sets.filter((x) => !top5Slugs.includes(x.slug)), ...extraSets].sort((a, b) =>
     a.code.localeCompare(b.code)
   );
 
@@ -485,7 +510,7 @@ export default function SetsPage() {
       <div className="ph-title">
         Set <span>Index</span>
       </div>
-      <div className="ph-sub">21 sets tracked &middot; Top 5 ranked by 7D momentum &middot; Updates with live data</div>
+      <div className="ph-sub">{sets.length + extraSets.length} sets tracked &middot; Top 5 ranked by 7D momentum &middot; Updates with live data</div>
 
       <div className="set-index-row">
         {top5.map((st) => (
@@ -504,9 +529,9 @@ export default function SetsPage() {
         <IndexChart s={s} activeTime={activeTime} onTimeChange={setActiveTime} />
       </div>
 
-      <TopCardsTable s={s} sets={SETS} activeTab={activeTab} onTabChange={setActiveTab} />
+      <TopCardsTable s={s} sets={sets} activeTab={activeTab} onTabChange={setActiveTab} />
       <PullRatesSection s={s} />
-      <ComparisonGrid activeSet={activeSet} onSelect={selectSet} />
+      <ComparisonGrid sets={sets} activeSet={activeSet} onSelect={selectSet} />
     </section>
   );
 }
