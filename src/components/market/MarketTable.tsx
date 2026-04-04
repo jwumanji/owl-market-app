@@ -11,14 +11,24 @@ import ChangeCell from "../ui/ChangeCell";
 interface MarketTableProps {
   cards: CardRow[];
   sets: SetInfo[];
+  initialSet?: string;
 }
 
-export default function MarketTable({ cards, sets }: MarketTableProps) {
+export default function MarketTable({ cards, sets, initialSet = "all" }: MarketTableProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const [selectedSet, setSelectedSet] = useState("all");
+  const [selectedSet, setSelectedSet] = useState(initialSet);
   const [selectedRarities, setSelectedRarities] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<SortKey>("value");
+
+  const handleSetChange = (setId: string) => {
+    setSelectedSet(setId);
+    if (setId === "all") {
+      router.push("/markets");
+    } else {
+      router.push(`/markets?set=${setId}`);
+    }
+  };
 
   const filtered = useMemo(() => {
     let result = cards;
@@ -61,7 +71,7 @@ export default function MarketTable({ cards, sets }: MarketTableProps) {
         search={search}
         onSearchChange={setSearch}
         selectedSet={selectedSet}
-        onSetChange={setSelectedSet}
+        onSetChange={handleSetChange}
         selectedRarities={selectedRarities}
         onRaritiesChange={setSelectedRarities}
         sortBy={sortBy}
