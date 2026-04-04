@@ -253,7 +253,7 @@ async function syncOneSet(
           ids.push(u.id);
           byRarity.set(u.rarity, ids);
         }
-        for (const [rarity, ids] of byRarity) {
+        for (const [rarity, ids] of Array.from(byRarity.entries())) {
           const { error: rarErr } = await supabase
             .from("cards")
             .update({ rarity })
