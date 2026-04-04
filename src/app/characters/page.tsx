@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CHARACTERS as FALLBACK_CHARS, TIER_LABELS } from "./characters-data";
 
 /* ── Types ── */
@@ -15,6 +16,9 @@ interface CharacterCard {
   chg7d: number;
   chg30d: number;
   spark: number[];
+  imageUrl?: string | null;
+  imageUrlSmall?: string | null;
+  cardImageId?: string | null;
 }
 
 interface CharacterData {
@@ -84,6 +88,12 @@ function rarityClass(rarity: string): string {
   return "rb-r";
 }
 
+/** Get character avatar from their top card image */
+function getCharAvatar(c: CharacterData): string | null {
+  const firstCard = c.topCards?.[0];
+  return firstCard?.imageUrlSmall ?? firstCard?.imageUrl ?? null;
+}
+
 /* ── SVG Sparkline ── */
 function sparkPoints(data: number[], W: number, H: number, pad: number) {
   const mn = Math.min(...data);
@@ -130,10 +140,81 @@ function RowSpark({ data, up }: { data: number[]; up: boolean }) {
   );
 }
 
+/* ── Character Avatar ── */
+function CharAvatar({ src, name, size = 28 }: { src: string | null; name: string; size?: number }) {
+  const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={name}
+        width={size}
+        height={Math.round(size * 1.4)}
+        loading="lazy"
+        className="ch-avatar-img"
+        style={{ width: size, height: Math.round(size * 1.4) }}
+      />
+    );
+  }
+  return (
+    <div
+      className="ch-avatar-placeholder"
+      style={{ width: size, height: Math.round(size * 1.4), fontSize: Math.round(size * 0.35) }}
+    >
+      {initials}
+    </div>
+  );
+}
+
+/* ── Card Image with Hover Preview ── */
+function CardImageCell({ card }: { card: CharacterCard }) {
+  const router = useRouter();
+  const [showPreview, setShowPreview] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const handleMouseEnter = () => {
+    timeoutRef.current = setTimeout(() => setShowPreview(true), 300);
+  };
+  const handleMouseLeave = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setShowPreview(false);
+  };
+  const handleClick = () => {
+    if (card.cardImageId) {
+      router.push(`/card/${card.cardImageId}`);
+    }
+  };
+
+  const imgSrc = card.imageUrlSmall ?? card.imageUrl;
+  const fullSrc = card.imageUrl ?? card.imageUrlSmall;
+
+  return (
+    <div
+      className="ch-card-img-cell"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onClick={handleClick}
+      style={{ cursor: card.cardImageId ? "pointer" : undefined }}
+    >
+      {imgSrc ? (
+        <img src={imgSrc} alt={card.name} width={32} height={45} loading="lazy" className="ch-card-thumb" />
+      ) : (
+        <div className="ch-card-thumb-placeholder" />
+      )}
+      {showPreview && fullSrc && (
+        <div className="ch-card-hover-preview">
+          <img src={fullSrc} alt={card.name} width={200} height={280} loading="lazy" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Character Ranking Card (top row) ── */
 function RankCard({ c, rank, active, onClick }: { c: CharacterData; rank: number; active: boolean; onClick: () => void }) {
   const tier = TIER_LABELS[c.tier] || TIER_LABELS[3];
   const color = c.color || "#E8A020";
+  const avatar = getCharAvatar(c);
   return (
     <div
       className="ch-rank-card"
@@ -147,8 +228,13 @@ function RankCard({ c, rank, active, onClick }: { c: CharacterData; rank: number
         <span className="ch-rank-num">#{rank}</span>
         <span className="ch-tier-badge" style={{ background: tier.bg, color: tier.color }}>{tier.label}</span>
       </div>
-      <div className="ch-rank-name">{c.name}</div>
-      <div className="ch-rank-sub">{c.subtitle}</div>
+      <div className="ch-rank-name-row">
+        <CharAvatar src={avatar} name={c.name} size={24} />
+        <div style={{ minWidth: 0 }}>
+          <div className="ch-rank-name">{c.name}</div>
+          <div className="ch-rank-sub">{c.subtitle}</div>
+        </div>
+      </div>
       <div className="ch-rank-price">${c.indexValue.toLocaleString()}</div>
       <div className="ch-rank-chg" style={{ color: c.up ? "var(--green)" : "var(--red)" }}>
         {c.up ? "\u2191" : "\u2193"} {Math.abs(c.chg7d)}% <span className="ch-rank-period">7D</span>
@@ -160,17 +246,38 @@ function RankCard({ c, rank, active, onClick }: { c: CharacterData; rank: number
   );
 }
 
-/* ── Character Pill (rest of list) ── */
-function CharPill({ c, rank, active, onClick }: { c: CharacterData; rank: number; active: boolean; onClick: () => void }) {
+/* ── Character Bullet (rank 6-10) ── */
+function CharBullet({ c, rank, active, onClick }: { c: CharacterData; rank: number; active: boolean; onClick: () => void }) {
   return (
-    <div className={`ch-pill${active ? " active" : ""}`} onClick={onClick}>
-      <span className="ch-pill-rank">#{rank}</span>
-      <span className="ch-pill-name" style={{ color: active ? c.color : undefined }}>{c.name}</span>
-      <span className="ch-pill-faction">{c.faction}</span>
-      <span className="ch-pill-val">${c.indexValue.toLocaleString()}</span>
-      <span className="ch-pill-chg" style={{ color: c.up ? "var(--green)" : "var(--red)" }}>
+    <div className={`ch-bullet${active ? " active" : ""}`} onClick={onClick}>
+      <span className="ch-bullet-dot" style={{ background: c.color || "var(--text2)" }} />
+      <span className="ch-bullet-rank">#{rank}</span>
+      <span className="ch-bullet-name" style={{ color: active ? c.color : undefined }}>{c.name}</span>
+      <span className="ch-bullet-val">${c.indexValue.toLocaleString()}</span>
+      <span className="ch-bullet-chg" style={{ color: c.up ? "var(--green)" : "var(--red)" }}>
         {c.up ? "+" : "-"}{Math.abs(c.chg7d)}%
       </span>
+    </div>
+  );
+}
+
+/* ── Search Input ── */
+function CharSearch({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="ch-search-wrap">
+      <svg className="ch-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+      </svg>
+      <input
+        type="text"
+        className="ch-search-input"
+        placeholder="Search characters..."
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {value && (
+        <button className="ch-search-clear" onClick={() => onChange("")}>&times;</button>
+      )}
     </div>
   );
 }
@@ -179,16 +286,31 @@ function CharPill({ c, rank, active, onClick }: { c: CharacterData; rank: number
 function CharacterDetail({ c }: { c: CharacterData }) {
   const tier = TIER_LABELS[c.tier] || TIER_LABELS[3];
   const color = c.color || "#E8A020";
+  const avatar = getCharAvatar(c);
+  const fullImg = c.topCards?.[0]?.imageUrl ?? c.topCards?.[0]?.imageUrlSmall ?? null;
   return (
     <div className="ch-detail">
       <div className="ch-detail-header" style={{ background: `linear-gradient(135deg,${c.colorD || "rgba(232,160,32,0.18)"},transparent)` }}>
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,transparent,${color},transparent)` }} />
-        <div className="ch-detail-badges">
-          <span className="ch-tier-badge" style={{ background: tier.bg, color: tier.color }}>Tier {tier.label}</span>
-          <span className="ch-faction-badge">{c.faction}</span>
+        <div className="ch-detail-header-inner">
+          {fullImg ? (
+            <img src={fullImg} alt={c.name} className="ch-detail-avatar" width={80} height={112} loading="lazy" />
+          ) : avatar ? (
+            <img src={avatar} alt={c.name} className="ch-detail-avatar" width={80} height={112} loading="lazy" />
+          ) : (
+            <div className="ch-detail-avatar-placeholder">
+              {c.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
+            </div>
+          )}
+          <div className="ch-detail-header-info">
+            <div className="ch-detail-badges">
+              <span className="ch-tier-badge" style={{ background: tier.bg, color: tier.color }}>Tier {tier.label}</span>
+              <span className="ch-faction-badge">{c.faction}</span>
+            </div>
+            <div className="ch-detail-name">{c.name}</div>
+            <div className="ch-detail-sub">{c.subtitle}</div>
+          </div>
         </div>
-        <div className="ch-detail-name">{c.name}</div>
-        <div className="ch-detail-sub">{c.subtitle}</div>
       </div>
       <div className="ch-detail-stats">
         {[
@@ -221,20 +343,23 @@ function CharacterCards({ c }: { c: CharacterData }) {
       <div className="cards-table-wrap">
         <table className="cards-table">
           <colgroup>
-            <col className="c0" /><col className="c1" /><col className="c2" /><col className="c3" />
+            <col className="c0" /><col className="c-img" /><col className="c1" /><col className="c2" /><col className="c3" />
             <col className="c4" /><col className="c5" /><col className="c6" /><col className="c7" /><col className="c8" />
           </colgroup>
           <thead>
             <tr>
-              <th>#</th><th>Card</th><th>Rarity</th><th className="r">Avg Price</th>
+              <th>#</th><th></th><th>Card</th><th>Rarity</th><th className="r">Avg Price</th>
               <th className="r">TCGPlayer</th><th className="r">24H</th><th className="r">7D</th>
               <th className="r">30D</th><th className="r">Last 7 Days</th>
             </tr>
           </thead>
           <tbody>
             {c.topCards.map((card, i) => (
-              <tr key={i}>
+              <tr key={i} className={card.cardImageId ? "ch-card-clickable" : ""}>
                 <td className="rank-n">{i + 1}</td>
+                <td className="ch-card-img-td">
+                  <CardImageCell card={card} />
+                </td>
                 <td>
                   <div className="card-cell">
                     <div style={{ minWidth: 0 }}>
@@ -274,6 +399,7 @@ function AllCharactersGrid({ chars, activeSlug, onSelect }: { chars: CharacterDa
       <div className="ch-all-grid">
         {chars.map((c, i) => {
           const tier = TIER_LABELS[c.tier] || TIER_LABELS[3];
+          const avatar = getCharAvatar(c);
           return (
             <div
               key={c.slug}
@@ -290,8 +416,13 @@ function AllCharactersGrid({ chars, activeSlug, onSelect }: { chars: CharacterDa
                   {c.chg30d >= 0 ? "+" : ""}{c.chg30d}%
                 </span>
               </div>
-              <div className="ch-grid-name">{c.name}</div>
-              <div className="ch-grid-sub">{c.subtitle}</div>
+              <div className="ch-grid-name-row">
+                <CharAvatar src={avatar} name={c.name} size={28} />
+                <div style={{ minWidth: 0 }}>
+                  <div className="ch-grid-name">{c.name}</div>
+                  <div className="ch-grid-sub">{c.subtitle}</div>
+                </div>
+              </div>
               <div className="ch-grid-val">${c.indexValue.toLocaleString()}</div>
               <div className="ch-grid-meta">{c.cardCount} cards &middot; {c.faction}</div>
               <div className="ch-grid-spark">
@@ -315,6 +446,8 @@ export default function CharactersPage() {
   const [characters, setCharacters] = useState<CharacterData[]>(() => assignColors(FALLBACK_CHARS));
   const [activeChar, setActiveChar] = useState(FALLBACK_CHARS[0].slug);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     fetch("/api/characters")
@@ -339,7 +472,12 @@ export default function CharactersPage() {
   }, []);
 
   const top5 = characters.slice(0, 5);
-  const rest = characters.slice(5);
+  const rank6to10 = characters.slice(5, 10);
+
+  // Filter characters for search
+  const filteredChars = search.trim()
+    ? characters.filter((ch) => ch.name.toLowerCase().includes(search.toLowerCase()) || ch.faction.toLowerCase().includes(search.toLowerCase()))
+    : characters;
 
   return (
     <section className="chars-page">
@@ -357,24 +495,54 @@ export default function CharactersPage() {
         {loading ? " Loading live data..." : " Updates with live data"}
       </div>
 
+      {/* Top 5 Rank Cards */}
       <div className="ch-rank-row">
         {top5.map((ch, i) => (
           <RankCard key={ch.slug} c={ch} rank={i + 1} active={activeChar === ch.slug} onClick={() => selectChar(ch.slug)} />
         ))}
       </div>
 
-      <div className="ch-pill-strip">
-        {rest.map((ch, i) => (
-          <CharPill key={ch.slug} c={ch} rank={i + 6} active={activeChar === ch.slug} onClick={() => selectChar(ch.slug)} />
-        ))}
-      </div>
+      {/* Rank 6-10 Bullets */}
+      {rank6to10.length > 0 && (
+        <div className="ch-bullet-strip">
+          {rank6to10.map((ch, i) => (
+            <CharBullet key={ch.slug} c={ch} rank={i + 6} active={activeChar === ch.slug} onClick={() => selectChar(ch.slug)} />
+          ))}
+        </div>
+      )}
 
+      {/* Search */}
+      <CharSearch value={search} onChange={setSearch} />
+
+      {/* Detail + Cards */}
       <div className="ch-detail-section">
         <CharacterDetail c={c} />
         <CharacterCards c={c} />
       </div>
 
-      <AllCharactersGrid chars={characters} activeSlug={activeChar} onSelect={selectChar} />
+      {/* See All Characters Button / Grid */}
+      {!showAll ? (
+        <div className="ch-see-all-wrap">
+          <button className="ch-see-all-btn" onClick={() => setShowAll(true)}>
+            See All Characters
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+        </div>
+      ) : (
+        <>
+          <AllCharactersGrid chars={filteredChars} activeSlug={activeChar} onSelect={selectChar} />
+          <div className="ch-see-all-wrap">
+            <button className="ch-see-all-btn" onClick={() => setShowAll(false)}>
+              Collapse
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="18 15 12 9 6 15" />
+              </svg>
+            </button>
+          </div>
+        </>
+      )}
     </section>
   );
 }

@@ -33,7 +33,7 @@ export async function GET() {
         .from("cards")
         .select(`
           id, name, card_number, variant_label, rarity,
-          set_id,
+          set_id, image_url, image_url_small, card_image_id,
           sets!inner (code, name),
           price_stats!inner (
             tcg_market, market_avg,
@@ -122,6 +122,9 @@ export async function GET() {
             chg7d: ps?.chg_7d ?? 0,
             chg30d: ps?.chg_30d ?? 0,
             spark: historyMap[c.id] ?? [ps?.tcg_market ?? 0, ps?.tcg_market ?? 0],
+            imageUrl: c.image_url ?? null,
+            imageUrlSmall: c.image_url_small ?? null,
+            cardImageId: c.card_image_id ?? null,
           };
         }),
       };
