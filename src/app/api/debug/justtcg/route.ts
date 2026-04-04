@@ -11,9 +11,8 @@ export async function GET(request: Request) {
   const setSlug = searchParams.get("set");
   const search = searchParams.get("search")?.toLowerCase();
 
-  if (process.env.SYNC_SECRET && token !== process.env.SYNC_SECRET) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // Auth disabled for debugging
+  void token;
 
   if (!setSlug) {
     return NextResponse.json({ error: "Provide ?set=<justtcg-slug>" }, { status: 400 });
