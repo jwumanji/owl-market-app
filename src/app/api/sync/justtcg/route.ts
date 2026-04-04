@@ -340,6 +340,25 @@ function matchAndCollect(
 
   const jtNameLower = jtCard.name.toLowerCase();
 
+  // Normalize: strip card number like "(119)" from names for comparison
+  // JustTCG: "Monkey.D.Luffy (Alternate Art) (Manga)"
+  // DB:      "Monkey.D.Luffy (119) (Alternate Art) (Manga)"
+  function stripCardNum(name: string): string {
+    return name.replace(/\s*\(\d+\)\s*/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+  }
+
+  // Extract variant tags from a name (e.g., "alternate art", "manga", "parallel")
+  function extractTags(name: string): string[] {
+    const tags: string[] = [];
+    const re = /\(([^)]+)\)/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(name.toLowerCase())) !== null) {
+      const tag = m[1].trim();
+      if (!/^\d+$/.test(tag)) tags.push(tag);
+    }
+    return tags;
+  }
+
   // Match by card number first (most reliable)
   if (jtCard.number) {
     const dbCards = byNumber.get(jtCard.number);
@@ -354,37 +373,42 @@ function matchAndCollect(
         }
       } else {
         // Multiple DB cards share this number (base + alt art + manga etc.)
-        // Match by name similarity to find the right one
-        const exactMatch = dbCards.find(
-          (c) => c.name && c.name.toLowerCase() === jtNameLower
-        );
+        // Compare variant tags to find the right match
+        const jtTags = extractTags(jtCard.name);
+        const jtStripped = stripCardNum(jtCard.name);
 
-        if (exactMatch) {
-          const variant = exactMatch.variant_label
+        // Score each DB card by tag overlap
+        const scored = dbCards.map((c) => {
+          const dbTags = extractTags(c.name ?? "");
+          const dbStripped = stripCardNum(c.name ?? "");
+
+          // Exact stripped name match
+          if (dbStripped === jtStripped) return { card: c, score: 0 };
+
+          // Count matching tags (alternate art, manga, parallel, sp, etc.)
+          let matchingTags = 0;
+          let totalTags = Math.max(jtTags.length, dbTags.length);
+          for (let t = 0; t < jtTags.length; t++) {
+            if (dbTags.indexOf(jtTags[t]) >= 0) matchingTags++;
+          }
+
+          if (totalTags === 0) {
+            // Both have no tags — it's the base card
+            return { card: c, score: 1 };
+          }
+
+          // Higher overlap = lower score (better match)
+          return { card: c, score: totalTags - matchingTags };
+        });
+
+        scored.sort((a, b) => a.score - b.score);
+        const best = scored[0];
+        if (best) {
+          const variant = best.card.variant_label
             ? foilVariant ?? nmVariant
             : nmVariant ?? foilVariant;
           if (variant) {
-            addToBatch(exactMatch.id, variant, priceUpserts, historyInserts);
-          }
-        } else {
-          // Fuzzy: find the card whose name is closest to the JustTCG name
-          const scored = dbCards.map((c) => {
-            const dbName = (c.name ?? "").toLowerCase();
-            // Score based on how much of the JustTCG name matches the DB name
-            if (jtNameLower.includes(dbName) || dbName.includes(jtNameLower)) {
-              return { card: c, score: Math.abs(dbName.length - jtNameLower.length) };
-            }
-            return { card: c, score: 9999 };
-          });
-          scored.sort((a, b) => a.score - b.score);
-          const best = scored[0];
-          if (best && best.score < 9999) {
-            const variant = best.card.variant_label
-              ? foilVariant ?? nmVariant
-              : nmVariant ?? foilVariant;
-            if (variant) {
-              addToBatch(best.card.id, variant, priceUpserts, historyInserts);
-            }
+            addToBatch(best.card.id, variant, priceUpserts, historyInserts);
           }
         }
       }
