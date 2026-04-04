@@ -334,16 +334,58 @@ function matchAndCollect(
 
   if (!nmVariant && !foilVariant) return;
 
+  // Best variant: prefer foil for parallels/alt-arts, normal for base cards
+  const bestVariant = nmVariant ?? foilVariant;
+  if (!bestVariant) return;
+
+  const jtNameLower = jtCard.name.toLowerCase();
+
   // Match by card number first (most reliable)
   if (jtCard.number) {
     const dbCards = byNumber.get(jtCard.number);
     if (dbCards && dbCards.length > 0) {
-      for (const dbCard of dbCards) {
-        const variant = dbCard.variant_label
+      if (dbCards.length === 1) {
+        // Only one DB card for this number — straightforward match
+        const variant = dbCards[0].variant_label
           ? foilVariant ?? nmVariant
           : nmVariant ?? foilVariant;
         if (variant) {
-          addToBatch(dbCard.id, variant, priceUpserts, historyInserts);
+          addToBatch(dbCards[0].id, variant, priceUpserts, historyInserts);
+        }
+      } else {
+        // Multiple DB cards share this number (base + alt art + manga etc.)
+        // Match by name similarity to find the right one
+        const exactMatch = dbCards.find(
+          (c) => c.name && c.name.toLowerCase() === jtNameLower
+        );
+
+        if (exactMatch) {
+          const variant = exactMatch.variant_label
+            ? foilVariant ?? nmVariant
+            : nmVariant ?? foilVariant;
+          if (variant) {
+            addToBatch(exactMatch.id, variant, priceUpserts, historyInserts);
+          }
+        } else {
+          // Fuzzy: find the card whose name is closest to the JustTCG name
+          const scored = dbCards.map((c) => {
+            const dbName = (c.name ?? "").toLowerCase();
+            // Score based on how much of the JustTCG name matches the DB name
+            if (jtNameLower.includes(dbName) || dbName.includes(jtNameLower)) {
+              return { card: c, score: Math.abs(dbName.length - jtNameLower.length) };
+            }
+            return { card: c, score: 9999 };
+          });
+          scored.sort((a, b) => a.score - b.score);
+          const best = scored[0];
+          if (best && best.score < 9999) {
+            const variant = best.card.variant_label
+              ? foilVariant ?? nmVariant
+              : nmVariant ?? foilVariant;
+            if (variant) {
+              addToBatch(best.card.id, variant, priceUpserts, historyInserts);
+            }
+          }
         }
       }
       return;
