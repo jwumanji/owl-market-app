@@ -481,12 +481,21 @@ function addToBatch(
   jtCardName?: string
 ): void {
   // Reclassify rarity if we have enough info
+  // Check BOTH DB name and JustTCG name — DB names often lack variant tags
+  // like (Manga), (Alternate Art), etc. that are needed for classification
   if (rarityUpdates && dbCard && jtCardName && dbCard.rarity) {
-    const newRarity = classifyRarity(
+    const fromDb = classifyRarity(
       dbCard.name ?? jtCardName,
       dbCard.variant_label ?? null,
       dbCard.rarity
     );
+    const fromJt = classifyRarity(
+      jtCardName,
+      dbCard.variant_label ?? null,
+      dbCard.rarity
+    );
+    // Prefer the more specific reclassification (non-base rarity wins)
+    const newRarity = fromDb !== dbCard.rarity ? fromDb : fromJt;
     if (newRarity !== dbCard.rarity) {
       rarityUpdates.push({ id: dbCard.id, rarity: newRarity });
     }
