@@ -169,18 +169,25 @@ export function classifyRarity(
   variantLabel: string | null,
   baseRarity: string
 ): string {
-  // Order matters: check more specific patterns first
-  if (/\(manga\)/i.test(name) || /\(alternate art\)\s*\(manga\)/i.test(name))
+  // Order matters: check more specific patterns first (most specific → least)
+  // 1. Manga Rare — highest priority chase cards
+  if (/\(manga\)/i.test(name))
     return "MR";
+  // 2. Treasure Rare — (TR) tag in name
+  if (/\(TR\)/i.test(name))
+    return "TR";
+  // 3. Super Alternate Art — (Super Alternate Art) or (Red Super Alternate Art)
   if (/\(red super alternate art\)/i.test(name) || /\(super alternate art\)/i.test(name))
     return "SAR";
-  if (/\(sp\)/i.test(name) || /\(sp\)\s*\(gold\)/i.test(name) || /\(sp\)\s*\(wanted poster\)/i.test(name))
+  // 4. SP — (SP), (SP) (Gold), (SP) (Wanted Poster), (Wanted Poster)
+  if (/\(sp\)/i.test(name))
     return "SP";
-  if (/\(alternate art\)/i.test(name))
-    return "AA";
   if (/\(wanted poster\)/i.test(name))
     return "SP";
-  // Parallel-only variants without other keywords stay as base rarity
+  // 5. Alternate Art — (Alternate Art) without manga/SP/SAR qualifier
+  if (/\(alternate art\)/i.test(name))
+    return "AA";
+  // Parallel-only variants and Box Toppers stay as base rarity
   return baseRarity;
 }
 
