@@ -6,61 +6,48 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Markets — OWL Market",
-  description: "Top 200 One Piece TCG cards ranked by market value.",
+  description: "Top 20 One Piece TCG cards ranked by market value.",
 };
 
-export default async function MarketsPage({
-  searchParams,
-}: {
-  searchParams: { set?: string };
-}) {
+export default async function MarketsPage() {
   const supabase = createServiceClient();
-  const selectedSetId = searchParams.set ?? "all";
-
-  // Build the cards query — when a set is selected, fetch ALL priced cards for it
-  let cardsQuery = supabase
-    .from("cards")
-    .select(`
-      id,
-      card_image_id,
-      card_number,
-      name,
-      name_base,
-      variant_label,
-      rarity,
-      card_type,
-      color,
-      image_url,
-      image_url_small,
-      price_stats (
-        market_avg,
-        tcg_market,
-        ebay_avg,
-        chg_1d,
-        chg_7d,
-        chg_30d
-      ),
-      sets (
-        id,
-        slug,
-        code,
-        name,
-        series,
-        color,
-        year
-      )
-    `)
-    .not("price_stats", "is", null)
-    .order("market_avg", { referencedTable: "price_stats", ascending: false });
-
-  if (selectedSetId !== "all") {
-    cardsQuery = cardsQuery.eq("set_id", selectedSetId);
-  } else {
-    cardsQuery = cardsQuery.limit(200);
-  }
 
   const [cardsRes, setsRes] = await Promise.all([
-    cardsQuery,
+    supabase
+      .from("cards")
+      .select(`
+        id,
+        card_image_id,
+        card_number,
+        name,
+        name_base,
+        variant_label,
+        rarity,
+        card_type,
+        color,
+        image_url,
+        image_url_small,
+        price_stats (
+          market_avg,
+          tcg_market,
+          ebay_avg,
+          chg_1d,
+          chg_7d,
+          chg_30d
+        ),
+        sets (
+          id,
+          slug,
+          code,
+          name,
+          series,
+          color,
+          year
+        )
+      `)
+      .not("price_stats", "is", null)
+      .order("market_avg", { referencedTable: "price_stats", ascending: false })
+      .limit(20),
 
     supabase
       .from("sets")
@@ -89,20 +76,13 @@ export default async function MarketsPage({
     return pa.num - pb.num;
   });
 
-  const selectedSetName =
-    selectedSetId !== "all"
-      ? sets.find((s) => s.id === selectedSetId)?.name
-      : null;
-
   return (
     <section className="max-w-[1400px] mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-1 tracking-tight">Markets</h1>
       <p className="text-text-2 text-sm mb-6">
-        {selectedSetName
-          ? `All priced cards in ${selectedSetName}`
-          : "Top 200 cards by market value"}
+        Top 20 cards by market value
       </p>
-      <MarketTable cards={cards} sets={sets} initialSet={selectedSetId} />
+      <MarketTable cards={cards} sets={sets} />
     </section>
   );
 }

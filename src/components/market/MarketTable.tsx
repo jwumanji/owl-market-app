@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { CardRow, SetInfo, SortKey } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
@@ -11,24 +11,34 @@ import ChangeCell from "../ui/ChangeCell";
 interface MarketTableProps {
   cards: CardRow[];
   sets: SetInfo[];
-  initialSet?: string;
 }
 
-export default function MarketTable({ cards, sets, initialSet = "all" }: MarketTableProps) {
+export default function MarketTable({ cards: initialCards, sets }: MarketTableProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const [selectedSet, setSelectedSet] = useState(initialSet);
+  const [selectedSet, setSelectedSet] = useState("all");
   const [selectedRarities, setSelectedRarities] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<SortKey>("value");
+  const [cards, setCards] = useState<CardRow[]>(initialCards);
+  const [loading, setLoading] = useState(false);
 
-  const handleSetChange = (setId: string) => {
-    setSelectedSet(setId);
-    if (setId === "all") {
-      router.push("/markets");
-    } else {
-      router.push(`/markets?set=${setId}`);
+  const fetchCards = useCallback(async (set: string, sort: SortKey) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ set, sort, limit: "20" });
+      const res = await fetch(`/api/markets?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCards(data);
+      }
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchCards(selectedSet, sortBy);
+  }, [selectedSet, sortBy, fetchCards]);
 
   const filtered = useMemo(() => {
     let result = cards;
@@ -38,31 +48,12 @@ export default function MarketTable({ cards, sets, initialSet = "all" }: MarketT
       result = result.filter((c) => c.name?.toLowerCase().includes(q));
     }
 
-    if (selectedSet !== "all") {
-      result = result.filter((c) => c.sets?.id === selectedSet);
-    }
-
     if (selectedRarities.length > 0) {
       result = result.filter((c) => c.rarity && selectedRarities.includes(c.rarity));
     }
 
-    return [...result].sort((a, b) => {
-      const pa = a.price_stats;
-      const pb = b.price_stats;
-      switch (sortBy) {
-        case "value":
-          return (pb?.market_avg ?? 0) - (pa?.market_avg ?? 0);
-        case "chg_1d":
-          return (pb?.chg_1d ?? 0) - (pa?.chg_1d ?? 0);
-        case "chg_7d":
-          return (pb?.chg_7d ?? 0) - (pa?.chg_7d ?? 0);
-        case "chg_30d":
-          return (pb?.chg_30d ?? 0) - (pa?.chg_30d ?? 0);
-        default:
-          return 0;
-      }
-    });
-  }, [cards, search, selectedSet, selectedRarities, sortBy]);
+    return result;
+  }, [cards, search, selectedRarities]);
 
   return (
     <>
@@ -71,7 +62,7 @@ export default function MarketTable({ cards, sets, initialSet = "all" }: MarketT
         search={search}
         onSearchChange={setSearch}
         selectedSet={selectedSet}
-        onSetChange={handleSetChange}
+        onSetChange={setSelectedSet}
         selectedRarities={selectedRarities}
         onRaritiesChange={setSelectedRarities}
         sortBy={sortBy}
@@ -93,7 +84,7 @@ export default function MarketTable({ cards, sets, initialSet = "all" }: MarketT
               <th className="w-[100px] py-3 px-3 text-right">eBay</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className={loading ? "opacity-50 transition-opacity" : "transition-opacity"}>
             {filtered.map((card, i) => (
               <tr
                 key={card.id}
@@ -164,7 +155,7 @@ export default function MarketTable({ cards, sets, initialSet = "all" }: MarketT
             {filtered.length === 0 && (
               <tr>
                 <td colSpan={9} className="py-12 text-center text-text-3 text-sm">
-                  No cards found
+                  {loading ? "Loading..." : "No cards found"}
                 </td>
               </tr>
             )}
