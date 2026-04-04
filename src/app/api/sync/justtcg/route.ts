@@ -214,10 +214,11 @@ async function syncOneSet(
       const priceUpserts: PriceUpsert[] = [];
       const historyInserts: HistoryInsert[] = [];
       const rarityUpdates: RarityUpdate[] = [];
+      const matchedCardIds = new Set<string>();
 
       for (const jtCard of cards) {
         try {
-          matchAndCollect(jtCard, byNumber, byNameLower, priceUpserts, historyInserts, rarityUpdates);
+          matchAndCollect(jtCard, byNumber, byNameLower, priceUpserts, historyInserts, rarityUpdates, matchedCardIds);
         } catch (err) {
           setErrors.push(
             `Card ${jtCard.name}: ${err instanceof Error ? err.message : String(err)}`
@@ -349,7 +350,8 @@ function matchAndCollect(
   byNameLower: Map<string, DbCard[]>,
   priceUpserts: PriceUpsert[],
   historyInserts: HistoryInsert[],
-  rarityUpdates: RarityUpdate[]
+  rarityUpdates: RarityUpdate[],
+  matchedCardIds: Set<string>
 ): void {
   const nmVariant = jtCard.variants.find(
     (v) => v.condition === "Near Mint" && v.printing === "Normal"
@@ -389,20 +391,27 @@ function matchAndCollect(
     if (dbCards && dbCards.length > 0) {
       if (dbCards.length === 1) {
         // Only one DB card for this number — straightforward match
-        const variant = dbCards[0].variant_label
-          ? foilVariant ?? nmVariant
-          : nmVariant ?? foilVariant;
-        if (variant) {
-          addToBatch(dbCards[0].id, variant, priceUpserts, historyInserts, rarityUpdates, dbCards[0], jtCard.name);
+        if (!matchedCardIds.has(dbCards[0].id)) {
+          const variant = dbCards[0].variant_label
+            ? foilVariant ?? nmVariant
+            : nmVariant ?? foilVariant;
+          if (variant) {
+            addToBatch(dbCards[0].id, variant, priceUpserts, historyInserts, rarityUpdates, dbCards[0], jtCard.name);
+            matchedCardIds.add(dbCards[0].id);
+          }
         }
       } else {
         // Multiple DB cards share this number (base + alt art + manga etc.)
         // Compare variant tags to find the right match
+        // Exclude already-matched DB cards so each JustTCG card maps to a unique DB card
+        const unmatched = dbCards.filter((c) => !matchedCardIds.has(c.id));
+        if (unmatched.length === 0) return;
+
         const jtTags = extractTags(jtCard.name);
         const jtStripped = stripCardNum(jtCard.name);
 
         // Score each DB card by tag overlap
-        const scored = dbCards.map((c) => {
+        const scored = unmatched.map((c) => {
           const dbTags = extractTags(c.name ?? "");
           const dbStripped = stripCardNum(c.name ?? "");
 
@@ -433,6 +442,7 @@ function matchAndCollect(
             : nmVariant ?? foilVariant;
           if (variant) {
             addToBatch(best.card.id, variant, priceUpserts, historyInserts, rarityUpdates, best.card, jtCard.name);
+            matchedCardIds.add(best.card.id);
           }
         }
       }
@@ -446,13 +456,17 @@ function matchAndCollect(
   const nameMatches = byNameLower.get(baseName);
 
   if (nameMatches && nameMatches.length > 0) {
+    const unmatchedNames = nameMatches.filter((c) => !matchedCardIds.has(c.id));
+    if (unmatchedNames.length === 0) return;
+
     const target =
-      nameMatches.find((c) => (c.variant_label ?? null) === variantLabel) ??
-      nameMatches[0];
+      unmatchedNames.find((c) => (c.variant_label ?? null) === variantLabel) ??
+      unmatchedNames[0];
 
     const variant = nmVariant ?? foilVariant;
     if (variant) {
       addToBatch(target.id, variant, priceUpserts, historyInserts, rarityUpdates, target, jtCard.name);
+      matchedCardIds.add(target.id);
     }
   }
 }
