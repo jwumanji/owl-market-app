@@ -393,6 +393,182 @@ nav {
 .set-pill-val { font-family: var(--font-ibm-plex-mono), monospace; font-size: 11px; font-weight: 600; color: var(--text); }
 .set-pill-chg { font-family: var(--font-ibm-plex-mono), monospace; font-size: 11px; font-weight: 700; }
 
+/* ══════════════════════════════
+   MARKET DASHBOARD
+══════════════════════════════ */
+.dashboard-grid {
+  margin-bottom: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dashboard-top {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.dashboard-bottom {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+/* Card wrapper */
+.dash-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.dash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.dash-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dash-view-all {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 10px;
+  color: var(--text3);
+  text-decoration: none;
+  letter-spacing: 0.02em;
+  transition: color 0.14s;
+  white-space: nowrap;
+}
+.dash-view-all:hover {
+  color: var(--owl);
+}
+.dash-body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Row */
+.dash-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  transition: background 0.14s;
+  cursor: pointer;
+  min-height: 48px;
+}
+.dash-row:last-child { border-bottom: none; }
+.dash-row:hover { background: var(--surf2); }
+
+.dash-rank {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text3);
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.dash-thumb {
+  width: 32px;
+  height: 45px;
+  border-radius: 3px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.dash-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.dash-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 10px;
+  color: var(--text2);
+}
+.dash-badges {
+  gap: 3px;
+}
+.dash-set {
+  color: var(--text2);
+}
+.dash-rarity-inline {
+  display: inline-flex;
+}
+.dash-values {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  flex-shrink: 0;
+}
+.dash-price {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+.dash-chg {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 10px;
+  font-weight: 600;
+}
+.dash-chg-solo {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.dash-rarity-badge {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  letter-spacing: 0.04em;
+  min-width: 32px;
+  text-align: center;
+}
+.dash-empty {
+  padding: 24px 14px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text3);
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+  .dashboard-top { grid-template-columns: 1fr 1fr; }
+  .dashboard-bottom { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .dashboard-top,
+  .dashboard-bottom { grid-template-columns: 1fr; }
+}
+
 /* Detail Section */
 .detail-section {
   display: grid;
@@ -402,8 +578,8 @@ nav {
   animation: fadeUp 0.4s 0.1s ease both;
 }
 .set-detail-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-.sdc-box-art { width: 100%; height: 150px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border); }
-.sdc-box-img { width: 78px; height: 108px; border-radius: 6px; border: 2px solid rgba(255,255,255,0.14); display: flex; align-items: center; justify-content: center; font-size: 38px; position: relative; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.6); z-index: 1; }
+.sdc-box-art { width: 100%; height: 180px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border); }
+.sdc-box-img { width: 160px; height: 130px; border-radius: 8px; border: 2px solid rgba(255,255,255,0.14); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.6); z-index: 1; }
 .sdc-box-label { font-family: var(--font-ibm-plex-mono), monospace; font-size: 10px; color: rgba(255,255,255,0.35); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 6px; z-index: 1; }
 .sdc-header { padding: 16px 18px; border-bottom: 1px solid var(--border); position: relative; overflow: hidden; }
 .sdc-code { font-family: var(--font-ibm-plex-mono), monospace; font-size: 11px; padding: 3px 10px; border-radius: 3px; font-weight: 600; letter-spacing: 0.07em; display: inline-block; margin-bottom: 10px; }
@@ -465,6 +641,8 @@ nav {
 .rank-n { font-family: var(--font-ibm-plex-mono), monospace; font-size: 11px; color: var(--text2); text-align: center; }
 .card-cell { display: flex; align-items: center; gap: 10px; }
 .card-art { width: 28px; height: 38px; border-radius: 3px; background: var(--surf3); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+.card-thumb { width: 28px; height: 38px; border-radius: 3px; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border); }
+.tr-link:hover td { background: rgba(255,255,255,0.04) !important; }
 .card-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-set-tag { font-family: var(--font-ibm-plex-mono), monospace; font-size: 10px; color: var(--text2); font-weight: 600; }
 
@@ -692,4 +870,109 @@ nav {
   font-family: var(--font-ibm-plex-mono), monospace;
   font-size: 28px; font-weight: 800; letter-spacing: 0.05em;
   opacity: 0.12; position: absolute; top: 12px; right: 16px;
+}
+
+/* ── Tier 2 Smaller Rank Cards ── */
+.ch-rank-row-sm { margin-bottom: 24px; }
+.ch-rank-card-sm { padding: 10px; }
+.ch-rank-card-sm .ch-rank-name { font-size: 12px; }
+.ch-rank-card-sm .ch-rank-price { font-size: 14px; }
+.ch-rank-card-sm .ch-rank-chg { font-size: 11px; margin-bottom: 0; }
+.ch-rank-card-sm .ch-rank-sub { display: none; }
+
+/* ── Rarity Badges: SAR, Promo & Sealed ── */
+.rb-sar { background: rgba(255,107,157,0.14); color: #FF6B9D; border: 1px solid rgba(255,107,157,0.3); }
+.rb-promo { background: rgba(245,166,35,0.18); color: #F5A623; border: 1px solid rgba(245,166,35,0.38); }
+.rb-sealed { background: rgba(32,201,176,0.18); color: #20C9B0; border: 1px solid rgba(32,201,176,0.38); }
+
+/* ── See All Cards Button ── */
+.rar-see-all { text-align: center; margin: 40px 0 16px; }
+.rar-see-all-btn {
+  display: inline-block; padding: 12px 32px;
+  border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text); font-size: 14px; font-weight: 600;
+  background: var(--surface); transition: border-color .2s, color .2s, box-shadow .2s;
+  text-decoration: none;
+}
+.rar-see-all-btn:hover { border-color: var(--owl); color: var(--owl); box-shadow: 0 0 0 1px var(--owl); }
+
+/* ── Coming Soon Placeholder ── */
+.rar-coming-soon {
+  display: flex; align-items: center; justify-content: center;
+  padding: 48px 20px; color: var(--text2); font-size: 14px;
+}
+
+/* ══════════════════════════════════════
+   Market Grid – test page
+   ══════════════════════════════════════ */
+
+.mgrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+}
+
+.mgrid-card {
+  display: flex; flex-direction: column;
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  text-decoration: none;
+  color: var(--text);
+  transition: transform 0.18s, border-color 0.18s, box-shadow 0.18s;
+}
+.mgrid-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--border2);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+}
+
+.mgrid-img {
+  width: 100%; aspect-ratio: 5/7;
+  background: var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.mgrid-img img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+}
+.mgrid-img-placeholder {
+  width: 100%; height: 100%;
+  background: var(--surf3);
+}
+
+.mgrid-info {
+  padding: 10px 12px 6px;
+}
+.mgrid-name {
+  font-size: 13px; font-weight: 600; line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin: 0;
+}
+.mgrid-series {
+  font-size: 11px; color: var(--text2);
+  margin: 2px 0 6px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mgrid-price {
+  font-family: var(--font-mono), monospace;
+  font-size: 18px; font-weight: 700;
+  color: var(--owl);
+  margin: 0;
+}
+
+.mgrid-changes {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  padding: 6px 12px 10px;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+}
+
+@media (max-width: 1100px) {
+  .mgrid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 640px) {
+  .mgrid { grid-template-columns: repeat(2, 1fr); }
 }

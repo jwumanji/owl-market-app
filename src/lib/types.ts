@@ -36,3 +36,55 @@ export interface CardRow {
 export type Rarity = "C" | "UC" | "R" | "SR" | "SEC" | "L" | "SP" | "MR" | "TR" | "AA";
 
 export type SortKey = "value" | "chg_1d" | "chg_7d" | "chg_30d";
+
+/* ── Dashboard widget types ── */
+
+export interface DashboardCard {
+  id: string;
+  card_image_id: string;
+  name: string;
+  rarity: string | null;
+  image_url_small: string | null;
+  set_code: string | null;
+  market_avg: number | null;
+  chg_1d: number | null;
+}
+
+export interface RarityRankItem {
+  code: string;
+  name: string;
+  avg_price: number;
+  card_count: number;
+  chg_1d: number;
+}
+
+export interface CharacterRankItem {
+  name: string;
+  slug: string;
+  rarities: string[];
+  chg_1d: number;
+}
+
+export interface SealedRankItem {
+  name: string;
+  set_code: string | null;
+  product_type: string | null;
+  market_avg: number | null;
+  chg_1d: number | null;
+}
+
+export interface EbaySaleItem {
+  title: string | null;
+  sale_price: number | null;
+  sold_at: string | null;
+}
+
+export interface DashboardData {
+  trending: DashboardCard[];
+  topGainers: DashboardCard[];
+  topLosers: DashboardCard[];
+  rarityRanking: RarityRankItem[];
+  topCharacters: CharacterRankItem[];
+  sealedBoxes: SealedRankItem[];
+  topEbaySales: EbaySaleItem[];
+}
