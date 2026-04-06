@@ -44,7 +44,7 @@ export async function GET() {
         .eq("character_id", char.id)
         .not("price_stats.tcg_market", "is", null)
         .order("price_stats(tcg_market)", { ascending: false })
-        .limit(5);
+        .limit(10);
 
       // Get sparkline history for top cards
       const topCardIds = (topCards ?? []).map((c) => c.id);

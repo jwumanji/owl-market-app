@@ -409,7 +409,7 @@ function CharacterCards({ c }: { c: CharacterData }) {
       <div className="section-header">
         <div>
           <div className="section-title">Top Cards &mdash; <span style={{ color: c.color }}>{c.name}</span></div>
-          <div className="section-sub">{c.topCards.length} highest value cards across all sets</div>
+          <div className="section-sub">Top {c.topCards.length} highest value cards across all sets</div>
         </div>
         <Link href="/markets" className="section-action">View all in markets &rarr;</Link>
       </div>
