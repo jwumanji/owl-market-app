@@ -27,6 +27,8 @@ const GAME = "one-piece-card-game";
 // ---------------------------------------------------------------------------
 
 async function syncPrices(request: Request) {
+  const isVercelCron =
+    request.headers.get("authorization") === `Bearer ${process.env.CRON_SECRET}`;
   const { searchParams } = new URL(request.url);
 
   const supabase = createServiceClient();
