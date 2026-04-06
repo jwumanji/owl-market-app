@@ -27,17 +27,7 @@ const GAME = "one-piece-card-game";
 // ---------------------------------------------------------------------------
 
 async function syncPrices(request: Request) {
-  // Auth check
-  const isVercelCron =
-    request.headers.get("authorization") === `Bearer ${process.env.CRON_SECRET}`;
   const { searchParams } = new URL(request.url);
-  const token = searchParams.get("token");
-  const hasTokenAuth =
-    process.env.SYNC_SECRET && token === process.env.SYNC_SECRET;
-
-  if (process.env.CRON_SECRET && !isVercelCron && !hasTokenAuth) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
 
   const supabase = createServiceClient();
 
