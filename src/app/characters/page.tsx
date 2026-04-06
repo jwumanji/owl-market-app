@@ -409,7 +409,7 @@ function CharacterCards({ c }: { c: CharacterData }) {
       <div className="section-header">
         <div>
           <div className="section-title">Top Cards &mdash; <span style={{ color: c.color }}>{c.name}</span></div>
-          <div className="section-sub">{c.topCards.length} highest value cards across all sets</div>
+          <div className="section-sub">Top {c.topCards.length} highest value cards across all sets</div>
         </div>
         <Link href="/markets" className="section-action">View all in markets &rarr;</Link>
       </div>
@@ -568,6 +568,15 @@ export default function CharactersPage() {
         {loading ? " Loading live data..." : " Updates with live data"}
       </div>
 
+      {/* Search + All Characters Dropdown */}
+      <CharToolbar
+        search={search}
+        onSearchChange={setSearch}
+        characters={characters}
+        activeSlug={activeChar}
+        onSelect={selectChar}
+      />
+
       {/* Top 10 Rank Cards */}
       <div className="ch-rank-row">
         {top10.map((ch, i) => (
@@ -583,15 +592,6 @@ export default function CharactersPage() {
           ))}
         </div>
       )}
-
-      {/* Search + All Characters Dropdown */}
-      <CharToolbar
-        search={search}
-        onSearchChange={setSearch}
-        characters={characters}
-        activeSlug={activeChar}
-        onSelect={selectChar}
-      />
 
       {/* Detail + Cards */}
       <div className="ch-detail-section">
