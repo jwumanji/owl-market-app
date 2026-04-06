@@ -568,6 +568,15 @@ export default function CharactersPage() {
         {loading ? " Loading live data..." : " Updates with live data"}
       </div>
 
+      {/* Search + All Characters Dropdown */}
+      <CharToolbar
+        search={search}
+        onSearchChange={setSearch}
+        characters={characters}
+        activeSlug={activeChar}
+        onSelect={selectChar}
+      />
+
       {/* Top 10 Rank Cards */}
       <div className="ch-rank-row">
         {top10.map((ch, i) => (
@@ -583,15 +592,6 @@ export default function CharactersPage() {
           ))}
         </div>
       )}
-
-      {/* Search + All Characters Dropdown */}
-      <CharToolbar
-        search={search}
-        onSearchChange={setSearch}
-        characters={characters}
-        activeSlug={activeChar}
-        onSelect={selectChar}
-      />
 
       {/* Detail + Cards */}
       <div className="ch-detail-section">
