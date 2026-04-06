@@ -261,23 +261,96 @@ function CharBullet({ c, rank, active, onClick }: { c: CharacterData; rank: numb
   );
 }
 
-/* ── Search Input ── */
-function CharSearch({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+/* ── Search + All Characters Toolbar ── */
+function CharToolbar({
+  search,
+  onSearchChange,
+  characters,
+  activeSlug,
+  onSelect,
+}: {
+  search: string;
+  onSearchChange: (v: string) => void;
+  characters: CharacterData[];
+  activeSlug: string;
+  onSelect: (slug: string) => void;
+}) {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const sorted = [...characters].sort((a, b) => a.name.localeCompare(b.name));
+
+  // Filter dropdown by search text
+  const filtered = search.trim()
+    ? sorted.filter(
+        (ch) =>
+          ch.name.toLowerCase().includes(search.toLowerCase()) ||
+          ch.faction.toLowerCase().includes(search.toLowerCase())
+      )
+    : sorted;
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    if (dropdownOpen) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [dropdownOpen]);
+
   return (
-    <div className="ch-search-wrap">
-      <svg className="ch-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
-      </svg>
-      <input
-        type="text"
-        className="ch-search-input"
-        placeholder="Search characters..."
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-      {value && (
-        <button className="ch-search-clear" onClick={() => onChange("")}>&times;</button>
-      )}
+    <div className="ch-toolbar">
+      {/* Search */}
+      <div className="ch-search-wrap">
+        <svg className="ch-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+        </svg>
+        <input
+          type="text"
+          className="ch-search-input"
+          placeholder="Search characters..."
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+        />
+        {search && (
+          <button className="ch-search-clear" onClick={() => onSearchChange("")}>&times;</button>
+        )}
+      </div>
+
+      {/* All Characters Dropdown */}
+      <div className="ch-dropdown-wrap" ref={dropdownRef}>
+        <button
+          className={`ch-dropdown-btn${dropdownOpen ? " open" : ""}`}
+          onClick={() => setDropdownOpen((o) => !o)}
+        >
+          All Characters
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points={dropdownOpen ? "18 15 12 9 6 15" : "6 9 12 15 18 9"} />
+          </svg>
+        </button>
+        {dropdownOpen && (
+          <div className="ch-dropdown-menu">
+            {filtered.length === 0 && (
+              <div className="ch-dropdown-empty">No characters found</div>
+            )}
+            {filtered.map((ch) => (
+              <div
+                key={ch.slug}
+                className={`ch-dropdown-item${ch.slug === activeSlug ? " active" : ""}`}
+                onClick={() => {
+                  onSelect(ch.slug);
+                  setDropdownOpen(false);
+                }}
+              >
+                <span className="ch-dropdown-item-name">{ch.name}</span>
+                <span className="ch-dropdown-item-val">${ch.indexValue.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -511,8 +584,14 @@ export default function CharactersPage() {
         </div>
       )}
 
-      {/* Search */}
-      <CharSearch value={search} onChange={setSearch} />
+      {/* Search + All Characters Dropdown */}
+      <CharToolbar
+        search={search}
+        onSearchChange={setSearch}
+        characters={characters}
+        activeSlug={activeChar}
+        onSelect={selectChar}
+      />
 
       {/* Detail + Cards */}
       <div className="ch-detail-section">
