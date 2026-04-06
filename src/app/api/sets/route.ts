@@ -277,7 +277,7 @@ export async function GET() {
     });
 
     // Sets with enough data get full treatment
-    if (cards.length >= 5 && topCards.length >= 3) {
+    if (cards.length >= 1) {
       sets.push({
         slug: set.slug,
         code: set.code ?? set.slug.toUpperCase(),

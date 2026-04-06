@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -132,7 +132,23 @@ function SetPill({ s, active, onClick }: { s: { slug: string; code: string; name
   );
 }
 
-const SETS_WITH_IMAGES = new Set(['op01','op02','op03','op04','op05','op06','op07','op08','op09','op10','op11','op12','op13','op14']);
+// Map set slug → image filename in /public/sets/
+const SET_IMAGE_MAP: Record<string, string> = {
+  op01:'op01.jpg', op02:'op02.jpg', op03:'op03.jpg', op04:'op04.jpg',
+  op05:'op05.jpg', op06:'op06.jpg', op07:'op07.jpg', op08:'op08.jpg',
+  op09:'op09.jpg', op10:'op10.jpg', op11:'op11.jpg', op12:'op12.jpg',
+  op13:'op13.jpg', op14:'op14.jpg',
+  eb01:'eb01.jpg',
+  prb01:'prb01.jpg', prb02:'prb02.webp',
+};
+
+/** Sort order for set codes: OP 0-99, EB 100-199, PRB 200-299, ST 300-399 */
+function setCodeOrder(code: string): number {
+  const m = code.match(/^([A-Z]+)(\d+)$/);
+  if (!m) return 9999;
+  const base: Record<string, number> = { OP: 0, EB: 100, PRB: 200, ST: 300 };
+  return (base[m[1]] ?? 400) + parseInt(m[2], 10);
+}
 
 function setImageSlug(slug: string): string {
   return slug.replace(/-/g, "");
@@ -140,16 +156,16 @@ function setImageSlug(slug: string): string {
 
 function DetailCard({ s }: { s: SetData }) {
   const imgSlug = setImageSlug(s.slug);
-  const hasImage = SETS_WITH_IMAGES.has(imgSlug);
+  const imgFile = SET_IMAGE_MAP[imgSlug];
   return (
     <div className="set-detail-card">
       <div className="sdc-box-art" style={{ background: `linear-gradient(135deg,${s.colorD} 0%,rgba(3,5,13,0.9) 100%)` }}>
         <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse at center,${s.color}18 0%,transparent 70%)` }} />
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
           <div className="sdc-box-img" style={{ background: `linear-gradient(145deg,${s.colorD},var(--surf3))` }}>
-            {hasImage ? (
+            {imgFile ? (
               <Image
-                src={`/sets/${imgSlug}.jpg`}
+                src={`/sets/${imgFile}`}
                 alt={`${s.code} ${s.name} Booster Box`}
                 fill
                 style={{ objectFit: "cover" }}
@@ -344,7 +360,13 @@ function TopCardsTable({ s, sets, activeTab, onTabChange }: { s: SetData; sets: 
             </tr>
           </thead>
           <tbody>
-            {tabSet.topCards.map((c, i) => (
+            {tabSet.topCards.length === 0 ? (
+              <tr>
+                <td colSpan={9} style={{ textAlign: "center", padding: "2rem 1rem", color: "var(--text2)", fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: 12 }}>
+                  No card data available for {tabSet.code}
+                </td>
+              </tr>
+            ) : tabSet.topCards.map((c, i) => (
               <tr key={i}>
                 <td className="rank-n">{i + 1}</td>
                 <td>
@@ -368,6 +390,7 @@ function TopCardsTable({ s, sets, activeTab, onTabChange }: { s: SetData; sets: 
               </tr>
             ))}
           </tbody>
+
         </table>
       </div>
     </div>
@@ -493,6 +516,11 @@ export default function SetsPage() {
     setActiveTab(slug);
   }, []);
 
+  const allSetsForTabs = useMemo(
+    () => [...sets].sort((a, b) => setCodeOrder(a.code) - setCodeOrder(b.code)),
+    [sets]
+  );
+
   const top5 = [...sets].sort((a, b) => b.chg7d - a.chg7d).slice(0, 5);
   const top5Slugs = top5.map((x) => x.slug);
   const remainingSets = [...sets.filter((x) => !top5Slugs.includes(x.slug)), ...extraSets].sort((a, b) =>
@@ -529,7 +557,7 @@ export default function SetsPage() {
         <IndexChart s={s} activeTime={activeTime} onTimeChange={setActiveTime} />
       </div>
 
-      <TopCardsTable s={s} sets={sets} activeTab={activeTab} onTabChange={setActiveTab} />
+      <TopCardsTable s={s} sets={allSetsForTabs} activeTab={activeTab} onTabChange={setActiveTab} />
       <PullRatesSection s={s} />
       <ComparisonGrid sets={sets} activeSet={activeSet} onSelect={selectSet} />
     </section>

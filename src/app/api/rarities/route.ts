@@ -13,6 +13,15 @@ export async function GET() {
   const supabase = createServiceClient();
 
   const distinctRarities = Object.keys(RARITY_META).filter((k) => k !== "SEALED");
+  const nonPromoRarities = distinctRarities.filter((k) => k !== "PROMO");
+
+  // Resolve promo set ID so we can query by set membership
+  const { data: promoSet } = await supabase
+    .from("sets")
+    .select("id")
+    .eq("slug", "promo")
+    .single();
+  const promoSetId = promoSet?.id as string | null;
 
   // ── Step 1: Batch-fetch ALL card counts + price aggregation in one pass ──
   // Paginate all cards with price_stats to avoid 1000-row limit
@@ -21,23 +30,35 @@ export async function GET() {
 
   // Count all cards per rarity in parallel
   const countPromises = distinctRarities.map(async (code) => {
-    const { count } = await supabase
+    if (code === "PROMO") {
+      if (!promoSetId) return { code, count: 0 };
+      const { count } = await supabase
+        .from("cards")
+        .select("id", { count: "exact", head: true })
+        .eq("set_id", promoSetId);
+      return { code, count: count ?? 0 };
+    }
+    let q = supabase
       .from("cards")
       .select("id", { count: "exact", head: true })
       .eq("rarity", code);
+    if (promoSetId) q = q.neq("set_id", promoSetId);
+    const { count } = await q;
     return { code, count: count ?? 0 };
   });
 
-  // Paginate priced cards (all rarities at once)
+  // Paginate priced cards — non-promo rarities (exclude promo set cards)
   let priceFrom = 0;
   const pricePageSize = 1000;
   while (true) {
-    const { data: page } = await supabase
+    let q = supabase
       .from("cards")
       .select("rarity, price_stats!inner (tcg_market, chg_7d, chg_30d)")
-      .in("rarity", distinctRarities)
+      .in("rarity", nonPromoRarities)
       .not("price_stats.tcg_market", "is", null)
       .range(priceFrom, priceFrom + pricePageSize - 1);
+    if (promoSetId) q = q.neq("set_id", promoSetId);
+    const { data: page } = await q;
 
     if (!page || page.length === 0) break;
 
@@ -61,6 +82,40 @@ export async function GET() {
     priceFrom += pricePageSize;
   }
 
+  // Paginate priced cards — promo set cards
+  if (promoSetId) {
+    let promoFrom = 0;
+    while (true) {
+      const { data: page } = await supabase
+        .from("cards")
+        .select("rarity, price_stats!inner (tcg_market, chg_7d, chg_30d)")
+        .eq("set_id", promoSetId)
+        .not("price_stats.tcg_market", "is", null)
+        .range(promoFrom, promoFrom + pricePageSize - 1);
+
+      if (!page || page.length === 0) break;
+
+      for (const card of page) {
+        const ps = card.price_stats as unknown as {
+          tcg_market: number | null;
+          chg_7d: number | null;
+          chg_30d: number | null;
+        };
+        if (ps?.tcg_market) {
+          allPriced.push({
+            rarity: "PROMO",
+            tcg_market: ps.tcg_market,
+            chg_7d: ps.chg_7d ?? 0,
+            chg_30d: ps.chg_30d ?? 0,
+          });
+        }
+      }
+
+      if (page.length < pricePageSize) break;
+      promoFrom += pricePageSize;
+    }
+  }
+
   // Wait for counts
   const countResults = await Promise.all(countPromises);
   for (const { code, count } of countResults) {
@@ -82,9 +137,7 @@ export async function GET() {
 
   // ── Step 2: Fetch top 10 cards per rarity (parallel) ──
   const topCardsPromises = distinctRarities.map(async (code) => {
-    const { data: topCards } = await supabase
-      .from("cards")
-      .select(`
+    const fields = `
         id, name, card_number, variant_label, rarity,
         card_image_id, image_url, image_url_small,
         sets!inner (code, name),
@@ -92,11 +145,29 @@ export async function GET() {
           tcg_market, market_avg,
           chg_1d, chg_7d, chg_30d
         )
-      `)
+      `;
+
+    if (code === "PROMO") {
+      if (!promoSetId) return { code, topCards: [] as never[] };
+      const { data: topCards } = await supabase
+        .from("cards")
+        .select(fields)
+        .eq("set_id", promoSetId)
+        .not("price_stats.tcg_market", "is", null)
+        .order("price_stats(tcg_market)", { ascending: false })
+        .limit(10);
+      return { code, topCards: topCards ?? [] };
+    }
+
+    let q = supabase
+      .from("cards")
+      .select(fields)
       .eq("rarity", code)
       .not("price_stats.tcg_market", "is", null)
       .order("price_stats(tcg_market)", { ascending: false })
       .limit(10);
+    if (promoSetId) q = q.neq("set_id", promoSetId);
+    const { data: topCards } = await q;
 
     return { code, topCards: topCards ?? [] };
   });
