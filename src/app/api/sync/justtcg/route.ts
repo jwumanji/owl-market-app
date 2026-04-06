@@ -10,10 +10,16 @@ import {
 // Vercel Hobby: 10s default, this raises it to 60s
 export const maxDuration = 60;
 
-// Reverse map: internal code → first JustTCG set slug
-const CODE_TO_SLUG: Record<string, string> = {};
+// Reverse map: internal code → all JustTCG set slugs
+const CODE_TO_SLUGS: Record<string, string[]> = {};
 for (const [slug, code] of Object.entries(SET_SLUG_MAP)) {
-  if (!CODE_TO_SLUG[code]) CODE_TO_SLUG[code] = slug;
+  if (!CODE_TO_SLUGS[code]) CODE_TO_SLUGS[code] = [];
+  CODE_TO_SLUGS[code].push(slug);
+}
+// Compat: single-slug lookup (first match)
+const CODE_TO_SLUG: Record<string, string> = {};
+for (const [code, slugs] of Object.entries(CODE_TO_SLUGS)) {
+  CODE_TO_SLUG[code] = slugs[0];
 }
 
 const GAME = "one-piece-card-game";
@@ -148,9 +154,9 @@ async function syncOneSet(
   dbSet: any
 ): Promise<{ code: string; updated: number; errors: string[] }> {
   const setCode = dbSet.code;
-  const justTcgSlug = CODE_TO_SLUG[setCode];
+  const justTcgSlugs = CODE_TO_SLUGS[setCode];
 
-  if (!justTcgSlug) {
+  if (!justTcgSlugs || justTcgSlugs.length === 0) {
     return { code: setCode, updated: 0, errors: ["No JustTCG slug mapping"] };
   }
 
@@ -185,6 +191,8 @@ async function syncOneSet(
     }
   }
 
+  // Loop through ALL JustTCG slugs for this set code (promos have 40+)
+  for (const justTcgSlug of justTcgSlugs) {
   try {
     let offset = 0;
     const limit = 100;
@@ -207,14 +215,73 @@ async function syncOneSet(
       const historyInserts: HistoryInsert[] = [];
       const rarityUpdates: RarityUpdate[] = [];
       const matchedCardIds = new Set<string>();
+      const unmatchedCards: JTCard[] = [];
 
       for (const jtCard of cards) {
         try {
-          matchAndCollect(jtCard, byNumber, byNameLower, priceUpserts, historyInserts, rarityUpdates, matchedCardIds);
+          matchAndCollect(jtCard, byNumber, byNameLower, priceUpserts, historyInserts, rarityUpdates, matchedCardIds, unmatchedCards);
         } catch (err) {
           setErrors.push(
             `Card ${jtCard.name}: ${err instanceof Error ? err.message : String(err)}`
           );
+        }
+      }
+
+      // Create new card rows for unmatched JustTCG cards
+      if (unmatchedCards.length > 0) {
+        const newCards = unmatchedCards
+          .filter((jt) => jt.number) // must have a card number
+          .map((jt) => {
+            const variantLabel = extractVariantLabel(jt.name);
+            const baseName = jt.name.replace(/\s*\([^)]*\)\s*/g, " ").trim();
+            const baseRarity = jt.rarity ?? "R";
+            const rarity = classifyRarity(jt.name, variantLabel, baseRarity);
+            // Build a unique card_image_id: "P-001" or "P-001-AA" for variants
+            const suffix = variantLabel ? `-${variantLabel.replace(/[^a-zA-Z0-9]/g, "").substring(0, 10)}` : "";
+            const cardImageId = `${setCode}-${jt.number}${suffix}`;
+            return {
+              card_image_id: cardImageId,
+              card_number: jt.number,
+              name: jt.name,
+              name_base: baseName,
+              variant_label: variantLabel,
+              set_id: dbSet.id,
+              rarity,
+              tcg_product_id: jt.id,
+            };
+          });
+
+        if (newCards.length > 0) {
+          const { data: inserted, error: insErr } = await supabase
+            .from("cards")
+            .upsert(newCards, { onConflict: "card_image_id", ignoreDuplicates: true })
+            .select("id, card_number, name, variant_label, rarity");
+
+          if (insErr) {
+            setErrors.push(`card insert: ${insErr.message}`);
+          } else if (inserted) {
+            // Add newly created cards to lookup maps so price sync works
+            for (const card of inserted as DbCard[]) {
+              if (card.card_number) {
+                const arr = byNumber.get(card.card_number) ?? [];
+                arr.push(card);
+                byNumber.set(card.card_number, arr);
+              }
+              if (card.name) {
+                const key = card.name.toLowerCase();
+                const arr = byNameLower.get(key) ?? [];
+                arr.push(card);
+                byNameLower.set(key, arr);
+              }
+            }
+
+            // Now match the previously unmatched cards to get their prices
+            for (const jtCard of unmatchedCards) {
+              try {
+                matchAndCollect(jtCard, byNumber, byNameLower, priceUpserts, historyInserts, rarityUpdates, matchedCardIds);
+              } catch { /* already tracked */ }
+            }
+          }
         }
       }
 
@@ -260,9 +327,10 @@ async function syncOneSet(
     }
   } catch (err) {
     setErrors.push(
-      `Set fetch failed: ${err instanceof Error ? err.message : String(err)}`
+      `Set fetch failed (${justTcgSlug}): ${err instanceof Error ? err.message : String(err)}`
     );
   }
+  } // end slug loop
 
   return { code: setCode, updated: updatedCount, errors: setErrors };
 }
@@ -343,7 +411,8 @@ function matchAndCollect(
   priceUpserts: PriceUpsert[],
   historyInserts: HistoryInsert[],
   rarityUpdates: RarityUpdate[],
-  matchedCardIds: Set<string>
+  matchedCardIds: Set<string>,
+  unmatchedCards?: JTCard[]
 ): void {
   const nmVariant = jtCard.variants.find(
     (v) => v.condition === "Near Mint" && v.printing === "Normal"
@@ -460,6 +529,12 @@ function matchAndCollect(
       addToBatch(target.id, variant, priceUpserts, historyInserts, rarityUpdates, target, jtCard.name);
       matchedCardIds.add(target.id);
     }
+    return;
+  }
+
+  // No match found — track as unmatched for potential card creation
+  if (unmatchedCards) {
+    unmatchedCards.push(jtCard);
   }
 }
 
