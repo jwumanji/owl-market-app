@@ -214,12 +214,24 @@ async function syncOneSet(
       const priceUpserts: PriceUpsert[] = [];
       const historyInserts: HistoryInsert[] = [];
       const rarityUpdates: RarityUpdate[] = [];
+      const imageUpdates: { id: string; image_url: string; image_url_small: string }[] = [];
       const matchedCardIds = new Set<string>();
       const unmatchedCards: JTCard[] = [];
 
       for (const jtCard of cards) {
         try {
+          const priceCountBefore = priceUpserts.length;
           matchAndCollect(jtCard, byNumber, byNameLower, priceUpserts, historyInserts, rarityUpdates, matchedCardIds, unmatchedCards);
+
+          // For promo set: update images on matched cards using TCGPlayer CDN
+          if (setCode === "P" && jtCard.tcgplayerId && priceUpserts.length > priceCountBefore) {
+            const matchedCardId = priceUpserts[priceUpserts.length - 1].card_id;
+            imageUpdates.push({
+              id: matchedCardId,
+              image_url: `https://product-images.tcgplayer.com/fit-in/437x437/${jtCard.tcgplayerId}.jpg`,
+              image_url_small: `https://tcgplayer-cdn.tcgplayer.com/product/${jtCard.tcgplayerId}_200w.jpg`,
+            });
+          }
         } catch (err) {
           setErrors.push(
             `Card ${jtCard.name}: ${err instanceof Error ? err.message : String(err)}`
@@ -239,8 +251,15 @@ async function syncOneSet(
             // Build a unique card_image_id: "P-001" or "P-001-AA" for variants
             const suffix = variantLabel ? `-${variantLabel.replace(/[^a-zA-Z0-9]/g, "").substring(0, 10)}` : "";
             const cardImageId = `${setCode}-${jt.number}${suffix}`;
-            const imageUrl = jt.number
-              ? `https://optcgapi.com/media/static/Card_Images/${jt.number}.jpg`
+            // Use TCGPlayer CDN images for promo cards (optcgapi only has base art)
+            const isPromo = setCode === "P";
+            const imageUrl = isPromo && jt.tcgplayerId
+              ? `https://product-images.tcgplayer.com/fit-in/437x437/${jt.tcgplayerId}.jpg`
+              : jt.number
+                ? `https://optcgapi.com/media/static/Card_Images/${jt.number}.jpg`
+                : null;
+            const imageUrlSmall = isPromo && jt.tcgplayerId
+              ? `https://tcgplayer-cdn.tcgplayer.com/product/${jt.tcgplayerId}_200w.jpg`
               : null;
             return {
               card_image_id: cardImageId,
@@ -252,6 +271,7 @@ async function syncOneSet(
               rarity,
               tcg_product_id: jt.id,
               image_url: imageUrl,
+              image_url_small: imageUrlSmall,
             };
           });
 
@@ -326,6 +346,17 @@ async function syncOneSet(
         }
       }
 
+      // Update promo card images with TCGPlayer CDN URLs
+      if (imageUpdates.length > 0) {
+        for (const img of imageUpdates) {
+          const { error: imgErr } = await supabase
+            .from("cards")
+            .update({ image_url: img.image_url, image_url_small: img.image_url_small })
+            .eq("id", img.id);
+          if (imgErr) setErrors.push(`image update: ${imgErr.message}`);
+        }
+      }
+
       hasMore = response.pagination?.hasMore ?? false;
       offset += limit;
     }
@@ -380,6 +411,7 @@ interface JTCard {
   setName?: string;
   number: string | null;
   rarity: string | null;
+  tcgplayerId: string | null;
   variants: JTVariant[];
 }
 
