@@ -239,6 +239,9 @@ async function syncOneSet(
             // Build a unique card_image_id: "P-001" or "P-001-AA" for variants
             const suffix = variantLabel ? `-${variantLabel.replace(/[^a-zA-Z0-9]/g, "").substring(0, 10)}` : "";
             const cardImageId = `${setCode}-${jt.number}${suffix}`;
+            const imageUrl = jt.number
+              ? `https://optcgapi.com/media/static/Card_Images/${jt.number}.jpg`
+              : null;
             return {
               card_image_id: cardImageId,
               card_number: jt.number,
@@ -248,13 +251,14 @@ async function syncOneSet(
               set_id: dbSet.id,
               rarity,
               tcg_product_id: jt.id,
+              image_url: imageUrl,
             };
           });
 
         if (newCards.length > 0) {
           const { data: inserted, error: insErr } = await supabase
             .from("cards")
-            .upsert(newCards, { onConflict: "card_image_id", ignoreDuplicates: true })
+            .upsert(newCards, { onConflict: "card_image_id" })
             .select("id, card_number, name, variant_label, rarity");
 
           if (insErr) {
