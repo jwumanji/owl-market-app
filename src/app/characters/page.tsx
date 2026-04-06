@@ -544,8 +544,8 @@ export default function CharactersPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  const top5 = characters.slice(0, 5);
-  const rank6to10 = characters.slice(5, 10);
+  const top10 = characters.slice(0, 10);
+  const rest = characters.slice(10);
 
   // Filter characters for search
   const filteredChars = search.trim()
@@ -568,18 +568,18 @@ export default function CharactersPage() {
         {loading ? " Loading live data..." : " Updates with live data"}
       </div>
 
-      {/* Top 5 Rank Cards */}
+      {/* Top 10 Rank Cards */}
       <div className="ch-rank-row">
-        {top5.map((ch, i) => (
+        {top10.map((ch, i) => (
           <RankCard key={ch.slug} c={ch} rank={i + 1} active={activeChar === ch.slug} onClick={() => selectChar(ch.slug)} />
         ))}
       </div>
 
-      {/* Rank 6-10 Bullets */}
-      {rank6to10.length > 0 && (
+      {/* Remaining Characters as Bullets */}
+      {rest.length > 0 && (
         <div className="ch-bullet-strip">
-          {rank6to10.map((ch, i) => (
-            <CharBullet key={ch.slug} c={ch} rank={i + 6} active={activeChar === ch.slug} onClick={() => selectChar(ch.slug)} />
+          {rest.map((ch, i) => (
+            <CharBullet key={ch.slug} c={ch} rank={i + 11} active={activeChar === ch.slug} onClick={() => selectChar(ch.slug)} />
           ))}
         </div>
       )}
