@@ -13,13 +13,12 @@ import {
 import { Line } from "react-chartjs-2";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   SETS as FALLBACK_SETS,
-  ALL_SETS_EXTRA as FALLBACK_EXTRA,
   PULL_RATES,
   DEFAULT_PULL_RATES,
   type SetData,
-  type ExtraSet,
 } from "./sets-data";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip);
@@ -115,19 +114,6 @@ function IndexCard({ s, active, onClick }: { s: SetData; active: boolean; onClic
       <div className="sic-spark">
         <SparkSvg data={s.spark} up={s.up} w={200} h={28} pad={3} />
       </div>
-    </div>
-  );
-}
-
-function SetPill({ s, active, onClick }: { s: { slug: string; code: string; name: string; price: number; chg7d: number; up: boolean; color: string }; active: boolean; onClick: () => void }) {
-  return (
-    <div className={`set-pill${active ? " active" : ""}`} onClick={onClick}>
-      <span className="set-pill-code" style={{ color: s.color }}>{s.code}</span>
-      <span className="set-pill-name">{s.name}</span>
-      <span className="set-pill-val">${s.price.toLocaleString()}</span>
-      <span className="set-pill-chg" style={{ color: s.up ? "var(--green)" : "var(--red)" }}>
-        {s.up ? "+" : "-"}{Math.abs(s.chg7d)}%
-      </span>
     </div>
   );
 }
@@ -324,6 +310,7 @@ function IndexChart({ s, activeTime, onTimeChange }: { s: SetData; activeTime: s
 }
 
 function TopCardsTable({ s, sets, activeTab, onTabChange }: { s: SetData; sets: SetData[]; activeTab: string; onTabChange: (slug: string) => void }) {
+  const router = useRouter();
   const tabSet = sets.find((x) => x.slug === activeTab) || s;
   return (
     <div className="top-cards-section">
@@ -367,11 +354,26 @@ function TopCardsTable({ s, sets, activeTab, onTabChange }: { s: SetData; sets: 
                 </td>
               </tr>
             ) : tabSet.topCards.map((c, i) => (
-              <tr key={i}>
+              <tr
+                key={c.id ?? i}
+                onClick={() => c.id && router.push(`/card/${c.id}`)}
+                style={{ cursor: c.id ? "pointer" : "default" }}
+              >
                 <td className="rank-n">{i + 1}</td>
                 <td>
                   <div className="card-cell">
-                    <div className="card-art">{c.e}</div>
+                    {c.img ? (
+                      <img
+                        src={c.img}
+                        alt={c.n}
+                        width={28}
+                        height={38}
+                        loading="lazy"
+                        style={{ width: 28, height: 38, objectFit: "cover", borderRadius: 3, flexShrink: 0 }}
+                      />
+                    ) : (
+                      <div className="card-art">{c.e}</div>
+                    )}
                     <div style={{ minWidth: 0 }}>
                       <div className="card-name">{c.n}</div>
                       <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 1 }}>
@@ -487,7 +489,6 @@ function ComparisonGrid({ sets, activeSet, onSelect }: { sets: SetData[]; active
 
 export default function SetsPage() {
   const [sets, setSets] = useState<SetData[]>(FALLBACK_SETS);
-  const [extraSets, setExtraSets] = useState<ExtraSet[]>(FALLBACK_EXTRA);
   const [activeSet, setActiveSet] = useState("op01");
   const [activeTime, setActiveTime] = useState("7d");
   const [activeTab, setActiveTab] = useState("op01");
@@ -498,7 +499,6 @@ export default function SetsPage() {
       .then((data) => {
         if (data.sets?.length > 0) {
           setSets(data.sets);
-          setExtraSets(data.extraSets ?? []);
           // Default to the highest-value set
           if (!data.sets.find((s: SetData) => s.slug === activeSet)) {
             setActiveSet(data.sets[0].slug);
@@ -521,11 +521,7 @@ export default function SetsPage() {
     [sets]
   );
 
-  const top5 = [...sets].sort((a, b) => b.chg7d - a.chg7d).slice(0, 5);
-  const top5Slugs = top5.map((x) => x.slug);
-  const remainingSets = [...sets.filter((x) => !top5Slugs.includes(x.slug)), ...extraSets].sort((a, b) =>
-    a.code.localeCompare(b.code)
-  );
+  const featuredSets = allSetsForTabs;
 
   return (
     <section className="sets-page">
@@ -538,17 +534,11 @@ export default function SetsPage() {
       <div className="ph-title">
         Set <span>Index</span>
       </div>
-      <div className="ph-sub">{sets.length + extraSets.length} sets tracked &middot; Top 5 ranked by 7D momentum &middot; Updates with live data</div>
+      <div className="ph-sub">{featuredSets.length} sealed products tracked &middot; Updates with live data</div>
 
       <div className="set-index-row">
-        {top5.map((st) => (
+        {featuredSets.map((st) => (
           <IndexCard key={st.slug} s={st} active={activeSet === st.slug} onClick={() => selectSet(st.slug)} />
-        ))}
-      </div>
-
-      <div className="set-pill-strip">
-        {remainingSets.map((st) => (
-          <SetPill key={st.slug} s={st} active={activeSet === st.slug} onClick={() => selectSet(st.slug)} />
         ))}
       </div>
 

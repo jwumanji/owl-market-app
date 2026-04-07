@@ -56,6 +56,12 @@ function formatChg(v: number): string {
 // Default color when set has no color stored
 const DEFAULT_COLOR = "#4F8EF7";
 
+// Whitelist of sealed product set codes shown on the Sets page (excludes promos)
+const ALLOWED_CODES = new Set([
+  "OP01","OP02","OP03","OP04","OP05","OP06","OP07","OP08","OP09","OP10",
+  "OP11","OP12","OP13","OP14","PRB01","PRB02","EB01","EB02","EB03",
+]);
+
 export async function GET() {
   const supabase = createServiceClient();
 
@@ -72,6 +78,9 @@ export async function GET() {
   if (!allSets || allSets.length === 0) {
     return NextResponse.json({ sets: [], extraSets: [] });
   }
+
+  // Filter to allowed sealed-product set codes only (exclude promotional cards)
+  const filteredSets = allSets.filter((s) => ALLOWED_CODES.has((s.code ?? "").toUpperCase()));
 
   // 2. Fetch ALL cards with price_stats in bulk (paginated)
   const allCards: Record<string, unknown>[] = [];
@@ -161,7 +170,7 @@ export async function GET() {
 
   for (const [setId, cards] of Object.entries(cardsBySet)) {
     const sorted = [...cards].sort((a, b) => b.ps.tcg_market - a.ps.tcg_market);
-    top5BySet[setId] = sorted.slice(0, 5);
+    top5BySet[setId] = sorted.slice(0, 10);
     allTop5Ids.push(...top5BySet[setId].map((c) => c.id));
   }
 
@@ -193,7 +202,7 @@ export async function GET() {
   const sets = [];
   const extraSets = [];
 
-  for (const set of allSets) {
+  for (const set of filteredSets) {
     const cards = cardsBySet[set.id] ?? [];
     const color = set.color || DEFAULT_COLOR;
 
@@ -263,6 +272,8 @@ export async function GET() {
       const normSpark = cardSpark.map((v) => +((v - cmn) / crng * 20).toFixed(1));
 
       return {
+        id: c.id,
+        img: c.image_url_small ?? c.image_url,
         e: RARITY_EMOJI[c.rarity] ?? "\uD83C\uDFB4",
         n: c.name ?? "Unknown",
         rb: `rb-${(c.rarity ?? "r").toLowerCase()}`,

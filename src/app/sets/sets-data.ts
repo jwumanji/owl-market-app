@@ -23,6 +23,8 @@ export interface SetData {
 }
 
 export interface TopCard {
+  id?: string;
+  img?: string | null;
   e: string;
   n: string;
   rb: string;

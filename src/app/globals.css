@@ -333,9 +333,9 @@ nav {
 /* Index Row — Top 5 cards */
 .set-index-row {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 22px;
   animation: fadeUp 0.4s 0.05s ease both;
 }
 .sic {
