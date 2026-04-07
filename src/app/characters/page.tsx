@@ -168,7 +168,6 @@ function CharAvatar({ src, name, size = 28 }: { src: string | null; name: string
 
 /* ── Card Image with Hover Preview ── */
 function CardImageCell({ card }: { card: CharacterCard }) {
-  const router = useRouter();
   const [showPreview, setShowPreview] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -179,11 +178,6 @@ function CardImageCell({ card }: { card: CharacterCard }) {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     setShowPreview(false);
   };
-  const handleClick = () => {
-    if (card.cardImageId) {
-      router.push(`/card/${card.cardImageId}`);
-    }
-  };
 
   const imgSrc = card.imageUrlSmall ?? card.imageUrl;
   const fullSrc = card.imageUrl ?? card.imageUrlSmall;
@@ -193,8 +187,6 @@ function CardImageCell({ card }: { card: CharacterCard }) {
       className="ch-card-img-cell"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      onClick={handleClick}
-      style={{ cursor: card.cardImageId ? "pointer" : undefined }}
     >
       {imgSrc ? (
         <img src={imgSrc} alt={card.name} width={32} height={45} loading="lazy" className="ch-card-thumb" />
@@ -389,6 +381,7 @@ function CharacterDetail({ c }: { c: CharacterData }) {
 
 /* ── Character Cards Table ── */
 function CharacterCards({ c }: { c: CharacterData }) {
+  const router = useRouter();
   return (
     <div className="ch-cards-section">
       <div className="section-header">
@@ -413,7 +406,11 @@ function CharacterCards({ c }: { c: CharacterData }) {
           </thead>
           <tbody>
             {c.topCards.map((card, i) => (
-              <tr key={i} className={card.cardImageId ? "ch-card-clickable" : ""}>
+              <tr
+                key={i}
+                className={card.cardImageId ? "ch-card-clickable" : ""}
+                onClick={card.cardImageId ? () => router.push(`/card/${card.cardImageId}`) : undefined}
+              >
                 <td className="rank-n">{i + 1}</td>
                 <td className="ch-card-img-td">
                   <CardImageCell card={card} />
