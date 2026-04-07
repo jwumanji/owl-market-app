@@ -246,21 +246,6 @@ function RankCard({ c, rank, active, onClick }: { c: CharacterData; rank: number
   );
 }
 
-/* ── Character Bullet (rank 6-10) ── */
-function CharBullet({ c, rank, active, onClick }: { c: CharacterData; rank: number; active: boolean; onClick: () => void }) {
-  return (
-    <div className={`ch-bullet${active ? " active" : ""}`} onClick={onClick}>
-      <span className="ch-bullet-dot" style={{ background: c.color || "var(--text2)" }} />
-      <span className="ch-bullet-rank">#{rank}</span>
-      <span className="ch-bullet-name" style={{ color: active ? c.color : undefined }}>{c.name}</span>
-      <span className="ch-bullet-val">${c.indexValue.toLocaleString()}</span>
-      <span className="ch-bullet-chg" style={{ color: c.up ? "var(--green)" : "var(--red)" }}>
-        {c.up ? "+" : "-"}{Math.abs(c.chg7d)}%
-      </span>
-    </div>
-  );
-}
-
 /* ── Search + All Characters Toolbar ── */
 function CharToolbar({
   search,
@@ -545,12 +530,21 @@ export default function CharactersPage() {
   }, []);
 
   const top10 = characters.slice(0, 10);
-  const rest = characters.slice(10);
 
-  // Filter characters for search
+  // Filter characters for search and auto-select first match
   const filteredChars = search.trim()
     ? characters.filter((ch) => ch.name.toLowerCase().includes(search.toLowerCase()) || ch.faction.toLowerCase().includes(search.toLowerCase()))
     : characters;
+
+  // When search text changes, auto-focus on the first matching character
+  useEffect(() => {
+    if (!search.trim()) return;
+    const q = search.toLowerCase();
+    const match = characters.find(
+      (ch) => ch.name.toLowerCase().includes(q) || ch.faction.toLowerCase().includes(q)
+    );
+    if (match) setActiveChar(match.slug);
+  }, [search, characters]);
 
   return (
     <section className="chars-page">
@@ -583,15 +577,6 @@ export default function CharactersPage() {
           <RankCard key={ch.slug} c={ch} rank={i + 1} active={activeChar === ch.slug} onClick={() => selectChar(ch.slug)} />
         ))}
       </div>
-
-      {/* Remaining Characters as Bullets */}
-      {rest.length > 0 && (
-        <div className="ch-bullet-strip">
-          {rest.map((ch, i) => (
-            <CharBullet key={ch.slug} c={ch} rank={i + 11} active={activeChar === ch.slug} onClick={() => selectChar(ch.slug)} />
-          ))}
-        </div>
-      )}
 
       {/* Detail + Cards */}
       <div className="ch-detail-section">
