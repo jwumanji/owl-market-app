@@ -169,23 +169,28 @@ export function classifyRarity(
   variantLabel: string | null,
   baseRarity: string
 ): string {
-  // Order matters: check more specific patterns first (most specific → least)
+  // Build a combined haystack so matches work whether the hint lives in the
+  // full name (as JustTCG delivers it) or has been moved into variant_label
+  // (as the DB stores it after extractVariantLabel).
+  const hay = `${name ?? ""} ${variantLabel ?? ""}`;
+
+  // Order matters: check more specific patterns first.
   // 1. Manga Rare — highest priority chase cards
-  if (/\(manga\)/i.test(name))
+  if (/\bmanga\b/i.test(hay))
     return "MR";
-  // 2. Treasure Rare — (TR) tag in name
-  if (/\(TR\)/i.test(name))
+  // 2. Treasure Rare — (TR) tag
+  if (/\(TR\)/i.test(hay))
     return "TR";
-  // 3. Super Alternate Art — (Super Alternate Art) or (Red Super Alternate Art)
-  if (/\(red super alternate art\)/i.test(name) || /\(super alternate art\)/i.test(name))
+  // 3. Super Alternate Art — (Super Alternate Art) / (Red Super Alternate Art)
+  if (/\(red super alternate art\)/i.test(hay) || /\(super alternate art\)/i.test(hay))
     return "SAR";
-  // 4. SP — (SP), (SP) (Gold), (SP) (Wanted Poster), (Wanted Poster)
-  if (/\(sp\)/i.test(name))
+  // 4. SP — (SP), (SP) (Gold), (Wanted Poster)
+  if (/\(sp\)/i.test(hay))
     return "SP";
-  if (/\(wanted poster\)/i.test(name))
+  if (/\(wanted poster\)/i.test(hay))
     return "SP";
-  // 5. Alternate Art — (Alternate Art) without manga/SP/SAR qualifier
-  if (/\(alternate art\)/i.test(name))
+  // 5. Alternate Art
+  if (/\(alternate art\)/i.test(hay))
     return "AA";
   // Parallel-only variants and Box Toppers stay as base rarity
   return baseRarity;

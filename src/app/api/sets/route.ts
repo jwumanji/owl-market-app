@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 // ---------------------------------------------------------------------------
 // GET /api/sets — returns all sets with aggregated price data for index page
 // ---------------------------------------------------------------------------
@@ -94,6 +97,7 @@ export async function GET() {
         id,
         set_id,
         name,
+        card_number,
         rarity,
         image_url,
         image_url_small,
@@ -124,6 +128,7 @@ export async function GET() {
   const cardsBySet: Record<string, Array<{
     id: string;
     name: string;
+    card_number: string | null;
     rarity: string;
     image_url: string | null;
     image_url_small: string | null;
@@ -148,6 +153,7 @@ export async function GET() {
     cardsBySet[setId].push({
       id: card.id as string,
       name: card.name as string,
+      card_number: (card.card_number as string | null) ?? null,
       rarity: card.rarity as string,
       image_url: card.image_url as string | null,
       image_url_small: card.image_url_small as string | null,
@@ -164,14 +170,38 @@ export async function GET() {
     });
   }
 
-  // 4. Get top 5 card IDs across all sets for sparkline history
+  // 4. Get top 10 cards per set for display, deduped by card_number.
+  //    When two variants share a card_number, prefer the chase-tier rarity
+  //    (MR/SAR/SP/AA/TR) so a stale base row can't hide the real Manga Rare.
+  //    Within a tier the highest tcg_market wins.
+  const CHASE_RANK: Record<string, number> = {
+    MR: 0, GMR: 0, SAR: 1, SP: 2, AA: 3, TR: 4, SEC: 5, SR: 6, L: 7, R: 8,
+  };
+  const rankOf = (r: string) => CHASE_RANK[r] ?? 99;
   const top5BySet: Record<string, typeof cardsBySet[string]> = {};
   const allTop5Ids: string[] = [];
 
   for (const [setId, cards] of Object.entries(cardsBySet)) {
-    const sorted = [...cards].sort((a, b) => b.ps.tcg_market - a.ps.tcg_market);
-    top5BySet[setId] = sorted.slice(0, 10);
-    allTop5Ids.push(...top5BySet[setId].map((c) => c.id));
+    // Group by card_number, then pick best per group
+    const byNum = new Map<string, typeof cards[number]>();
+    for (const c of cards) {
+      const key = c.card_number ?? `id:${c.id}`;
+      const cur = byNum.get(key);
+      if (!cur) {
+        byNum.set(key, c);
+        continue;
+      }
+      // Prefer chase-tier rarity, then higher tcg_market
+      const a = rankOf(cur.rarity);
+      const b = rankOf(c.rarity);
+      if (b < a) byNum.set(key, c);
+      else if (b === a && c.ps.tcg_market > cur.ps.tcg_market) byNum.set(key, c);
+    }
+    const deduped = Array.from(byNum.values())
+      .sort((a, b) => b.ps.tcg_market - a.ps.tcg_market)
+      .slice(0, 10);
+    top5BySet[setId] = deduped;
+    allTop5Ids.push(...deduped.map((c) => c.id));
   }
 
   // 5. Fetch sparkline history for top cards (9 points each)

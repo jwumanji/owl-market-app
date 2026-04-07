@@ -76,8 +76,15 @@ async function syncPrices(request: Request) {
   const client = new JustTCG();
   const results: { code: string; updated: number; errors: string[] }[] = [];
 
+  // Build a card-number-prefix → set_id map once so new-card inserts go to the
+  // correct physical set, not whichever set happens to be iterating.
+  const prefixToSetId: Record<string, string> = {};
+  for (const s of dbSets) {
+    if (s.code) prefixToSetId[s.code.toUpperCase()] = s.id;
+  }
+
   for (const dbSet of setsToSync) {
-    const result = await syncOneSet(client, supabase, dbSet);
+    const result = await syncOneSet(client, supabase, dbSet, prefixToSetId);
     results.push(result);
   }
 
@@ -111,7 +118,15 @@ async function syncByIndex(
   const dbSet = syncableSets[index];
   const client = new JustTCG();
   const supabase = createServiceClient();
-  const result = await syncOneSet(client, supabase, dbSet);
+
+  // Build prefix → set_id map so new cards land in their correct physical set.
+  const { data: allSets } = await supabase.from("sets").select("id, code");
+  const prefixToSetId: Record<string, string> = {};
+  for (const s of allSets ?? []) {
+    if (s.code) prefixToSetId[s.code.toUpperCase()] = s.id;
+  }
+
+  const result = await syncOneSet(client, supabase, dbSet, prefixToSetId);
 
   // Trigger next set in the chain (fire-and-forget)
   const nextIndex = index + 1;
@@ -146,12 +161,26 @@ interface DbCard {
   rarity: string | null;
 }
 
+/** Extract the set code prefix from a card number like "OP02-013" → "OP02"
+ *  or "P-001" → "P". */
+function prefixFromCardNumber(cardNumber: string | null | undefined): string | null {
+  if (!cardNumber) return null;
+  const s = String(cardNumber);
+  const m = s.match(/^([A-Z]+\d+)-/);
+  if (m) return m[1].toUpperCase();
+  // Promo prefix: "P-001"
+  const p = s.match(/^([A-Z]+)-/);
+  if (p) return p[1].toUpperCase();
+  return null;
+}
+
 async function syncOneSet(
   client: JustTCG,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  dbSet: any
+  dbSet: any,
+  prefixToSetId: Record<string, string> = {}
 ): Promise<{ code: string; updated: number; errors: string[] }> {
   const setCode = dbSet.code;
   const justTcgSlugs = CODE_TO_SLUGS[setCode];
@@ -245,6 +274,13 @@ async function syncOneSet(
         const newCards = unmatchedCards
           .filter((jt) => jt.number) // must have a card number
           .map((jt) => {
+            // Skip cards that physically belong to a different set — let that
+            // set's own sync run create them under the correct card_image_id.
+            // This prevents shadow rows like "OP02-OP01-001-Manga" living in OP01.
+            const numberPrefix = prefixFromCardNumber(jt.number);
+            const resolvedSetId = (numberPrefix && prefixToSetId[numberPrefix]) || dbSet.id;
+            if (resolvedSetId !== dbSet.id) return null;
+
             const variantLabel = extractVariantLabel(jt.name);
             const baseName = jt.name.replace(/\s*\([^)]*\)\s*/g, " ").trim();
             const baseRarity = jt.rarity ?? "R";
@@ -268,13 +304,14 @@ async function syncOneSet(
               name: jt.name,
               name_base: baseName,
               variant_label: variantLabel,
-              set_id: dbSet.id,
+              set_id: resolvedSetId,
               rarity,
               tcg_product_id: jt.id,
               image_url: imageUrl,
               image_url_small: imageUrlSmall,
             };
-          });
+          })
+          .filter((c): c is NonNullable<typeof c> => c !== null);
 
         if (newCards.length > 0) {
           const { data: inserted, error: insErr } = await supabase
@@ -508,36 +545,55 @@ function matchAndCollect(
         }
       } else {
         // Multiple DB cards share this number (base + alt art + manga etc.)
-        // Compare variant tags to find the right match
-        // Exclude already-matched DB cards so each JustTCG card maps to a unique DB card
+        // Compare variant tags to find the right match.
+        // DB rows often store the variant tag in `variant_label` (not `name`)
+        // because extractVariantLabel strips it during insert. Build the
+        // candidate haystack from BOTH columns so the scoring still works.
         const unmatched = dbCards.filter((c) => !matchedCardIds.has(c.id));
         if (unmatched.length === 0) return;
 
         const jtTags = extractTags(jtCard.name);
+        const jtTagSet = new Set(jtTags);
         const jtStripped = stripCardNum(jtCard.name);
 
-        // Score each DB card by tag overlap
+        // Score each DB card. Lower = better.
         const scored = unmatched.map((c) => {
-          const dbTags = extractTags(c.name ?? "");
+          const haystack = `${c.name ?? ""} ${c.variant_label ?? ""}`;
+          let dbTags = extractTags(haystack);
+          // Treat the variant_label itself as an extra tag (e.g. "Manga", "Alt Art")
+          if (c.variant_label) {
+            const vl = c.variant_label.toLowerCase();
+            if (dbTags.indexOf(vl) < 0) dbTags = [...dbTags, vl];
+          }
+          const dbTagSet = new Set(dbTags);
           const dbStripped = stripCardNum(c.name ?? "");
 
-          // Exact stripped name match
-          if (dbStripped === jtStripped) return { card: c, score: 0 };
-
-          // Count matching tags (alternate art, manga, parallel, sp, etc.)
-          let matchingTags = 0;
-          const totalTags = Math.max(jtTags.length, dbTags.length);
-          for (let t = 0; t < jtTags.length; t++) {
-            if (dbTags.indexOf(jtTags[t]) >= 0) matchingTags++;
+          // Exact stripped-name match wins outright
+          if (dbStripped === jtStripped && jtTags.length === 0 && dbTags.length === 0) {
+            return { card: c, score: -2 };
           }
 
-          if (totalTags === 0) {
-            // Both have no tags — it's the base card
-            return { card: c, score: 1 };
+          // Exact tag-set equality wins (handles "(SP) (Gold)" vs "(SP)" correctly)
+          const equal =
+            jtTagSet.size === dbTagSet.size &&
+            Array.from(jtTagSet).every((t) => dbTagSet.has(t));
+          if (equal) return { card: c, score: -1 };
+
+          // Otherwise: penalize tags only on one side
+          const onlyJt = jtTags.filter((t) => !dbTagSet.has(t)).length;
+          const onlyDb = dbTags.filter((t) => !jtTagSet.has(t)).length;
+
+          // Strongly penalize a base row (no tags) when jt has tags — prevents
+          // base row from eating Manga/Alt-Art/SP variants.
+          if (jtTags.length > 0 && dbTags.length === 0) {
+            return { card: c, score: 100 + onlyJt };
+          }
+          // And vice-versa: prefer the base DB row when jt has no tags.
+          if (jtTags.length === 0 && dbTags.length > 0) {
+            return { card: c, score: 50 + onlyDb };
           }
 
-          // Higher overlap = lower score (better match)
-          return { card: c, score: totalTags - matchingTags };
+          return { card: c, score: onlyJt + onlyDb };
         });
 
         scored.sort((a, b) => a.score - b.score);
@@ -556,25 +612,50 @@ function matchAndCollect(
     }
   }
 
-  // Fallback: match by name
+  // Fallback: match by name. Promo cards share names across many printings,
+  // so a loose `unmatchedNames[0]` fallback silently mis-assigns prices.
+  // Require either an exact variant_label match OR a tag overlap; otherwise
+  // bail to the unmatchedCards path so the insert logic can handle it.
   const variantLabel = extractVariantLabel(jtCard.name);
   const baseName = jtCard.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase();
   const nameMatches = byNameLower.get(baseName);
 
   if (nameMatches && nameMatches.length > 0) {
     const unmatchedNames = nameMatches.filter((c) => !matchedCardIds.has(c.id));
-    if (unmatchedNames.length === 0) return;
+    if (unmatchedNames.length > 0) {
+      const jtTags = (jtCard.name.match(/\(([^)]+)\)/g) || []).map((s) =>
+        s.slice(1, -1).toLowerCase()
+      );
 
-    const target =
-      unmatchedNames.find((c) => (c.variant_label ?? null) === variantLabel) ??
-      unmatchedNames[0];
+      // 1. Exact variant_label match
+      let target = unmatchedNames.find(
+        (c) => (c.variant_label ?? null) === variantLabel
+      );
 
-    const variant = nmVariant ?? foilVariant;
-    if (variant) {
-      addToBatch(target.id, variant, priceUpserts, historyInserts, rarityUpdates, target, jtCard.name);
-      matchedCardIds.add(target.id);
+      // 2. Tag overlap with name+variant_label
+      if (!target && jtTags.length > 0) {
+        target = unmatchedNames.find((c) => {
+          const hay = `${c.name ?? ""} ${c.variant_label ?? ""}`.toLowerCase();
+          return jtTags.some((t) => hay.indexOf(t) >= 0);
+        });
+      }
+
+      // 3. Both base (no tags on either side)
+      if (!target && jtTags.length === 0) {
+        target = unmatchedNames.find((c) => !c.variant_label);
+      }
+
+      if (target) {
+        const variant = target.variant_label
+          ? foilVariant ?? nmVariant
+          : nmVariant ?? foilVariant;
+        if (variant) {
+          addToBatch(target.id, variant, priceUpserts, historyInserts, rarityUpdates, target, jtCard.name);
+          matchedCardIds.add(target.id);
+        }
+        return;
+      }
     }
-    return;
   }
 
   // No match found — track as unmatched for potential card creation
