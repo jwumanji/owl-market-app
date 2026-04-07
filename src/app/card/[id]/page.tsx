@@ -118,6 +118,7 @@ export default function CardDetailPage() {
   const [set, setSet] = useState<SetData | null>(null);
   const [priceStats, setPriceStats] = useState<PriceStatsData | null>(null);
   const [priceHistory, setPriceHistory] = useState<PricePoint[]>([]);
+  const [historySynthetic, setHistorySynthetic] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chartPeriod, setChartPeriod] = useState<Period>("3m");
@@ -137,6 +138,7 @@ export default function CardDetailPage() {
         setSet(data.set);
         setPriceStats(data.priceStats);
         setPriceHistory(data.priceHistory);
+        setHistorySynthetic(Boolean(data.priceHistorySynthetic));
       } catch {
         setError("Failed to load card data");
       } finally {
@@ -357,7 +359,14 @@ export default function CardDetailPage() {
       {/* Price History Chart */}
       <div className="bg-surface border border-border rounded-lg p-4">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Price History</h2>
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-lg font-semibold">Price History</h2>
+            {historySynthetic && filteredHistory.length > 0 && (
+              <span className="text-[10px] font-mono text-text-3 uppercase tracking-wider">
+                Estimated from 30-day stats
+              </span>
+            )}
+          </div>
           <div className="flex gap-1">
             {PERIODS.map((p) => (
               <button
