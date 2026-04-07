@@ -624,6 +624,7 @@ nav {
 .cards-table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
 .cards-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .cards-table col.c0 { width: 44px; }
+.cards-table col.c-img { width: 48px; }
 .cards-table col.c1 { width: 240px; }
 .cards-table col.c2 { width: 100px; }
 .cards-table col.c3 { width: 95px; }
@@ -875,7 +876,7 @@ nav {
 .ch-card-img-td { width: 40px; padding: 4px !important; }
 .ch-card-img-cell { position: relative; display: inline-block; }
 .ch-card-thumb { width: 32px; height: 45px; border-radius: 3px; object-fit: cover; display: block; }
-.ch-card-thumb-placeholder { width: 32px; height: 45px; border-radius: 3px; background: var(--surf3); }
+.ch-card-thumb-placeholder { width: 32px; height: 45px; border-radius: 3px; background: var(--surf3); border: 1px solid var(--border); }
 .ch-card-clickable { cursor: pointer; }
 .ch-card-clickable:hover td { background: var(--surf2); }
 
