@@ -2,19 +2,48 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, run the development server:
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure environment variables
+
+Copy the example file and fill in your own values:
+
+```bash
+cp .env.local.example .env.local
+```
+
+Required variables (see `.env.local.example` for details):
+
+| Variable | Purpose | Where it's used |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | Browser + server |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key | Browser client |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (bypasses RLS) | Server only |
+| `JUSTTCG_API_KEY` | JustTCG API key for price data | Sync routes |
+| `SYNC_SECRET` | Shared secret for `/api/sync/*` admin routes | Server only |
+| `CRON_SECRET` | Shared secret for `/api/sync/justtcg` cron auth | Server only |
+
+### 3. Run the development server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+### 4. Validate before pushing
+
+Before committing and pushing changes, it's a good idea to run the same checks Vercel will:
+
+```bash
+npm run lint       # ESLint
+npx tsc --noEmit   # TypeScript type-check
+npm run build      # Production build
+```
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
