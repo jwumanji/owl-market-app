@@ -204,7 +204,7 @@ function RarityCards({ r }: { r: RarityData }) {
 /* ── Main Page ── */
 
 export default function RaritiesPage() {
-  const [allRarities, setAllRarities] = useState<RarityData[]>(FALLBACK_RARITIES);
+  const [allRarities, setAllRarities] = useState<RarityData[]>([]);
   const [activeRarity, setActiveRarity] = useState<string>(TOP_5_SLUGS[0]);
   const [loading, setLoading] = useState(true);
 
@@ -220,8 +220,9 @@ export default function RaritiesPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const { top5, tier2, all } = buildTieredRarities(allRarities, FALLBACK_RARITIES);
+  const { top5, tier2, all } = buildTieredRarities(allRarities, []);
   const r = all.find((x) => x.slug === activeRarity) || top5[0];
+  const showSkeleton = loading || allRarities.length === 0 || !r;
 
   const selectRarity = useCallback((slug: string) => {
     setActiveRarity(slug);
@@ -240,29 +241,58 @@ export default function RaritiesPage() {
         Rarity <span>Index</span>
       </div>
       <div className="ph-sub">
-        {all.length} categories tracked &middot; Ranked by total card value &middot;
-        {loading ? " Loading live data..." : " Updates with live data"}
+        {showSkeleton
+          ? "Loading live data..."
+          : `${all.length} categories tracked \u00B7 Ranked by total card value \u00B7 Updates with live data`}
       </div>
 
-      {/* Top 5 large cards */}
-      <div className="ch-rank-row">
-        {top5.map((rar, i) => (
-          <RankCard key={rar.slug} r={rar} rank={i + 1} active={activeRarity === rar.slug} onClick={() => selectRarity(rar.slug)} />
-        ))}
-      </div>
+      {showSkeleton ? (
+        <>
+          <div className="ch-rank-row">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="ch-rank-card" style={{ opacity: 0.5 }}>
+                <div className="ch-rank-top"><span className="ch-rank-num">#{i + 1}</span></div>
+                <div className="ch-rank-name">&nbsp;</div>
+                <div className="ch-rank-sub">&nbsp;</div>
+                <div className="ch-rank-price">&mdash;</div>
+                <div className="ch-rank-chg">&nbsp;</div>
+              </div>
+            ))}
+          </div>
+          <div className="ch-rank-row ch-rank-row-sm">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="ch-rank-card ch-rank-card-sm" style={{ opacity: 0.5 }}>
+                <div className="ch-rank-top"><span className="ch-rank-num">#{i + 6}</span></div>
+                <div className="ch-rank-name">&nbsp;</div>
+                <div className="ch-rank-price">&mdash;</div>
+                <div className="ch-rank-chg">&nbsp;</div>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Top 5 large cards */}
+          <div className="ch-rank-row">
+            {top5.map((rar, i) => (
+              <RankCard key={rar.slug} r={rar} rank={i + 1} active={activeRarity === rar.slug} onClick={() => selectRarity(rar.slug)} />
+            ))}
+          </div>
 
-      {/* Tier 2 smaller cards (#6-10) */}
-      <div className="ch-rank-row ch-rank-row-sm">
-        {tier2.map((rar, i) => (
-          <SmallRankCard key={rar.slug} r={rar} rank={i + 6} active={activeRarity === rar.slug} onClick={() => selectRarity(rar.slug)} />
-        ))}
-      </div>
+          {/* Tier 2 smaller cards (#6-10) */}
+          <div className="ch-rank-row ch-rank-row-sm">
+            {tier2.map((rar, i) => (
+              <SmallRankCard key={rar.slug} r={rar} rank={i + 6} active={activeRarity === rar.slug} onClick={() => selectRarity(rar.slug)} />
+            ))}
+          </div>
 
-      {/* Detail + Cards table */}
-      <div className="ch-detail-section">
-        <RarityDetail r={r} />
-        <RarityCards r={r} />
-      </div>
+          {/* Detail + Cards table */}
+          <div className="ch-detail-section">
+            <RarityDetail r={r} />
+            <RarityCards r={r} />
+          </div>
+        </>
+      )}
 
       {/* See All Cards */}
       <div className="rar-see-all">
