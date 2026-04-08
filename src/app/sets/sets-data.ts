@@ -12,6 +12,7 @@ export interface SetData {
   chg30d: number;
   chgMax: number;
   cards: number;
+  cardsTotal?: number;
   volume: string;
   ath: string;
   atl: string;
