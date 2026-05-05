@@ -32,3 +32,16 @@ export async function fetchCardByNumber(cardNumber: string) {
 export async function fetchAllSets() {
   return safeFetch(`${BASE_URL}/allSets/`, "fetchAllSets");
 }
+
+/** Fetch the index of all starter decks (e.g. ST01..ST28) */
+export async function fetchAllDecks() {
+  return safeFetch(`${BASE_URL}/allDecks/`, "fetchAllDecks");
+}
+
+/** Fetch all cards in a starter deck.
+ *  Accepts DB-format ID ("ST01"); the optcgapi endpoint expects the
+ *  hyphenated form ("ST-01"), inserted here. */
+export async function fetchDeck(deckId: string) {
+  const apiId = deckId.replace(/^([A-Z]+)(\d+)$/, "$1-$2");
+  return safeFetch(`${BASE_URL}/decks/${apiId}/`, `fetchDeck(${deckId})`);
+}

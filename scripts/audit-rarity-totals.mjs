@@ -2,8 +2,12 @@
 // per rarity, both globally (excluding promo set) and restricted to the
 // sets-index ALLOWED_CODES whitelist.
 
-const URL = "https://kiquytaevufssveqmqix.supabase.co";
-const KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpcXV5dGFldnVmc3N2ZXFtcWl4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDMzNjAyNywiZXhwIjoyMDg5OTEyMDI3fQ._15oM28RbPSEU8Yj4XjTDN2fDTMGDL66Pf7iuGVmwiI";
+const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://kiquytaevufssveqmqix.supabase.co";
+const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!KEY) {
+  console.error("Set SUPABASE_SERVICE_ROLE_KEY in env before running.");
+  process.exit(1);
+}
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}` };
 
 const ALLOWED_CODES = new Set([
