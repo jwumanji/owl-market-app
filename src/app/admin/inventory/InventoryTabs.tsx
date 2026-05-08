@@ -206,6 +206,10 @@ export default function InventoryTabs({
     });
   }, [activeTab, rows, statusFilter]);
 
+  const statusFilteredRows = useMemo(() => {
+    return rows.filter((item) => statusFilter === "all" || item.status === statusFilter);
+  }, [rows, statusFilter]);
+
   const groups = useMemo<InventoryGroup[]>(() => {
     const map = new Map<string, InventoryRow[]>();
     for (const item of filtered) {
@@ -223,7 +227,7 @@ export default function InventoryTabs({
   }, [filtered]);
 
   const counts = useMemo(() => {
-    return rows.reduce(
+    return statusFilteredRows.reduce(
       (acc, item) => {
         acc.all += item.quantity;
         acc[item.inventory_type] += item.quantity;
@@ -231,7 +235,7 @@ export default function InventoryTabs({
       },
       { all: 0, raw: 0, damaged: 0, graded: 0, sealed: 0 }
     );
-  }, [rows]);
+  }, [statusFilteredRows]);
 
   const selectedGroup = useMemo<InventoryGroup | null>(() => {
     if (!selectedGroupKey) return null;
