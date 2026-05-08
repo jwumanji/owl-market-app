@@ -604,9 +604,9 @@ export default function InventoryTabs({
     );
   }
 
-  function renderCardImage(item: InventoryRow, size: "table" | "modal" = "table") {
+  function renderCardImage(item: InventoryRow, size: "table" | "modal" | "small" = "table") {
     const imageUrl = cardImageUrl(item);
-    const dimensions = size === "modal" ? "h-80 w-56" : "h-28 w-20";
+    const dimensions = size === "modal" ? "h-80 w-56" : size === "small" ? "h-20 w-14" : "h-28 w-20";
 
     if (!imageUrl) {
       return (
@@ -999,11 +999,31 @@ export default function InventoryTabs({
                           className="border-b border-[rgba(79,142,247,0.16)] bg-[rgba(79,142,247,0.075)] shadow-[inset_3px_0_0_rgba(79,142,247,0.45)] transition-colors hover:bg-[rgba(79,142,247,0.11)]"
                         >
                           <td className="px-3 py-3.5" />
-                          <td className="px-3 py-3.5 font-mono text-sm text-text-2">#{index + 1}</td>
+                          <td className="px-3 py-3.5">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedGroupKey(group.key)}
+                              onMouseEnter={(event) => updateHoverPreview(event, child)}
+                              onMouseMove={(event) => updateHoverPreview(event, child)}
+                              onMouseLeave={() => setHoverPreview(null)}
+                              className="flex w-16 flex-col items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-owl"
+                            >
+                              {renderCardImage(child, "small")}
+                              <span className="rounded-full border border-owl bg-owl px-2.5 py-1 font-mono text-xs font-black leading-none text-void shadow-[0_0_14px_rgba(245,166,35,0.45)]">
+                                #{index + 1}
+                              </span>
+                            </button>
+                          </td>
                           <td className="px-3 py-3.5">
                             <div className="flex min-w-0 items-start justify-between gap-3">
                               <div className="min-w-0">
-                                <div className="text-base font-semibold text-text">Individual item</div>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedGroupKey(group.key)}
+                                  className="block max-w-full truncate text-left text-base font-semibold text-text underline-offset-2 hover:text-owl hover:underline"
+                                >
+                                  {child.card.name ?? "Unknown Card"}
+                                </button>
                                 <div className="mt-1 truncate font-mono text-xs text-text-2">{child.id}</div>
                               </div>
                               {renderDeleteControls(child)}
