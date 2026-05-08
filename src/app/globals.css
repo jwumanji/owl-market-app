@@ -48,6 +48,20 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+input[type="date"] {
+  color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 1;
+  filter: invert(72%) sepia(69%) saturate(716%) hue-rotate(348deg) brightness(99%) contrast(94%);
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  filter: invert(85%) sepia(51%) saturate(676%) hue-rotate(343deg) brightness(102%) contrast(92%);
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
