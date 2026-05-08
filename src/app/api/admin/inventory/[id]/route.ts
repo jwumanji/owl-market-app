@@ -39,6 +39,13 @@ export async function PATCH(
     updates.inventory_type = body.inventory_type;
   }
 
+  if ("item_nickname" in body) {
+    if (body.item_nickname !== null && typeof body.item_nickname !== "string") {
+      return NextResponse.json({ error: "Invalid nickname" }, { status: 400 });
+    }
+    updates.item_nickname = body.item_nickname?.trim() || null;
+  }
+
   if ("shipping_tracking" in body) {
     if (body.shipping_tracking !== null && typeof body.shipping_tracking !== "string") {
       return NextResponse.json({ error: "Invalid shipping tracking" }, { status: 400 });

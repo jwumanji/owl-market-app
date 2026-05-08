@@ -13,6 +13,7 @@ export interface InventoryRow {
   inventory_type: InventoryType;
   status: InventoryStatus;
   quantity: number;
+  item_nickname?: string | null;
   graded_rating: GradedRating | null;
   shipping_tracking?: string | null;
   shipped_at?: string | null;
@@ -75,7 +76,7 @@ type InventoryGroup = {
 
 type CreatedInventoryItem = Pick<
   InventoryRow,
-  "id" | "inventory_type" | "status" | "quantity" | "graded_rating" | "shipping_tracking" | "shipped_at"
+  "id" | "inventory_type" | "status" | "quantity" | "item_nickname" | "graded_rating" | "shipping_tracking" | "shipped_at"
   | "sale_channel" | "sold_date" | "sold_price"
 >;
 
@@ -194,21 +195,43 @@ export default function InventoryTabs({
   const [confirmingDeleteIds, setConfirmingDeleteIds] = useState<Record<string, boolean>>({});
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null);
   const [hoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
+  const [searchDraft, setSearchDraft] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
   const showShipping = statusFilter === "sale";
   const showSaleFields = statusFilter === "sale" || statusFilter === "sold";
 
-  const filtered = useMemo(() => {
-    return rows.filter((item) => {
-      const matchesTab = activeTab === "all" || item.inventory_type === activeTab;
-      const matchesStatus = statusFilter === "all" || item.status === statusFilter;
-      return matchesTab && matchesStatus;
-    });
-  }, [activeTab, rows, statusFilter]);
-
   const statusFilteredRows = useMemo(() => {
     return rows.filter((item) => statusFilter === "all" || item.status === statusFilter);
   }, [rows, statusFilter]);
+
+  const searchFilteredRows = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return statusFilteredRows;
+
+    return statusFilteredRows.filter((item) =>
+      [
+        item.item_nickname,
+        item.card.name,
+        item.card.set_code,
+        item.card.card_number,
+        item.inventory_type,
+        item.status,
+        item.graded_rating,
+        item.sale_channel,
+        item.shipping_tracking,
+        item.notes,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(query)
+    );
+  }, [searchQuery, statusFilteredRows]);
+
+  const filtered = useMemo(() => {
+    return searchFilteredRows.filter((item) => activeTab === "all" || item.inventory_type === activeTab);
+  }, [activeTab, searchFilteredRows]);
 
   const groups = useMemo<InventoryGroup[]>(() => {
     const map = new Map<string, InventoryRow[]>();
@@ -227,7 +250,7 @@ export default function InventoryTabs({
   }, [filtered]);
 
   const counts = useMemo(() => {
-    return statusFilteredRows.reduce(
+    return searchFilteredRows.reduce(
       (acc, item) => {
         acc.all += item.quantity;
         acc[item.inventory_type] += item.quantity;
@@ -235,7 +258,7 @@ export default function InventoryTabs({
       },
       { all: 0, raw: 0, damaged: 0, graded: 0, sealed: 0 }
     );
-  }, [statusFilteredRows]);
+  }, [searchFilteredRows]);
 
   const selectedGroup = useMemo<InventoryGroup | null>(() => {
     if (!selectedGroupKey) return null;
@@ -254,7 +277,7 @@ export default function InventoryTabs({
 
   async function updateItem(
     id: string,
-    updates: Partial<Pick<InventoryRow, "status" | "graded_rating" | "inventory_type" | "shipping_tracking" | "shipped_at" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "notes">>
+    updates: Partial<Pick<InventoryRow, "status" | "graded_rating" | "inventory_type" | "item_nickname" | "shipping_tracking" | "shipped_at" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "notes">>
   ) {
     setRows((current) =>
       current.map((item) => (item.id === id ? { ...item, ...updates } : item))
@@ -284,6 +307,7 @@ export default function InventoryTabs({
       ...source,
       id: tempId,
       quantity: 1,
+      item_nickname: source.item_nickname ?? null,
       shipping_tracking: null,
       shipped_at: null,
       sale_channel: source.sale_channel ?? "not_sold",
@@ -322,6 +346,7 @@ export default function InventoryTabs({
                 inventory_type: created.inventory_type,
                 status: created.status,
                 quantity: created.quantity,
+                item_nickname: created.item_nickname ?? null,
                 graded_rating: created.graded_rating,
                 shipping_tracking: created.shipping_tracking ?? null,
                 shipped_at: created.shipped_at ?? null,
@@ -612,6 +637,19 @@ export default function InventoryTabs({
     );
   }
 
+  function renderCardTitle(item: InventoryRow, titleClassName = "text-base font-bold text-text") {
+    return (
+      <div className="min-w-0">
+        {item.item_nickname && (
+          <div className="mb-0.5 truncate font-mono text-xs font-bold uppercase tracking-wider text-owl">
+            {item.item_nickname}
+          </div>
+        )}
+        <div className={`truncate ${titleClassName}`}>{item.card.name ?? "Unknown Card"}</div>
+      </div>
+    );
+  }
+
   function renderCardImage(item: InventoryRow, size: "table" | "modal" | "small" = "table") {
     const imageUrl = cardImageUrl(item);
     const dimensions = size === "modal" ? "h-80 w-56" : size === "small" ? "h-20 w-14" : "h-28 w-20";
@@ -689,7 +727,7 @@ export default function InventoryTabs({
           <div className="flex items-start justify-between gap-4 border-b border-border p-5">
             <div>
               <div className="font-mono text-xs font-bold uppercase tracking-wider text-owl">Inventory Detail</div>
-              <h2 className="mt-1 text-2xl font-bold text-text">{item.card.name ?? "Unknown Card"}</h2>
+              <div className="mt-1">{renderCardTitle(item, "text-2xl font-bold text-text")}</div>
               <div className="mt-2 flex flex-wrap gap-2 font-mono text-xs font-semibold text-text-2">
                 {item.card.set_code && <span>{item.card.set_code}</span>}
                 {item.card.card_number && <span>{item.card.card_number}</span>}
@@ -736,6 +774,16 @@ export default function InventoryTabs({
                   </div>
 
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <label className="block">
+                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Nickname</span>
+                      <input
+                        type="text"
+                        value={row.item_nickname ?? ""}
+                        onChange={(event) => updateItem(row.id, { item_nickname: event.target.value })}
+                        placeholder="Optional searchable item name"
+                        className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
+                      />
+                    </label>
                     <label className="block">
                       <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Condition</span>
                       <div className="mt-2">{renderConditionControls(row)}</div>
@@ -833,6 +881,47 @@ export default function InventoryTabs({
 
   return (
     <div className="space-y-4">
+      <form
+        className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3 md:flex-row md:items-center"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setSearchQuery(searchDraft);
+        }}
+      >
+        <input
+          value={searchDraft}
+          onChange={(event) => setSearchDraft(event.target.value)}
+          placeholder="Search inventory by nickname, card name, set, number, notes, tracking..."
+          className="min-w-0 flex-1 rounded-md border border-border bg-deep px-4 py-3 text-sm text-text outline-none focus:border-owl"
+        />
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            className="rounded-md bg-owl px-5 py-3 font-mono text-sm font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
+          >
+            Search
+          </button>
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchDraft("");
+                setSearchQuery("");
+              }}
+              className="rounded-md border border-border bg-surface px-4 py-3 font-mono text-sm font-bold uppercase tracking-wider text-text hover:border-border-2 hover:text-owl"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </form>
+
+      {searchQuery && (
+        <div className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
+          Search: <span className="text-owl">{searchQuery}</span>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -964,7 +1053,7 @@ export default function InventoryTabs({
                             onClick={() => setSelectedGroupKey(group.key)}
                             className="block max-w-full truncate text-left text-base font-bold text-text underline-offset-2 hover:text-owl hover:underline"
                           >
-                            {item.card.name ?? "Unknown Card"}
+                            {renderCardTitle(item)}
                           </button>
                           <div className="mt-1.5 flex items-center gap-2 font-mono text-xs font-medium text-text-2">
                             {item.card.set_code && <span>{item.card.set_code}</span>}
@@ -1067,7 +1156,7 @@ export default function InventoryTabs({
                                   onClick={() => setSelectedGroupKey(group.key)}
                                   className="block max-w-full truncate text-left text-base font-semibold text-text underline-offset-2 hover:text-owl hover:underline"
                                 >
-                                  {child.card.name ?? "Unknown Card"}
+                                  {renderCardTitle(child, "text-base font-semibold text-text")}
                                 </button>
                                 <div className="mt-1 truncate font-mono text-xs text-text-2">{child.id}</div>
                               </div>

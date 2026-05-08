@@ -49,6 +49,7 @@ export default function NewInventoryForm() {
   const [manualSet, setManualSet] = useState("");
   const [condition, setCondition] = useState<InventoryType>("raw");
   const [status, setStatus] = useState<InventoryStatus>("new");
+  const [nickname, setNickname] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [gradedRating, setGradedRating] = useState<GradedRating | "">("");
   const [costBasis, setCostBasis] = useState("");
@@ -98,6 +99,7 @@ export default function NewInventoryForm() {
         manual_card_name: manualMode ? manualName : null,
         manual_card_number: manualMode ? manualNumber : null,
         manual_set_code: manualMode ? manualSet : null,
+        item_nickname: nickname,
         inventory_type: condition,
         status,
         quantity,
@@ -249,6 +251,16 @@ export default function NewInventoryForm() {
                 </option>
               ))}
             </select>
+          </label>
+
+          <label className="block">
+            <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Item Nickname</span>
+            <input
+              value={nickname}
+              onChange={(event) => setNickname(event.target.value)}
+              placeholder="Optional searchable nickname"
+              className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-3 text-text outline-none focus:border-owl"
+            />
           </label>
 
           {condition === "graded" && (

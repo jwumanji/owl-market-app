@@ -14,6 +14,7 @@ type InventoryQueryRow = {
   manual_card_name: string | null;
   manual_card_number: string | null;
   manual_set_code: string | null;
+  item_nickname: string | null;
   pending_card_match: boolean | null;
   inventory_type: "raw" | "damaged" | "graded" | "sealed";
   status: "new" | "grading" | "sale" | "sold";
@@ -47,6 +48,7 @@ function toInventoryRow(row: InventoryQueryRow, cardMap: Map<string, CardLookupR
     inventory_type: row.inventory_type,
     status: row.status,
     quantity: row.quantity,
+    item_nickname: row.item_nickname,
     graded_rating: row.graded_rating,
     shipping_tracking: row.shipping_tracking,
     shipped_at: row.shipped_at,
@@ -81,7 +83,7 @@ export default async function AdminInventoryPage() {
     ? await supabase
         .from("inventory_items")
         .select(`
-          id, card_id, manual_card_name, manual_card_number, manual_set_code, pending_card_match,
+          id, card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match,
           inventory_type, status, quantity, graded_rating, shipping_tracking, shipped_at,
           sale_channel, sold_date, sold_price, acquired_at, cost_basis, notes
         `)

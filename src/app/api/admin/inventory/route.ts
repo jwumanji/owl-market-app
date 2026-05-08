@@ -6,6 +6,7 @@ type InventorySource = {
   manual_card_name: string | null;
   manual_card_number: string | null;
   manual_set_code: string | null;
+  item_nickname: string | null;
   pending_card_match: boolean | null;
   inventory_type: string;
   status: string;
@@ -67,6 +68,7 @@ export async function POST(request: Request) {
       manual_card_name: cardId ? null : manualName,
       manual_card_number: cardId || typeof body.manual_card_number !== "string" ? null : body.manual_card_number.trim() || null,
       manual_set_code: cardId || typeof body.manual_set_code !== "string" ? null : body.manual_set_code.trim() || null,
+      item_nickname: typeof body.item_nickname === "string" ? body.item_nickname.trim() || null : null,
       pending_card_match: !cardId,
       inventory_type: body.inventory_type,
       status: body.status,
@@ -102,7 +104,7 @@ export async function POST(request: Request) {
 
   const { data: source, error: sourceError } = await supabase
     .from("inventory_items")
-    .select("card_id, manual_card_name, manual_card_number, manual_set_code, pending_card_match, inventory_type, status, graded_rating, shipping_tracking, shipped_at, sale_channel, sold_date, sold_price, acquired_at, cost_basis, notes")
+    .select("card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match, inventory_type, status, graded_rating, shipping_tracking, shipped_at, sale_channel, sold_date, sold_price, acquired_at, cost_basis, notes")
     .eq("id", sourceId)
     .single();
 
@@ -118,6 +120,7 @@ export async function POST(request: Request) {
       manual_card_name: item.manual_card_name,
       manual_card_number: item.manual_card_number,
       manual_set_code: item.manual_set_code,
+      item_nickname: item.item_nickname,
       pending_card_match: item.pending_card_match ?? false,
       inventory_type: item.inventory_type,
       status: item.status,
@@ -132,7 +135,7 @@ export async function POST(request: Request) {
       cost_basis: item.cost_basis,
       notes: item.notes,
     })
-    .select("id, inventory_type, status, quantity, graded_rating, shipping_tracking, shipped_at, sale_channel, sold_date, sold_price")
+    .select("id, inventory_type, status, quantity, item_nickname, graded_rating, shipping_tracking, shipped_at, sale_channel, sold_date, sold_price")
     .single();
 
   if (error) {
