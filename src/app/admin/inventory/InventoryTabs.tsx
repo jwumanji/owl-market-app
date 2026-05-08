@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, type SelectHTMLAttributes, useMemo, useState } from "react";
+import { Fragment, type MouseEvent, type SelectHTMLAttributes, useMemo, useState } from "react";
 
 type InventoryType = "raw" | "damaged" | "graded" | "sealed";
 type InventoryStatus = "new" | "grading" | "sale" | "sold";
@@ -81,6 +81,13 @@ type CreatedInventoryItem = Pick<
 
 type SelectFieldProps = SelectHTMLAttributes<HTMLSelectElement> & {
   wrapperClassName?: string;
+};
+
+type HoverPreview = {
+  src: string;
+  name: string;
+  x: number;
+  y: number;
 };
 
 function SelectField({
@@ -165,6 +172,10 @@ function isLocalOnlyItem(id: string) {
   return id.startsWith("preview-") || id.startsWith("temp-");
 }
 
+function cardImageUrl(item: InventoryRow) {
+  return item.card.image_url_small ?? item.card.image_url;
+}
+
 export default function InventoryTabs({
   items,
   statusFilter = "all",
@@ -182,6 +193,7 @@ export default function InventoryTabs({
   const [deletingItemIds, setDeletingItemIds] = useState<Record<string, boolean>>({});
   const [confirmingDeleteIds, setConfirmingDeleteIds] = useState<Record<string, boolean>>({});
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null);
+  const [hoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const showShipping = statusFilter === "sale";
   const showSaleFields = statusFilter === "sale" || statusFilter === "sold";
@@ -593,7 +605,7 @@ export default function InventoryTabs({
   }
 
   function renderCardImage(item: InventoryRow, size: "table" | "modal" = "table") {
-    const imageUrl = item.card.image_url_small ?? item.card.image_url;
+    const imageUrl = cardImageUrl(item);
     const dimensions = size === "modal" ? "h-80 w-56" : "h-28 w-20";
 
     if (!imageUrl) {
@@ -615,6 +627,45 @@ export default function InventoryTabs({
           }}
           className="h-full w-full object-cover"
         />
+      </div>
+    );
+  }
+
+  function updateHoverPreview(event: MouseEvent, item: InventoryRow) {
+    const imageUrl = cardImageUrl(item);
+    if (!imageUrl) return;
+
+    const previewWidth = 260;
+    const previewHeight = 360;
+    const margin = 18;
+    const x = Math.min(event.clientX + margin, window.innerWidth - previewWidth - margin);
+    const y = Math.min(event.clientY + margin, window.innerHeight - previewHeight - margin);
+
+    setHoverPreview({
+      src: imageUrl,
+      name: item.card.name ?? "Card image",
+      x: Math.max(margin, x),
+      y: Math.max(margin, y),
+    });
+  }
+
+  function renderHoverPreview() {
+    if (!hoverPreview) return null;
+
+    return (
+      <div
+        className="pointer-events-none fixed z-[60] rounded-lg border border-border bg-deep p-2 shadow-2xl"
+        style={{ left: hoverPreview.x, top: hoverPreview.y }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={hoverPreview.src}
+          alt={hoverPreview.name}
+          className="h-[340px] w-[238px] rounded-md object-cover"
+        />
+        <div className="mt-2 max-w-[238px] truncate font-mono text-xs font-semibold text-text">
+          {hoverPreview.name}
+        </div>
       </div>
     );
   }
@@ -852,6 +903,9 @@ export default function InventoryTabs({
                       <button
                         type="button"
                         onClick={() => setSelectedGroupKey(group.key)}
+                        onMouseEnter={(event) => updateHoverPreview(event, item)}
+                        onMouseMove={(event) => updateHoverPreview(event, item)}
+                        onMouseLeave={() => setHoverPreview(null)}
                         className="block rounded-md outline-none transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-owl"
                       >
                         {renderCardImage(item)}
@@ -1000,6 +1054,7 @@ export default function InventoryTabs({
           </tbody>
         </table>
       </div>
+      {renderHoverPreview()}
       {renderInventoryDetailModal()}
     </div>
   );
