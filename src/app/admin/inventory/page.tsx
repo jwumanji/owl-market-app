@@ -62,22 +62,32 @@ function toInventoryRow(row: InventoryQueryRow, cardMap: Map<string, CardLookupR
 }
 
 export default async function AdminInventoryPage() {
-  const supabase = createServiceClient();
-  const { data, error } = await supabase
-    .from("inventory_items")
-    .select(`
-      id, card_id, manual_card_name, manual_card_number, manual_set_code, pending_card_match,
-      inventory_type, status, quantity, graded_rating, shipping_tracking, shipped_at,
-      sale_channel, sold_date, sold_price
-    `)
-    .order("created_at", { ascending: false });
+  let supabase;
+  let configError: string | null = null;
+
+  try {
+    supabase = createServiceClient();
+  } catch (error) {
+    configError = error instanceof Error ? error.message : "Supabase service client is not configured correctly.";
+  }
+
+  const { data, error } = supabase
+    ? await supabase
+        .from("inventory_items")
+        .select(`
+          id, card_id, manual_card_name, manual_card_number, manual_set_code, pending_card_match,
+          inventory_type, status, quantity, graded_rating, shipping_tracking, shipped_at,
+          sale_channel, sold_date, sold_price
+        `)
+        .order("created_at", { ascending: false })
+    : { data: null, error: null };
 
   const inventoryRows = (data ?? []) as unknown as InventoryQueryRow[];
   const cardIds = Array.from(new Set(inventoryRows.map((row) => row.card_id).filter(Boolean))) as string[];
   let cardMap = new Map<string, CardLookupRow>();
   let cardError: { message: string } | null = null;
 
-  if (cardIds.length > 0) {
+  if (supabase && cardIds.length > 0) {
     const cardsRes = await supabase
       .from("cards")
       .select(`
@@ -109,9 +119,9 @@ export default async function AdminInventoryPage() {
         </div>
       </div>
 
-      {error || cardError ? (
+      {configError || error || cardError ? (
         <div className="rounded-lg border border-loss/30 bg-loss/10 p-4 text-base text-text">
-          Inventory query failed: {error?.message ?? cardError?.message}
+          Inventory query failed: {configError ?? error?.message ?? cardError?.message}
         </div>
       ) : (
         <InventoryShell items={items} />
