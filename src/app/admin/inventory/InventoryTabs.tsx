@@ -19,6 +19,9 @@ export interface InventoryRow {
   sale_channel?: SaleChannel | null;
   sold_date?: string | null;
   sold_price?: string | number | null;
+  acquired_at?: string | null;
+  cost_basis?: string | number | null;
+  notes?: string | null;
   pending_card_match?: boolean | null;
   card: {
     name: string | null;
@@ -178,6 +181,7 @@ export default function InventoryTabs({
   const [addingGroups, setAddingGroups] = useState<Record<string, boolean>>({});
   const [deletingItemIds, setDeletingItemIds] = useState<Record<string, boolean>>({});
   const [confirmingDeleteIds, setConfirmingDeleteIds] = useState<Record<string, boolean>>({});
+  const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const showShipping = statusFilter === "sale";
   const showSaleFields = statusFilter === "sale" || statusFilter === "sold";
@@ -217,9 +221,24 @@ export default function InventoryTabs({
     );
   }, [rows]);
 
+  const selectedGroup = useMemo<InventoryGroup | null>(() => {
+    if (!selectedGroupKey) return null;
+    const groupRows = rows.filter((item) => groupKey(item) === selectedGroupKey);
+    if (groupRows.length === 0) return null;
+
+    return {
+      key: selectedGroupKey,
+      rows: groupRows,
+      first: groupRows[0],
+      quantity: groupRows.reduce((sum, item) => sum + item.quantity, 0),
+      condition: sameValue(groupRows.map((item) => item.inventory_type)),
+      status: sameValue(groupRows.map((item) => item.status)),
+    };
+  }, [rows, selectedGroupKey]);
+
   async function updateItem(
     id: string,
-    updates: Partial<Pick<InventoryRow, "status" | "graded_rating" | "inventory_type" | "shipping_tracking" | "shipped_at" | "sale_channel" | "sold_date" | "sold_price">>
+    updates: Partial<Pick<InventoryRow, "status" | "graded_rating" | "inventory_type" | "shipping_tracking" | "shipped_at" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "notes">>
   ) {
     setRows((current) =>
       current.map((item) => (item.id === id ? { ...item, ...updates } : item))
@@ -573,6 +592,149 @@ export default function InventoryTabs({
     );
   }
 
+  function renderCardImage(item: InventoryRow, size: "table" | "modal" = "table") {
+    const imageUrl = item.card.image_url_small ?? item.card.image_url;
+    const dimensions = size === "modal" ? "h-80 w-56" : "h-28 w-20";
+
+    if (!imageUrl) {
+      return (
+        <div className={`flex ${dimensions} items-center justify-center rounded-md border border-border bg-surf3 font-mono text-xs font-semibold text-text-2`}>
+          BOX
+        </div>
+      );
+    }
+
+    return (
+      <div className={`flex ${dimensions} items-center justify-center overflow-hidden rounded-md border border-border bg-surf3`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imageUrl}
+          alt={item.card.name ?? "Card image"}
+          onError={(event) => {
+            event.currentTarget.style.display = "none";
+          }}
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  }
+
+  function renderInventoryDetailModal() {
+    if (!selectedGroup) return null;
+
+    const item = selectedGroup.first;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 px-4 py-8">
+        <div className="w-full max-w-6xl rounded-lg border border-border bg-deep shadow-2xl">
+          <div className="flex items-start justify-between gap-4 border-b border-border p-5">
+            <div>
+              <div className="font-mono text-xs font-bold uppercase tracking-wider text-owl">Inventory Detail</div>
+              <h2 className="mt-1 text-2xl font-bold text-text">{item.card.name ?? "Unknown Card"}</h2>
+              <div className="mt-2 flex flex-wrap gap-2 font-mono text-xs font-semibold text-text-2">
+                {item.card.set_code && <span>{item.card.set_code}</span>}
+                {item.card.card_number && <span>{item.card.card_number}</span>}
+                {item.pending_card_match && <span className="text-owl">Needs Card Match</span>}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedGroupKey(null)}
+              className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-sm font-bold uppercase tracking-wider text-text hover:border-border-2 hover:text-owl"
+            >
+              Close
+            </button>
+          </div>
+
+          <div className="grid gap-6 p-5 lg:grid-cols-[260px_minmax(0,1fr)]">
+            <div>
+              {renderCardImage(item, "modal")}
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="rounded-md border border-border bg-surface p-3">
+                  <div className="font-mono text-xs uppercase tracking-wider text-text-2">Quantity</div>
+                  <div className="mt-1 text-2xl font-bold text-text">{selectedGroup.quantity}</div>
+                </div>
+                <div className="rounded-md border border-border bg-surface p-3">
+                  <div className="font-mono text-xs uppercase tracking-wider text-text-2">Stage</div>
+                  <div className="mt-1 text-lg font-bold text-text">
+                    {selectedGroup.status ? STATUS_LABELS[selectedGroup.status] : "Mixed"}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {selectedGroup.rows.map((row, index) => (
+                <div key={row.id} className="rounded-lg border border-border bg-surface p-4">
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-mono text-sm font-bold uppercase tracking-wider text-text">
+                        Item #{index + 1}
+                      </div>
+                      <div className="mt-1 font-mono text-xs text-text-2">{row.id}</div>
+                    </div>
+                    {renderDeleteControls(row)}
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <label className="block">
+                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Condition</span>
+                      <div className="mt-2">{renderConditionControls(row)}</div>
+                    </label>
+                    <label className="block">
+                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Stage</span>
+                      <div className="mt-2">{renderStatusControl(row)}</div>
+                    </label>
+                    <label className="block">
+                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Acquired Date</span>
+                      <input
+                        type="date"
+                        value={row.acquired_at ?? ""}
+                        onChange={(event) => updateItem(row.id, { acquired_at: event.target.value })}
+                        className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Cost Basis</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={row.cost_basis ?? ""}
+                        onChange={(event) => updateItem(row.id, { cost_basis: event.target.value })}
+                        placeholder="0.00"
+                        className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
+                      />
+                    </label>
+                  </div>
+
+                  <label className="mt-3 block">
+                    <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Notes</span>
+                    <textarea
+                      value={row.notes ?? ""}
+                      onChange={(event) => updateItem(row.id, { notes: event.target.value })}
+                      rows={3}
+                      placeholder="Condition notes, source, purchase details, or internal comments"
+                      className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 text-sm text-text outline-none focus:border-owl"
+                    />
+                  </label>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                disabled={addingGroups[selectedGroup.key] ?? false}
+                onClick={() => addIndividualItem(selectedGroup)}
+                className="rounded-md border border-gain bg-[rgba(0,214,143,0.10)] px-4 py-3 font-mono text-sm font-bold uppercase tracking-wider text-gain transition-colors hover:bg-[rgba(0,214,143,0.16)] disabled:cursor-wait disabled:opacity-60"
+              >
+                Add Individual Item
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
@@ -687,28 +849,24 @@ export default function InventoryTabs({
                       )}
                     </td>
                     <td className="px-4 py-4">
-                      {item.card.image_url || item.card.image_url_small ? (
-                        <div className="flex h-28 w-20 items-center justify-center overflow-hidden rounded-md border border-border bg-surf3">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={item.card.image_url_small ?? item.card.image_url ?? ""}
-                            alt={item.card.name ?? "Card image"}
-                            onError={(event) => {
-                              event.currentTarget.style.display = "none";
-                            }}
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex h-28 w-20 items-center justify-center rounded-md border border-border bg-surf3 font-mono text-xs font-semibold text-text-2">
-                          BOX
-                        </div>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedGroupKey(group.key)}
+                        className="block rounded-md outline-none transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-owl"
+                      >
+                        {renderCardImage(item)}
+                      </button>
                     </td>
                     <td className="min-w-0 px-3 py-4">
                       <div className="flex min-w-0 items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="truncate text-base font-bold text-text">{item.card.name ?? "Unknown Card"}</div>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedGroupKey(group.key)}
+                            className="block max-w-full truncate text-left text-base font-bold text-text underline-offset-2 hover:text-owl hover:underline"
+                          >
+                            {item.card.name ?? "Unknown Card"}
+                          </button>
                           <div className="mt-1.5 flex items-center gap-2 font-mono text-xs font-medium text-text-2">
                             {item.card.set_code && <span>{item.card.set_code}</span>}
                             {item.card.card_number && <span>{item.card.card_number}</span>}
@@ -842,6 +1000,7 @@ export default function InventoryTabs({
           </tbody>
         </table>
       </div>
+      {renderInventoryDetailModal()}
     </div>
   );
 }

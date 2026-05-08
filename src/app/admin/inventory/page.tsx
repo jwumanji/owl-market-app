@@ -24,6 +24,9 @@ type InventoryQueryRow = {
   sale_channel: "not_sold" | "ebay" | "fb" | "instagram" | "in_person" | "traded" | null;
   sold_date: string | null;
   sold_price: string | number | null;
+  acquired_at: string | null;
+  cost_basis: string | number | null;
+  notes: string | null;
 };
 
 type CardLookupRow = {
@@ -50,6 +53,9 @@ function toInventoryRow(row: InventoryQueryRow, cardMap: Map<string, CardLookupR
     sale_channel: row.sale_channel,
     sold_date: row.sold_date,
     sold_price: row.sold_price,
+    acquired_at: row.acquired_at,
+    cost_basis: row.cost_basis,
+    notes: row.notes,
     card: {
       name: card?.name ?? row.manual_card_name ?? null,
       image_url: card?.image_url ?? null,
@@ -77,7 +83,7 @@ export default async function AdminInventoryPage() {
         .select(`
           id, card_id, manual_card_name, manual_card_number, manual_set_code, pending_card_match,
           inventory_type, status, quantity, graded_rating, shipping_tracking, shipped_at,
-          sale_channel, sold_date, sold_price
+          sale_channel, sold_date, sold_price, acquired_at, cost_basis, notes
         `)
         .order("created_at", { ascending: false })
     : { data: null, error: null };

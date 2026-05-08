@@ -16,7 +16,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const updates: Record<string, string | null> = {};
+  const updates: Record<string, string | number | null> = {};
 
   if ("status" in body) {
     if (typeof body.status !== "string" || !STATUSES.has(body.status)) {
@@ -71,6 +71,27 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid sold price" }, { status: 400 });
     }
     updates.sold_price = body.sold_price?.trim() || null;
+  }
+
+  if ("acquired_at" in body) {
+    if (body.acquired_at !== null && typeof body.acquired_at !== "string") {
+      return NextResponse.json({ error: "Invalid acquired date" }, { status: 400 });
+    }
+    updates.acquired_at = body.acquired_at || null;
+  }
+
+  if ("cost_basis" in body) {
+    if (body.cost_basis !== null && typeof body.cost_basis !== "string") {
+      return NextResponse.json({ error: "Invalid cost basis" }, { status: 400 });
+    }
+    updates.cost_basis = body.cost_basis?.trim() || null;
+  }
+
+  if ("notes" in body) {
+    if (body.notes !== null && typeof body.notes !== "string") {
+      return NextResponse.json({ error: "Invalid notes" }, { status: 400 });
+    }
+    updates.notes = body.notes?.trim() || null;
   }
 
   if (Object.keys(updates).length === 0) {
