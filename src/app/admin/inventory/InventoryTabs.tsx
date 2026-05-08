@@ -1051,7 +1051,7 @@ export default function InventoryTabs({
                               onMouseEnter={(event) => updateHoverPreview(event, child)}
                               onMouseMove={(event) => updateHoverPreview(event, child)}
                               onMouseLeave={() => setHoverPreview(null)}
-                              className="flex w-16 flex-col items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-owl"
+                              className="ml-auto mr-2 flex w-16 flex-col items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-owl"
                             >
                               {renderCardImage(child, "small")}
                               <span className="rounded-full border border-owl bg-owl px-2.5 py-1 font-mono text-xs font-black leading-none text-void shadow-[0_0_14px_rgba(245,166,35,0.45)]">
