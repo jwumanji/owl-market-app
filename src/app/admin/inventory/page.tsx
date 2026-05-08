@@ -10,6 +10,7 @@ export const metadata = {
 
 type InventoryQueryRow = {
   id: string;
+  card_id: string | null;
   manual_card_name: string | null;
   manual_card_number: string | null;
   manual_set_code: string | null;
@@ -23,23 +24,19 @@ type InventoryQueryRow = {
   sale_channel: "not_sold" | "ebay" | "fb" | "instagram" | "in_person" | "traded" | null;
   sold_date: string | null;
   sold_price: string | number | null;
-  cards: {
-    name: string | null;
-    image_url: string | null;
-    image_url_small: string | null;
-    card_number: string | null;
-    sets: { code: string | null } | { code: string | null }[] | null;
-  } | {
-    name: string | null;
-    image_url: string | null;
-    image_url_small: string | null;
-    card_number: string | null;
-    sets: { code: string | null } | { code: string | null }[] | null;
-  }[] | null;
 };
 
-function toInventoryRow(row: InventoryQueryRow): InventoryRow {
-  const card = Array.isArray(row.cards) ? row.cards[0] : row.cards;
+type CardLookupRow = {
+  id: string;
+  name: string | null;
+  image_url: string | null;
+  image_url_small: string | null;
+  card_number: string | null;
+  sets: { code: string | null } | { code: string | null }[] | null;
+};
+
+function toInventoryRow(row: InventoryQueryRow, cardMap: Map<string, CardLookupRow>): InventoryRow {
+  const card = row.card_id ? cardMap.get(row.card_id) ?? null : null;
   const set = Array.isArray(card?.sets) ? card?.sets[0] : card?.sets;
 
   return {
@@ -69,17 +66,31 @@ export default async function AdminInventoryPage() {
   const { data, error } = await supabase
     .from("inventory_items")
     .select(`
-      id, manual_card_name, manual_card_number, manual_set_code, pending_card_match,
+      id, card_id, manual_card_name, manual_card_number, manual_set_code, pending_card_match,
       inventory_type, status, quantity, graded_rating, shipping_tracking, shipped_at,
-      sale_channel, sold_date, sold_price,
-      cards (
-        name, image_url, image_url_small, card_number,
-        sets (code)
-      )
+      sale_channel, sold_date, sold_price
     `)
     .order("created_at", { ascending: false });
 
-  const items = ((data ?? []) as unknown as InventoryQueryRow[]).map(toInventoryRow);
+  const inventoryRows = (data ?? []) as unknown as InventoryQueryRow[];
+  const cardIds = Array.from(new Set(inventoryRows.map((row) => row.card_id).filter(Boolean))) as string[];
+  let cardMap = new Map<string, CardLookupRow>();
+  let cardError: { message: string } | null = null;
+
+  if (cardIds.length > 0) {
+    const cardsRes = await supabase
+      .from("cards")
+      .select(`
+        id, name, image_url, image_url_small, card_number,
+        sets (code)
+      `)
+      .in("id", cardIds);
+
+    cardError = cardsRes.error;
+    cardMap = new Map(((cardsRes.data ?? []) as unknown as CardLookupRow[]).map((card) => [card.id, card]));
+  }
+
+  const items = inventoryRows.map((row) => toInventoryRow(row, cardMap));
   const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
@@ -98,9 +109,9 @@ export default async function AdminInventoryPage() {
         </div>
       </div>
 
-      {error ? (
+      {error || cardError ? (
         <div className="rounded-lg border border-loss/30 bg-loss/10 p-4 text-base text-text">
-          Inventory table is not ready yet. Run `schema-migration-v8-inventory.sql` in Supabase, then refresh this page.
+          Inventory query failed: {error?.message ?? cardError?.message}
         </div>
       ) : (
         <InventoryShell items={items} />
