@@ -13,6 +13,17 @@ grant select, insert, update, delete on table inventory_status_history to servic
 grant select on table cards to service_role;
 grant select on table sets to service_role;
 
+-- Supabase's API role still needs ordinary Postgres table privileges before
+-- RLS policies are evaluated. These broader grants are intentional for the
+-- server-only service role and do not grant browser anon access.
+grant all privileges on all tables in schema public to service_role;
+grant all privileges on all sequences in schema public to service_role;
+grant execute on all functions in schema public to service_role;
+
+alter default privileges in schema public grant all privileges on tables to service_role;
+alter default privileges in schema public grant all privileges on sequences to service_role;
+alter default privileges in schema public grant execute on functions to service_role;
+
 drop policy if exists "service_role can manage inventory_items" on inventory_items;
 create policy "service_role can manage inventory_items"
 on inventory_items
