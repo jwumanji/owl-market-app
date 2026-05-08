@@ -684,7 +684,7 @@ export default function InventoryTabs({
     const item = selectedGroup.first;
 
     return (
-      <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 px-4 py-8">
+      <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 px-4 pb-8 pt-[120px]">
         <div className="w-full max-w-6xl rounded-lg border border-border bg-deep shadow-2xl">
           <div className="flex items-start justify-between gap-4 border-b border-border p-5">
             <div>
