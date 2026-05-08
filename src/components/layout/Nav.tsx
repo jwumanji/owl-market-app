@@ -11,6 +11,7 @@ const NAV_LINKS = [
   { label: "SETS", href: "/sets" },
   { label: "CHARACTERS", href: "/characters" },
   { label: "PORTFOLIO", href: "/portfolio" },
+  { label: "INVENTORY", href: "/admin/inventory" },
 ];
 
 export default function Nav() {
@@ -46,7 +47,9 @@ export default function Nav() {
           <Link href="/login" className="btn-login">
             Login
           </Link>
-          <button className="btn-signup">Sign Up</button>
+          <Link href="/logout" className="btn-login">
+            Logout
+          </Link>
         </div>
       </div>
 

@@ -220,7 +220,7 @@ export default function RaritiesPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const { top5, tier2, all } = buildTieredRarities(allRarities, []);
+  const { top5, tier2, all } = buildTieredRarities(allRarities, FALLBACK_RARITIES);
   const r = all.find((x) => x.slug === activeRarity) || top5[0];
   const showSkeleton = loading || allRarities.length === 0 || !r;
 
