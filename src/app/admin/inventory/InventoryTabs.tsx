@@ -442,6 +442,14 @@ export default function InventoryTabs({
     return new Date(now.getTime() - offset * 60_000).toISOString().slice(0, 10);
   }
 
+  function updateSaleChannel(item: InventoryRow, nextChannel: SaleChannel) {
+    updateItem(item.id, {
+      sale_channel: nextChannel,
+      status: nextChannel === "not_sold" ? "sale" : "sold",
+      sold_date: nextChannel === "not_sold" ? null : item.sold_date ?? todayDateString(),
+    });
+  }
+
   function renderSaleFields(item: InventoryRow) {
     const channel = item.sale_channel ?? "not_sold";
     const soldDate = channel === "not_sold" ? "" : item.sold_date ?? "";
@@ -453,11 +461,7 @@ export default function InventoryTabs({
             value={channel}
             onChange={(event) => {
               const nextChannel = event.target.value as SaleChannel;
-              updateItem(item.id, {
-                sale_channel: nextChannel,
-                status: nextChannel === "not_sold" ? "sale" : "sold",
-                sold_date: nextChannel === "not_sold" ? null : item.sold_date ?? todayDateString(),
-              });
+              updateSaleChannel(item, nextChannel);
             }}
           >
             {(Object.keys(SALE_CHANNEL_LABELS) as SaleChannel[]).map((option) => (
@@ -752,6 +756,43 @@ export default function InventoryTabs({
                         inputMode="decimal"
                         value={row.cost_basis ?? ""}
                         onChange={(event) => updateItem(row.id, { cost_basis: event.target.value })}
+                        placeholder="0.00"
+                        className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="mt-3 grid gap-3 md:grid-cols-3">
+                    <label className="block">
+                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Sold At</span>
+                      <SelectField
+                        value={row.sale_channel ?? "not_sold"}
+                        onChange={(event) => updateSaleChannel(row, event.target.value as SaleChannel)}
+                        wrapperClassName="mt-2"
+                      >
+                        {(Object.keys(SALE_CHANNEL_LABELS) as SaleChannel[]).map((option) => (
+                          <option key={option} value={option}>
+                            {SALE_CHANNEL_LABELS[option]}
+                          </option>
+                        ))}
+                      </SelectField>
+                    </label>
+                    <label className="block">
+                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Sold Date</span>
+                      <input
+                        type="date"
+                        value={(row.sale_channel ?? "not_sold") === "not_sold" ? "" : row.sold_date ?? ""}
+                        onChange={(event) => updateItem(row.id, { sold_date: event.target.value })}
+                        className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Sold Price</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={row.sold_price ?? ""}
+                        onChange={(event) => updateItem(row.id, { sold_price: event.target.value })}
                         placeholder="0.00"
                         className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
                       />
