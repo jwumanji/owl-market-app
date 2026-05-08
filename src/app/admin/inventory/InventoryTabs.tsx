@@ -692,15 +692,11 @@ export default function InventoryTabs({
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={item.card.image_url_small ?? item.card.image_url ?? ""}
-                            alt=""
-                            aria-hidden="true"
-                            onLoad={(event) => {
-                              event.currentTarget.style.opacity = "1";
-                            }}
+                            alt={item.card.name ?? "Card image"}
                             onError={(event) => {
                               event.currentTarget.style.display = "none";
                             }}
-                            className="h-full w-full object-cover opacity-0 transition-opacity"
+                            className="h-full w-full object-cover"
                           />
                         </div>
                       ) : (
