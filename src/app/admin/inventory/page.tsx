@@ -17,10 +17,11 @@ type InventoryQueryRow = {
   item_nickname: string | null;
   pending_card_match: boolean | null;
   inventory_type: "raw" | "damaged" | "graded" | "sealed";
-  status: "new" | "grading" | "sale" | "sold";
+  status: "new" | "grading" | "sale" | "ship" | "sold";
   quantity: number;
   graded_rating: "TAG 10" | "PSA 10" | "PSA 9" | "BGS 10" | "BGS 9.5" | null;
   shipping_tracking: string | null;
+  shipping_label_url: string | null;
   shipped_at: string | null;
   sale_channel: "not_sold" | "ebay" | "fb" | "instagram" | "in_person" | "traded" | null;
   sold_date: string | null;
@@ -51,6 +52,7 @@ function toInventoryRow(row: InventoryQueryRow, cardMap: Map<string, CardLookupR
     item_nickname: row.item_nickname,
     graded_rating: row.graded_rating,
     shipping_tracking: row.shipping_tracking,
+    shipping_label_url: row.shipping_label_url,
     shipped_at: row.shipped_at,
     sale_channel: row.sale_channel,
     sold_date: row.sold_date,
@@ -84,7 +86,7 @@ export default async function AdminInventoryPage() {
         .from("inventory_items")
         .select(`
           id, card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match,
-          inventory_type, status, quantity, graded_rating, shipping_tracking, shipped_at,
+          inventory_type, status, quantity, graded_rating, shipping_tracking, shipping_label_url, shipped_at,
           sale_channel, sold_date, sold_price, acquired_at, cost_basis, notes
         `)
         .order("created_at", { ascending: false })
@@ -112,13 +114,13 @@ export default async function AdminInventoryPage() {
   const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <section className="mx-auto max-w-[1920px] px-2 py-8">
+    <section className="mx-auto max-w-[1920px] px-5 py-8 sm:px-7 lg:px-10 xl:px-12">
       <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="mb-2 font-mono text-sm font-semibold uppercase tracking-wider text-owl">Internal Tool</p>
           <h1 className="text-4xl font-bold tracking-tight text-text">Inventory</h1>
           <p className="mt-2 max-w-2xl text-base text-text">
-            Track cards by condition and movement stage: New, Grading, For Sale, and Sold.
+            Track cards by condition and movement stage: New, Grading, For Sale, Need Shipping, and Sold.
           </p>
         </div>
         <div className="rounded-lg border border-border bg-surface px-4 py-3 text-right">

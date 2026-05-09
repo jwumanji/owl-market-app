@@ -12,6 +12,7 @@ type InventorySource = {
   status: string;
   graded_rating: string | null;
   shipping_tracking: string | null;
+  shipping_label_url: string | null;
   shipped_at: string | null;
   sale_channel: string | null;
   sold_date: string | null;
@@ -22,7 +23,7 @@ type InventorySource = {
 };
 
 const CONDITIONS = new Set(["raw", "damaged", "graded", "sealed"]);
-const STATUSES = new Set(["new", "grading", "sale", "sold"]);
+const STATUSES = new Set(["new", "grading", "sale", "ship", "sold"]);
 const GRADED_RATINGS = new Set(["TAG 10", "PSA 10", "PSA 9", "BGS 10", "BGS 9.5"]);
 
 export async function POST(request: Request) {
@@ -104,7 +105,7 @@ export async function POST(request: Request) {
 
   const { data: source, error: sourceError } = await supabase
     .from("inventory_items")
-    .select("card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match, inventory_type, status, graded_rating, shipping_tracking, shipped_at, sale_channel, sold_date, sold_price, acquired_at, cost_basis, notes")
+    .select("card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match, inventory_type, status, graded_rating, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price, acquired_at, cost_basis, notes")
     .eq("id", sourceId)
     .single();
 
@@ -127,6 +128,7 @@ export async function POST(request: Request) {
       quantity: 1,
       graded_rating: item.graded_rating,
       shipping_tracking: item.shipping_tracking,
+      shipping_label_url: item.shipping_label_url,
       shipped_at: item.shipped_at,
       sale_channel: item.sale_channel,
       sold_date: item.sold_date,
@@ -135,7 +137,7 @@ export async function POST(request: Request) {
       cost_basis: item.cost_basis,
       notes: item.notes,
     })
-    .select("id, inventory_type, status, quantity, item_nickname, graded_rating, shipping_tracking, shipped_at, sale_channel, sold_date, sold_price")
+    .select("id, inventory_type, status, quantity, item_nickname, graded_rating, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price")
     .single();
 
   if (error) {

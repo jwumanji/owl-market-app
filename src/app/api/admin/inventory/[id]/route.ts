@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 
-const STATUSES = new Set(["new", "grading", "sale", "sold"]);
+const STATUSES = new Set(["new", "grading", "sale", "ship", "sold"]);
 const CONDITIONS = new Set(["raw", "damaged", "graded", "sealed"]);
 const GRADED_RATINGS = new Set(["TAG 10", "PSA 10", "PSA 9", "BGS 10", "BGS 9.5"]);
 const SALE_CHANNELS = new Set(["not_sold", "ebay", "fb", "instagram", "in_person", "traded"]);
@@ -52,7 +52,20 @@ export async function PATCH(
     }
     const tracking = body.shipping_tracking?.trim() || null;
     updates.shipping_tracking = tracking;
-    updates.shipped_at = tracking ? new Date().toISOString() : null;
+  }
+
+  if ("shipping_label_url" in body) {
+    if (body.shipping_label_url !== null && typeof body.shipping_label_url !== "string") {
+      return NextResponse.json({ error: "Invalid shipping label" }, { status: 400 });
+    }
+    updates.shipping_label_url = body.shipping_label_url?.trim() || null;
+  }
+
+  if ("shipped_at" in body) {
+    if (body.shipped_at !== null && typeof body.shipped_at !== "string") {
+      return NextResponse.json({ error: "Invalid shipped date" }, { status: 400 });
+    }
+    updates.shipped_at = body.shipped_at || null;
   }
 
   if ("sale_channel" in body) {
@@ -60,7 +73,6 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid sale channel" }, { status: 400 });
     }
     updates.sale_channel = body.sale_channel;
-    updates.status = body.sale_channel === "not_sold" ? "sale" : "sold";
     if (body.sale_channel !== "not_sold" && !("sold_date" in body)) {
       updates.sold_date = new Date().toISOString().slice(0, 10);
     }

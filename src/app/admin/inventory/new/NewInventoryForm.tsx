@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type InventoryType = "raw" | "damaged" | "graded" | "sealed";
-type InventoryStatus = "new" | "grading" | "sale" | "sold";
+type InventoryStatus = "new" | "grading" | "sale" | "ship" | "sold";
 type GradedRating = "TAG 10" | "PSA 10" | "PSA 9" | "BGS 10" | "BGS 9.5";
 
 type CardSearchResult = {
@@ -28,6 +28,7 @@ const STATUSES: { value: InventoryStatus; label: string }[] = [
   { value: "new", label: "New" },
   { value: "grading", label: "Grading" },
   { value: "sale", label: "For Sale" },
+  { value: "ship", label: "Need Shipping" },
   { value: "sold", label: "Sold" },
 ];
 

@@ -23,12 +23,13 @@ const sampleItems: InventoryRow[] = [
   {
     id: "preview-raw-1b",
     inventory_type: "raw",
-    status: "sale",
+    status: "ship",
     quantity: 1,
     graded_rating: null,
     shipping_tracking: "1Z999AA10123456784",
-    shipped_at: "2026-05-07T00:00:00.000Z",
-    sale_channel: "not_sold",
+    shipping_label_url: "https://example.com/labels/luffy",
+    shipped_at: null,
+    sale_channel: "ebay",
     sold_date: null,
     sold_price: null,
     card: {
@@ -87,12 +88,13 @@ const sampleItems: InventoryRow[] = [
   {
     id: "preview-graded-1",
     inventory_type: "graded",
-    status: "sale",
+    status: "ship",
     quantity: 1,
     graded_rating: "PSA 10",
     shipping_tracking: "https://tools.usps.com/go/TrackConfirmAction?qtc_tLabels1=9400111206213900000000",
-    shipped_at: "2026-05-07T00:00:00.000Z",
-    sale_channel: "not_sold",
+    shipping_label_url: "Label queued",
+    shipped_at: null,
+    sale_channel: "instagram",
     sold_date: null,
     sold_price: null,
     card: {
@@ -156,7 +158,7 @@ const sampleItems: InventoryRow[] = [
 export default function InventoryPreviewPage() {
   const totalQuantity = sampleItems.reduce((sum, item) => sum + item.quantity, 0);
   return (
-    <section className="mx-auto max-w-[1920px] px-2 py-8">
+    <section className="mx-auto max-w-[1920px] px-5 py-8 sm:px-7 lg:px-10 xl:px-12">
       <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="mb-2 font-mono text-sm font-semibold uppercase tracking-wider text-owl">Preview</p>

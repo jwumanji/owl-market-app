@@ -3,7 +3,7 @@
 import { Fragment, type MouseEvent, type SelectHTMLAttributes, useEffect, useMemo, useState } from "react";
 
 type InventoryType = "raw" | "damaged" | "graded" | "sealed";
-type InventoryStatus = "new" | "grading" | "sale" | "sold";
+type InventoryStatus = "new" | "grading" | "sale" | "ship" | "sold";
 type GradedRating = "TAG 10" | "PSA 10" | "PSA 9" | "BGS 10" | "BGS 9.5";
 type StatusFilter = InventoryStatus | "all";
 type SaleChannel = "not_sold" | "ebay" | "fb" | "instagram" | "in_person" | "traded";
@@ -16,6 +16,7 @@ export interface InventoryRow {
   item_nickname?: string | null;
   graded_rating: GradedRating | null;
   shipping_tracking?: string | null;
+  shipping_label_url?: string | null;
   shipped_at?: string | null;
   sale_channel?: SaleChannel | null;
   sold_date?: string | null;
@@ -45,6 +46,7 @@ const STATUS_LABELS: Record<InventoryStatus, string> = {
   new: "New",
   grading: "Grading",
   sale: "For Sale",
+  ship: "Need Shipping",
   sold: "Sold",
 };
 
@@ -77,7 +79,7 @@ type InventoryGroup = {
 type CreatedInventoryItem = Pick<
   InventoryRow,
   "id" | "inventory_type" | "status" | "quantity" | "item_nickname" | "graded_rating" | "shipping_tracking" | "shipped_at"
-  | "sale_channel" | "sold_date" | "sold_price"
+  | "shipping_label_url" | "sale_channel" | "sold_date" | "sold_price"
 >;
 
 type SelectFieldProps = SelectHTMLAttributes<HTMLSelectElement> & {
@@ -192,6 +194,8 @@ export default function InventoryTabs({
   const [rows, setRows] = useState(items);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [trackingDrafts, setTrackingDrafts] = useState<Record<string, string>>({});
+  const [shippingLabelDrafts, setShippingLabelDrafts] = useState<Record<string, string>>({});
+  const [confirmingShippedIds, setConfirmingShippedIds] = useState<Record<string, boolean>>({});
   const [addingGroups, setAddingGroups] = useState<Record<string, boolean>>({});
   const [deletingItemIds, setDeletingItemIds] = useState<Record<string, boolean>>({});
   const [confirmingDeleteIds, setConfirmingDeleteIds] = useState<Record<string, boolean>>({});
@@ -200,8 +204,9 @@ export default function InventoryTabs({
   const [searchDraft, setSearchDraft] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
-  const showShipping = statusFilter === "sale";
-  const showSaleFields = statusFilter === "sale" || statusFilter === "sold";
+  const showTracking = statusFilter === "ship" || statusFilter === "sold";
+  const showShippingActions = statusFilter === "ship";
+  const showSaleFields = statusFilter === "sold";
 
   useEffect(() => {
     onItemsChange?.(rows);
@@ -226,6 +231,7 @@ export default function InventoryTabs({
         item.graded_rating,
         item.sale_channel,
         item.shipping_tracking,
+        item.shipping_label_url,
         item.notes,
       ]
         .filter(Boolean)
@@ -283,7 +289,7 @@ export default function InventoryTabs({
 
   async function updateItem(
     id: string,
-    updates: Partial<Pick<InventoryRow, "status" | "graded_rating" | "inventory_type" | "item_nickname" | "shipping_tracking" | "shipped_at" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "notes">>
+    updates: Partial<Pick<InventoryRow, "status" | "graded_rating" | "inventory_type" | "item_nickname" | "shipping_tracking" | "shipping_label_url" | "shipped_at" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "notes">>
   ) {
     setRows((current) =>
       current.map((item) => (item.id === id ? { ...item, ...updates } : item))
@@ -315,6 +321,7 @@ export default function InventoryTabs({
       quantity: 1,
       item_nickname: source.item_nickname ?? null,
       shipping_tracking: null,
+      shipping_label_url: null,
       shipped_at: null,
       sale_channel: source.sale_channel ?? "not_sold",
       sold_date: source.sold_date ?? null,
@@ -355,6 +362,7 @@ export default function InventoryTabs({
                 item_nickname: created.item_nickname ?? null,
                 graded_rating: created.graded_rating,
                 shipping_tracking: created.shipping_tracking ?? null,
+                shipping_label_url: created.shipping_label_url ?? null,
                 shipped_at: created.shipped_at ?? null,
                 sale_channel: created.sale_channel ?? "not_sold",
                 sold_date: created.sold_date ?? null,
@@ -471,6 +479,11 @@ export default function InventoryTabs({
     return null;
   }
 
+  function urlHref(value?: string | null) {
+    if (!value) return null;
+    return /^https?:\/\//i.test(value.trim()) ? value.trim() : null;
+  }
+
   function todayDateString() {
     const now = new Date();
     const offset = now.getTimezoneOffset();
@@ -480,14 +493,27 @@ export default function InventoryTabs({
   function updateSaleChannel(item: InventoryRow, nextChannel: SaleChannel) {
     updateItem(item.id, {
       sale_channel: nextChannel,
-      status: nextChannel === "not_sold" ? "sale" : "sold",
+      status: nextChannel === "not_sold" ? "sale" : item.status === "sold" ? "sold" : "ship",
       sold_date: nextChannel === "not_sold" ? null : item.sold_date ?? todayDateString(),
+    });
+  }
+
+  function markItemShipped(item: InventoryRow) {
+    updateItem(item.id, {
+      status: "sold",
+      shipped_at: item.shipped_at ?? new Date().toISOString(),
+      sold_date: item.sold_date ?? todayDateString(),
+    });
+    setConfirmingShippedIds((current) => {
+      const next = { ...current };
+      delete next[item.id];
+      return next;
     });
   }
 
   function renderSaleFields(item: InventoryRow) {
     const channel = item.sale_channel ?? "not_sold";
-    const soldDate = channel === "not_sold" ? "" : item.sold_date ?? "";
+    const soldDate = item.sold_date ?? "";
 
     return (
       <>
@@ -528,12 +554,12 @@ export default function InventoryTabs({
     );
   }
 
-  function renderShippingCell(item: InventoryRow) {
+  function renderTrackingCell(item: InventoryRow) {
     if (item.shipping_tracking) {
       return (
         <div className="space-y-2">
           <div className="font-mono text-xs font-semibold text-gain">
-            Shipped
+            Tracking
             {detectCarrier(item.shipping_tracking) && (
               <span className="ml-2 rounded border border-border bg-deep px-2 py-0.5 text-text">
                 {detectCarrier(item.shipping_tracking)}
@@ -578,14 +604,103 @@ export default function InventoryTabs({
           onClick={() =>
             updateItem(item.id, {
               shipping_tracking: trackingDrafts[item.id]?.trim() ?? "",
-              shipped_at: new Date().toISOString(),
             })
           }
           className="rounded-md border border-owl bg-owl/10 px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-owl disabled:cursor-not-allowed disabled:border-border disabled:bg-surface disabled:text-text-3"
         >
-          Confirm Shipping
+          Save Tracking
         </button>
       </div>
+    );
+  }
+
+  function renderShippingLabelCell(item: InventoryRow) {
+    const savedLabel = item.shipping_label_url?.trim() ?? "";
+    const draftValue = shippingLabelDrafts[item.id] ?? savedLabel;
+    const href = urlHref(savedLabel);
+
+    return (
+      <div className="space-y-2">
+        {savedLabel && (
+          href ? (
+            <a
+              href={href}
+              target="_blank"
+              rel="noreferrer"
+              className="block truncate font-mono text-sm font-semibold text-owl underline-offset-2 hover:underline"
+            >
+              {savedLabel}
+            </a>
+          ) : (
+            <div className="truncate font-mono text-sm text-text">{savedLabel}</div>
+          )
+        )}
+        <input
+          value={draftValue}
+          onChange={(event) =>
+            setShippingLabelDrafts((current) => ({
+              ...current,
+              [item.id]: event.target.value,
+            }))
+          }
+          placeholder="Paste ship label URL or note"
+          className="w-full rounded-md border border-border bg-surface px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-owl"
+        />
+        <button
+          type="button"
+          disabled={draftValue.trim() === savedLabel}
+          onClick={() => updateItem(item.id, { shipping_label_url: draftValue.trim() || null })}
+          className="rounded-md border border-owl bg-owl/10 px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-owl disabled:cursor-not-allowed disabled:border-border disabled:bg-surface disabled:text-text-3"
+        >
+          Save Label
+        </button>
+      </div>
+    );
+  }
+
+  function renderShippedCell(item: InventoryRow) {
+    const isConfirming = confirmingShippedIds[item.id] ?? false;
+
+    if (isConfirming) {
+      return (
+        <div className="space-y-2">
+          <div className="font-mono text-xs font-semibold text-text-2">
+            Move this item to Sold?
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => markItemShipped(item)}
+              className="rounded-md border border-gain bg-gain/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-gain hover:bg-gain/15"
+            >
+              Confirm
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setConfirmingShippedIds((current) => {
+                  const next = { ...current };
+                  delete next[item.id];
+                  return next;
+                })
+              }
+              className="rounded-md border border-border-2 bg-surface px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-text-2 hover:text-text"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={() => setConfirmingShippedIds((current) => ({ ...current, [item.id]: true }))}
+        className="rounded-md border border-gain bg-gain/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-gain hover:bg-gain/15"
+      >
+        Mark Shipped
+      </button>
     );
   }
 
@@ -820,42 +935,63 @@ export default function InventoryTabs({
                     </label>
                   </div>
 
-                  <div className="mt-3 grid gap-3 md:grid-cols-3">
-                    <label className="block">
-                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Sold At</span>
-                      <SelectField
-                        value={row.sale_channel ?? "not_sold"}
-                        onChange={(event) => updateSaleChannel(row, event.target.value as SaleChannel)}
-                        wrapperClassName="mt-2"
-                      >
-                        {(Object.keys(SALE_CHANNEL_LABELS) as SaleChannel[]).map((option) => (
-                          <option key={option} value={option}>
-                            {SALE_CHANNEL_LABELS[option]}
-                          </option>
-                        ))}
-                      </SelectField>
-                    </label>
-                    <label className="block">
-                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Sold Date</span>
-                      <input
-                        type="date"
-                        value={(row.sale_channel ?? "not_sold") === "not_sold" ? "" : row.sold_date ?? ""}
-                        onChange={(event) => updateItem(row.id, { sold_date: event.target.value })}
-                        className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Sold Price</span>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={row.sold_price ?? ""}
-                        onChange={(event) => updateItem(row.id, { sold_price: event.target.value })}
-                        placeholder="0.00"
-                        className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
-                      />
-                    </label>
-                  </div>
+                  {(row.status === "ship" || row.status === "sold") && (
+                    <div className="mt-3 grid gap-3 md:grid-cols-3">
+                      <label className="block">
+                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Tracking</span>
+                        <div className="mt-2">{renderTrackingCell(row)}</div>
+                      </label>
+                      <label className="block">
+                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Print Ship Label</span>
+                        <div className="mt-2">{renderShippingLabelCell(row)}</div>
+                      </label>
+                      {row.status === "ship" && (
+                        <label className="block">
+                          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Shipped</span>
+                          <div className="mt-2">{renderShippedCell(row)}</div>
+                        </label>
+                      )}
+                    </div>
+                  )}
+
+                  {row.status === "sold" && (
+                    <div className="mt-3 grid gap-3 md:grid-cols-3">
+                      <label className="block">
+                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Sold At</span>
+                        <SelectField
+                          value={row.sale_channel ?? "not_sold"}
+                          onChange={(event) => updateSaleChannel(row, event.target.value as SaleChannel)}
+                          wrapperClassName="mt-2"
+                        >
+                          {(Object.keys(SALE_CHANNEL_LABELS) as SaleChannel[]).map((option) => (
+                            <option key={option} value={option}>
+                              {SALE_CHANNEL_LABELS[option]}
+                            </option>
+                          ))}
+                        </SelectField>
+                      </label>
+                      <label className="block">
+                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Sold Date</span>
+                        <input
+                          type="date"
+                          value={row.sold_date ?? ""}
+                          onChange={(event) => updateItem(row.id, { sold_date: event.target.value })}
+                          className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Sold Price</span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={row.sold_price ?? ""}
+                          onChange={(event) => updateItem(row.id, { sold_price: event.target.value })}
+                          placeholder="0.00"
+                          className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
+                        />
+                      </label>
+                    </div>
+                  )}
 
                   <label className="mt-3 block">
                     <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Notes</span>
@@ -979,7 +1115,9 @@ export default function InventoryTabs({
             <col className="w-[132px]" />
             <col className="w-[330px]" />
             <col className="w-[105px]" />
-            {showShipping && <col className="w-[300px]" />}
+            {showTracking && <col className="w-[300px]" />}
+            {showShippingActions && <col className="w-[280px]" />}
+            {showShippingActions && <col className="w-[180px]" />}
             {showSaleFields && <col className="w-[185px]" />}
             {showSaleFields && <col className="w-[160px]" />}
             {showSaleFields && <col className="w-[145px]" />}
@@ -992,7 +1130,9 @@ export default function InventoryTabs({
               <th className="px-4 py-3.5">Image</th>
               <th className="px-3 py-3.5">Card Name</th>
               <th className="px-3 py-3.5 text-right">Quantity</th>
-              {showShipping && <th className="px-3 py-3.5">Shipping</th>}
+              {showTracking && <th className="px-3 py-3.5">Tracking</th>}
+              {showShippingActions && <th className="px-3 py-3.5">Print Ship Label</th>}
+              {showShippingActions && <th className="px-3 py-3.5">Shipped</th>}
               {showSaleFields && <th className="px-3 py-3.5">Sold At</th>}
               {showSaleFields && <th className="px-3 py-3.5">Sold Date</th>}
               {showSaleFields && <th className="px-3 py-3.5">Sold Price</th>}
@@ -1088,15 +1228,31 @@ export default function InventoryTabs({
                       </div>
                     </td>
                     <td className="px-3 py-4 text-right font-mono text-base font-semibold text-text">{group.quantity}</td>
-                    {showShipping && (
+                    {showTracking && (
                       <td className="px-3 py-4 font-mono text-sm">
                         {group.rows.length === 1 ? (
-                          renderShippingCell(group.rows[0])
+                          renderTrackingCell(group.rows[0])
                         ) : (
                           <span className={group.rows.some((row) => row.shipping_tracking) ? "font-semibold text-gain" : "text-text-2"}>
-                            {group.rows.some((row) => row.shipping_tracking) ? "Shipped" : "Not shipped"}
+                            {group.rows.some((row) => row.shipping_tracking) ? "Tracking saved" : "No tracking"}
                           </span>
                         )}
+                      </td>
+                    )}
+                    {showShippingActions && (
+                      <td className="px-3 py-4 font-mono text-sm">
+                        {group.rows.length === 1 ? (
+                          renderShippingLabelCell(group.rows[0])
+                        ) : (
+                          <span className={group.rows.some((row) => row.shipping_label_url) ? "font-semibold text-owl" : "text-text-2"}>
+                            {group.rows.some((row) => row.shipping_label_url) ? "Label saved" : "No label"}
+                          </span>
+                        )}
+                      </td>
+                    )}
+                    {showShippingActions && (
+                      <td className="px-3 py-4 font-mono text-sm">
+                        {group.rows.length === 1 ? renderShippedCell(group.rows[0]) : "Open group"}
                       </td>
                     )}
                     {showSaleFields && group.rows.length === 1 && renderSaleFields(group.rows[0])}
@@ -1170,9 +1326,19 @@ export default function InventoryTabs({
                             </div>
                           </td>
                           <td className="px-3 py-3.5 text-right font-mono text-base font-semibold text-text">{child.quantity}</td>
-                          {showShipping && (
+                          {showTracking && (
                             <td className="px-3 py-3.5">
-                              {renderShippingCell(child)}
+                              {renderTrackingCell(child)}
+                            </td>
+                          )}
+                          {showShippingActions && (
+                            <td className="px-3 py-3.5">
+                              {renderShippingLabelCell(child)}
+                            </td>
+                          )}
+                          {showShippingActions && (
+                            <td className="px-3 py-3.5">
+                              {renderShippedCell(child)}
                             </td>
                           )}
                           {showSaleFields && renderSaleFields(child)}
@@ -1186,7 +1352,7 @@ export default function InventoryTabs({
                       ))}
                       <tr className="border-b border-[rgba(79,142,247,0.16)] bg-[rgba(79,142,247,0.045)] shadow-[inset_3px_0_0_rgba(79,142,247,0.32)] last:border-b-0">
                         <td className="px-3 py-3.5" />
-                        <td colSpan={(showShipping ? 6 : 5) + (showSaleFields ? 3 : 0)} className="px-3 py-3.5">
+                        <td colSpan={(showTracking ? 6 : 5) + (showShippingActions ? 2 : 0) + (showSaleFields ? 3 : 0)} className="px-3 py-3.5">
                           <button
                             type="button"
                             disabled={isAdding}
@@ -1206,7 +1372,7 @@ export default function InventoryTabs({
 
             {groups.length === 0 && (
               <tr>
-                <td colSpan={(showShipping ? 7 : 6) + (showSaleFields ? 3 : 0)} className="px-3 py-12 text-center text-base text-text-2">
+                <td colSpan={(showTracking ? 7 : 6) + (showShippingActions ? 2 : 0) + (showSaleFields ? 3 : 0)} className="px-3 py-12 text-center text-base text-text-2">
                   No inventory items in this view yet.
                 </td>
               </tr>

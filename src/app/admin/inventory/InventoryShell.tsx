@@ -3,13 +3,14 @@
 import { useMemo, useState } from "react";
 import InventoryTabs, { InventoryRow } from "./InventoryTabs";
 
-type InventoryStatus = "new" | "grading" | "sale" | "sold";
+type InventoryStatus = "new" | "grading" | "sale" | "ship" | "sold";
 type StatusFilter = InventoryStatus | "all";
 
 const STATUS_LABELS: Record<InventoryStatus, string> = {
   new: "New",
   grading: "Grading",
   sale: "For Sale",
+  ship: "Need Shipping",
   sold: "Sold",
 };
 
@@ -23,13 +24,13 @@ export default function InventoryShell({ items }: { items: InventoryRow[] }) {
         acc[item.status] += item.quantity;
         return acc;
       },
-      { new: 0, grading: 0, sale: 0, sold: 0 }
+      { new: 0, grading: 0, sale: 0, ship: 0, sold: 0 }
     );
   }, [liveItems]);
 
   return (
     <>
-      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-5">
         {(Object.keys(STATUS_LABELS) as InventoryStatus[]).map((status) => (
           <button
             key={status}
