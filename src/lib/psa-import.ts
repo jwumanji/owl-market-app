@@ -7,6 +7,8 @@ export type PsaImportRow = {
   setCode: string | null;
   gradeText: string | null;
   gradedRating: GradedRating | null;
+  frontImageUrl: string | null;
+  backImageUrl: string | null;
   description: string | null;
   notes: string | null;
   sourceIndex: number;
@@ -33,7 +35,45 @@ const HEADER_ALIASES = {
   cardName: ["cardname", "name", "player", "subject", "title", "itemname"],
   cardNumber: ["cardnumber", "cardno", "number", "no"],
   setCode: ["setcode", "set", "setid"],
-  grade: ["grade", "numericgrade", "cardgrade", "finalgrade"],
+  grade: [
+    "grade",
+    "numericgrade",
+    "cardgrade",
+    "finalgrade",
+    "psagrade",
+    "gradedescription",
+    "gradegrade",
+    "itemgrade",
+    "gradevalue",
+  ],
+  frontImageUrl: [
+    "frontimage",
+    "frontimageurl",
+    "frontscan",
+    "frontscanurl",
+    "fronturl",
+    "obverse",
+    "obverseimage",
+    "obverseimageurl",
+    "imagefront",
+    "imagefronturl",
+    "image1",
+    "image1url",
+  ],
+  backImageUrl: [
+    "backimage",
+    "backimageurl",
+    "backscan",
+    "backscanurl",
+    "backurl",
+    "reverse",
+    "reverseimage",
+    "reverseimageurl",
+    "imageback",
+    "imagebackurl",
+    "image2",
+    "image2url",
+  ],
   description: ["description", "itemdescription", "carddescription", "psadescription"],
   notes: ["notes", "note", "comments", "comment"],
 } as const;
@@ -88,6 +128,12 @@ function cleanCertNumber(value: string | null | undefined) {
   if (!trimmed) return null;
   const digits = trimmed.match(/\d{5,}/)?.[0];
   return digits ?? trimmed;
+}
+
+function cleanUrl(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed || !/^https?:\/\//i.test(trimmed)) return null;
+  return trimmed;
 }
 
 function cleanCell(value: string | undefined) {
@@ -189,6 +235,9 @@ export function parsePsaImport(text: string): PsaImportRow[] {
     const gradeText = valueFor(row, HEADER_ALIASES.grade);
     const cardName = valueFor(row, HEADER_ALIASES.cardName) ?? description;
     const certificationNumber = cleanCertNumber(valueFor(row, HEADER_ALIASES.certificationNumber));
+    const frontImageUrl = cleanUrl(valueFor(row, HEADER_ALIASES.frontImageUrl));
+    const backImageUrl = cleanUrl(valueFor(row, HEADER_ALIASES.backImageUrl));
+    const gradedRating = normalizePsaGrade(gradeText) ?? normalizePsaGrade(description);
 
     return {
       certificationNumber,
@@ -196,7 +245,9 @@ export function parsePsaImport(text: string): PsaImportRow[] {
       cardNumber,
       setCode,
       gradeText,
-      gradedRating: normalizePsaGrade(gradeText),
+      gradedRating,
+      frontImageUrl,
+      backImageUrl,
       description,
       notes: valueFor(row, HEADER_ALIASES.notes),
       sourceIndex: index,
@@ -209,30 +260,31 @@ export function matchInventoryCard(row: PsaImportRow, cards: CardLookupForImport
   const rowSet = row.setCode?.toUpperCase() ?? null;
   const rowName = normalizeText(row.cardName);
 
-  if (rowNumber) {
+  if (rowNumber && rowSet) {
     const exactNumberMatches = cards.filter((card) => normalizeCardNumber(card.card_number) === rowNumber);
     const setMatch = exactNumberMatches.find((card) => {
       const set = Array.isArray(card.sets) ? card.sets[0] : card.sets;
       return rowSet && set?.code?.toUpperCase() === rowSet;
     });
     if (setMatch) return setMatch;
-    if (exactNumberMatches.length === 1) return exactNumberMatches[0];
   }
 
   if (rowName) {
     const nameMatches = cards.filter((card) => normalizeText(card.name) === rowName);
-    const setMatch = nameMatches.find((card) => {
-      const set = Array.isArray(card.sets) ? card.sets[0] : card.sets;
-      return rowSet && set?.code?.toUpperCase() === rowSet;
-    });
-    if (setMatch) return setMatch;
-    if (nameMatches.length === 1) return nameMatches[0];
+    if (rowSet) {
+      const setMatch = nameMatches.find((card) => {
+        const set = Array.isArray(card.sets) ? card.sets[0] : card.sets;
+        return set?.code?.toUpperCase() === rowSet;
+      });
+      if (setMatch) return setMatch;
+    }
 
-    const containsMatches = cards.filter((card) => {
-      const cardName = normalizeText(card.name);
-      return cardName && (rowName.includes(cardName) || cardName.includes(rowName));
-    });
-    if (containsMatches.length === 1) return containsMatches[0];
+    if (rowNumber) {
+      const numberMatch = nameMatches.find((card) => normalizeCardNumber(card.card_number) === rowNumber);
+      if (numberMatch) return numberMatch;
+    }
+
+    if (!rowSet && !rowNumber && nameMatches.length === 1) return nameMatches[0];
   }
 
   return null;

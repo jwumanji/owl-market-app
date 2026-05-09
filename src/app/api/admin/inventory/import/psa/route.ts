@@ -116,18 +116,22 @@ export async function POST(request: Request) {
   for (const row of rows) {
     const pair = scanPairs.get(row.sourceIndex) ?? { front: null, back: null };
     const match = matchInventoryCard(row, cards);
-    let customImageFrontUrl: string | null = null;
-    let customImageBackUrl: string | null = null;
+    let customImageFrontUrl: string | null = row.frontImageUrl;
+    let customImageBackUrl: string | null = row.backImageUrl;
 
     try {
-      customImageFrontUrl = await uploadInventoryScan(supabase, pair.front, {
-        certificationNumber: row.certificationNumber,
-        side: "front",
-      });
-      customImageBackUrl = await uploadInventoryScan(supabase, pair.back, {
-        certificationNumber: row.certificationNumber,
-        side: "back",
-      });
+      if (!customImageFrontUrl) {
+        customImageFrontUrl = await uploadInventoryScan(supabase, pair.front, {
+          certificationNumber: row.certificationNumber,
+          side: "front",
+        });
+      }
+      if (!customImageBackUrl) {
+        customImageBackUrl = await uploadInventoryScan(supabase, pair.back, {
+          certificationNumber: row.certificationNumber,
+          side: "back",
+        });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not upload PSA scan image.";
       return NextResponse.json({ error: message }, { status: 400 });
