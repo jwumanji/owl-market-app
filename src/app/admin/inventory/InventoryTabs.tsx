@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, type MouseEvent, type SelectHTMLAttributes, useMemo, useState } from "react";
+import { Fragment, type MouseEvent, type SelectHTMLAttributes, useEffect, useMemo, useState } from "react";
 
 type InventoryType = "raw" | "damaged" | "graded" | "sealed";
 type InventoryStatus = "new" | "grading" | "sale" | "sold";
@@ -179,10 +179,12 @@ function cardImageUrl(item: InventoryRow) {
 
 export default function InventoryTabs({
   items,
+  onItemsChange,
   statusFilter = "all",
   onStatusFilterChange,
 }: {
   items: InventoryRow[];
+  onItemsChange?: (items: InventoryRow[]) => void;
   statusFilter?: StatusFilter;
   onStatusFilterChange?: (status: StatusFilter) => void;
 }) {
@@ -200,6 +202,10 @@ export default function InventoryTabs({
   const [actionError, setActionError] = useState<string | null>(null);
   const showShipping = statusFilter === "sale";
   const showSaleFields = statusFilter === "sale" || statusFilter === "sold";
+
+  useEffect(() => {
+    onItemsChange?.(rows);
+  }, [onItemsChange, rows]);
 
   const statusFilteredRows = useMemo(() => {
     return rows.filter((item) => statusFilter === "all" || item.status === statusFilter);

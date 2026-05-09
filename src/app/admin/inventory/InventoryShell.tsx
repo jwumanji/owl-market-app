@@ -15,16 +15,17 @@ const STATUS_LABELS: Record<InventoryStatus, string> = {
 
 export default function InventoryShell({ items }: { items: InventoryRow[] }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [liveItems, setLiveItems] = useState(items);
 
   const byStatus = useMemo(() => {
-    return items.reduce(
+    return liveItems.reduce(
       (acc, item) => {
         acc[item.status] += item.quantity;
         return acc;
       },
       { new: 0, grading: 0, sale: 0, sold: 0 }
     );
-  }, [items]);
+  }, [liveItems]);
 
   return (
     <>
@@ -50,6 +51,7 @@ export default function InventoryShell({ items }: { items: InventoryRow[] }) {
 
       <InventoryTabs
         items={items}
+        onItemsChange={setLiveItems}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
       />
