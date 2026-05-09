@@ -538,65 +538,67 @@ export default function InventoryTabs({
         </button>
 
         {isOpen && (
-          <div className="absolute right-0 top-10 z-40 min-w-[190px] rounded-lg border border-border bg-deep p-2 shadow-2xl">
-            {canAdd && (
-              <button
-                type="button"
-                disabled={isAdding}
-                onClick={() => {
-                  addIndividualItem(group);
-                  setOpenActionMenuKey(null);
-                }}
-                className="block w-full rounded-md px-3 py-2 text-left font-mono text-xs font-bold uppercase tracking-wider text-gain transition-colors hover:bg-[rgba(0,214,143,0.10)] disabled:cursor-wait disabled:opacity-60"
-              >
-                Add item
-              </button>
-            )}
-
-            {canRemove && (
-              isConfirmingDelete ? (
-                <div className="space-y-2 p-1">
-                  <div className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
-                    Remove item?
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={isDeleting}
-                      onClick={() => {
-                        deleteItem(item);
-                        setOpenActionMenuKey(null);
-                      }}
-                      className="rounded-md border border-loss bg-loss/10 px-2.5 py-1.5 font-mono text-xs font-bold uppercase tracking-wider text-loss transition-colors hover:bg-loss/15 disabled:cursor-wait disabled:opacity-60"
-                    >
-                      Confirm
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isDeleting}
-                      onClick={() =>
-                        setConfirmingDeleteIds((current) => {
-                          const next = { ...current };
-                          delete next[item.id];
-                          return next;
-                        })
-                      }
-                      className="rounded-md border border-border-2 bg-surface px-2.5 py-1.5 font-mono text-xs font-bold uppercase tracking-wider text-text-2 transition-colors hover:text-text disabled:cursor-wait disabled:opacity-60"
-                    >
-                      Cancel
-                    </button>
-                  </div>
+          <div className="absolute right-0 top-10 z-40 rounded-lg border border-border bg-deep p-2 shadow-2xl">
+            {isConfirmingDelete && canRemove ? (
+              <div className="w-[230px] space-y-2 p-1">
+                <div className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
+                  Remove item?
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  disabled={isDeleting}
-                  onClick={() => setConfirmingDeleteIds((current) => ({ ...current, [item.id]: true }))}
-                  className="block w-full rounded-md px-3 py-2 text-left font-mono text-xs font-bold uppercase tracking-wider text-loss transition-colors hover:bg-loss/10 disabled:cursor-wait disabled:opacity-60"
-                >
-                  Remove item
-                </button>
-              )
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={isDeleting}
+                    onClick={() => {
+                      deleteItem(item);
+                      setOpenActionMenuKey(null);
+                    }}
+                    className="flex-1 rounded-md border border-loss bg-loss/10 px-2.5 py-1.5 text-center font-mono text-xs font-bold uppercase tracking-wider text-loss transition-colors hover:bg-loss/15 disabled:cursor-wait disabled:opacity-60"
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isDeleting}
+                    onClick={() =>
+                      setConfirmingDeleteIds((current) => {
+                        const next = { ...current };
+                        delete next[item.id];
+                        return next;
+                      })
+                    }
+                    className="flex-1 rounded-md border border-border-2 bg-surface px-2.5 py-1.5 text-center font-mono text-xs font-bold uppercase tracking-wider text-text-2 transition-colors hover:text-text disabled:cursor-wait disabled:opacity-60"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex min-w-[230px] gap-2">
+                {canAdd && (
+                  <button
+                    type="button"
+                    disabled={isAdding}
+                    onClick={() => {
+                      addIndividualItem(group);
+                      setOpenActionMenuKey(null);
+                    }}
+                    className="flex-1 rounded-md px-3 py-2 text-center font-mono text-xs font-bold uppercase tracking-wider text-gain transition-colors hover:bg-[rgba(0,214,143,0.10)] disabled:cursor-wait disabled:opacity-60"
+                  >
+                    Add item
+                  </button>
+                )}
+
+                {canRemove && (
+                  <button
+                    type="button"
+                    disabled={isDeleting}
+                    onClick={() => setConfirmingDeleteIds((current) => ({ ...current, [item.id]: true }))}
+                    className="flex-1 rounded-md px-3 py-2 text-center font-mono text-xs font-bold uppercase tracking-wider text-loss transition-colors hover:bg-loss/10 disabled:cursor-wait disabled:opacity-60"
+                  >
+                    Remove item
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -1436,9 +1438,10 @@ export default function InventoryTabs({
 
       {statusFilter === "ship" ? (
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
-        <table className="w-full min-w-[1080px] table-fixed">
+        <table className="w-full min-w-[1180px] table-fixed">
           <colgroup>
             <col className="w-[48px]" />
+            <col className="w-[104px]" />
             <col className="w-[330px]" />
             <col className="w-[190px]" />
             <col className="w-[210px]" />
@@ -1448,6 +1451,7 @@ export default function InventoryTabs({
           <thead>
             <tr className="border-b border-border bg-surf2 text-left font-mono text-xs font-semibold uppercase tracking-wider text-text">
               <th className="px-3 py-3.5" />
+              <th className="px-4 py-3.5">Image</th>
               <th className="px-3 py-3.5">Card</th>
               <th className="px-3 py-3.5">Customer Name</th>
               <th className="px-3 py-3.5">Ship Label</th>
@@ -1493,6 +1497,18 @@ export default function InventoryTabs({
                           </svg>
                         </button>
                       )}
+                    </td>
+                    <td className="px-4 py-4">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedGroupKey(group.key)}
+                        onMouseEnter={(event) => updateHoverPreview(event, item)}
+                        onMouseMove={(event) => updateHoverPreview(event, item)}
+                        onMouseLeave={() => setHoverPreview(null)}
+                        className="block rounded-md outline-none transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-owl"
+                      >
+                        {renderCardImage(item)}
+                      </button>
                     </td>
                     <td className="min-w-0 px-3 py-4">
                       <div className="flex min-w-0 items-start justify-between gap-3">
@@ -1568,6 +1584,18 @@ export default function InventoryTabs({
                         >
                           <td className="px-3 py-3.5" />
                           <td className="px-3 py-3.5">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedGroupKey(group.key)}
+                              onMouseEnter={(event) => updateHoverPreview(event, child)}
+                              onMouseMove={(event) => updateHoverPreview(event, child)}
+                              onMouseLeave={() => setHoverPreview(null)}
+                              className="ml-auto mr-2 flex w-16 flex-col items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-owl"
+                            >
+                              {renderCardImage(child, "small")}
+                            </button>
+                          </td>
+                          <td className="px-3 py-3.5">
                             <div className="flex min-w-0 items-start justify-between gap-3">
                               <div className="min-w-0">
                                 <button
@@ -1584,7 +1612,7 @@ export default function InventoryTabs({
                                   <span className="truncate">{child.id}</span>
                                 </div>
                               </div>
-                              {renderRowActions({ group, item: child, canRemove: true })}
+                              {renderRowActions({ group, item: child, canAdd: true, canRemove: true })}
                             </div>
                           </td>
                           <td className="px-3 py-3.5">{renderCustomerNameCell(child)}</td>
@@ -1595,7 +1623,7 @@ export default function InventoryTabs({
                       ))}
                       <tr className="border-b border-[rgba(79,142,247,0.16)] bg-[rgba(79,142,247,0.045)] shadow-[inset_3px_0_0_rgba(79,142,247,0.32)] last:border-b-0">
                         <td className="px-3 py-3.5" />
-                        <td colSpan={5} className="px-3 py-3.5">
+                        <td colSpan={6} className="px-3 py-3.5">
                           <button
                             type="button"
                             disabled={isAdding}
@@ -1615,7 +1643,7 @@ export default function InventoryTabs({
 
             {groups.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-12 text-center text-base text-text-2">
+                <td colSpan={7} className="px-3 py-12 text-center text-base text-text-2">
                   No inventory items need shipping yet.
                 </td>
               </tr>
@@ -1850,7 +1878,7 @@ export default function InventoryTabs({
                                   <span className="truncate font-mono text-xs text-text-2">{child.id}</span>
                                 </div>
                               </div>
-                              {renderRowActions({ group, item: child, canRemove: true })}
+                              {renderRowActions({ group, item: child, canAdd: true, canRemove: true })}
                             </div>
                           </td>
                           <td className="px-3 py-3.5 text-right font-mono text-base font-semibold text-text">{child.quantity}</td>

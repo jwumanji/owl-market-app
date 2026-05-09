@@ -46,6 +46,31 @@ type CardLookupRow = {
   sets: { code: string | null } | { code: string | null }[] | null;
 };
 
+const INVENTORY_SELECT_WITH_PSA = `
+  id, card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match,
+  inventory_type, status, quantity, graded_rating, certification_number, custom_image_front_url, custom_image_back_url,
+  customer_name, shipping_tracking, shipping_label_url, shipped_at,
+  sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from, notes
+`;
+
+const INVENTORY_SELECT_BASE = `
+  id, card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match,
+  inventory_type, status, quantity, graded_rating,
+  customer_name, shipping_tracking, shipping_label_url, shipped_at,
+  sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from, notes
+`;
+
+function isMissingPsaColumnsError(error: { message?: string } | null) {
+  return Boolean(
+    error?.message &&
+      (
+        error.message.includes("certification_number") ||
+        error.message.includes("custom_image_front_url") ||
+        error.message.includes("custom_image_back_url")
+      )
+  );
+}
+
 function toInventoryRow(row: InventoryQueryRow, cardMap: Map<string, CardLookupRow>): InventoryRow {
   const card = row.card_id ? cardMap.get(row.card_id) ?? null : null;
   const set = Array.isArray(card?.sets) ? card?.sets[0] : card?.sets;
@@ -92,17 +117,31 @@ export default async function AdminInventoryPage() {
     configError = error instanceof Error ? error.message : "Supabase service client is not configured correctly.";
   }
 
-  const { data, error } = supabase
+  let migrationWarning: string | null = null;
+  const inventoryResult = supabase
     ? await supabase
         .from("inventory_items")
-        .select(`
-          id, card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match,
-          inventory_type, status, quantity, graded_rating, certification_number, custom_image_front_url, custom_image_back_url,
-          customer_name, shipping_tracking, shipping_label_url, shipped_at,
-          sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from, notes
-        `)
+        .select(INVENTORY_SELECT_WITH_PSA)
         .order("created_at", { ascending: false })
     : { data: null, error: null };
+
+  let data: unknown[] | null = inventoryResult.data as unknown[] | null;
+  let error = inventoryResult.error;
+
+  if (supabase && isMissingPsaColumnsError(inventoryResult.error)) {
+    migrationWarning = "PSA fields are not available yet. Run schema-migration-v14-inventory-psa-scans.sql in Supabase to enable PSA certs and scan images.";
+    const baseResult = await supabase
+      .from("inventory_items")
+      .select(INVENTORY_SELECT_BASE)
+      .order("created_at", { ascending: false });
+    data = (baseResult.data ?? []).map((row) => ({
+      ...row,
+      certification_number: null,
+      custom_image_front_url: null,
+      custom_image_back_url: null,
+    }));
+    error = baseResult.error;
+  }
 
   const inventoryRows = (data ?? []) as unknown as InventoryQueryRow[];
   const cardIds = Array.from(new Set(inventoryRows.map((row) => row.card_id).filter(Boolean))) as string[];
@@ -146,7 +185,14 @@ export default async function AdminInventoryPage() {
           Inventory query failed: {configError ?? error?.message ?? cardError?.message}
         </div>
       ) : (
-        <InventoryShell items={items} />
+        <>
+          {migrationWarning && (
+            <div className="mb-4 rounded-lg border border-owl/40 bg-owl/10 p-4 text-sm font-semibold text-text">
+              {migrationWarning}
+            </div>
+          )}
+          <InventoryShell items={items} />
+        </>
       )}
     </section>
   );
