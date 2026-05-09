@@ -1031,6 +1031,47 @@ export default function InventoryTabs({
     );
   }
 
+  function renderCardMeta(
+    item: InventoryRow,
+    {
+      groupLabel,
+      quantity,
+      itemIndex,
+      showCardBadge = true,
+      showItemId = false,
+    }: {
+      groupLabel?: string;
+      quantity?: number;
+      itemIndex?: number;
+      showCardBadge?: boolean;
+      showItemId?: boolean;
+    } = {}
+  ) {
+    return (
+      <div className="mt-1.5 flex flex-col items-start gap-1 font-mono text-xs font-medium text-text-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {typeof itemIndex === "number" && <span>#{itemIndex}</span>}
+          {item.card.set_code && <span>{item.card.set_code}</span>}
+          {item.card.card_number && <span>{item.card.card_number}</span>}
+          {typeof quantity === "number" && (
+            <span className="rounded bg-surf3 px-2 py-0.5 text-text">Qty {quantity}</span>
+          )}
+        </div>
+        {groupLabel && (
+          <span className="rounded bg-surf3 px-2 py-0.5 text-text">{groupLabel}</span>
+        )}
+        {showCardBadge && renderInventoryCardBadge(item)}
+        {item.certification_number && <span>Cert {item.certification_number}</span>}
+        {item.pending_card_match && (
+          <span className="rounded border border-owl/40 bg-owl/10 px-2 py-0.5 text-owl">
+            NEEDS MATCH
+          </span>
+        )}
+        {showItemId && <span className="truncate">{item.id}</span>}
+      </div>
+    );
+  }
+
   function renderCardImage(item: InventoryRow, size: "table" | "modal" | "small" = "table") {
     const imageUrl = cardImageUrl(item);
     const dimensions = size === "modal" ? "h-80 w-56" : size === "small" ? "h-20 w-14" : "h-28 w-20";
@@ -1142,15 +1183,7 @@ export default function InventoryTabs({
             <div>
               <div className="font-mono text-xs font-bold uppercase tracking-wider text-owl">Inventory Detail</div>
               <div className="mt-1">{renderCardTitle(item, "text-2xl font-bold text-text")}</div>
-              <div className="mt-2 flex flex-wrap gap-2 font-mono text-xs font-semibold text-text-2">
-                {item.card.set_code && <span>{item.card.set_code}</span>}
-                {item.card.card_number && <span>{item.card.card_number}</span>}
-                {selectedGroup.rows.length === 1 && renderInventoryCardBadge(item)}
-                {selectedGroup.rows.length === 1 && item.certification_number && (
-                  <span>Cert {item.certification_number}</span>
-                )}
-                {item.pending_card_match && <span className="text-owl">Needs Card Match</span>}
-              </div>
+              {renderCardMeta(item, { showCardBadge: selectedGroup.rows.length === 1 })}
             </div>
             <button
               type="button"
@@ -1187,15 +1220,7 @@ export default function InventoryTabs({
                       <div className="font-mono text-sm font-bold uppercase tracking-wider text-text">
                         Item #{index + 1}
                       </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        {renderInventoryCardBadge(row)}
-                        {row.certification_number && (
-                          <span className="font-mono text-xs font-semibold text-owl">
-                            Cert {row.certification_number}
-                          </span>
-                        )}
-                        <span className="font-mono text-xs text-text-2">{row.id}</span>
-                      </div>
+                      {renderCardMeta(row, { showItemId: true })}
                     </div>
                     {renderDeleteControls(row)}
                   </div>
@@ -1568,20 +1593,11 @@ export default function InventoryTabs({
                           >
                             {renderCardTitle(item)}
                           </button>
-                          <div className="mt-1.5 flex flex-wrap items-center gap-2 font-mono text-xs font-medium text-text-2">
-                            {item.card.set_code && <span>{item.card.set_code}</span>}
-                            {item.card.card_number && <span>{item.card.card_number}</span>}
-                            <span className="rounded bg-surf3 px-2 py-0.5 text-text">Qty {group.quantity}</span>
-                            {group.rows.length === 1 && renderInventoryCardBadge(item)}
-                            {group.rows.length === 1 && item.certification_number && (
-                              <span>Cert {item.certification_number}</span>
-                            )}
-                            {item.pending_card_match && (
-                              <span className="rounded border border-owl/40 bg-owl/10 px-2 py-0.5 text-owl">
-                                NEEDS MATCH
-                              </span>
-                            )}
-                          </div>
+                          {renderCardMeta(item, {
+                            groupLabel: hasNestedRows ? "GROUP" : undefined,
+                            quantity: group.quantity,
+                            showItemId: false,
+                          })}
                         </div>
                         {renderRowActions({
                           group,
@@ -1653,12 +1669,7 @@ export default function InventoryTabs({
                                 >
                                   {renderCardTitle(child, "text-base font-semibold text-text")}
                                 </button>
-                                <div className="mt-1 flex items-center gap-2 font-mono text-xs text-text-2">
-                                  <span>#{index + 1}</span>
-                                  {renderInventoryCardBadge(child)}
-                                  {child.certification_number && <span>Cert {child.certification_number}</span>}
-                                  <span className="truncate">{child.id}</span>
-                                </div>
+                                {renderCardMeta(child, { itemIndex: index + 1, showItemId: true })}
                               </div>
                               {renderRowActions({ group, item: child, canAdd: true, canRemove: true })}
                             </div>
@@ -1792,20 +1803,7 @@ export default function InventoryTabs({
                           >
                             {renderCardTitle(item)}
                           </button>
-                          <div className="mt-1.5 flex flex-wrap items-center gap-2 font-mono text-xs font-medium text-text-2">
-                            {item.card.set_code && <span>{item.card.set_code}</span>}
-                            {item.card.card_number && <span>{item.card.card_number}</span>}
-                            <span className="rounded bg-surf3 px-2 py-0.5 text-text">GROUP</span>
-                            {group.rows.length === 1 && renderInventoryCardBadge(item)}
-                            {group.rows.length === 1 && item.certification_number && (
-                              <span>Cert {item.certification_number}</span>
-                            )}
-                            {item.pending_card_match && (
-                              <span className="rounded border border-owl/40 bg-owl/10 px-2 py-0.5 text-owl">
-                                NEEDS MATCH
-                              </span>
-                            )}
-                          </div>
+                          {renderCardMeta(item, { groupLabel: "GROUP" })}
                         </div>
                         {renderRowActions({
                           group,
@@ -1916,15 +1914,7 @@ export default function InventoryTabs({
                                 >
                                   {renderCardTitle(child, "text-base font-semibold text-text")}
                                 </button>
-                                <div className="mt-1 flex flex-wrap items-center gap-2">
-                                  {renderInventoryCardBadge(child)}
-                                  {child.certification_number && (
-                                    <span className="font-mono text-xs font-semibold text-owl">
-                                      Cert {child.certification_number}
-                                    </span>
-                                  )}
-                                  <span className="truncate font-mono text-xs text-text-2">{child.id}</span>
-                                </div>
+                                {renderCardMeta(child, { showItemId: true })}
                               </div>
                               {renderRowActions({ group, item: child, canAdd: true, canRemove: true })}
                             </div>
