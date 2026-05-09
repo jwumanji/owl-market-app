@@ -223,6 +223,7 @@ export default function InventoryTabs({
   const [hoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
   const [searchDraft, setSearchDraft] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [pendingMatchOnly, setPendingMatchOnly] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const showTracking = statusFilter === "ship" || statusFilter === "sold";
   const showShippingActions = statusFilter === "ship";
@@ -233,9 +234,17 @@ export default function InventoryTabs({
     onItemsChange?.(rows);
   }, [onItemsChange, rows]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setPendingMatchOnly(params.get("review") === "needs-match");
+  }, []);
+
   const statusFilteredRows = useMemo(() => {
-    return rows.filter((item) => statusFilter === "all" || item.status === statusFilter);
-  }, [rows, statusFilter]);
+    return rows.filter((item) => {
+      if (pendingMatchOnly && !item.pending_card_match) return false;
+      return statusFilter === "all" || item.status === statusFilter;
+    });
+  }, [pendingMatchOnly, rows, statusFilter]);
 
   const searchFilteredRows = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -298,6 +307,10 @@ export default function InventoryTabs({
       { all: 0, raw: 0, damaged: 0, graded: 0, sealed: 0 }
     );
   }, [searchFilteredRows]);
+
+  const pendingMatchCount = useMemo(() => {
+    return rows.reduce((sum, item) => sum + (item.pending_card_match ? item.quantity : 0), 0);
+  }, [rows]);
 
   const selectedGroup = useMemo<InventoryGroup | null>(() => {
     if (!selectedGroupKey) return null;
@@ -1364,8 +1377,8 @@ export default function InventoryTabs({
             >
               Search
             </button>
-            {searchQuery && (
-              <button
+          {searchQuery && (
+            <button
                 type="button"
                 onClick={() => {
                   setSearchDraft("");
@@ -1373,11 +1386,23 @@ export default function InventoryTabs({
                 }}
                 className="h-10 rounded-md border border-border bg-surface px-3 font-mono text-xs font-bold uppercase tracking-wider text-text hover:border-border-2 hover:text-owl"
               >
-                Clear
-              </button>
-            )}
-          </div>
-        </form>
+              Clear
+            </button>
+          )}
+          {pendingMatchOnly && (
+            <button
+              type="button"
+              onClick={() => {
+                setPendingMatchOnly(false);
+                window.history.replaceState(null, "", window.location.pathname);
+              }}
+              className="h-10 rounded-md border border-border bg-surface px-3 font-mono text-xs font-bold uppercase tracking-wider text-text hover:border-border-2 hover:text-owl"
+            >
+              Clear Match
+            </button>
+          )}
+        </div>
+      </form>
 
         <div className="flex shrink-0 justify-start gap-2 xl:justify-end">
           <a
@@ -1398,6 +1423,12 @@ export default function InventoryTabs({
       {searchQuery && (
         <div className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
           Search: <span className="text-owl">{searchQuery}</span>
+        </div>
+      )}
+
+      {pendingMatchOnly && (
+        <div className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
+          Review: <span className="text-owl">Needs Match</span>
         </div>
       )}
 
@@ -1428,6 +1459,23 @@ export default function InventoryTabs({
             <span className="ml-2 text-text-2">{counts[tab.id]}</span>
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => {
+            const next = !pendingMatchOnly;
+            setPendingMatchOnly(next);
+            const url = next ? `${window.location.pathname}?review=needs-match` : window.location.pathname;
+            window.history.replaceState(null, "", url);
+          }}
+          className={`rounded-md border px-4 py-2.5 font-mono text-sm font-semibold transition-colors ${
+            pendingMatchOnly
+              ? "border-owl bg-owl/10 text-owl"
+              : "border-border bg-surface text-text hover:border-border-2 hover:text-owl"
+          }`}
+        >
+          Needs Match
+          <span className="ml-2 text-text-2">{pendingMatchCount}</span>
+        </button>
       </div>
 
       {actionError && (

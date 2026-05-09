@@ -87,7 +87,17 @@ export default function PsaImportForm() {
           <div className="grid gap-3 font-mono text-sm font-semibold text-text md:grid-cols-3">
             <div>Imported {result.count}</div>
             <div>Matched {result.matched}</div>
-            <div>Needs Match {result.pending_match}</div>
+            <div className="flex items-center justify-between gap-3">
+              <span>Needs Match {result.pending_match}</span>
+              {result.pending_match > 0 && (
+                <a
+                  href="/admin/inventory?review=needs-match"
+                  className="rounded border border-owl/60 bg-owl/10 px-2 py-1 font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/15"
+                >
+                  Review
+                </a>
+              )}
+            </div>
           </div>
           <div className="mt-3 max-h-48 overflow-y-auto rounded border border-border bg-deep">
             {result.rows.map((row, index) => (
