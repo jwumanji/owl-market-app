@@ -7,6 +7,7 @@ type InventoryStatus = "new" | "grading" | "sale" | "ship" | "sold";
 type GradedRating = "TAG 10" | "PSA 10" | "PSA 9" | "BGS 10" | "BGS 9.5";
 type StatusFilter = InventoryStatus | "all";
 type SaleChannel = "not_sold" | "ebay" | "fb" | "instagram" | "in_person" | "traded";
+type PurchasedFrom = "facebook" | "ebay" | "instagram" | "direct_person" | "event";
 
 export interface InventoryRow {
   id: string;
@@ -24,6 +25,7 @@ export interface InventoryRow {
   sold_price?: string | number | null;
   acquired_at?: string | null;
   cost_basis?: string | number | null;
+  purchased_from?: PurchasedFrom | null;
   notes?: string | null;
   pending_card_match?: boolean | null;
   card: {
@@ -68,6 +70,14 @@ const SALE_CHANNEL_LABELS: Record<SaleChannel, string> = {
   traded: "Traded",
 };
 
+const PURCHASED_FROM_LABELS: Record<PurchasedFrom, string> = {
+  facebook: "Facebook",
+  ebay: "Ebay",
+  instagram: "Instagram",
+  direct_person: "Direct Person",
+  event: "Event",
+};
+
 type InventoryGroup = {
   key: string;
   rows: InventoryRow[];
@@ -80,7 +90,7 @@ type InventoryGroup = {
 type CreatedInventoryItem = Pick<
   InventoryRow,
   "id" | "inventory_type" | "status" | "quantity" | "item_nickname" | "graded_rating" | "customer_name" | "shipping_tracking" | "shipped_at"
-  | "shipping_label_url" | "sale_channel" | "sold_date" | "sold_price"
+  | "shipping_label_url" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "purchased_from"
 >;
 
 type SelectFieldProps = SelectHTMLAttributes<HTMLSelectElement> & {
@@ -180,6 +190,11 @@ function cardImageUrl(item: InventoryRow) {
   return item.card.image_url_small ?? item.card.image_url;
 }
 
+function inventoryCardId(item: InventoryRow) {
+  const stableId = item.id.replace(/^(preview-|temp-)/, "");
+  return stableId.slice(0, 8).toUpperCase();
+}
+
 export default function InventoryTabs({
   items,
   onItemsChange,
@@ -202,6 +217,7 @@ export default function InventoryTabs({
   const [addingGroups, setAddingGroups] = useState<Record<string, boolean>>({});
   const [deletingItemIds, setDeletingItemIds] = useState<Record<string, boolean>>({});
   const [confirmingDeleteIds, setConfirmingDeleteIds] = useState<Record<string, boolean>>({});
+  const [openActionMenuKey, setOpenActionMenuKey] = useState<string | null>(null);
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null);
   const [hoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
   const [searchDraft, setSearchDraft] = useState("");
@@ -210,7 +226,7 @@ export default function InventoryTabs({
   const showTracking = statusFilter === "ship" || statusFilter === "sold";
   const showShippingActions = statusFilter === "ship";
   const showSaleFields = statusFilter === "sold";
-  const standardTableMinWidth = showSaleFields ? "min-w-[1320px]" : "min-w-[980px]";
+  const standardTableMinWidth = showSaleFields ? "min-w-[1280px]" : "min-w-[940px]";
 
   useEffect(() => {
     onItemsChange?.(rows);
@@ -230,11 +246,15 @@ export default function InventoryTabs({
         item.card.name,
         item.card.set_code,
         item.card.card_number,
+        item.id,
+        inventoryCardId(item),
         item.inventory_type,
         item.status,
         item.graded_rating,
         item.sale_channel,
         item.customer_name,
+        item.purchased_from,
+        item.purchased_from ? PURCHASED_FROM_LABELS[item.purchased_from] : null,
         item.shipping_tracking,
         item.shipping_label_url,
         item.notes,
@@ -294,7 +314,7 @@ export default function InventoryTabs({
 
   async function updateItem(
     id: string,
-    updates: Partial<Pick<InventoryRow, "status" | "graded_rating" | "inventory_type" | "item_nickname" | "customer_name" | "shipping_tracking" | "shipping_label_url" | "shipped_at" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "notes">>
+    updates: Partial<Pick<InventoryRow, "status" | "graded_rating" | "inventory_type" | "item_nickname" | "customer_name" | "shipping_tracking" | "shipping_label_url" | "shipped_at" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "purchased_from" | "notes">>
   ) {
     setRows((current) =>
       current.map((item) => (item.id === id ? { ...item, ...updates } : item))
@@ -332,6 +352,9 @@ export default function InventoryTabs({
       sale_channel: source.sale_channel ?? "not_sold",
       sold_date: source.sold_date ?? null,
       sold_price: source.sold_price ?? null,
+      acquired_at: source.acquired_at ?? null,
+      cost_basis: source.cost_basis ?? null,
+      purchased_from: source.purchased_from ?? null,
     };
 
     setActionError(null);
@@ -374,6 +397,9 @@ export default function InventoryTabs({
                 sale_channel: created.sale_channel ?? "not_sold",
                 sold_date: created.sold_date ?? null,
                 sold_price: created.sold_price ?? null,
+                acquired_at: created.acquired_at ?? null,
+                cost_basis: created.cost_basis ?? null,
+                purchased_from: created.purchased_from ?? null,
               }
             : item
         )
@@ -471,6 +497,102 @@ export default function InventoryTabs({
       >
         X
       </button>
+    );
+  }
+
+  function renderRowActions({
+    group,
+    item,
+    canAdd = false,
+    canRemove = false,
+  }: {
+    group: InventoryGroup;
+    item: InventoryRow;
+    canAdd?: boolean;
+    canRemove?: boolean;
+  }) {
+    const key = `${group.key}:${item.id}`;
+    const isOpen = openActionMenuKey === key;
+    const isAdding = addingGroups[group.key] ?? false;
+    const isConfirmingDelete = confirmingDeleteIds[item.id] ?? false;
+    const isDeleting = deletingItemIds[item.id] ?? false;
+
+    return (
+      <div className="relative shrink-0">
+        <button
+          type="button"
+          title="Inventory actions"
+          aria-label="Inventory actions"
+          onClick={() => setOpenActionMenuKey((current) => (current === key ? null : key))}
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-border-2 bg-surface font-mono text-lg font-black leading-none text-text-2 transition-colors hover:border-owl hover:text-owl"
+        >
+          ...
+        </button>
+
+        {isOpen && (
+          <div className="absolute right-0 top-10 z-40 min-w-[190px] rounded-lg border border-border bg-deep p-2 shadow-2xl">
+            {canAdd && (
+              <button
+                type="button"
+                disabled={isAdding}
+                onClick={() => {
+                  addIndividualItem(group);
+                  setOpenActionMenuKey(null);
+                }}
+                className="block w-full rounded-md px-3 py-2 text-left font-mono text-xs font-bold uppercase tracking-wider text-gain transition-colors hover:bg-[rgba(0,214,143,0.10)] disabled:cursor-wait disabled:opacity-60"
+              >
+                Add item
+              </button>
+            )}
+
+            {canRemove && (
+              isConfirmingDelete ? (
+                <div className="space-y-2 p-1">
+                  <div className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
+                    Remove item?
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={isDeleting}
+                      onClick={() => {
+                        deleteItem(item);
+                        setOpenActionMenuKey(null);
+                      }}
+                      className="rounded-md border border-loss bg-loss/10 px-2.5 py-1.5 font-mono text-xs font-bold uppercase tracking-wider text-loss transition-colors hover:bg-loss/15 disabled:cursor-wait disabled:opacity-60"
+                    >
+                      Confirm
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isDeleting}
+                      onClick={() =>
+                        setConfirmingDeleteIds((current) => {
+                          const next = { ...current };
+                          delete next[item.id];
+                          return next;
+                        })
+                      }
+                      className="rounded-md border border-border-2 bg-surface px-2.5 py-1.5 font-mono text-xs font-bold uppercase tracking-wider text-text-2 transition-colors hover:text-text disabled:cursor-wait disabled:opacity-60"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => setConfirmingDeleteIds((current) => ({ ...current, [item.id]: true }))}
+                  className="block w-full rounded-md px-3 py-2 text-left font-mono text-xs font-bold uppercase tracking-wider text-loss transition-colors hover:bg-loss/10 disabled:cursor-wait disabled:opacity-60"
+                >
+                  Remove item
+                </button>
+              )
+            )}
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -861,6 +983,17 @@ export default function InventoryTabs({
     );
   }
 
+  function renderInventoryCardBadge(item: InventoryRow) {
+    return (
+      <span
+        title={`Inventory item ID: ${item.id}`}
+        className="inline-flex items-center rounded-full border border-owl/50 bg-owl px-2.5 py-1 font-mono text-[11px] font-black uppercase leading-none tracking-wider text-void shadow-[0_0_14px_rgba(245,166,35,0.28)]"
+      >
+        Card # {inventoryCardId(item)}
+      </span>
+    );
+  }
+
   function renderCardImage(item: InventoryRow, size: "table" | "modal" | "small" = "table") {
     const imageUrl = cardImageUrl(item);
     const dimensions = size === "modal" ? "h-80 w-56" : size === "small" ? "h-20 w-14" : "h-28 w-20";
@@ -942,6 +1075,7 @@ export default function InventoryTabs({
               <div className="mt-2 flex flex-wrap gap-2 font-mono text-xs font-semibold text-text-2">
                 {item.card.set_code && <span>{item.card.set_code}</span>}
                 {item.card.card_number && <span>{item.card.card_number}</span>}
+                {selectedGroup.rows.length === 1 && renderInventoryCardBadge(item)}
                 {item.pending_card_match && <span className="text-owl">Needs Card Match</span>}
               </div>
             </div>
@@ -979,7 +1113,10 @@ export default function InventoryTabs({
                       <div className="font-mono text-sm font-bold uppercase tracking-wider text-text">
                         Item #{index + 1}
                       </div>
-                      <div className="mt-1 font-mono text-xs text-text-2">{row.id}</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {renderInventoryCardBadge(row)}
+                        <span className="font-mono text-xs text-text-2">{row.id}</span>
+                      </div>
                     </div>
                     {renderDeleteControls(row)}
                   </div>
@@ -1022,6 +1159,25 @@ export default function InventoryTabs({
                         placeholder="0.00"
                         className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
                       />
+                    </label>
+                    <label className="block">
+                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Purchased From</span>
+                      <SelectField
+                        value={row.purchased_from ?? ""}
+                        onChange={(event) =>
+                          updateItem(row.id, {
+                            purchased_from: event.target.value ? (event.target.value as PurchasedFrom) : null,
+                          })
+                        }
+                        wrapperClassName="mt-2"
+                      >
+                        <option value="">Select origin</option>
+                        {(Object.keys(PURCHASED_FROM_LABELS) as PurchasedFrom[]).map((origin) => (
+                          <option key={origin} value={origin}>
+                            {PURCHASED_FROM_LABELS[origin]}
+                          </option>
+                        ))}
+                      </SelectField>
                     </label>
                   </div>
 
@@ -1206,14 +1362,14 @@ export default function InventoryTabs({
 
       {statusFilter === "ship" ? (
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
-        <table className="w-full min-w-[1120px] table-fixed">
+        <table className="w-full min-w-[1080px] table-fixed">
           <colgroup>
             <col className="w-[48px]" />
-            <col className="w-[360px]" />
-            <col className="w-[200px]" />
-            <col className="w-[230px]" />
+            <col className="w-[330px]" />
+            <col className="w-[190px]" />
+            <col className="w-[210px]" />
             <col className="w-[145px]" />
-            <col className="w-[260px]" />
+            <col className="w-[240px]" />
           </colgroup>
           <thead>
             <tr className="border-b border-border bg-surf2 text-left font-mono text-xs font-semibold uppercase tracking-wider text-text">
@@ -1278,6 +1434,7 @@ export default function InventoryTabs({
                             {item.card.set_code && <span>{item.card.set_code}</span>}
                             {item.card.card_number && <span>{item.card.card_number}</span>}
                             <span className="rounded bg-surf3 px-2 py-0.5 text-text">Qty {group.quantity}</span>
+                            {group.rows.length === 1 && renderInventoryCardBadge(item)}
                             {item.pending_card_match && (
                               <span className="rounded border border-owl/40 bg-owl/10 px-2 py-0.5 text-owl">
                                 NEEDS MATCH
@@ -1285,19 +1442,12 @@ export default function InventoryTabs({
                             )}
                           </div>
                         </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <button
-                            type="button"
-                            title="Add individual item"
-                            aria-label={`Add individual item for ${item.card.name ?? "this card"}`}
-                            disabled={isAdding}
-                            onClick={() => addIndividualItem(group)}
-                            className="flex h-8 w-8 items-center justify-center rounded-md border border-gain bg-[rgba(0,214,143,0.10)] font-mono text-lg font-bold leading-none text-gain transition-colors hover:bg-[rgba(0,214,143,0.16)] disabled:cursor-wait disabled:opacity-60"
-                          >
-                            +
-                          </button>
-                          {!hasNestedRows && renderDeleteControls(item)}
-                        </div>
+                        {renderRowActions({
+                          group,
+                          item,
+                          canAdd: true,
+                          canRemove: !hasNestedRows,
+                        })}
                       </div>
                     </td>
                     <td className="px-3 py-4 font-mono text-sm">
@@ -1352,10 +1502,11 @@ export default function InventoryTabs({
                                 </button>
                                 <div className="mt-1 flex items-center gap-2 font-mono text-xs text-text-2">
                                   <span>#{index + 1}</span>
+                                  {renderInventoryCardBadge(child)}
                                   <span className="truncate">{child.id}</span>
                                 </div>
                               </div>
-                              {renderDeleteControls(child)}
+                              {renderRowActions({ group, item: child, canRemove: true })}
                             </div>
                           </td>
                           <td className="px-3 py-3.5">{renderCustomerNameCell(child)}</td>
@@ -1400,7 +1551,7 @@ export default function InventoryTabs({
           <colgroup>
             <col className="w-[48px]" />
             <col className="w-[104px]" />
-            <col className="w-[320px]" />
+            <col className="w-[290px]" />
             <col className="w-[82px]" />
             {showTracking && <col className="w-[250px]" />}
             {showSaleFields && <col className="w-[145px]" />}
@@ -1487,30 +1638,24 @@ export default function InventoryTabs({
                           >
                             {renderCardTitle(item)}
                           </button>
-                          <div className="mt-1.5 flex items-center gap-2 font-mono text-xs font-medium text-text-2">
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2 font-mono text-xs font-medium text-text-2">
                             {item.card.set_code && <span>{item.card.set_code}</span>}
                             {item.card.card_number && <span>{item.card.card_number}</span>}
-                        <span className="rounded bg-surf3 px-2 py-0.5 text-text">GROUP</span>
-                        {item.pending_card_match && (
-                          <span className="rounded border border-owl/40 bg-owl/10 px-2 py-0.5 text-owl">
-                            NEEDS MATCH
-                          </span>
-                        )}
+                            <span className="rounded bg-surf3 px-2 py-0.5 text-text">GROUP</span>
+                            {group.rows.length === 1 && renderInventoryCardBadge(item)}
+                            {item.pending_card_match && (
+                              <span className="rounded border border-owl/40 bg-owl/10 px-2 py-0.5 text-owl">
+                                NEEDS MATCH
+                              </span>
+                            )}
                           </div>
                         </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <button
-                            type="button"
-                            title="Add individual item"
-                            aria-label={`Add individual item for ${item.card.name ?? "this card"}`}
-                            disabled={isAdding}
-                            onClick={() => addIndividualItem(group)}
-                            className="flex h-8 w-8 items-center justify-center rounded-md border border-gain bg-[rgba(0,214,143,0.10)] font-mono text-lg font-bold leading-none text-gain transition-colors hover:bg-[rgba(0,214,143,0.16)] disabled:cursor-wait disabled:opacity-60"
-                          >
-                            +
-                          </button>
-                          {!hasNestedRows && renderDeleteControls(item)}
-                        </div>
+                        {renderRowActions({
+                          group,
+                          item,
+                          canAdd: true,
+                          canRemove: !hasNestedRows,
+                        })}
                       </div>
                     </td>
                     <td className="px-3 py-4 text-right font-mono text-base font-semibold text-text">{group.quantity}</td>
@@ -1586,7 +1731,7 @@ export default function InventoryTabs({
 
                   {isOpen && (
                     <>
-                      {group.rows.map((child, index) => (
+                      {group.rows.map((child) => (
                         <tr
                           key={child.id}
                           className="border-b border-[rgba(79,142,247,0.16)] bg-[rgba(79,142,247,0.075)] shadow-[inset_3px_0_0_rgba(79,142,247,0.45)] transition-colors hover:bg-[rgba(79,142,247,0.11)]"
@@ -1602,9 +1747,6 @@ export default function InventoryTabs({
                               className="ml-auto mr-2 flex w-16 flex-col items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-owl"
                             >
                               {renderCardImage(child, "small")}
-                              <span className="rounded-full border border-owl bg-owl px-2.5 py-1 font-mono text-xs font-black leading-none text-void shadow-[0_0_14px_rgba(245,166,35,0.45)]">
-                                #{index + 1}
-                              </span>
                             </button>
                           </td>
                           <td className="px-3 py-3.5">
@@ -1617,9 +1759,12 @@ export default function InventoryTabs({
                                 >
                                   {renderCardTitle(child, "text-base font-semibold text-text")}
                                 </button>
-                                <div className="mt-1 truncate font-mono text-xs text-text-2">{child.id}</div>
+                                <div className="mt-1 flex flex-wrap items-center gap-2">
+                                  {renderInventoryCardBadge(child)}
+                                  <span className="truncate font-mono text-xs text-text-2">{child.id}</span>
+                                </div>
                               </div>
-                              {renderDeleteControls(child)}
+                              {renderRowActions({ group, item: child, canRemove: true })}
                             </div>
                           </td>
                           <td className="px-3 py-3.5 text-right font-mono text-base font-semibold text-text">{child.quantity}</td>

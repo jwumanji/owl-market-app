@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS inventory_items (
   sold_price      numeric,
   acquired_at     date DEFAULT current_date,
   cost_basis      numeric DEFAULT 0,
+  purchased_from  text CHECK (
+    purchased_from IS NULL OR purchased_from IN ('facebook', 'ebay', 'instagram', 'direct_person', 'event')
+  ),
   notes           text,
   created_at      timestamptz DEFAULT now(),
   updated_at      timestamptz DEFAULT now()
@@ -35,6 +38,7 @@ ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS shipped_at timestamptz;
 ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS sale_channel text DEFAULT 'not_sold';
 ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS sold_date date;
 ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS sold_price numeric;
+ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS purchased_from text;
 ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS manual_card_name text;
 ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS manual_card_number text;
 ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS manual_set_code text;

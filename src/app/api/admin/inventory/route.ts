@@ -20,6 +20,7 @@ type InventorySource = {
   sold_price: number | null;
   acquired_at: string | null;
   cost_basis: number | null;
+  purchased_from: string | null;
   notes: string | null;
 };
 
@@ -80,6 +81,7 @@ export async function POST(request: Request) {
       sold_date: null,
       sold_price: null,
       cost_basis: body.cost_basis ? body.cost_basis : 0,
+      purchased_from: null,
       notes: typeof body.notes === "string" ? body.notes.trim() || null : null,
     }));
 
@@ -106,7 +108,7 @@ export async function POST(request: Request) {
 
   const { data: source, error: sourceError } = await supabase
     .from("inventory_items")
-    .select("card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match, inventory_type, status, graded_rating, customer_name, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price, acquired_at, cost_basis, notes")
+    .select("card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match, inventory_type, status, graded_rating, customer_name, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from, notes")
     .eq("id", sourceId)
     .single();
 
@@ -137,9 +139,10 @@ export async function POST(request: Request) {
       sold_price: item.sold_price,
       acquired_at: item.acquired_at,
       cost_basis: item.cost_basis,
+      purchased_from: item.purchased_from,
       notes: item.notes,
     })
-    .select("id, inventory_type, status, quantity, item_nickname, graded_rating, customer_name, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price")
+    .select("id, inventory_type, status, quantity, item_nickname, graded_rating, customer_name, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from")
     .single();
 
   if (error) {

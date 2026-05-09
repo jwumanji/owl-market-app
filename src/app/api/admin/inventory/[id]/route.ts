@@ -5,6 +5,7 @@ const STATUSES = new Set(["new", "grading", "sale", "ship", "sold"]);
 const CONDITIONS = new Set(["raw", "damaged", "graded", "sealed"]);
 const GRADED_RATINGS = new Set(["TAG 10", "PSA 10", "PSA 9", "BGS 10", "BGS 9.5"]);
 const SALE_CHANNELS = new Set(["not_sold", "ebay", "fb", "instagram", "in_person", "traded"]);
+const PURCHASED_FROM_OPTIONS = new Set(["facebook", "ebay", "instagram", "direct_person", "event"]);
 
 export async function PATCH(
   request: Request,
@@ -111,6 +112,16 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid cost basis" }, { status: 400 });
     }
     updates.cost_basis = body.cost_basis?.trim() || null;
+  }
+
+  if ("purchased_from" in body) {
+    if (
+      body.purchased_from !== null &&
+      (typeof body.purchased_from !== "string" || !PURCHASED_FROM_OPTIONS.has(body.purchased_from))
+    ) {
+      return NextResponse.json({ error: "Invalid purchase origin" }, { status: 400 });
+    }
+    updates.purchased_from = body.purchased_from;
   }
 
   if ("notes" in body) {
