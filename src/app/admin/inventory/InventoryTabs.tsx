@@ -210,6 +210,7 @@ export default function InventoryTabs({
   const showTracking = statusFilter === "ship" || statusFilter === "sold";
   const showShippingActions = statusFilter === "ship";
   const showSaleFields = statusFilter === "sold";
+  const standardTableMinWidth = showSaleFields ? "min-w-[1320px]" : "min-w-[980px]";
 
   useEffect(() => {
     onItemsChange?.(rows);
@@ -1205,14 +1206,14 @@ export default function InventoryTabs({
 
       {statusFilter === "ship" ? (
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
-        <table className="w-full min-w-[1180px] table-fixed">
+        <table className="w-full min-w-[1120px] table-fixed">
           <colgroup>
-            <col className="w-[58px]" />
-            <col className="w-[390px]" />
-            <col className="w-[220px]" />
-            <col className="w-[250px]" />
-            <col className="w-[160px]" />
-            <col className="w-[300px]" />
+            <col className="w-[48px]" />
+            <col className="w-[360px]" />
+            <col className="w-[200px]" />
+            <col className="w-[230px]" />
+            <col className="w-[145px]" />
+            <col className="w-[260px]" />
           </colgroup>
           <thead>
             <tr className="border-b border-border bg-surf2 text-left font-mono text-xs font-semibold uppercase tracking-wider text-text">
@@ -1395,21 +1396,18 @@ export default function InventoryTabs({
       </div>
       ) : (
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
-        <table className="w-full min-w-[1980px] table-fixed">
+        <table className={`w-full ${standardTableMinWidth} table-fixed`}>
           <colgroup>
-            <col className="w-[58px]" />
-            <col className="w-[132px]" />
-            <col className="w-[330px]" />
-            <col className="w-[105px]" />
-            {showShippingActions && <col className="w-[230px]" />}
-            {showShippingActions && <col className="w-[280px]" />}
-            {showShippingActions && <col className="w-[180px]" />}
-            {showTracking && <col className="w-[300px]" />}
-            {showSaleFields && <col className="w-[185px]" />}
-            {showSaleFields && <col className="w-[160px]" />}
+            <col className="w-[48px]" />
+            <col className="w-[104px]" />
+            <col className="w-[320px]" />
+            <col className="w-[82px]" />
+            {showTracking && <col className="w-[250px]" />}
             {showSaleFields && <col className="w-[145px]" />}
-            <col className="w-[175px]" />
-            <col className="w-[175px]" />
+            {showSaleFields && <col className="w-[132px]" />}
+            {showSaleFields && <col className="w-[118px]" />}
+            <col className="w-[150px]" />
+            <col className="w-[150px]" />
           </colgroup>
           <thead>
             <tr className="border-b border-border bg-surf2 text-left font-mono text-xs font-semibold uppercase tracking-wider text-text">
