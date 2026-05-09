@@ -882,7 +882,7 @@ export default function InventoryTabs({
   return (
     <div className="space-y-4">
       <form
-        className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3 md:flex-row md:items-center"
+        className="flex max-w-3xl flex-col gap-2 md:flex-row md:items-center"
         onSubmit={(event) => {
           event.preventDefault();
           setSearchQuery(searchDraft);
@@ -891,13 +891,13 @@ export default function InventoryTabs({
         <input
           value={searchDraft}
           onChange={(event) => setSearchDraft(event.target.value)}
-          placeholder="Search inventory by nickname, card name, set, number, notes, tracking..."
-          className="min-w-0 flex-1 rounded-md border border-border bg-deep px-4 py-3 text-sm text-text outline-none focus:border-owl"
+          placeholder="Search inventory"
+          className="h-10 min-w-0 flex-1 rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus:border-owl"
         />
         <div className="flex gap-2">
           <button
             type="submit"
-            className="rounded-md bg-owl px-5 py-3 font-mono text-sm font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
+            className="h-10 rounded-md bg-owl px-4 font-mono text-xs font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
           >
             Search
           </button>
@@ -908,7 +908,7 @@ export default function InventoryTabs({
                 setSearchDraft("");
                 setSearchQuery("");
               }}
-              className="rounded-md border border-border bg-surface px-4 py-3 font-mono text-sm font-bold uppercase tracking-wider text-text hover:border-border-2 hover:text-owl"
+              className="h-10 rounded-md border border-border bg-surface px-3 font-mono text-xs font-bold uppercase tracking-wider text-text hover:border-border-2 hover:text-owl"
             >
               Clear
             </button>
