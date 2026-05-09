@@ -239,9 +239,28 @@ export default function InventoryTabs({
     setPendingMatchOnly(params.get("review") === "needs-match");
   }, []);
 
+  useEffect(() => {
+    if (!pendingMatchOnly || statusFilter === "all") return;
+    setPendingMatchOnly(false);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [pendingMatchOnly, statusFilter]);
+
+  function setNeedsMatchReview(next: boolean) {
+    setPendingMatchOnly(next);
+    if (next) {
+      setActiveTab("all");
+      onStatusFilterChange?.("all");
+    }
+    const url = next ? `${window.location.pathname}?review=needs-match` : window.location.pathname;
+    window.history.replaceState(null, "", url);
+  }
+
   const statusFilteredRows = useMemo(() => {
+    if (pendingMatchOnly) {
+      return rows.filter((item) => item.pending_card_match);
+    }
+
     return rows.filter((item) => {
-      if (pendingMatchOnly && !item.pending_card_match) return false;
       return statusFilter === "all" || item.status === statusFilter;
     });
   }, [pendingMatchOnly, rows, statusFilter]);
@@ -278,13 +297,14 @@ export default function InventoryTabs({
   }, [searchQuery, statusFilteredRows]);
 
   const filtered = useMemo(() => {
+    if (pendingMatchOnly) return searchFilteredRows;
     return searchFilteredRows.filter((item) => activeTab === "all" || item.inventory_type === activeTab);
-  }, [activeTab, searchFilteredRows]);
+  }, [activeTab, pendingMatchOnly, searchFilteredRows]);
 
   const groups = useMemo<InventoryGroup[]>(() => {
     const map = new Map<string, InventoryRow[]>();
     for (const item of filtered) {
-      const key = groupKey(item);
+      const key = pendingMatchOnly ? `item:${item.id}` : groupKey(item);
       map.set(key, [...(map.get(key) ?? []), item]);
     }
     return Array.from(map.entries()).map(([key, groupRows]) => ({
@@ -295,7 +315,7 @@ export default function InventoryTabs({
       condition: sameValue(groupRows.map((item) => item.inventory_type)),
       status: sameValue(groupRows.map((item) => item.status)),
     }));
-  }, [filtered]);
+  }, [filtered, pendingMatchOnly]);
 
   const counts = useMemo(() => {
     return searchFilteredRows.reduce(
@@ -311,10 +331,19 @@ export default function InventoryTabs({
   const pendingMatchCount = useMemo(() => {
     return rows.reduce((sum, item) => sum + (item.pending_card_match ? item.quantity : 0), 0);
   }, [rows]);
+  const showNeedsMatchTab = pendingMatchCount > 0;
+
+  useEffect(() => {
+    if (!pendingMatchOnly || pendingMatchCount > 0) return;
+    setPendingMatchOnly(false);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [pendingMatchOnly, pendingMatchCount]);
 
   const selectedGroup = useMemo<InventoryGroup | null>(() => {
     if (!selectedGroupKey) return null;
-    const groupRows = rows.filter((item) => groupKey(item) === selectedGroupKey);
+    const groupRows = selectedGroupKey.startsWith("item:")
+      ? rows.filter((item) => item.id === selectedGroupKey.slice(5))
+      : rows.filter((item) => groupKey(item) === selectedGroupKey);
     if (groupRows.length === 0) return null;
 
     return {
@@ -1418,8 +1447,7 @@ export default function InventoryTabs({
             <button
               type="button"
               onClick={() => {
-                setPendingMatchOnly(false);
-                window.history.replaceState(null, "", window.location.pathname);
+                setNeedsMatchReview(false);
               }}
               className="h-10 rounded-md border border-border bg-surface px-3 font-mono text-xs font-bold uppercase tracking-wider text-text hover:border-border-2 hover:text-owl"
             >
@@ -1460,9 +1488,12 @@ export default function InventoryTabs({
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={() => onStatusFilterChange?.("all")}
+          onClick={() => {
+            setNeedsMatchReview(false);
+            onStatusFilterChange?.("all");
+          }}
           className={`rounded-md border px-4 py-2.5 font-mono text-sm font-semibold transition-colors ${
-            statusFilter === "all"
+            statusFilter === "all" && !pendingMatchOnly
               ? "border-blue bg-blue/10 text-blue"
               : "border-border bg-surface text-text hover:border-border-2 hover:text-owl"
           }`}
@@ -1473,9 +1504,12 @@ export default function InventoryTabs({
           <button
             key={tab.id}
             type="button"
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => {
+              setNeedsMatchReview(false);
+              setActiveTab(tab.id);
+            }}
             className={`rounded-md border px-4 py-2.5 font-mono text-sm font-semibold transition-colors ${
-              activeTab === tab.id
+              activeTab === tab.id && !pendingMatchOnly
                 ? "border-owl bg-owl/10 text-owl"
                 : "border-border bg-surface text-text hover:border-border-2 hover:text-owl"
             }`}
@@ -1484,23 +1518,22 @@ export default function InventoryTabs({
             <span className="ml-2 text-text-2">{counts[tab.id]}</span>
           </button>
         ))}
-        <button
-          type="button"
-          onClick={() => {
-            const next = !pendingMatchOnly;
-            setPendingMatchOnly(next);
-            const url = next ? `${window.location.pathname}?review=needs-match` : window.location.pathname;
-            window.history.replaceState(null, "", url);
-          }}
-          className={`rounded-md border px-4 py-2.5 font-mono text-sm font-semibold transition-colors ${
-            pendingMatchOnly
-              ? "border-owl bg-owl/10 text-owl"
-              : "border-border bg-surface text-text hover:border-border-2 hover:text-owl"
-          }`}
-        >
-          Needs Match
-          <span className="ml-2 text-text-2">{pendingMatchCount}</span>
-        </button>
+        {showNeedsMatchTab && (
+          <button
+            type="button"
+            onClick={() => {
+              setNeedsMatchReview(!pendingMatchOnly);
+            }}
+            className={`rounded-md border px-4 py-2.5 font-mono text-sm font-semibold transition-colors ${
+              pendingMatchOnly
+                ? "border-owl bg-owl/10 text-owl"
+                : "border-border bg-surface text-text hover:border-border-2 hover:text-owl"
+            }`}
+          >
+            Needs Match
+            <span className="ml-2 text-text-2">{pendingMatchCount}</span>
+          </button>
+        )}
       </div>
 
       {actionError && (
