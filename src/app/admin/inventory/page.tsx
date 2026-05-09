@@ -1,6 +1,7 @@
 import InventoryShell from "./InventoryShell";
 import { InventoryRow } from "./InventoryTabs";
 import { createServiceClient } from "@/lib/supabase-server";
+import type { GradedRating } from "@/lib/inventory-options";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,10 @@ type InventoryQueryRow = {
   inventory_type: "raw" | "damaged" | "graded" | "sealed";
   status: "new" | "grading" | "sale" | "ship" | "sold";
   quantity: number;
-  graded_rating: "TAG 10" | "PSA 10" | "PSA 9" | "BGS 10" | "BGS 9.5" | null;
+  graded_rating: GradedRating | null;
+  certification_number: string | null;
+  custom_image_front_url: string | null;
+  custom_image_back_url: string | null;
   customer_name: string | null;
   shipping_tracking: string | null;
   shipping_label_url: string | null;
@@ -53,6 +57,9 @@ function toInventoryRow(row: InventoryQueryRow, cardMap: Map<string, CardLookupR
     quantity: row.quantity,
     item_nickname: row.item_nickname,
     graded_rating: row.graded_rating,
+    certification_number: row.certification_number,
+    custom_image_front_url: row.custom_image_front_url,
+    custom_image_back_url: row.custom_image_back_url,
     customer_name: row.customer_name,
     shipping_tracking: row.shipping_tracking,
     shipping_label_url: row.shipping_label_url,
@@ -90,7 +97,8 @@ export default async function AdminInventoryPage() {
         .from("inventory_items")
         .select(`
           id, card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match,
-          inventory_type, status, quantity, graded_rating, customer_name, shipping_tracking, shipping_label_url, shipped_at,
+          inventory_type, status, quantity, graded_rating, certification_number, custom_image_front_url, custom_image_back_url,
+          customer_name, shipping_tracking, shipping_label_url, shipped_at,
           sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from, notes
         `)
         .order("created_at", { ascending: false })

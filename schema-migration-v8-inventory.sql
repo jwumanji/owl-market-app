@@ -12,8 +12,34 @@ CREATE TABLE IF NOT EXISTS inventory_items (
   status          text NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'grading', 'sale', 'sold')),
   quantity        int NOT NULL DEFAULT 1 CHECK (quantity > 0),
   graded_rating   text CHECK (
-    graded_rating IS NULL OR graded_rating IN ('TAG 10', 'PSA 10', 'PSA 9', 'BGS 10', 'BGS 9.5')
+    graded_rating IS NULL OR graded_rating IN (
+      'TAG 10',
+      'PSA 10',
+      'PSA 9',
+      'PSA 8.5',
+      'PSA 8',
+      'PSA 7.5',
+      'PSA 7',
+      'PSA 6.5',
+      'PSA 6',
+      'PSA 5.5',
+      'PSA 5',
+      'PSA 4.5',
+      'PSA 4',
+      'PSA 3.5',
+      'PSA 3',
+      'PSA 2.5',
+      'PSA 2',
+      'PSA 1.5',
+      'PSA 1',
+      'PSA Authentic',
+      'BGS 10',
+      'BGS 9.5'
+    )
   ),
+  certification_number text,
+  custom_image_front_url text,
+  custom_image_back_url text,
   shipping_tracking text,
   shipped_at      timestamptz,
   sale_channel    text DEFAULT 'not_sold' CHECK (sale_channel IN ('not_sold', 'ebay', 'fb', 'instagram', 'in_person', 'traded')),
@@ -43,6 +69,9 @@ ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS manual_card_name text;
 ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS manual_card_number text;
 ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS manual_set_code text;
 ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS pending_card_match boolean NOT NULL DEFAULT false;
+ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS certification_number text;
+ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS custom_image_front_url text;
+ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS custom_image_back_url text;
 ALTER TABLE inventory_items ALTER COLUMN card_id DROP NOT NULL;
 
 CREATE TABLE IF NOT EXISTS inventory_status_history (

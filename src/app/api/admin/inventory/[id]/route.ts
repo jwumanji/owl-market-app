@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { GRADED_RATINGS } from "@/lib/inventory-options";
 
 const STATUSES = new Set(["new", "grading", "sale", "ship", "sold"]);
 const CONDITIONS = new Set(["raw", "damaged", "graded", "sealed"]);
-const GRADED_RATINGS = new Set(["TAG 10", "PSA 10", "PSA 9", "BGS 10", "BGS 9.5"]);
+const GRADED_RATING_VALUES = new Set<string>(GRADED_RATINGS);
 const SALE_CHANNELS = new Set(["not_sold", "ebay", "fb", "instagram", "in_person", "traded"]);
 const PURCHASED_FROM_OPTIONS = new Set(["facebook", "ebay", "instagram", "direct_person", "event"]);
 
@@ -27,10 +28,17 @@ export async function PATCH(
   }
 
   if ("graded_rating" in body) {
-    if (body.graded_rating !== null && (typeof body.graded_rating !== "string" || !GRADED_RATINGS.has(body.graded_rating))) {
+    if (body.graded_rating !== null && (typeof body.graded_rating !== "string" || !GRADED_RATING_VALUES.has(body.graded_rating))) {
       return NextResponse.json({ error: "Invalid graded rating" }, { status: 400 });
     }
     updates.graded_rating = body.graded_rating;
+  }
+
+  if ("certification_number" in body) {
+    if (body.certification_number !== null && typeof body.certification_number !== "string") {
+      return NextResponse.json({ error: "Invalid certification number" }, { status: 400 });
+    }
+    updates.certification_number = body.certification_number?.trim() || null;
   }
 
   if ("inventory_type" in body) {
@@ -67,6 +75,20 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid shipping label" }, { status: 400 });
     }
     updates.shipping_label_url = body.shipping_label_url?.trim() || null;
+  }
+
+  if ("custom_image_front_url" in body) {
+    if (body.custom_image_front_url !== null && typeof body.custom_image_front_url !== "string") {
+      return NextResponse.json({ error: "Invalid front image URL" }, { status: 400 });
+    }
+    updates.custom_image_front_url = body.custom_image_front_url?.trim() || null;
+  }
+
+  if ("custom_image_back_url" in body) {
+    if (body.custom_image_back_url !== null && typeof body.custom_image_back_url !== "string") {
+      return NextResponse.json({ error: "Invalid back image URL" }, { status: 400 });
+    }
+    updates.custom_image_back_url = body.custom_image_back_url?.trim() || null;
   }
 
   if ("shipped_at" in body) {
@@ -148,7 +170,7 @@ export async function PATCH(
     .from("inventory_items")
     .update(updates)
     .eq("id", params.id)
-    .select("id, status, graded_rating")
+    .select("id, status, graded_rating, certification_number, custom_image_front_url, custom_image_back_url")
     .single();
 
   if (error) {

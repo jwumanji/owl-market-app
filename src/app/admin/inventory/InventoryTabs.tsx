@@ -1,10 +1,8 @@
 "use client";
 
 import { Fragment, type MouseEvent, type SelectHTMLAttributes, useEffect, useMemo, useState } from "react";
+import { GRADED_RATINGS, type GradedRating, type InventoryStatus, type InventoryType } from "@/lib/inventory-options";
 
-type InventoryType = "raw" | "damaged" | "graded" | "sealed";
-type InventoryStatus = "new" | "grading" | "sale" | "ship" | "sold";
-type GradedRating = "TAG 10" | "PSA 10" | "PSA 9" | "BGS 10" | "BGS 9.5";
 type StatusFilter = InventoryStatus | "all";
 type SaleChannel = "not_sold" | "ebay" | "fb" | "instagram" | "in_person" | "traded";
 type PurchasedFrom = "facebook" | "ebay" | "instagram" | "direct_person" | "event";
@@ -16,6 +14,9 @@ export interface InventoryRow {
   quantity: number;
   item_nickname?: string | null;
   graded_rating: GradedRating | null;
+  certification_number?: string | null;
+  custom_image_front_url?: string | null;
+  custom_image_back_url?: string | null;
   customer_name?: string | null;
   shipping_tracking?: string | null;
   shipping_label_url?: string | null;
@@ -60,7 +61,6 @@ const CONDITION_LABELS: Record<InventoryType, string> = {
   sealed: "Sealed",
 };
 
-const GRADED_RATINGS: GradedRating[] = ["TAG 10", "PSA 10", "PSA 9", "BGS 10", "BGS 9.5"];
 const SALE_CHANNEL_LABELS: Record<SaleChannel, string> = {
   not_sold: "Not Sold",
   ebay: "Ebay",
@@ -89,7 +89,8 @@ type InventoryGroup = {
 
 type CreatedInventoryItem = Pick<
   InventoryRow,
-  "id" | "inventory_type" | "status" | "quantity" | "item_nickname" | "graded_rating" | "customer_name" | "shipping_tracking" | "shipped_at"
+  "id" | "inventory_type" | "status" | "quantity" | "item_nickname" | "graded_rating" | "certification_number"
+  | "custom_image_front_url" | "custom_image_back_url" | "customer_name" | "shipping_tracking" | "shipped_at"
   | "shipping_label_url" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "purchased_from"
 >;
 
@@ -187,7 +188,7 @@ function isLocalOnlyItem(id: string) {
 }
 
 function cardImageUrl(item: InventoryRow) {
-  return item.card.image_url_small ?? item.card.image_url;
+  return item.custom_image_front_url ?? item.card.image_url_small ?? item.card.image_url;
 }
 
 function inventoryCardId(item: InventoryRow) {
@@ -251,6 +252,7 @@ export default function InventoryTabs({
         item.inventory_type,
         item.status,
         item.graded_rating,
+        item.certification_number,
         item.sale_channel,
         item.customer_name,
         item.purchased_from,
@@ -314,7 +316,7 @@ export default function InventoryTabs({
 
   async function updateItem(
     id: string,
-    updates: Partial<Pick<InventoryRow, "status" | "graded_rating" | "inventory_type" | "item_nickname" | "customer_name" | "shipping_tracking" | "shipping_label_url" | "shipped_at" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "purchased_from" | "notes">>
+    updates: Partial<Pick<InventoryRow, "status" | "graded_rating" | "certification_number" | "custom_image_front_url" | "custom_image_back_url" | "inventory_type" | "item_nickname" | "customer_name" | "shipping_tracking" | "shipping_label_url" | "shipped_at" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "purchased_from" | "notes">>
   ) {
     setRows((current) =>
       current.map((item) => (item.id === id ? { ...item, ...updates } : item))
@@ -345,6 +347,9 @@ export default function InventoryTabs({
       id: tempId,
       quantity: 1,
       item_nickname: source.item_nickname ?? null,
+      certification_number: source.certification_number ?? null,
+      custom_image_front_url: source.custom_image_front_url ?? null,
+      custom_image_back_url: source.custom_image_back_url ?? null,
       customer_name: source.customer_name ?? null,
       shipping_tracking: null,
       shipping_label_url: null,
@@ -390,6 +395,9 @@ export default function InventoryTabs({
                 quantity: created.quantity,
                 item_nickname: created.item_nickname ?? null,
                 graded_rating: created.graded_rating,
+                certification_number: created.certification_number ?? null,
+                custom_image_front_url: created.custom_image_front_url ?? null,
+                custom_image_back_url: created.custom_image_back_url ?? null,
                 customer_name: created.customer_name ?? null,
                 shipping_tracking: created.shipping_tracking ?? null,
                 shipping_label_url: created.shipping_label_url ?? null,
@@ -922,7 +930,12 @@ export default function InventoryTabs({
         <SelectField
           value={item.inventory_type}
           onChange={(event) =>
-            updateItem(item.id, { inventory_type: event.target.value as InventoryType })
+            updateItem(item.id, {
+              inventory_type: event.target.value as InventoryType,
+              ...(event.target.value === "graded"
+                ? {}
+                : { graded_rating: null, certification_number: null }),
+            })
           }
         >
           {(Object.keys(CONDITION_LABELS) as InventoryType[]).map((condition) => (
@@ -948,6 +961,15 @@ export default function InventoryTabs({
               </option>
             ))}
           </SelectField>
+        )}
+        {item.inventory_type === "graded" && (
+          <input
+            type="text"
+            value={item.certification_number ?? ""}
+            onChange={(event) => updateItem(item.id, { certification_number: event.target.value })}
+            placeholder="PSA cert number"
+            className="mt-2 w-full rounded-md border border-border bg-surface px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none transition-colors hover:border-border-2 hover:bg-surf2 focus:border-owl focus:bg-surf2"
+          />
         )}
       </>
     );
@@ -1021,6 +1043,39 @@ export default function InventoryTabs({
     );
   }
 
+  function renderScanImages(item: InventoryRow) {
+    const scans = [
+      { label: "Front", url: item.custom_image_front_url },
+      { label: "Back", url: item.custom_image_back_url },
+    ].filter((scan): scan is { label: string; url: string } => Boolean(scan.url));
+
+    if (scans.length === 0) return null;
+
+    return (
+      <div className="mt-3 flex flex-wrap gap-3">
+        {scans.map((scan) => (
+          <a
+            key={scan.label}
+            href={scan.url}
+            target="_blank"
+            rel="noreferrer"
+            className="group block w-20 rounded-md border border-border bg-deep p-1 transition-colors hover:border-owl"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={scan.url}
+              alt={`${scan.label} scan`}
+              className="h-24 w-full rounded object-cover"
+            />
+            <div className="mt-1 text-center font-mono text-[10px] font-bold uppercase tracking-wider text-text-2 group-hover:text-owl">
+              {scan.label}
+            </div>
+          </a>
+        ))}
+      </div>
+    );
+  }
+
   function updateHoverPreview(event: MouseEvent, item: InventoryRow) {
     const imageUrl = cardImageUrl(item);
     if (!imageUrl) return;
@@ -1076,6 +1131,9 @@ export default function InventoryTabs({
                 {item.card.set_code && <span>{item.card.set_code}</span>}
                 {item.card.card_number && <span>{item.card.card_number}</span>}
                 {selectedGroup.rows.length === 1 && renderInventoryCardBadge(item)}
+                {selectedGroup.rows.length === 1 && item.certification_number && (
+                  <span>Cert {item.certification_number}</span>
+                )}
                 {item.pending_card_match && <span className="text-owl">Needs Card Match</span>}
               </div>
             </div>
@@ -1091,6 +1149,7 @@ export default function InventoryTabs({
           <div className="grid gap-6 p-5 lg:grid-cols-[260px_minmax(0,1fr)]">
             <div>
               {renderCardImage(item, "modal")}
+              {renderScanImages(item)}
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <div className="rounded-md border border-border bg-surface p-3">
                   <div className="font-mono text-xs uppercase tracking-wider text-text-2">Quantity</div>
@@ -1115,6 +1174,11 @@ export default function InventoryTabs({
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         {renderInventoryCardBadge(row)}
+                        {row.certification_number && (
+                          <span className="font-mono text-xs font-semibold text-owl">
+                            Cert {row.certification_number}
+                          </span>
+                        )}
                         <span className="font-mono text-xs text-text-2">{row.id}</span>
                       </div>
                     </div>
@@ -1180,6 +1244,8 @@ export default function InventoryTabs({
                       </SelectField>
                     </label>
                   </div>
+
+                  {renderScanImages(row)}
 
                   {(row.status === "ship" || row.status === "sold") && (
                     <div className="mt-3 grid gap-3 md:grid-cols-4">
@@ -1275,40 +1341,57 @@ export default function InventoryTabs({
 
   return (
     <div className="space-y-4">
-      <form
-        className="flex max-w-3xl flex-col gap-2 md:flex-row md:items-center"
-        onSubmit={(event) => {
-          event.preventDefault();
-          setSearchQuery(searchDraft);
-        }}
-      >
-        <input
-          value={searchDraft}
-          onChange={(event) => setSearchDraft(event.target.value)}
-          placeholder="Search inventory"
-          className="h-10 min-w-0 flex-1 rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus:border-owl"
-        />
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            className="h-10 rounded-md bg-owl px-4 font-mono text-xs font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
-          >
-            Search
-          </button>
-          {searchQuery && (
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <form
+          className="flex min-w-0 flex-1 flex-col gap-2 md:flex-row md:items-center xl:max-w-3xl"
+          onSubmit={(event) => {
+            event.preventDefault();
+            setSearchQuery(searchDraft);
+          }}
+        >
+          <input
+            value={searchDraft}
+            onChange={(event) => setSearchDraft(event.target.value)}
+            placeholder="Search inventory"
+            className="h-10 min-w-0 flex-1 rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus:border-owl"
+          />
+          <div className="flex gap-2">
             <button
-              type="button"
-              onClick={() => {
-                setSearchDraft("");
-                setSearchQuery("");
-              }}
-              className="h-10 rounded-md border border-border bg-surface px-3 font-mono text-xs font-bold uppercase tracking-wider text-text hover:border-border-2 hover:text-owl"
+              type="submit"
+              className="h-10 rounded-md bg-owl px-4 font-mono text-xs font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
             >
-              Clear
+              Search
             </button>
-          )}
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchDraft("");
+                  setSearchQuery("");
+                }}
+                className="h-10 rounded-md border border-border bg-surface px-3 font-mono text-xs font-bold uppercase tracking-wider text-text hover:border-border-2 hover:text-owl"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </form>
+
+        <div className="flex shrink-0 justify-start gap-2 xl:justify-end">
+          <a
+            href="/admin/inventory/import/psa"
+            className="h-10 rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl"
+          >
+            PSA Import
+          </a>
+          <a
+            href="/admin/inventory/new"
+            className="h-10 rounded-md bg-owl px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
+          >
+            Add Inventory
+          </a>
         </div>
-      </form>
+      </div>
 
       {searchQuery && (
         <div className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
@@ -1343,15 +1426,6 @@ export default function InventoryTabs({
             <span className="ml-2 text-text-2">{counts[tab.id]}</span>
           </button>
         ))}
-      </div>
-
-      <div className="flex justify-end">
-        <a
-          href="/admin/inventory/new"
-          className="rounded-md bg-owl px-5 py-2.5 font-mono text-sm font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
-        >
-          Add Inventory
-        </a>
       </div>
 
       {actionError && (
@@ -1435,6 +1509,9 @@ export default function InventoryTabs({
                             {item.card.card_number && <span>{item.card.card_number}</span>}
                             <span className="rounded bg-surf3 px-2 py-0.5 text-text">Qty {group.quantity}</span>
                             {group.rows.length === 1 && renderInventoryCardBadge(item)}
+                            {group.rows.length === 1 && item.certification_number && (
+                              <span>Cert {item.certification_number}</span>
+                            )}
                             {item.pending_card_match && (
                               <span className="rounded border border-owl/40 bg-owl/10 px-2 py-0.5 text-owl">
                                 NEEDS MATCH
@@ -1503,6 +1580,7 @@ export default function InventoryTabs({
                                 <div className="mt-1 flex items-center gap-2 font-mono text-xs text-text-2">
                                   <span>#{index + 1}</span>
                                   {renderInventoryCardBadge(child)}
+                                  {child.certification_number && <span>Cert {child.certification_number}</span>}
                                   <span className="truncate">{child.id}</span>
                                 </div>
                               </div>
@@ -1643,6 +1721,9 @@ export default function InventoryTabs({
                             {item.card.card_number && <span>{item.card.card_number}</span>}
                             <span className="rounded bg-surf3 px-2 py-0.5 text-text">GROUP</span>
                             {group.rows.length === 1 && renderInventoryCardBadge(item)}
+                            {group.rows.length === 1 && item.certification_number && (
+                              <span>Cert {item.certification_number}</span>
+                            )}
                             {item.pending_card_match && (
                               <span className="rounded border border-owl/40 bg-owl/10 px-2 py-0.5 text-owl">
                                 NEEDS MATCH
@@ -1761,6 +1842,11 @@ export default function InventoryTabs({
                                 </button>
                                 <div className="mt-1 flex flex-wrap items-center gap-2">
                                   {renderInventoryCardBadge(child)}
+                                  {child.certification_number && (
+                                    <span className="font-mono text-xs font-semibold text-owl">
+                                      Cert {child.certification_number}
+                                    </span>
+                                  )}
                                   <span className="truncate font-mono text-xs text-text-2">{child.id}</span>
                                 </div>
                               </div>

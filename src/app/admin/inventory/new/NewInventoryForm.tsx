@@ -2,10 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-
-type InventoryType = "raw" | "damaged" | "graded" | "sealed";
-type InventoryStatus = "new" | "grading" | "sale" | "ship" | "sold";
-type GradedRating = "TAG 10" | "PSA 10" | "PSA 9" | "BGS 10" | "BGS 9.5";
+import { GRADED_RATINGS, type GradedRating, type InventoryStatus, type InventoryType } from "@/lib/inventory-options";
 
 type CardSearchResult = {
   id: string;
@@ -32,8 +29,6 @@ const STATUSES: { value: InventoryStatus; label: string }[] = [
   { value: "sold", label: "Sold" },
 ];
 
-const GRADED_RATINGS: GradedRating[] = ["TAG 10", "PSA 10", "PSA 9", "BGS 10", "BGS 9.5"];
-
 function setCode(card: CardSearchResult) {
   const set = Array.isArray(card.sets) ? card.sets[0] : card.sets;
   return set?.code ?? null;
@@ -53,6 +48,9 @@ export default function NewInventoryForm() {
   const [nickname, setNickname] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [gradedRating, setGradedRating] = useState<GradedRating | "">("");
+  const [certificationNumber, setCertificationNumber] = useState("");
+  const [frontScan, setFrontScan] = useState<File | null>(null);
+  const [backScan, setBackScan] = useState<File | null>(null);
   const [costBasis, setCostBasis] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
@@ -92,23 +90,38 @@ export default function NewInventoryForm() {
     setSaving(true);
     setError(null);
 
-    const res = await fetch("/api/admin/inventory", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        card_id: selectedCard?.id ?? null,
-        manual_card_name: manualMode ? manualName : null,
-        manual_card_number: manualMode ? manualNumber : null,
-        manual_set_code: manualMode ? manualSet : null,
-        item_nickname: nickname,
-        inventory_type: condition,
-        status,
-        quantity,
-        graded_rating: condition === "graded" ? gradedRating || null : null,
-        cost_basis: costBasis || null,
-        notes,
-      }),
-    });
+    const payload = {
+      card_id: selectedCard?.id ?? "",
+      manual_card_name: manualMode ? manualName : "",
+      manual_card_number: manualMode ? manualNumber : "",
+      manual_set_code: manualMode ? manualSet : "",
+      item_nickname: nickname,
+      inventory_type: condition,
+      status,
+      quantity: String(quantity),
+      graded_rating: condition === "graded" ? gradedRating : "",
+      certification_number: condition === "graded" ? certificationNumber : "",
+      cost_basis: costBasis,
+      notes,
+    };
+
+    const hasScanUploads = condition === "graded" && (frontScan || backScan);
+    const res = hasScanUploads
+      ? await fetch("/api/admin/inventory", {
+          method: "POST",
+          body: (() => {
+            const formData = new FormData();
+            Object.entries(payload).forEach(([key, value]) => formData.append(key, value));
+            if (frontScan) formData.append("custom_image_front", frontScan);
+            if (backScan) formData.append("custom_image_back", backScan);
+            return formData;
+          })(),
+        })
+      : await fetch("/api/admin/inventory", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
 
     setSaving(false);
 
@@ -243,7 +256,16 @@ export default function NewInventoryForm() {
             <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Condition</span>
             <select
               value={condition}
-              onChange={(event) => setCondition(event.target.value as InventoryType)}
+              onChange={(event) => {
+                const nextCondition = event.target.value as InventoryType;
+                setCondition(nextCondition);
+                if (nextCondition !== "graded") {
+                  setGradedRating("");
+                  setCertificationNumber("");
+                  setFrontScan(null);
+                  setBackScan(null);
+                }
+              }}
               className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-3 text-text outline-none focus:border-owl"
             >
               {CONDITIONS.map((option) => (
@@ -265,21 +287,33 @@ export default function NewInventoryForm() {
           </label>
 
           {condition === "graded" && (
-            <label className="block">
-              <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Graded Rating</span>
-              <select
-                value={gradedRating}
-                onChange={(event) => setGradedRating(event.target.value as GradedRating | "")}
-                className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-3 text-text outline-none focus:border-owl"
-              >
-                <option value="">Select rating</option>
-                {GRADED_RATINGS.map((rating) => (
-                  <option key={rating} value={rating}>
-                    {rating}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="space-y-4">
+              <label className="block">
+                <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Graded Rating</span>
+                <select
+                  value={gradedRating}
+                  onChange={(event) => setGradedRating(event.target.value as GradedRating | "")}
+                  className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-3 text-text outline-none focus:border-owl"
+                >
+                  <option value="">Select rating</option>
+                  {GRADED_RATINGS.map((rating) => (
+                    <option key={rating} value={rating}>
+                      {rating}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Certification Number</span>
+                <input
+                  value={certificationNumber}
+                  onChange={(event) => setCertificationNumber(event.target.value)}
+                  placeholder="PSA cert number"
+                  className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-3 text-text outline-none focus:border-owl"
+                />
+              </label>
+            </div>
           )}
 
           <label className="block">
@@ -329,6 +363,34 @@ export default function NewInventoryForm() {
               className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-3 text-text outline-none focus:border-owl"
             />
           </label>
+
+          {condition === "graded" && (
+            <div className="rounded-lg border border-border bg-deep p-4">
+              <div className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
+                Scan Images
+              </div>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <label className="block">
+                  <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Front Scan</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={(event) => setFrontScan(event.target.files?.[0] ?? null)}
+                    className="mt-2 w-full rounded-md border border-border bg-surface px-3 py-2.5 text-sm text-text file:mr-3 file:rounded file:border-0 file:bg-owl file:px-3 file:py-2 file:font-mono file:text-xs file:font-bold file:uppercase file:text-void"
+                  />
+                </label>
+                <label className="block">
+                  <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Back Scan</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={(event) => setBackScan(event.target.files?.[0] ?? null)}
+                    className="mt-2 w-full rounded-md border border-border bg-surface px-3 py-2.5 text-sm text-text file:mr-3 file:rounded file:border-0 file:bg-owl file:px-3 file:py-2 file:font-mono file:text-xs file:font-bold file:uppercase file:text-void"
+                  />
+                </label>
+              </div>
+            </div>
+          )}
 
           {error && <div className="rounded-md border border-loss/30 bg-loss/10 p-3 text-sm text-text">{error}</div>}
 
