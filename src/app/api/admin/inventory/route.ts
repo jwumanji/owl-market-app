@@ -11,6 +11,7 @@ type InventorySource = {
   inventory_type: string;
   status: string;
   graded_rating: string | null;
+  customer_name: string | null;
   shipping_tracking: string | null;
   shipping_label_url: string | null;
   shipped_at: string | null;
@@ -105,7 +106,7 @@ export async function POST(request: Request) {
 
   const { data: source, error: sourceError } = await supabase
     .from("inventory_items")
-    .select("card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match, inventory_type, status, graded_rating, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price, acquired_at, cost_basis, notes")
+    .select("card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match, inventory_type, status, graded_rating, customer_name, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price, acquired_at, cost_basis, notes")
     .eq("id", sourceId)
     .single();
 
@@ -127,6 +128,7 @@ export async function POST(request: Request) {
       status: item.status,
       quantity: 1,
       graded_rating: item.graded_rating,
+      customer_name: item.customer_name,
       shipping_tracking: item.shipping_tracking,
       shipping_label_url: item.shipping_label_url,
       shipped_at: item.shipped_at,
@@ -137,7 +139,7 @@ export async function POST(request: Request) {
       cost_basis: item.cost_basis,
       notes: item.notes,
     })
-    .select("id, inventory_type, status, quantity, item_nickname, graded_rating, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price")
+    .select("id, inventory_type, status, quantity, item_nickname, graded_rating, customer_name, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price")
     .single();
 
   if (error) {

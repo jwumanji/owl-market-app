@@ -15,6 +15,7 @@ export interface InventoryRow {
   quantity: number;
   item_nickname?: string | null;
   graded_rating: GradedRating | null;
+  customer_name?: string | null;
   shipping_tracking?: string | null;
   shipping_label_url?: string | null;
   shipped_at?: string | null;
@@ -78,7 +79,7 @@ type InventoryGroup = {
 
 type CreatedInventoryItem = Pick<
   InventoryRow,
-  "id" | "inventory_type" | "status" | "quantity" | "item_nickname" | "graded_rating" | "shipping_tracking" | "shipped_at"
+  "id" | "inventory_type" | "status" | "quantity" | "item_nickname" | "graded_rating" | "customer_name" | "shipping_tracking" | "shipped_at"
   | "shipping_label_url" | "sale_channel" | "sold_date" | "sold_price"
 >;
 
@@ -193,8 +194,10 @@ export default function InventoryTabs({
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]["id"]>("all");
   const [rows, setRows] = useState(items);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [customerNameDrafts, setCustomerNameDrafts] = useState<Record<string, string>>({});
   const [trackingDrafts, setTrackingDrafts] = useState<Record<string, string>>({});
   const [shippingLabelDrafts, setShippingLabelDrafts] = useState<Record<string, string>>({});
+  const [editingShippingLabelIds, setEditingShippingLabelIds] = useState<Record<string, boolean>>({});
   const [confirmingShippedIds, setConfirmingShippedIds] = useState<Record<string, boolean>>({});
   const [addingGroups, setAddingGroups] = useState<Record<string, boolean>>({});
   const [deletingItemIds, setDeletingItemIds] = useState<Record<string, boolean>>({});
@@ -230,6 +233,7 @@ export default function InventoryTabs({
         item.status,
         item.graded_rating,
         item.sale_channel,
+        item.customer_name,
         item.shipping_tracking,
         item.shipping_label_url,
         item.notes,
@@ -289,7 +293,7 @@ export default function InventoryTabs({
 
   async function updateItem(
     id: string,
-    updates: Partial<Pick<InventoryRow, "status" | "graded_rating" | "inventory_type" | "item_nickname" | "shipping_tracking" | "shipping_label_url" | "shipped_at" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "notes">>
+    updates: Partial<Pick<InventoryRow, "status" | "graded_rating" | "inventory_type" | "item_nickname" | "customer_name" | "shipping_tracking" | "shipping_label_url" | "shipped_at" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "notes">>
   ) {
     setRows((current) =>
       current.map((item) => (item.id === id ? { ...item, ...updates } : item))
@@ -320,6 +324,7 @@ export default function InventoryTabs({
       id: tempId,
       quantity: 1,
       item_nickname: source.item_nickname ?? null,
+      customer_name: source.customer_name ?? null,
       shipping_tracking: null,
       shipping_label_url: null,
       shipped_at: null,
@@ -361,6 +366,7 @@ export default function InventoryTabs({
                 quantity: created.quantity,
                 item_nickname: created.item_nickname ?? null,
                 graded_rating: created.graded_rating,
+                customer_name: created.customer_name ?? null,
                 shipping_tracking: created.shipping_tracking ?? null,
                 shipping_label_url: created.shipping_label_url ?? null,
                 shipped_at: created.shipped_at ?? null,
@@ -618,23 +624,52 @@ export default function InventoryTabs({
     const savedLabel = item.shipping_label_url?.trim() ?? "";
     const draftValue = shippingLabelDrafts[item.id] ?? savedLabel;
     const href = urlHref(savedLabel);
+    const isEditing = editingShippingLabelIds[item.id] ?? !savedLabel;
+
+    if (!isEditing && href) {
+      return (
+        <div className="flex items-center gap-2">
+          <a
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex rounded-md border border-blue bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-blue transition-colors hover:bg-blue/15"
+          >
+            Print Shipping
+          </a>
+          <button
+            type="button"
+            title="Edit shipping label"
+            aria-label="Edit shipping label"
+            onClick={() => {
+              setShippingLabelDrafts((current) => ({ ...current, [item.id]: savedLabel }));
+              setEditingShippingLabelIds((current) => ({ ...current, [item.id]: true }));
+            }}
+            className="flex h-9 w-9 items-center justify-center rounded-md border border-border-2 bg-surface text-text-2 transition-colors hover:border-blue hover:text-blue"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+              <path
+                d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2.4"
+              />
+              <path
+                d="m14 8 2 2"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2.4"
+              />
+            </svg>
+          </button>
+        </div>
+      );
+    }
 
     return (
       <div className="space-y-2">
-        {savedLabel && (
-          href ? (
-            <a
-              href={href}
-              target="_blank"
-              rel="noreferrer"
-              className="block truncate font-mono text-sm font-semibold text-owl underline-offset-2 hover:underline"
-            >
-              {savedLabel}
-            </a>
-          ) : (
-            <div className="truncate font-mono text-sm text-text">{savedLabel}</div>
-          )
-        )}
         <input
           value={draftValue}
           onChange={(event) =>
@@ -646,13 +681,67 @@ export default function InventoryTabs({
           placeholder="Paste ship label URL or note"
           className="w-full rounded-md border border-border bg-surface px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-owl"
         />
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={draftValue.trim() === savedLabel}
+            onClick={() => {
+              updateItem(item.id, { shipping_label_url: draftValue.trim() || null });
+              setEditingShippingLabelIds((current) => {
+                const next = { ...current };
+                delete next[item.id];
+                return next;
+              });
+            }}
+            className="rounded-md border border-owl bg-owl/10 px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-owl disabled:cursor-not-allowed disabled:border-border disabled:bg-surface disabled:text-text-3"
+          >
+            Confirm Change
+          </button>
+          {savedLabel && (
+            <button
+              type="button"
+              onClick={() => {
+                setShippingLabelDrafts((current) => ({ ...current, [item.id]: savedLabel }));
+                setEditingShippingLabelIds((current) => {
+                  const next = { ...current };
+                  delete next[item.id];
+                  return next;
+                });
+              }}
+              className="rounded-md border border-border-2 bg-surface px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-text-2 hover:text-text"
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function renderCustomerNameCell(item: InventoryRow) {
+    const savedName = item.customer_name?.trim() ?? "";
+    const draftValue = customerNameDrafts[item.id] ?? savedName;
+
+    return (
+      <div className="space-y-2">
+        <input
+          value={draftValue}
+          onChange={(event) =>
+            setCustomerNameDrafts((current) => ({
+              ...current,
+              [item.id]: event.target.value,
+            }))
+          }
+          placeholder="Customer name"
+          className="w-full rounded-md border border-border bg-surface px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-owl"
+        />
         <button
           type="button"
-          disabled={draftValue.trim() === savedLabel}
-          onClick={() => updateItem(item.id, { shipping_label_url: draftValue.trim() || null })}
+          disabled={draftValue.trim() === savedName}
+          onClick={() => updateItem(item.id, { customer_name: draftValue.trim() || null })}
           className="rounded-md border border-owl bg-owl/10 px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-owl disabled:cursor-not-allowed disabled:border-border disabled:bg-surface disabled:text-text-3"
         >
-          Save Label
+          Save Name
         </button>
       </div>
     );
@@ -671,7 +760,7 @@ export default function InventoryTabs({
             <button
               type="button"
               onClick={() => markItemShipped(item)}
-              className="rounded-md border border-gain bg-gain/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-gain hover:bg-gain/15"
+              className="rounded-md border border-blue bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-blue hover:bg-blue/15"
             >
               Confirm
             </button>
@@ -697,7 +786,7 @@ export default function InventoryTabs({
       <button
         type="button"
         onClick={() => setConfirmingShippedIds((current) => ({ ...current, [item.id]: true }))}
-        className="rounded-md border border-gain bg-gain/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-gain hover:bg-gain/15"
+        className="rounded-md border border-blue bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-blue hover:bg-blue/15"
       >
         Mark Shipped
       </button>
@@ -936,13 +1025,15 @@ export default function InventoryTabs({
                   </div>
 
                   {(row.status === "ship" || row.status === "sold") && (
-                    <div className="mt-3 grid gap-3 md:grid-cols-3">
+                    <div className="mt-3 grid gap-3 md:grid-cols-4">
+                      {row.status === "ship" && (
+                        <label className="block">
+                          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Customer Name</span>
+                          <div className="mt-2">{renderCustomerNameCell(row)}</div>
+                        </label>
+                      )}
                       <label className="block">
-                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Tracking</span>
-                        <div className="mt-2">{renderTrackingCell(row)}</div>
-                      </label>
-                      <label className="block">
-                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Print Ship Label</span>
+                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Ship Label</span>
                         <div className="mt-2">{renderShippingLabelCell(row)}</div>
                       </label>
                       {row.status === "ship" && (
@@ -951,6 +1042,10 @@ export default function InventoryTabs({
                           <div className="mt-2">{renderShippedCell(row)}</div>
                         </label>
                       )}
+                      <label className="block">
+                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Tracking</span>
+                        <div className="mt-2">{renderTrackingCell(row)}</div>
+                      </label>
                     </div>
                   )}
 
@@ -1108,16 +1203,208 @@ export default function InventoryTabs({
         </div>
       )}
 
+      {statusFilter === "ship" ? (
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
-        <table className="w-full min-w-[1760px] table-fixed">
+        <table className="w-full min-w-[1180px] table-fixed">
+          <colgroup>
+            <col className="w-[58px]" />
+            <col className="w-[390px]" />
+            <col className="w-[220px]" />
+            <col className="w-[250px]" />
+            <col className="w-[160px]" />
+            <col className="w-[300px]" />
+          </colgroup>
+          <thead>
+            <tr className="border-b border-border bg-surf2 text-left font-mono text-xs font-semibold uppercase tracking-wider text-text">
+              <th className="px-3 py-3.5" />
+              <th className="px-3 py-3.5">Card</th>
+              <th className="px-3 py-3.5">Customer Name</th>
+              <th className="px-3 py-3.5">Ship Label</th>
+              <th className="px-3 py-3.5">Shipped</th>
+              <th className="px-3 py-3.5">Tracking</th>
+            </tr>
+          </thead>
+          <tbody>
+            {groups.map((group) => {
+              const item = group.first;
+              const hasNestedRows = group.rows.length > 1;
+              const isOpen = hasNestedRows && (openGroups[group.key] ?? true);
+              const isAdding = addingGroups[group.key] ?? false;
+
+              return (
+                <Fragment key={group.key}>
+                  <tr className="border-b border-border hover:bg-surf2/70">
+                    <td className="px-3 py-4">
+                      {hasNestedRows && (
+                        <button
+                          type="button"
+                          aria-label={isOpen ? "Collapse group" : "Expand group"}
+                          onClick={() =>
+                            setOpenGroups((current) => ({
+                              ...current,
+                              [group.key]: !isOpen,
+                            }))
+                          }
+                          className={`flex h-9 w-9 items-center justify-center rounded-md border transition-colors ${
+                            isOpen
+                              ? "border-owl bg-owl/15 text-owl"
+                              : "border-border-2 bg-deep text-text hover:border-owl hover:text-owl"
+                          }`}
+                        >
+                          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+                            <path
+                              d={isOpen ? "m7 15 5-5 5 5" : "m9 6 6 6-6 6"}
+                              stroke="currentColor"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="3"
+                            />
+                          </svg>
+                        </button>
+                      )}
+                    </td>
+                    <td className="min-w-0 px-3 py-4">
+                      <div className="flex min-w-0 items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedGroupKey(group.key)}
+                            className="block max-w-full truncate text-left text-base font-bold text-text underline-offset-2 hover:text-owl hover:underline"
+                          >
+                            {renderCardTitle(item)}
+                          </button>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2 font-mono text-xs font-medium text-text-2">
+                            {item.card.set_code && <span>{item.card.set_code}</span>}
+                            {item.card.card_number && <span>{item.card.card_number}</span>}
+                            <span className="rounded bg-surf3 px-2 py-0.5 text-text">Qty {group.quantity}</span>
+                            {item.pending_card_match && (
+                              <span className="rounded border border-owl/40 bg-owl/10 px-2 py-0.5 text-owl">
+                                NEEDS MATCH
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <button
+                            type="button"
+                            title="Add individual item"
+                            aria-label={`Add individual item for ${item.card.name ?? "this card"}`}
+                            disabled={isAdding}
+                            onClick={() => addIndividualItem(group)}
+                            className="flex h-8 w-8 items-center justify-center rounded-md border border-gain bg-[rgba(0,214,143,0.10)] font-mono text-lg font-bold leading-none text-gain transition-colors hover:bg-[rgba(0,214,143,0.16)] disabled:cursor-wait disabled:opacity-60"
+                          >
+                            +
+                          </button>
+                          {!hasNestedRows && renderDeleteControls(item)}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-4 font-mono text-sm">
+                      {group.rows.length === 1 ? (
+                        renderCustomerNameCell(group.rows[0])
+                      ) : (
+                        <span className={group.rows.some((row) => row.customer_name) ? "font-semibold text-text" : "text-text-2"}>
+                          {sameValue(group.rows.map((row) => row.customer_name ?? "")) || "Mixed"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-4 font-mono text-sm">
+                      {group.rows.length === 1 ? (
+                        renderShippingLabelCell(group.rows[0])
+                      ) : (
+                        <span className={group.rows.some((row) => row.shipping_label_url) ? "font-semibold text-owl" : "text-text-2"}>
+                          {group.rows.some((row) => row.shipping_label_url) ? "Label saved" : "No label"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-4 font-mono text-sm">
+                      {group.rows.length === 1 ? renderShippedCell(group.rows[0]) : "Open group"}
+                    </td>
+                    <td className="px-3 py-4 font-mono text-sm">
+                      {group.rows.length === 1 ? (
+                        renderTrackingCell(group.rows[0])
+                      ) : (
+                        <span className={group.rows.some((row) => row.shipping_tracking) ? "font-semibold text-gain" : "text-text-2"}>
+                          {group.rows.some((row) => row.shipping_tracking) ? "Tracking saved" : "No tracking"}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+
+                  {isOpen && (
+                    <>
+                      {group.rows.map((child, index) => (
+                        <tr
+                          key={child.id}
+                          className="border-b border-[rgba(79,142,247,0.16)] bg-[rgba(79,142,247,0.075)] shadow-[inset_3px_0_0_rgba(79,142,247,0.45)] transition-colors hover:bg-[rgba(79,142,247,0.11)]"
+                        >
+                          <td className="px-3 py-3.5" />
+                          <td className="px-3 py-3.5">
+                            <div className="flex min-w-0 items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedGroupKey(group.key)}
+                                  className="block max-w-full truncate text-left text-base font-semibold text-text underline-offset-2 hover:text-owl hover:underline"
+                                >
+                                  {renderCardTitle(child, "text-base font-semibold text-text")}
+                                </button>
+                                <div className="mt-1 flex items-center gap-2 font-mono text-xs text-text-2">
+                                  <span>#{index + 1}</span>
+                                  <span className="truncate">{child.id}</span>
+                                </div>
+                              </div>
+                              {renderDeleteControls(child)}
+                            </div>
+                          </td>
+                          <td className="px-3 py-3.5">{renderCustomerNameCell(child)}</td>
+                          <td className="px-3 py-3.5">{renderShippingLabelCell(child)}</td>
+                          <td className="px-3 py-3.5">{renderShippedCell(child)}</td>
+                          <td className="px-3 py-3.5">{renderTrackingCell(child)}</td>
+                        </tr>
+                      ))}
+                      <tr className="border-b border-[rgba(79,142,247,0.16)] bg-[rgba(79,142,247,0.045)] shadow-[inset_3px_0_0_rgba(79,142,247,0.32)] last:border-b-0">
+                        <td className="px-3 py-3.5" />
+                        <td colSpan={5} className="px-3 py-3.5">
+                          <button
+                            type="button"
+                            disabled={isAdding}
+                            onClick={() => addIndividualItem(group)}
+                            className="inline-flex items-center gap-2 rounded-md border border-gain bg-[rgba(0,214,143,0.10)] px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-gain transition-colors hover:bg-[rgba(0,214,143,0.16)] disabled:cursor-wait disabled:opacity-60"
+                          >
+                            <span className="text-base leading-none">+</span>
+                            Add individual item
+                          </button>
+                        </td>
+                      </tr>
+                    </>
+                  )}
+                </Fragment>
+              );
+            })}
+
+            {groups.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-3 py-12 text-center text-base text-text-2">
+                  No inventory items need shipping yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      ) : (
+      <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+        <table className="w-full min-w-[1980px] table-fixed">
           <colgroup>
             <col className="w-[58px]" />
             <col className="w-[132px]" />
             <col className="w-[330px]" />
             <col className="w-[105px]" />
-            {showTracking && <col className="w-[300px]" />}
+            {showShippingActions && <col className="w-[230px]" />}
             {showShippingActions && <col className="w-[280px]" />}
             {showShippingActions && <col className="w-[180px]" />}
+            {showTracking && <col className="w-[300px]" />}
             {showSaleFields && <col className="w-[185px]" />}
             {showSaleFields && <col className="w-[160px]" />}
             {showSaleFields && <col className="w-[145px]" />}
@@ -1130,9 +1417,10 @@ export default function InventoryTabs({
               <th className="px-4 py-3.5">Image</th>
               <th className="px-3 py-3.5">Card Name</th>
               <th className="px-3 py-3.5 text-right">Quantity</th>
-              {showTracking && <th className="px-3 py-3.5">Tracking</th>}
-              {showShippingActions && <th className="px-3 py-3.5">Print Ship Label</th>}
+              {showShippingActions && <th className="px-3 py-3.5">Customer Name</th>}
+              {showShippingActions && <th className="px-3 py-3.5">Ship Label</th>}
               {showShippingActions && <th className="px-3 py-3.5">Shipped</th>}
+              {showTracking && <th className="px-3 py-3.5">Tracking</th>}
               {showSaleFields && <th className="px-3 py-3.5">Sold At</th>}
               {showSaleFields && <th className="px-3 py-3.5">Sold Date</th>}
               {showSaleFields && <th className="px-3 py-3.5">Sold Price</th>}
@@ -1228,13 +1516,13 @@ export default function InventoryTabs({
                       </div>
                     </td>
                     <td className="px-3 py-4 text-right font-mono text-base font-semibold text-text">{group.quantity}</td>
-                    {showTracking && (
+                    {showShippingActions && (
                       <td className="px-3 py-4 font-mono text-sm">
                         {group.rows.length === 1 ? (
-                          renderTrackingCell(group.rows[0])
+                          renderCustomerNameCell(group.rows[0])
                         ) : (
-                          <span className={group.rows.some((row) => row.shipping_tracking) ? "font-semibold text-gain" : "text-text-2"}>
-                            {group.rows.some((row) => row.shipping_tracking) ? "Tracking saved" : "No tracking"}
+                          <span className={group.rows.some((row) => row.customer_name) ? "font-semibold text-text" : "text-text-2"}>
+                            {sameValue(group.rows.map((row) => row.customer_name ?? "")) || "Mixed"}
                           </span>
                         )}
                       </td>
@@ -1253,6 +1541,17 @@ export default function InventoryTabs({
                     {showShippingActions && (
                       <td className="px-3 py-4 font-mono text-sm">
                         {group.rows.length === 1 ? renderShippedCell(group.rows[0]) : "Open group"}
+                      </td>
+                    )}
+                    {showTracking && (
+                      <td className="px-3 py-4 font-mono text-sm">
+                        {group.rows.length === 1 ? (
+                          renderTrackingCell(group.rows[0])
+                        ) : (
+                          <span className={group.rows.some((row) => row.shipping_tracking) ? "font-semibold text-gain" : "text-text-2"}>
+                            {group.rows.some((row) => row.shipping_tracking) ? "Tracking saved" : "No tracking"}
+                          </span>
+                        )}
                       </td>
                     )}
                     {showSaleFields && group.rows.length === 1 && renderSaleFields(group.rows[0])}
@@ -1326,9 +1625,9 @@ export default function InventoryTabs({
                             </div>
                           </td>
                           <td className="px-3 py-3.5 text-right font-mono text-base font-semibold text-text">{child.quantity}</td>
-                          {showTracking && (
+                          {showShippingActions && (
                             <td className="px-3 py-3.5">
-                              {renderTrackingCell(child)}
+                              {renderCustomerNameCell(child)}
                             </td>
                           )}
                           {showShippingActions && (
@@ -1339,6 +1638,11 @@ export default function InventoryTabs({
                           {showShippingActions && (
                             <td className="px-3 py-3.5">
                               {renderShippedCell(child)}
+                            </td>
+                          )}
+                          {showTracking && (
+                            <td className="px-3 py-3.5">
+                              {renderTrackingCell(child)}
                             </td>
                           )}
                           {showSaleFields && renderSaleFields(child)}
@@ -1352,7 +1656,7 @@ export default function InventoryTabs({
                       ))}
                       <tr className="border-b border-[rgba(79,142,247,0.16)] bg-[rgba(79,142,247,0.045)] shadow-[inset_3px_0_0_rgba(79,142,247,0.32)] last:border-b-0">
                         <td className="px-3 py-3.5" />
-                        <td colSpan={(showTracking ? 6 : 5) + (showShippingActions ? 2 : 0) + (showSaleFields ? 3 : 0)} className="px-3 py-3.5">
+                        <td colSpan={(showTracking ? 6 : 5) + (showShippingActions ? 3 : 0) + (showSaleFields ? 3 : 0)} className="px-3 py-3.5">
                           <button
                             type="button"
                             disabled={isAdding}
@@ -1372,7 +1676,7 @@ export default function InventoryTabs({
 
             {groups.length === 0 && (
               <tr>
-                <td colSpan={(showTracking ? 7 : 6) + (showShippingActions ? 2 : 0) + (showSaleFields ? 3 : 0)} className="px-3 py-12 text-center text-base text-text-2">
+                <td colSpan={(showTracking ? 7 : 6) + (showShippingActions ? 3 : 0) + (showSaleFields ? 3 : 0)} className="px-3 py-12 text-center text-base text-text-2">
                   No inventory items in this view yet.
                 </td>
               </tr>
@@ -1380,6 +1684,7 @@ export default function InventoryTabs({
           </tbody>
         </table>
       </div>
+      )}
       {renderHoverPreview()}
       {renderInventoryDetailModal()}
     </div>

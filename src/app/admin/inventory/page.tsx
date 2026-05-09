@@ -20,6 +20,7 @@ type InventoryQueryRow = {
   status: "new" | "grading" | "sale" | "ship" | "sold";
   quantity: number;
   graded_rating: "TAG 10" | "PSA 10" | "PSA 9" | "BGS 10" | "BGS 9.5" | null;
+  customer_name: string | null;
   shipping_tracking: string | null;
   shipping_label_url: string | null;
   shipped_at: string | null;
@@ -51,6 +52,7 @@ function toInventoryRow(row: InventoryQueryRow, cardMap: Map<string, CardLookupR
     quantity: row.quantity,
     item_nickname: row.item_nickname,
     graded_rating: row.graded_rating,
+    customer_name: row.customer_name,
     shipping_tracking: row.shipping_tracking,
     shipping_label_url: row.shipping_label_url,
     shipped_at: row.shipped_at,
@@ -86,7 +88,7 @@ export default async function AdminInventoryPage() {
         .from("inventory_items")
         .select(`
           id, card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match,
-          inventory_type, status, quantity, graded_rating, shipping_tracking, shipping_label_url, shipped_at,
+          inventory_type, status, quantity, graded_rating, customer_name, shipping_tracking, shipping_label_url, shipped_at,
           sale_channel, sold_date, sold_price, acquired_at, cost_basis, notes
         `)
         .order("created_at", { ascending: false })

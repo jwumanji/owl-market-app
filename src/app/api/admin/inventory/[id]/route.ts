@@ -54,6 +54,13 @@ export async function PATCH(
     updates.shipping_tracking = tracking;
   }
 
+  if ("customer_name" in body) {
+    if (body.customer_name !== null && typeof body.customer_name !== "string") {
+      return NextResponse.json({ error: "Invalid customer name" }, { status: 400 });
+    }
+    updates.customer_name = body.customer_name?.trim() || null;
+  }
+
   if ("shipping_label_url" in body) {
     if (body.shipping_label_url !== null && typeof body.shipping_label_url !== "string") {
       return NextResponse.json({ error: "Invalid shipping label" }, { status: 400 });
