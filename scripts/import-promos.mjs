@@ -86,11 +86,17 @@ const SEGMENT_RULES = [
   [/Anniversary Set\)/i, "Anniversary Set"],
   [/Premium Card Collection/i, "Premium Card Collection"],
   [/Championship 20\d\d/i, "Championship Prize"],
+  // Year-pair format: "Championship 25-26 Regionals", "Championship 24-25"
+  [/Championship \d{2}-\d{2}/i, "Championship Prize"],
   [/(Online|Offline) Regional/i, "Regional Prize"],
+  // Bare "Regional Champion Card Set …" without Online/Offline prefix
+  [/Regional Champion Card Set/i, "Regional Prize"],
   [/Treasure Cup/i, "Championship Prize"],
   [/Pirates League/i, "Championship Prize"],
   [/Store Championship/i, "Store Championship"],
   [/Store \d-on-\d Battle/i, "Store Event"],
+  // Generic N-on-N events (e.g. "3-on-3 Cup")
+  [/\d-on-\d Cup/i, "Store Event"],
   [/Sealed Battle/i, "Sealed Battle Kit"],
   [/Tournament Pack/i, "Tournament Pack"],
   [/Event Pack/i, "Event Pack"],
@@ -108,13 +114,24 @@ const SEGMENT_RULES = [
   [/Beginners Deck Party/i, "Beginners Deck Party"],
   [/CS \d/i, "CS Pack"],
   [/Convention Promo|Anime Expo|Gen Con/i, "Convention Promo"],
+  // BANDAI Card Games Fest is a recurring convention-style event
+  [/BANDAI Card Games Fest|Bandai.*Card.*Fest/i, "Convention Promo"],
   [/PSA Magazine/i, "Magazine Promo"],
-  [/2nd Anniversary Tournament|Pre-Release Tournament/i, "Tournament Prize"],
+  // Anniversary tournaments — generalized from the original 2nd-only rule
+  [/\d(?:st|nd|rd|th) Anniversary Tournament|Pre-Release Tournament/i, "Tournament Prize"],
+  // Anniversary stamped/event promos that aren't part of an Anniversary Set
+  [/Anniversary Stamped|Anniversary Promo/i, "Anniversary Promo"],
   [/Release Event/i, "Release Event"],
   [/New Year Event/i, "Special Event"],
   [/One Piece Film Red|Live Action|FILM RED/i, "Movie Tie-in"],
   [/Dodgers x|BVB x|x ONE PIECE|x One Piece/i, "Crossover Promo"],
   [/Demo Deck/i, "Demo Deck"],
+  // Order matters: "Deck Battle Promo" must come before generic "Demo Deck"
+  // (handled above) and before "Starter Deck" which itself isn't a promo.
+  [/Starter Deck \d+:.*Deck Battle/i, "Deck Battle Promo"],
+  [/Seven Warlords.*Binder Set/i, "Binder Set"],
+  [/Retail Promo/i, "Retail Promo"],
+  // Brackets included via the haystack builder below ([Serial Number])
   [/Serial Number|Jumbo/i, "Special Edition"],
   [/Alternate Art/i, "Alt Art Promo"],
   [/Learn Together Deck Set/i, "Learn Together"],
@@ -123,15 +140,20 @@ const SEGMENT_RULES = [
 
 function classifySegment(cardName) {
   if (!cardName) return "Other";
-  // Look at parentheticals only — the rest is the card name proper.
-  const parens = cardName.match(/\(([^)]+)\)/g) ?? [];
-  if (parens.length === 0) return "Other";
-  const haystack = parens.join(" ");
+  // Pull both () and [] groups — TCGPlayer-derived names sometimes use square
+  // brackets ("[Serial Number]", "[Winner]", "[Participant]") that the
+  // earlier paren-only regex silently ignored.
+  const groups = cardName.match(/[(\[]([^)\]]+)[)\]]/g) ?? [];
+  if (groups.length === 0) return "Other";
+  const haystack = groups.join(" ");
   for (const [re, label] of SEGMENT_RULES) {
     if (re.test(haystack)) return label;
   }
   return "Other";
 }
+
+// Re-export so a re-classify script can pull the same logic without forking.
+export { classifySegment, SEGMENT_RULES };
 
 function segmentSlug(segment) {
   return segment.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -384,7 +406,15 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Only run the import when invoked directly. Other scripts may import the
+// classifier (`classifySegment`) without triggering a full promo fetch.
+import { fileURLToPath } from "node:url";
+import { resolve as resolvePath } from "node:path";
+const isEntryPoint =
+  process.argv[1] && resolvePath(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isEntryPoint) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
