@@ -200,13 +200,22 @@ export function classifyRarity(
 // extractVariantLabel — detect promo variant from card name suffix
 // ---------------------------------------------------------------------------
 
+// Order matters: most specific first. "Super Alternate Art" must come before
+// "Alternate Art" so the broader pattern doesn't swallow the specific one.
 const VARIANT_PATTERNS: [RegExp, string][] = [
-  [/\(Parallel\)/i,        "Parallel"],
-  [/\(Best Selection\)/i,  "Alt Art"],
-  [/\(Anniversary\)/i,     "Anniversary"],
-  [/\(Pre-Release\)/i,     "Pre-Release"],
-  [/\(Film Red\)/i,        "Alt Art"],
-  [/\(ONE PIECE DAY\)/i,   "Alt Art"],
+  [/\(Super Alternate Art\)/i, "Alt Art"],
+  [/\(Red Super Alternate Art\)/i, "Alt Art"],
+  [/\(Alternate Art\)/i,    "Alt Art"],
+  [/\(Manga\)/i,            "Manga"],
+  [/\(SP\)/i,               "SP"],
+  [/\(TR\)/i,               "TR"],
+  [/\(Wanted Poster\)/i,    "Wanted Poster"],
+  [/\(Parallel\)/i,         "Parallel"],
+  [/\(Best Selection\)/i,   "Alt Art"],
+  [/\(Anniversary\)/i,      "Anniversary"],
+  [/\(Pre-Release\)/i,      "Pre-Release"],
+  [/\(Film Red\)/i,         "Alt Art"],
+  [/\(ONE PIECE DAY\)/i,    "Alt Art"],
 ];
 
 /**
