@@ -18,7 +18,51 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const updates: Record<string, string | number | null> = {};
+  const updates: Record<string, string | number | boolean | null> = {};
+
+  if ("card_id" in body) {
+    if (body.card_id !== null && typeof body.card_id !== "string") {
+      return NextResponse.json({ error: "Invalid card match" }, { status: 400 });
+    }
+
+    const cardId = body.card_id?.trim() || null;
+    updates.card_id = cardId;
+
+    if (cardId) {
+      updates.manual_card_name = null;
+      updates.manual_card_number = null;
+      updates.manual_set_code = null;
+      updates.pending_card_match = false;
+    }
+  }
+
+  if ("manual_card_name" in body) {
+    if (body.manual_card_name !== null && typeof body.manual_card_name !== "string") {
+      return NextResponse.json({ error: "Invalid manual card name" }, { status: 400 });
+    }
+    updates.manual_card_name = body.manual_card_name?.trim() || null;
+  }
+
+  if ("manual_card_number" in body) {
+    if (body.manual_card_number !== null && typeof body.manual_card_number !== "string") {
+      return NextResponse.json({ error: "Invalid manual card number" }, { status: 400 });
+    }
+    updates.manual_card_number = body.manual_card_number?.trim() || null;
+  }
+
+  if ("manual_set_code" in body) {
+    if (body.manual_set_code !== null && typeof body.manual_set_code !== "string") {
+      return NextResponse.json({ error: "Invalid manual set code" }, { status: 400 });
+    }
+    updates.manual_set_code = body.manual_set_code?.trim() || null;
+  }
+
+  if ("pending_card_match" in body) {
+    if (typeof body.pending_card_match !== "boolean") {
+      return NextResponse.json({ error: "Invalid match review state" }, { status: 400 });
+    }
+    updates.pending_card_match = body.pending_card_match;
+  }
 
   if ("status" in body) {
     if (typeof body.status !== "string" || !STATUSES.has(body.status)) {
@@ -170,7 +214,7 @@ export async function PATCH(
     .from("inventory_items")
     .update(updates)
     .eq("id", params.id)
-    .select("id, status, graded_rating, certification_number, custom_image_front_url, custom_image_back_url")
+    .select("id, card_id, manual_card_name, manual_card_number, manual_set_code, pending_card_match, status, graded_rating, certification_number, custom_image_front_url, custom_image_back_url")
     .single();
 
   if (error) {

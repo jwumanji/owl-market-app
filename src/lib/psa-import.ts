@@ -9,6 +9,7 @@ export type PsaImportRow = {
   gradedRating: GradedRating | null;
   frontImageUrl: string | null;
   backImageUrl: string | null;
+  imageArchiveUrl: string | null;
   description: string | null;
   notes: string | null;
   sourceIndex: number;
@@ -39,11 +40,15 @@ const HEADER_ALIASES = {
     "grade",
     "numericgrade",
     "cardgrade",
+    "cardgradedescription",
     "finalgrade",
     "psagrade",
+    "psagradedescription",
     "gradedescription",
+    "gradedesc",
     "gradegrade",
     "itemgrade",
+    "itemgradedescription",
     "gradevalue",
   ],
   frontImageUrl: [
@@ -73,6 +78,20 @@ const HEADER_ALIASES = {
     "imagebackurl",
     "image2",
     "image2url",
+  ],
+  imageArchiveUrl: [
+    "images",
+    "image",
+    "imagesurl",
+    "imageurl",
+    "imagezip",
+    "imagezipurl",
+    "imageszip",
+    "imageszipurl",
+    "imagearchive",
+    "imagearchiveurl",
+    "collectorsimages",
+    "collectorsimagesurl",
   ],
   description: ["description", "itemdescription", "carddescription", "psadescription"],
   notes: ["notes", "note", "comments", "comment"],
@@ -134,6 +153,10 @@ function cleanUrl(value: string | null | undefined) {
   const trimmed = value?.trim();
   if (!trimmed || !/^https?:\/\//i.test(trimmed)) return null;
   return trimmed;
+}
+
+function cleanCertDigits(value: string | null | undefined) {
+  return cleanCertNumber(value)?.replace(/\D/g, "") || null;
 }
 
 function cleanCell(value: string | undefined) {
@@ -204,11 +227,84 @@ export function normalizePsaGrade(value: string | null | undefined): GradedRatin
     return "PSA Authentic";
   }
 
+  const isBareGrade = /^(10|[1-9](?:\.5)?)$/.test(raw);
+  const hasGradeWords = /\b(?:psa|gem|mint|mt|nm|excellent|ex|very good|vg|good|gd|fair|fr|poor|pr)\b/i.test(raw);
+  if (!isBareGrade && !hasGradeWords) return null;
+
   const numericMatch = raw.match(/\b(10|[1-9](?:\.5)?)\b/);
   if (!numericMatch) return null;
 
   const rating = `PSA ${numericMatch[1]}`.replace(".0", "");
   return GRADED_RATING_SET.has(rating) ? (rating as GradedRating) : null;
+}
+
+export function psaCertImageUrl(certificationNumber: string | null | undefined, side: "front" | "back") {
+  const cert = cleanCertDigits(certificationNumber);
+  if (!cert) return null;
+  return `https://cert-images.psa.com/${cert}/large/${cert}_${side === "front" ? "f" : "b"}.jpg`;
+}
+
+function decodeHtmlEntities(value: string) {
+  return value
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">");
+}
+
+function textFromHtml(html: string) {
+  return decodeHtmlEntities(html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function imageFromHtml(html: string, certificationNumber: string, side: "front" | "back") {
+  const suffix = side === "front" ? "f" : "b";
+  const escapedCert = certificationNumber.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const imageMatch = html.match(new RegExp(`https?:[^"')\\s]+${escapedCert}[_-]${suffix}\\.(?:jpg|jpeg|png|webp)`, "i"));
+  return cleanUrl(imageMatch?.[0]) ?? psaCertImageUrl(certificationNumber, side);
+}
+
+export async function lookupPsaCertDetails(certificationNumber: string | null | undefined) {
+  const cert = cleanCertDigits(certificationNumber);
+  if (!cert) {
+    return { gradedRating: null, frontImageUrl: null, backImageUrl: null };
+  }
+
+  try {
+    const response = await fetch(`https://www.psacard.com/cert/${cert}/psa`, {
+      signal: AbortSignal.timeout(5000),
+      headers: {
+        "user-agent": "owl-market-app/1.0",
+      },
+    });
+
+    if (!response.ok) {
+      return {
+        gradedRating: null,
+        frontImageUrl: psaCertImageUrl(cert, "front"),
+        backImageUrl: psaCertImageUrl(cert, "back"),
+      };
+    }
+
+    const html = await response.text();
+    const pageText = textFromHtml(html);
+    const gradeMatch = pageText.match(/\b(?:Item Grade|Grade)\s+([A-Z0-9.\- ]{1,30}?)(?:\s+Sales History|\s+Item Information|\s+Cert Number|\s+Reverse Cert|$)/i);
+
+    return {
+      gradedRating: normalizePsaGrade(gradeMatch?.[1]) ?? null,
+      frontImageUrl: imageFromHtml(html, cert, "front"),
+      backImageUrl: imageFromHtml(html, cert, "back"),
+    };
+  } catch {
+    return {
+      gradedRating: null,
+      frontImageUrl: psaCertImageUrl(cert, "front"),
+      backImageUrl: psaCertImageUrl(cert, "back"),
+    };
+  }
 }
 
 export function parsePsaImport(text: string): PsaImportRow[] {
@@ -237,7 +333,8 @@ export function parsePsaImport(text: string): PsaImportRow[] {
     const certificationNumber = cleanCertNumber(valueFor(row, HEADER_ALIASES.certificationNumber));
     const frontImageUrl = cleanUrl(valueFor(row, HEADER_ALIASES.frontImageUrl));
     const backImageUrl = cleanUrl(valueFor(row, HEADER_ALIASES.backImageUrl));
-    const gradedRating = normalizePsaGrade(gradeText) ?? normalizePsaGrade(description);
+    const imageArchiveUrl = cleanUrl(valueFor(row, HEADER_ALIASES.imageArchiveUrl));
+    const gradedRating = normalizePsaGrade(gradeText);
 
     return {
       certificationNumber,
@@ -248,6 +345,7 @@ export function parsePsaImport(text: string): PsaImportRow[] {
       gradedRating,
       frontImageUrl,
       backImageUrl,
+      imageArchiveUrl,
       description,
       notes: valueFor(row, HEADER_ALIASES.notes),
       sourceIndex: index,

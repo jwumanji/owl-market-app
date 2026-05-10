@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { isUploadFile, uploadInventoryScan } from "@/lib/inventory-scans";
 import {
+  lookupPsaCertDetails,
   matchInventoryCard,
   parsePsaImport,
   type CardLookupForImport,
@@ -65,6 +66,97 @@ function assignScans(rows: PsaImportRow[], frontFiles: File[], backFiles: File[]
   return pairs;
 }
 
+
+type ZipImageEntry = {
+  name: string;
+  data: Buffer;
+};
+
+function contentTypeForZipImage(name: string) {
+  const lower = name.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".gif")) return "image/gif";
+  return "image/jpeg";
+}
+
+function isZipImage(name: string) {
+  return /\.(?:jpe?g|png|webp|gif)$/i.test(name);
+}
+
+function findEndOfCentralDirectory(buffer: Buffer) {
+  const minimumOffset = Math.max(0, buffer.length - 0xffff - 22);
+  for (let offset = buffer.length - 22; offset >= minimumOffset; offset -= 1) {
+    if (buffer.readUInt32LE(offset) === 0x06054b50) return offset;
+  }
+  return -1;
+}
+
+function extractZipImageEntries(buffer: Buffer) {
+  const eocdOffset = findEndOfCentralDirectory(buffer);
+  if (eocdOffset < 0) return [];
+
+  const entryCount = buffer.readUInt16LE(eocdOffset + 10);
+  let centralOffset = buffer.readUInt32LE(eocdOffset + 16);
+  const entries: ZipImageEntry[] = [];
+
+  for (let index = 0; index < entryCount; index += 1) {
+    if (buffer.readUInt32LE(centralOffset) !== 0x02014b50) break;
+
+    const compressionMethod = buffer.readUInt16LE(centralOffset + 10);
+    const compressedSize = buffer.readUInt32LE(centralOffset + 20);
+    const fileNameLength = buffer.readUInt16LE(centralOffset + 28);
+    const extraLength = buffer.readUInt16LE(centralOffset + 30);
+    const commentLength = buffer.readUInt16LE(centralOffset + 32);
+    const localHeaderOffset = buffer.readUInt32LE(centralOffset + 42);
+    const name = buffer.toString("utf8", centralOffset + 46, centralOffset + 46 + fileNameLength);
+
+    if (!name.endsWith("/") && isZipImage(name) && buffer.readUInt32LE(localHeaderOffset) === 0x04034b50) {
+      const localNameLength = buffer.readUInt16LE(localHeaderOffset + 26);
+      const localExtraLength = buffer.readUInt16LE(localHeaderOffset + 28);
+      const dataOffset = localHeaderOffset + 30 + localNameLength + localExtraLength;
+      const compressed = buffer.subarray(dataOffset, dataOffset + compressedSize);
+      const data = compressionMethod === 0 ? compressed : compressionMethod === 8 ? inflateRawSync(compressed) : null;
+      if (data) entries.push({ name, data });
+    }
+
+    centralOffset += 46 + fileNameLength + extraLength + commentLength;
+  }
+
+  return entries;
+}
+
+function fileFromZipEntry(entry: ZipImageEntry) {
+  return new File([entry.data], entry.name.split(/[\\/]/).pop() ?? entry.name, {
+    type: contentTypeForZipImage(entry.name),
+  });
+}
+
+function scanPairFromZip(buffer: Buffer) {
+  const entries = extractZipImageEntries(buffer);
+  const front = entries.find((entry) => /front|obverse/i.test(entry.name)) ?? entries[0] ?? null;
+  const back = entries.find((entry) => /back|reverse/i.test(entry.name)) ?? entries.find((entry) => entry !== front) ?? null;
+
+  return {
+    front: front ? fileFromZipEntry(front) : null,
+    back: back ? fileFromZipEntry(back) : null,
+  } satisfies ScanPair;
+}
+
+async function downloadPsaImageArchive(url: string | null) {
+  if (!url) return { front: null, back: null } satisfies ScanPair;
+
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    if (!response.ok) return { front: null, back: null } satisfies ScanPair;
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return scanPairFromZip(buffer);
+  } catch {
+    return { front: null, back: null } satisfies ScanPair;
+  }
+}
+
 function setCodeFor(card: CardLookupForImport | null) {
   const set = Array.isArray(card?.sets) ? card?.sets[0] : card?.sets;
   return set?.code ?? null;
@@ -116,8 +208,10 @@ export async function POST(request: Request) {
   for (const row of rows) {
     const pair = scanPairs.get(row.sourceIndex) ?? { front: null, back: null };
     const match = matchInventoryCard(row, cards);
-    let customImageFrontUrl: string | null = row.frontImageUrl;
-    let customImageBackUrl: string | null = row.backImageUrl;
+    const psaCertDetails = await lookupPsaCertDetails(row.certificationNumber);
+    const gradedRating = row.gradedRating ?? psaCertDetails.gradedRating;
+    let customImageFrontUrl: string | null = row.frontImageUrl ?? psaCertDetails.frontImageUrl;
+    let customImageBackUrl: string | null = row.backImageUrl ?? psaCertDetails.backImageUrl;
 
     try {
       if (!customImageFrontUrl) {
@@ -146,7 +240,7 @@ export async function POST(request: Request) {
       inventory_type: "graded",
       status: "new",
       quantity: 1,
-      graded_rating: row.gradedRating,
+      graded_rating: gradedRating,
       certification_number: row.certificationNumber,
       custom_image_front_url: customImageFrontUrl,
       custom_image_back_url: customImageBackUrl,
