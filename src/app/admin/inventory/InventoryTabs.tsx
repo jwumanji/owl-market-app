@@ -38,6 +38,16 @@ export interface InventoryRow {
   };
 }
 
+type CardMatchResult = {
+  id: string;
+  name: string | null;
+  card_number: string | null;
+  rarity: string | null;
+  image_url: string | null;
+  image_url_small: string | null;
+  sets: { code: string | null; name: string | null } | { code: string | null; name: string | null }[] | null;
+};
+
 const TABS = [
   { id: "all", label: "All Items" },
   { id: "raw", label: "Raw" },
@@ -196,6 +206,21 @@ function inventoryCardId(item: InventoryRow) {
   return stableId.slice(0, 8).toUpperCase();
 }
 
+function setCodeForMatch(card: CardMatchResult) {
+  const set = Array.isArray(card.sets) ? card.sets[0] : card.sets;
+  return set?.code ?? null;
+}
+
+function cardFromMatch(card: CardMatchResult): InventoryRow["card"] {
+  return {
+    name: card.name,
+    image_url: card.image_url,
+    image_url_small: card.image_url_small,
+    card_number: card.card_number,
+    set_code: setCodeForMatch(card),
+  };
+}
+
 export default function InventoryTabs({
   items,
   onItemsChange,
@@ -224,6 +249,11 @@ export default function InventoryTabs({
   const [searchDraft, setSearchDraft] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [pendingMatchOnly, setPendingMatchOnly] = useState(false);
+  const [matchQueries, setMatchQueries] = useState<Record<string, string>>({});
+  const [matchResults, setMatchResults] = useState<Record<string, CardMatchResult[]>>({});
+  const [searchingMatchIds, setSearchingMatchIds] = useState<Record<string, boolean>>({});
+  const [matchingItemIds, setMatchingItemIds] = useState<Record<string, boolean>>({});
+  const [matchErrors, setMatchErrors] = useState<Record<string, string>>({});
   const [actionError, setActionError] = useState<string | null>(null);
   const showTracking = statusFilter === "ship" || statusFilter === "sold";
   const showShippingActions = statusFilter === "ship";
@@ -265,11 +295,8 @@ export default function InventoryTabs({
     });
   }, [pendingMatchOnly, rows, statusFilter]);
 
-  const searchFilteredRows = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return statusFilteredRows;
-
-    return statusFilteredRows.filter((item) =>
+  function itemMatchesSearch(item: InventoryRow, query: string) {
+    return (
       [
         item.item_nickname,
         item.card.name,
@@ -294,6 +321,13 @@ export default function InventoryTabs({
         .toLowerCase()
         .includes(query)
     );
+  }
+
+  const searchFilteredRows = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return statusFilteredRows;
+
+    return statusFilteredRows.filter((item) => itemMatchesSearch(item, query));
   }, [searchQuery, statusFilteredRows]);
 
   const filtered = useMemo(() => {
@@ -317,8 +351,15 @@ export default function InventoryTabs({
     }));
   }, [filtered, pendingMatchOnly]);
 
+  const countRows = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const baseRows = rows.filter((item) => statusFilter === "all" || item.status === statusFilter);
+    if (!query) return baseRows;
+    return baseRows.filter((item) => itemMatchesSearch(item, query));
+  }, [rows, searchQuery, statusFilter]);
+
   const counts = useMemo(() => {
-    return searchFilteredRows.reduce(
+    return countRows.reduce(
       (acc, item) => {
         acc.all += item.quantity;
         acc[item.inventory_type] += item.quantity;
@@ -326,7 +367,7 @@ export default function InventoryTabs({
       },
       { all: 0, raw: 0, damaged: 0, graded: 0, sealed: 0 }
     );
-  }, [searchFilteredRows]);
+  }, [countRows]);
 
   const pendingMatchCount = useMemo(() => {
     return rows.reduce((sum, item) => sum + (item.pending_card_match ? item.quantity : 0), 0);
@@ -376,6 +417,111 @@ export default function InventoryTabs({
 
     if (!res.ok) {
       setRows(items);
+    }
+  }
+
+  function initialMatchQuery(item: InventoryRow) {
+    return [item.card.set_code, item.card.card_number, item.card.name].filter(Boolean).join(" ").trim();
+  }
+
+  async function searchMatchCandidates(item: InventoryRow) {
+    const query = (matchQueries[item.id] ?? initialMatchQuery(item)).trim();
+    if (query.length < 2 || searchingMatchIds[item.id]) return;
+
+    setMatchErrors((current) => {
+      const next = { ...current };
+      delete next[item.id];
+      return next;
+    });
+    setSearchingMatchIds((current) => ({ ...current, [item.id]: true }));
+
+    try {
+      const res = await fetch(`/api/admin/cards/search?q=${encodeURIComponent(query)}`);
+      if (!res.ok) {
+        throw new Error("Search failed");
+      }
+
+      const data = (await res.json()) as CardMatchResult[];
+      setMatchResults((current) => ({ ...current, [item.id]: data }));
+      if (data.length === 0) {
+        setMatchErrors((current) => ({ ...current, [item.id]: "No matching catalog cards found." }));
+      }
+    } catch {
+      setMatchErrors((current) => ({ ...current, [item.id]: "Could not search the card catalog." }));
+    } finally {
+      setSearchingMatchIds((current) => {
+        const next = { ...current };
+        delete next[item.id];
+        return next;
+      });
+    }
+  }
+
+  async function applyCardMatch(item: InventoryRow, card: CardMatchResult) {
+    if (matchingItemIds[item.id]) return;
+
+    setMatchErrors((current) => {
+      const next = { ...current };
+      delete next[item.id];
+      return next;
+    });
+    setMatchingItemIds((current) => ({ ...current, [item.id]: true }));
+
+    const matchedCard = cardFromMatch(card);
+    setRows((current) =>
+      current.map((row) =>
+        row.id === item.id
+          ? {
+              ...row,
+              pending_card_match: false,
+              card: matchedCard,
+            }
+          : row
+      )
+    );
+
+    if (isLocalOnlyItem(item.id)) {
+      setMatchingItemIds((current) => {
+        const next = { ...current };
+        delete next[item.id];
+        return next;
+      });
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/admin/inventory/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          card_id: card.id,
+          pending_card_match: false,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to save card match");
+      }
+
+      setMatchQueries((current) => {
+        const next = { ...current };
+        delete next[item.id];
+        return next;
+      });
+      setMatchResults((current) => {
+        const next = { ...current };
+        delete next[item.id];
+        return next;
+      });
+    } catch {
+      setRows((current) => current.map((row) => (row.id === item.id ? item : row)));
+      setMatchErrors((current) => ({ ...current, [item.id]: "Could not save the card match." }));
+    } finally {
+      setMatchingItemIds((current) => {
+        const next = { ...current };
+        delete next[item.id];
+        return next;
+      });
     }
   }
 
@@ -1101,6 +1247,97 @@ export default function InventoryTabs({
     );
   }
 
+  function renderMatchControls(item: InventoryRow) {
+    if (!item.pending_card_match) return null;
+
+    const query = matchQueries[item.id] ?? initialMatchQuery(item);
+    const results = matchResults[item.id] ?? [];
+    const isSearching = searchingMatchIds[item.id] ?? false;
+    const isMatching = matchingItemIds[item.id] ?? false;
+    const error = matchErrors[item.id];
+
+    return (
+      <div className="mt-3 rounded-lg border border-owl/40 bg-owl/10 p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+          <label className="block min-w-0 flex-1">
+            <span className="font-mono text-xs font-bold uppercase tracking-wider text-owl">Match Catalog Card</span>
+            <input
+              type="text"
+              value={query}
+              onChange={(event) => {
+                setMatchQueries((current) => ({ ...current, [item.id]: event.target.value }));
+                setMatchResults((current) => {
+                  const next = { ...current };
+                  delete next[item.id];
+                  return next;
+                });
+                setMatchErrors((current) => {
+                  const next = { ...current };
+                  delete next[item.id];
+                  return next;
+                });
+              }}
+              placeholder="Search by card name or card number"
+              className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 text-sm text-text outline-none focus:border-owl"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={query.trim().length < 2 || isSearching}
+            onClick={() => searchMatchCandidates(item)}
+            className="rounded-md border border-owl bg-owl/10 px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/15 disabled:cursor-wait disabled:border-border disabled:bg-surface disabled:text-text-3"
+          >
+            {isSearching ? "Searching..." : "Search"}
+          </button>
+        </div>
+
+        {error && (
+          <div className="mt-3 rounded-md border border-loss/30 bg-loss/10 px-3 py-2 text-sm font-semibold text-text">
+            {error}
+          </div>
+        )}
+
+        {results.length > 0 && (
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {results.map((card) => (
+              <button
+                key={card.id}
+                type="button"
+                disabled={isMatching}
+                onClick={() => applyCardMatch(item, card)}
+                className="flex min-w-0 items-center gap-3 rounded-md border border-border bg-deep p-3 text-left transition-colors hover:border-owl hover:bg-surf2 disabled:cursor-wait disabled:opacity-60"
+              >
+                {card.image_url || card.image_url_small ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={card.image_url_small ?? card.image_url ?? ""}
+                    alt=""
+                    className="h-16 w-11 shrink-0 rounded object-cover"
+                  />
+                ) : (
+                  <div className="flex h-16 w-11 shrink-0 items-center justify-center rounded bg-surf3 font-mono text-[10px] text-text-2">
+                    BOX
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-bold text-text">{card.name ?? "Unknown Card"}</div>
+                  <div className="mt-1 flex flex-wrap gap-2 font-mono text-xs text-text-2">
+                    {setCodeForMatch(card) && <span>{setCodeForMatch(card)}</span>}
+                    {card.card_number && <span>{card.card_number}</span>}
+                    {card.rarity && <span>{card.rarity}</span>}
+                  </div>
+                </div>
+                <span className="shrink-0 rounded border border-owl/60 bg-owl/10 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-owl">
+                  {isMatching ? "Saving" : "Use"}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   function renderCardImage(item: InventoryRow, size: "table" | "modal" | "small" = "table") {
     const imageUrl = cardImageUrl(item);
     const dimensions = size === "modal" ? "h-80 w-56" : size === "small" ? "h-20 w-14" : "h-28 w-20";
@@ -1253,6 +1490,8 @@ export default function InventoryTabs({
                     </div>
                     {renderDeleteControls(row)}
                   </div>
+
+                  {renderMatchControls(row)}
 
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <label className="block">
