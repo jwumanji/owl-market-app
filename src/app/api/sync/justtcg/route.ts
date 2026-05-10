@@ -230,20 +230,6 @@ function buildCardMaps(cards: DbCard[]): CardMaps {
   return { byNumber, byNameLower };
 }
 
-function addCardToMaps(maps: CardMaps, card: DbCard): void {
-  if (card.card_number) {
-    const arr = maps.byNumber.get(card.card_number) ?? [];
-    arr.push(card);
-    maps.byNumber.set(card.card_number, arr);
-  }
-  if (card.name) {
-    const key = card.name.toLowerCase();
-    const arr = maps.byNameLower.get(key) ?? [];
-    arr.push(card);
-    maps.byNameLower.set(key, arr);
-  }
-}
-
 /** Extract the set code prefix from a card number like "OP02-013" → "OP02"
  *  or "P-001" → "P". */
 function prefixFromCardNumber(cardNumber: string | null | undefined): string | null {
