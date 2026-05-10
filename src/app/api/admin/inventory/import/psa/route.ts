@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { inflateRawSync } from "zlib";
 import { createServiceClient } from "@/lib/supabase-server";
 import { isUploadFile, uploadInventoryScan } from "@/lib/inventory-scans";
 import {
@@ -127,7 +128,8 @@ function extractZipImageEntries(buffer: Buffer) {
 }
 
 function fileFromZipEntry(entry: ZipImageEntry) {
-  return new File([entry.data], entry.name.split(/[\\/]/).pop() ?? entry.name, {
+  const bytes = entry.data.buffer.slice(entry.data.byteOffset, entry.data.byteOffset + entry.data.byteLength) as ArrayBuffer;
+  return new File([bytes], entry.name.split(/[\\/]/).pop() ?? entry.name, {
     type: contentTypeForZipImage(entry.name),
   });
 }
@@ -209,19 +211,22 @@ export async function POST(request: Request) {
     const pair = scanPairs.get(row.sourceIndex) ?? { front: null, back: null };
     const match = matchInventoryCard(row, cards);
     const psaCertDetails = await lookupPsaCertDetails(row.certificationNumber);
+    const archivePair = await downloadPsaImageArchive(row.imageArchiveUrl);
+    const frontScan = pair.front ?? archivePair.front;
+    const backScan = pair.back ?? archivePair.back;
     const gradedRating = row.gradedRating ?? psaCertDetails.gradedRating;
-    let customImageFrontUrl: string | null = row.frontImageUrl ?? psaCertDetails.frontImageUrl;
-    let customImageBackUrl: string | null = row.backImageUrl ?? psaCertDetails.backImageUrl;
+    let customImageFrontUrl: string | null = row.frontImageUrl;
+    let customImageBackUrl: string | null = row.backImageUrl;
 
     try {
       if (!customImageFrontUrl) {
-        customImageFrontUrl = await uploadInventoryScan(supabase, pair.front, {
+        customImageFrontUrl = await uploadInventoryScan(supabase, frontScan, {
           certificationNumber: row.certificationNumber,
           side: "front",
         });
       }
       if (!customImageBackUrl) {
-        customImageBackUrl = await uploadInventoryScan(supabase, pair.back, {
+        customImageBackUrl = await uploadInventoryScan(supabase, backScan, {
           certificationNumber: row.certificationNumber,
           side: "back",
         });
@@ -230,6 +235,9 @@ export async function POST(request: Request) {
       const message = error instanceof Error ? error.message : "Could not upload PSA scan image.";
       return NextResponse.json({ error: message }, { status: 400 });
     }
+
+    customImageFrontUrl ??= psaCertDetails.frontImageUrl;
+    customImageBackUrl ??= psaCertDetails.backImageUrl;
 
     importRows.push({
       card_id: match?.id ?? null,
