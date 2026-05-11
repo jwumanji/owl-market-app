@@ -287,18 +287,20 @@ async function main() {
     return;
   }
 
-  // 1. Upsert destination set rows.
-  const setRows = [OP_HALF, EB_HALF].map((code) => ({
-    slug: code.toLowerCase(),
-    code,
-    name: SET_NAMES[code] ?? code,
-  }));
-  const okSets = await sbUpsert("sets", setRows, "slug");
-  if (!okSets) { console.error("set upsert failed — aborting"); process.exit(1); }
-
+  // 1. Ensure destination set rows exist. Look up by `code` first; only
+  //    upsert when the code isn't already present, to avoid creating a
+  //    duplicate row with a different slug format.
   const setUuids = {};
   for (const code of [OP_HALF, EB_HALF]) {
-    const id = await getSetUuid(code);
+    let id = await getSetUuid(code);
+    if (!id) {
+      await sbUpsert(
+        "sets",
+        [{ slug: code.toLowerCase(), code, name: SET_NAMES[code] ?? code }],
+        "slug",
+      );
+      id = await getSetUuid(code);
+    }
     if (!id) { console.error(`Set ${code} missing after upsert — aborting`); process.exit(1); }
     setUuids[code] = id;
   }

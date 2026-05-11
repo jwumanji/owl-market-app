@@ -396,10 +396,20 @@ async function syncOneSet(
           })
           .filter((c): c is NonNullable<typeof c> => c !== null);
 
-        if (newCards.length > 0) {
+        // Deduplicate by card_image_id before upserting. JustTCG may return
+        // multiple rows for the same physical card (e.g. variants returned
+        // under multiple slugs in the same page), and Postgres rejects an
+        // `ON CONFLICT DO UPDATE` batch that touches the same conflict key
+        // twice with "command cannot affect row a second time". Keep the
+        // first occurrence since later duplicates carry the same metadata.
+        const dedupedNewCards = Array.from(
+          new Map(newCards.map((c) => [c.card_image_id, c])).values(),
+        );
+
+        if (dedupedNewCards.length > 0) {
           const { data: inserted, error: insErr } = await supabase
             .from("cards")
-            .upsert(newCards, { onConflict: "card_image_id" })
+            .upsert(dedupedNewCards, { onConflict: "card_image_id" })
             .select("id, card_number, name, variant_label, rarity, set_id");
 
           if (insErr) {

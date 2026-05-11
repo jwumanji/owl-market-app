@@ -253,14 +253,20 @@ async function main() {
   const cards = await fetchJson(`${OPT_BASE}/sets/${apiId}/`);
   console.log(`Fetched ${cards.length} card records.`);
 
-  // 2. Ensure the set row exists.
+  // 2. Ensure the set row exists. Look up by `code` first — the upsert
+  //    `on_conflict=slug` doesn't conflict with rows that use a different
+  //    slug format (e.g. existing "op-07" vs. new "op07"), so guarding by
+  //    code prevents creating a duplicate set row per import.
   const setName = cards[0]?.set_name ?? SET_CODE;
-  await sbUpsert(
-    "sets",
-    [{ slug: SET_CODE.toLowerCase(), code: SET_CODE, name: setName }],
-    "slug",
-  );
-  const setUuid = await getSetUuid(SET_CODE);
+  let setUuid = await getSetUuid(SET_CODE);
+  if (!setUuid) {
+    await sbUpsert(
+      "sets",
+      [{ slug: SET_CODE.toLowerCase(), code: SET_CODE, name: setName }],
+      "slug",
+    );
+    setUuid = await getSetUuid(SET_CODE);
+  }
   if (!setUuid) {
     console.error(`Set ${SET_CODE} not found after upsert — aborting.`);
     process.exit(1);
