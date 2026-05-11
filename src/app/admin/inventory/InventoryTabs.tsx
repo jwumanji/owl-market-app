@@ -243,6 +243,10 @@ export default function InventoryTabs({
   const [addingGroups, setAddingGroups] = useState<Record<string, boolean>>({});
   const [deletingItemIds, setDeletingItemIds] = useState<Record<string, boolean>>({});
   const [confirmingDeleteIds, setConfirmingDeleteIds] = useState<Record<string, boolean>>({});
+  const [bulkSelectMode, setBulkSelectMode] = useState(false);
+  const [selectedItemIds, setSelectedItemIds] = useState<Record<string, boolean>>({});
+  const [bulkDeleteStep, setBulkDeleteStep] = useState<0 | 1 | 2>(0);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [openActionMenuKey, setOpenActionMenuKey] = useState<string | null>(null);
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null);
   const [hoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
@@ -351,6 +355,15 @@ export default function InventoryTabs({
     }));
   }, [filtered, pendingMatchOnly]);
 
+  const visibleRows = useMemo(() => groups.flatMap((group) => group.rows), [groups]);
+  const selectedIds = useMemo(
+    () => Object.entries(selectedItemIds).filter(([, selected]) => selected).map(([id]) => id),
+    [selectedItemIds]
+  );
+  const selectedCount = selectedIds.length;
+  const visibleSelectedCount = visibleRows.reduce((sum, item) => sum + (selectedItemIds[item.id] ? 1 : 0), 0);
+  const allVisibleSelected = visibleRows.length > 0 && visibleSelectedCount === visibleRows.length;
+
   const countRows = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     const baseRows = rows.filter((item) => statusFilter === "all" || item.status === statusFilter);
@@ -379,6 +392,14 @@ export default function InventoryTabs({
     setPendingMatchOnly(false);
     window.history.replaceState(null, "", window.location.pathname);
   }, [pendingMatchOnly, pendingMatchCount]);
+
+  useEffect(() => {
+    const availableIds = new Set(rows.map((row) => row.id));
+    setSelectedItemIds((current) => {
+      const next = Object.fromEntries(Object.entries(current).filter(([id]) => availableIds.has(id)));
+      return Object.keys(next).length === Object.keys(current).length ? current : next;
+    });
+  }, [rows]);
 
   const selectedGroup = useMemo<InventoryGroup | null>(() => {
     if (!selectedGroupKey) return null;
@@ -647,6 +668,161 @@ export default function InventoryTabs({
         return next;
       });
     }
+  }
+
+  function clearBulkSelection() {
+    setBulkSelectMode(false);
+    setSelectedItemIds({});
+    setBulkDeleteStep(0);
+  }
+
+  function setGroupSelected(group: InventoryGroup, selected: boolean) {
+    setSelectedItemIds((current) => {
+      const next = { ...current };
+      for (const item of group.rows) {
+        if (selected) next[item.id] = true;
+        else delete next[item.id];
+      }
+      return next;
+    });
+    setBulkDeleteStep(0);
+  }
+
+  function setItemSelected(item: InventoryRow, selected: boolean) {
+    setSelectedItemIds((current) => {
+      const next = { ...current };
+      if (selected) next[item.id] = true;
+      else delete next[item.id];
+      return next;
+    });
+    setBulkDeleteStep(0);
+  }
+
+  function setAllVisibleSelected(selected: boolean) {
+    setSelectedItemIds((current) => {
+      const next = { ...current };
+      for (const item of visibleRows) {
+        if (selected) next[item.id] = true;
+        else delete next[item.id];
+      }
+      return next;
+    });
+    setBulkDeleteStep(0);
+  }
+
+  async function deleteSelectedItems() {
+    if (bulkDeleting || selectedIds.length === 0) return;
+
+    const selectedSet = new Set(selectedIds);
+    const previousRows = rows;
+    const itemsToDelete = rows.filter((item) => selectedSet.has(item.id));
+
+    setActionError(null);
+    setBulkDeleting(true);
+    setRows((current) => current.filter((item) => !selectedSet.has(item.id)));
+
+    try {
+      for (const item of itemsToDelete) {
+        if (isLocalOnlyItem(item.id)) continue;
+        const res = await fetch(`/api/admin/inventory/${item.id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("Failed to delete selected inventory items");
+      }
+      clearBulkSelection();
+    } catch {
+      setRows(previousRows);
+      setActionError("Could not delete the selected inventory items. Try again.");
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
+  function handleBulkDeleteClick() {
+    if (selectedCount === 0 || bulkDeleting) return;
+    if (bulkDeleteStep < 2) {
+      setBulkDeleteStep((current) => (current + 1) as 0 | 1 | 2);
+      return;
+    }
+    deleteSelectedItems();
+  }
+
+  function selectionStateFor(group: InventoryGroup) {
+    const selectedInGroup = group.rows.filter((item) => selectedItemIds[item.id]).length;
+    return {
+      selectedInGroup,
+      isSelected: selectedInGroup === group.rows.length,
+      isPartiallySelected: selectedInGroup > 0 && selectedInGroup < group.rows.length,
+    };
+  }
+
+  function groupSelectionClass(group: InventoryGroup) {
+    return group.rows.some((item) => selectedItemIds[item.id])
+      ? "border-owl/60 bg-[rgba(245,166,35,0.18)] shadow-[inset_4px_0_0_rgba(245,166,35,0.95)]"
+      : "border-border hover:bg-surf2/70";
+  }
+
+  function nestedRowSelectionClass(item: InventoryRow) {
+    return selectedItemIds[item.id]
+      ? "border-owl/60 bg-[rgba(245,166,35,0.18)] shadow-[inset_4px_0_0_rgba(245,166,35,0.95)]"
+      : "border-[rgba(79,142,247,0.16)] bg-[rgba(79,142,247,0.075)] shadow-[inset_3px_0_0_rgba(79,142,247,0.45)] hover:bg-[rgba(79,142,247,0.11)]";
+  }
+
+  function renderSelectionCell(group: InventoryGroup, label: string) {
+    const { selectedInGroup, isSelected, isPartiallySelected } = selectionStateFor(group);
+
+    if (!bulkSelectMode) return null;
+
+    return (
+      <label className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-owl/40 bg-owl/10 text-owl hover:bg-owl/15">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          ref={(input) => {
+            if (input) input.indeterminate = isPartiallySelected;
+          }}
+          onChange={(event) => setGroupSelected(group, event.target.checked)}
+          className="h-4 w-4 accent-owl"
+          aria-label={label}
+        />
+        {isPartiallySelected && (
+          <span className="sr-only">{selectedInGroup} selected</span>
+        )}
+      </label>
+    );
+  }
+
+  function renderItemSelectionCell(item: InventoryRow, label: string) {
+    if (!bulkSelectMode) return null;
+
+    return (
+      <label className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-owl/40 bg-owl/10 text-owl hover:bg-owl/15">
+        <input
+          type="checkbox"
+          checked={Boolean(selectedItemIds[item.id])}
+          onChange={(event) => setItemSelected(item, event.target.checked)}
+          className="h-4 w-4 accent-owl"
+          aria-label={label}
+        />
+      </label>
+    );
+  }
+
+  function renderSelectionHeader() {
+    if (!bulkSelectMode) return null;
+
+    return (
+      <label className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-owl/40 bg-owl/10 text-owl hover:bg-owl/15">
+        <input
+          type="checkbox"
+          checked={allVisibleSelected}
+          ref={(input) => {
+            if (input) input.indeterminate = visibleSelectedCount > 0 && !allVisibleSelected;
+          }}
+          onChange={(event) => setAllVisibleSelected(event.target.checked)}
+          className="h-4 w-4 accent-owl"
+          aria-label="Select all visible inventory items"
+        />
+      </label>
+    );
   }
 
   function renderDeleteControls(item: InventoryRow) {
@@ -1775,6 +1951,59 @@ export default function InventoryTabs({
         )}
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            if (bulkSelectMode) clearBulkSelection();
+            else setBulkSelectMode(true);
+          }}
+          className={`rounded-md border px-4 py-2.5 font-mono text-sm font-semibold uppercase tracking-wider transition-colors ${
+            bulkSelectMode
+              ? "border-owl bg-owl/10 text-owl"
+              : "border-border bg-surface text-text hover:border-border-2 hover:text-owl"
+          }`}
+        >
+          {bulkSelectMode ? "Cancel Selection" : "Select Items"}
+        </button>
+        {bulkSelectMode && (
+          <>
+            <div className="rounded-md border border-border bg-surface px-3 py-2.5 font-mono text-sm font-semibold text-text">
+              Selected <span className="text-owl">{selectedCount}</span>
+            </div>
+            {selectedCount > 0 && (
+              <button
+                type="button"
+                disabled={bulkDeleting}
+                onClick={handleBulkDeleteClick}
+                className={`rounded-md border px-4 py-2.5 font-mono text-sm font-bold uppercase tracking-wider transition-colors disabled:cursor-wait disabled:opacity-60 ${
+                  bulkDeleteStep === 0
+                    ? "border-loss/60 bg-loss/10 text-loss hover:bg-loss/15"
+                    : bulkDeleteStep === 1
+                      ? "border-loss bg-loss/15 text-loss hover:bg-loss/20"
+                      : "border-loss bg-loss text-void hover:bg-loss/90"
+                }`}
+              >
+                {bulkDeleting
+                  ? "Deleting..."
+                  : bulkDeleteStep === 0
+                    ? "Delete Selected"
+                    : bulkDeleteStep === 1
+                      ? "Confirm Delete"
+                      : "Delete Permanently"}
+              </button>
+            )}
+            {bulkDeleteStep > 0 && (
+              <div className="rounded-md border border-loss/40 bg-loss/10 px-3 py-2 text-sm font-semibold text-text">
+                {bulkDeleteStep === 1
+                  ? `Confirm once more to delete ${selectedCount} selected item${selectedCount === 1 ? "" : "s"}.`
+                  : "Final confirmation. This permanently removes the selected inventory records."}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
       {actionError && (
         <div className="rounded-md border border-loss/30 bg-loss/10 px-4 py-3 text-sm font-semibold text-text">
           {actionError}
@@ -1795,7 +2024,7 @@ export default function InventoryTabs({
           </colgroup>
           <thead>
             <tr className="border-b border-border bg-surf2 text-left font-mono text-xs font-semibold uppercase tracking-wider text-text">
-              <th className="px-3 py-3.5" />
+              <th className="px-3 py-3.5">{renderSelectionHeader()}</th>
               <th className="px-4 py-3.5">Image</th>
               <th className="px-3 py-3.5">Card</th>
               <th className="px-3 py-3.5">Customer Name</th>
@@ -1813,9 +2042,9 @@ export default function InventoryTabs({
 
               return (
                 <Fragment key={group.key}>
-                  <tr className="border-b border-border hover:bg-surf2/70">
+                  <tr className={`border-b ${groupSelectionClass(group)}`}>
                     <td className="px-3 py-4">
-                      {hasNestedRows && (
+                      {bulkSelectMode ? renderSelectionCell(group, `Select ${item.card.name ?? "inventory group"}`) : hasNestedRows && (
                         <button
                           type="button"
                           aria-label={isOpen ? "Collapse group" : "Expand group"}
@@ -1916,9 +2145,11 @@ export default function InventoryTabs({
                       {group.rows.map((child, index) => (
                         <tr
                           key={child.id}
-                          className="border-b border-[rgba(79,142,247,0.16)] bg-[rgba(79,142,247,0.075)] shadow-[inset_3px_0_0_rgba(79,142,247,0.45)] transition-colors hover:bg-[rgba(79,142,247,0.11)]"
+                          className={`border-b transition-colors ${nestedRowSelectionClass(child)}`}
                         >
-                          <td className="px-3 py-3.5" />
+                          <td className="px-3 py-3.5">
+                            {renderItemSelectionCell(child, `Select item ${index + 1}`)}
+                          </td>
                           <td className="px-3 py-3.5">
                             <button
                               type="button"
@@ -1999,7 +2230,7 @@ export default function InventoryTabs({
           </colgroup>
           <thead>
             <tr className="border-b border-border bg-surf2 text-left font-mono text-xs font-semibold uppercase tracking-wider text-text">
-              <th className="px-3 py-3.5" />
+              <th className="px-3 py-3.5">{renderSelectionHeader()}</th>
               <th className="px-4 py-3.5">Image</th>
               <th className="px-3 py-3.5">Card Name</th>
               <th className="px-3 py-3.5 text-right">Quantity</th>
@@ -2023,9 +2254,9 @@ export default function InventoryTabs({
 
               return (
                 <Fragment key={group.key}>
-                  <tr className="border-b border-border hover:bg-surf2/70">
+                  <tr className={`border-b ${groupSelectionClass(group)}`}>
                     <td className="px-3 py-4">
-                      {hasNestedRows && (
+                      {bulkSelectMode ? renderSelectionCell(group, `Select ${item.card.name ?? "inventory group"}`) : hasNestedRows && (
                         <button
                           type="button"
                           aria-label={isOpen ? "Collapse group" : "Expand group"}
@@ -2161,9 +2392,11 @@ export default function InventoryTabs({
                       {group.rows.map((child) => (
                         <tr
                           key={child.id}
-                          className="border-b border-[rgba(79,142,247,0.16)] bg-[rgba(79,142,247,0.075)] shadow-[inset_3px_0_0_rgba(79,142,247,0.45)] transition-colors hover:bg-[rgba(79,142,247,0.11)]"
+                          className={`border-b transition-colors ${nestedRowSelectionClass(child)}`}
                         >
-                          <td className="px-3 py-3.5" />
+                          <td className="px-3 py-3.5">
+                            {renderItemSelectionCell(child, "Select inventory item")}
+                          </td>
                           <td className="px-3 py-3.5">
                             <button
                               type="button"
