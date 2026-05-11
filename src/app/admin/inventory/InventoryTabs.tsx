@@ -113,6 +113,7 @@ type HoverPreview = {
   name: string;
   x: number;
   y: number;
+  isScanImage: boolean;
 };
 
 type ScanViewer = {
@@ -211,6 +212,10 @@ function cardImageUrl(item: InventoryRow) {
 function cardImageFallbackUrl(item: InventoryRow) {
   if (item.custom_image_front_url) return item.card.image_url_small ?? item.card.image_url ?? null;
   return null;
+}
+
+function hasCustomScanImage(item: InventoryRow) {
+  return Boolean(item.custom_image_front_url);
 }
 
 function inventoryCardId(item: InventoryRow) {
@@ -1579,7 +1584,18 @@ export default function InventoryTabs({
 
   function renderCardImage(item: InventoryRow, size: "table" | "modal" | "small" = "table") {
     const imageUrl = cardImageUrl(item);
-    const dimensions = size === "modal" ? "h-80 w-56" : size === "small" ? "h-20 w-14" : "h-28 w-20";
+    const isScanImage = hasCustomScanImage(item);
+    const dimensions = isScanImage
+      ? size === "modal"
+        ? "h-96 w-72"
+        : size === "small"
+          ? "h-24 w-20"
+          : "h-32 w-24"
+      : size === "modal"
+        ? "h-80 w-56"
+        : size === "small"
+          ? "h-20 w-14"
+          : "h-28 w-20";
 
     if (!imageUrl) {
       return (
@@ -1605,7 +1621,7 @@ export default function InventoryTabs({
             }
             event.currentTarget.style.display = "none";
           }}
-          className="h-full w-full object-cover"
+          className={`h-full w-full ${isScanImage ? "object-contain p-1" : "object-cover"}`}
         />
       </div>
     );
@@ -1639,7 +1655,7 @@ export default function InventoryTabs({
             <img
               src={scan.url}
               alt={`${scan.label} scan`}
-              className="h-24 w-full rounded object-cover"
+              className="h-24 w-full rounded object-contain"
             />
             <div className="mt-1 text-center font-mono text-[10px] font-bold uppercase tracking-wider text-text-2 group-hover:text-owl">
               {scan.label}
@@ -1654,8 +1670,9 @@ export default function InventoryTabs({
     const imageUrl = cardImageUrl(item);
     if (!imageUrl) return;
 
-    const previewWidth = 260;
-    const previewHeight = 360;
+    const isScanImage = hasCustomScanImage(item);
+    const previewWidth = isScanImage ? 320 : 260;
+    const previewHeight = isScanImage ? 430 : 360;
     const margin = 18;
     const x = Math.min(event.clientX + margin, window.innerWidth - previewWidth - margin);
     const y = Math.min(event.clientY + margin, window.innerHeight - previewHeight - margin);
@@ -1665,6 +1682,7 @@ export default function InventoryTabs({
       name: item.card.name ?? "Card image",
       x: Math.max(margin, x),
       y: Math.max(margin, y),
+      isScanImage,
     });
   }
 
@@ -1680,9 +1698,9 @@ export default function InventoryTabs({
         <img
           src={hoverPreview.src}
           alt={hoverPreview.name}
-          className="h-[340px] w-[238px] rounded-md object-cover"
+          className={`rounded-md ${hoverPreview.isScanImage ? "h-[410px] w-[300px] object-contain" : "h-[340px] w-[238px] object-cover"}`}
         />
-        <div className="mt-2 max-w-[238px] truncate font-mono text-xs font-semibold text-text">
+        <div className={`mt-2 truncate font-mono text-xs font-semibold text-text ${hoverPreview.isScanImage ? "max-w-[300px]" : "max-w-[238px]"}`}>
           {hoverPreview.name}
         </div>
       </div>
@@ -1709,9 +1727,12 @@ export default function InventoryTabs({
             <button
               type="button"
               onClick={() => setScanViewer(null)}
-              className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-sm font-bold uppercase tracking-wider text-text hover:border-border-2 hover:text-owl"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-loss/70 bg-loss/15 text-loss transition-colors hover:bg-loss hover:text-void"
+              aria-label="Close scan viewer"
             >
-              Close
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
             </button>
           </div>
           <div className="grid min-h-0 gap-4 p-4 lg:grid-cols-[1fr_160px]">
@@ -1736,12 +1757,23 @@ export default function InventoryTabs({
                   }`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={scan.url} alt={`${scan.label} scan thumbnail`} className="h-24 w-16 rounded object-cover" />
+                  <img src={scan.url} alt={`${scan.label} scan thumbnail`} className="h-24 w-16 rounded object-contain" />
                   <div className="mt-1 text-center font-mono text-[10px] font-bold uppercase tracking-wider">
                     {scan.label}
                   </div>
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => setScanViewer(null)}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-blue/70 bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-blue transition-colors hover:bg-blue hover:text-void"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 14 4 9l5-5" />
+                  <path d="M4 9h11a5 5 0 0 1 0 10h-3" />
+                </svg>
+                Go Back
+              </button>
             </div>
           </div>
         </div>
