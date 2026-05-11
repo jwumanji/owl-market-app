@@ -6,12 +6,14 @@ type PsaImportResult = {
   count: number;
   matched: number;
   pending_match: number;
+  skipped_duplicates?: number;
   rows: {
     certification_number: string | null;
     matched: boolean;
     card_name: string | null;
     card_number: string | null;
     set_code: string | null;
+    skipped_duplicate?: boolean;
     image_status?: string | null;
   }[];
 };
@@ -85,9 +87,10 @@ export default function PsaImportForm() {
 
       {result && (
         <div className="mt-4 rounded-md border border-gain/30 bg-[rgba(0,214,143,0.08)] p-4">
-          <div className="grid gap-3 font-mono text-sm font-semibold text-text md:grid-cols-3">
+          <div className="grid gap-3 font-mono text-sm font-semibold text-text md:grid-cols-4">
             <div>Imported {result.count}</div>
             <div>Matched {result.matched}</div>
+            <div>Skipped {result.skipped_duplicates ?? 0}</div>
             <div className="flex items-center justify-between gap-3">
               <span>Needs Match {result.pending_match}</span>
               {result.pending_match > 0 && (
@@ -103,8 +106,8 @@ export default function PsaImportForm() {
           <div className="mt-3 max-h-48 overflow-y-auto rounded border border-border bg-deep">
             {result.rows.map((row, index) => (
               <div key={`${row.certification_number ?? "row"}-${index}`} className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2 text-xs text-text-2 last:border-b-0">
-                <span className={row.matched ? "font-semibold text-gain" : "font-semibold text-owl"}>
-                  {row.matched ? "Matched" : "Needs Match"}
+                <span className={row.skipped_duplicate ? "font-semibold text-text-2" : row.matched ? "font-semibold text-gain" : "font-semibold text-owl"}>
+                  {row.skipped_duplicate ? "Skipped" : row.matched ? "Matched" : "Needs Match"}
                 </span>
                 {row.set_code && <span>{row.set_code}</span>}
                 {row.card_number && <span>{row.card_number}</span>}

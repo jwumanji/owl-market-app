@@ -179,6 +179,10 @@ function setCodeFor(card: CardLookupForImport | null) {
   return set?.code ?? null;
 }
 
+function compactStrings(values: Array<string | null | undefined>) {
+  return values.filter((value): value is string => Boolean(value));
+}
+
 export async function POST(request: Request) {
   const formData = await request.formData().catch(() => null);
   if (!formData) {
@@ -205,6 +209,23 @@ export async function POST(request: Request) {
   const backFiles = filesFrom(formData, "back_images");
   const scanPairs = assignScans(rows, frontFiles, backFiles);
   const supabase = createServiceClient();
+  const certificationNumbers = Array.from(new Set(compactStrings(rows.map((row) => row.certificationNumber))));
+  const existingCertificationNumbers = new Set<string>();
+
+  if (certificationNumbers.length > 0) {
+    const { data: existingCertData, error: existingCertError } = await supabase
+      .from("inventory_items")
+      .select("certification_number")
+      .in("certification_number", certificationNumbers);
+
+    if (existingCertError) {
+      return NextResponse.json({ error: existingCertError.message }, { status: 500 });
+    }
+
+    for (const item of existingCertData ?? []) {
+      if (item.certification_number) existingCertificationNumbers.add(item.certification_number);
+    }
+  }
 
   const { data: cardData, error: cardsError } = await supabase
     .from("cards")
@@ -221,8 +242,28 @@ export async function POST(request: Request) {
   const cards = (cardData ?? []) as unknown as CardLookupForImport[];
   const importRows = [];
   const summaryRows = [];
+  const importCertificationNumbers = new Set<string>();
 
   for (const row of rows) {
+    const certificationNumber = row.certificationNumber;
+    const isExistingDuplicate = Boolean(certificationNumber && existingCertificationNumbers.has(certificationNumber));
+    const isFileDuplicate = Boolean(certificationNumber && importCertificationNumbers.has(certificationNumber));
+
+    if (isExistingDuplicate || isFileDuplicate) {
+      summaryRows.push({
+        certification_number: certificationNumber,
+        matched: false,
+        card_name: row.cardName,
+        card_number: row.cardNumber,
+        set_code: row.setCode,
+        front_image_uploaded: false,
+        back_image_uploaded: false,
+        skipped_duplicate: true,
+        image_status: isExistingDuplicate ? "Skipped - cert already in inventory" : "Skipped - duplicate cert in CSV",
+      });
+      continue;
+    }
+
     const pair = scanPairs.get(row.sourceIndex) ?? { front: null, back: null };
     const match = matchInventoryCard(row, cards);
     const psaCertDetails = await lookupPsaCertDetails(row.certificationNumber);
@@ -291,6 +332,19 @@ export async function POST(request: Request) {
             : archivePair.downloaded && archivePair.imageCount === 0
               ? "PSA ZIP had no images"
               : "No scans imported",
+      skipped_duplicate: false,
+    });
+
+    if (certificationNumber) importCertificationNumbers.add(certificationNumber);
+  }
+
+  if (importRows.length === 0) {
+    return NextResponse.json({
+      count: 0,
+      matched: 0,
+      pending_match: 0,
+      skipped_duplicates: summaryRows.filter((row) => row.skipped_duplicate).length,
+      rows: summaryRows,
     });
   }
 
@@ -306,7 +360,8 @@ export async function POST(request: Request) {
   return NextResponse.json({
     count: data?.length ?? 0,
     matched: summaryRows.filter((row) => row.matched).length,
-    pending_match: summaryRows.filter((row) => !row.matched).length,
+    pending_match: summaryRows.filter((row) => !row.matched && !row.skipped_duplicate).length,
+    skipped_duplicates: summaryRows.filter((row) => row.skipped_duplicate).length,
     rows: summaryRows,
   });
 }

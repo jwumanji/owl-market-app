@@ -115,6 +115,13 @@ type HoverPreview = {
   y: number;
 };
 
+type ScanViewer = {
+  cardName: string;
+  certificationNumber: string | null;
+  scans: { label: string; url: string }[];
+  activeIndex: number;
+};
+
 function SelectField({
   children,
   className = "",
@@ -256,6 +263,7 @@ export default function InventoryTabs({
   const [openActionMenuKey, setOpenActionMenuKey] = useState<string | null>(null);
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null);
   const [hoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
+  const [scanViewer, setScanViewer] = useState<ScanViewer | null>(null);
   const [searchDraft, setSearchDraft] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [pendingMatchOnly, setPendingMatchOnly] = useState(false);
@@ -1613,12 +1621,18 @@ export default function InventoryTabs({
 
     return (
       <div className="mt-3 flex flex-wrap gap-3">
-        {scans.map((scan) => (
-          <a
+        {scans.map((scan, index) => (
+          <button
             key={scan.label}
-            href={scan.url}
-            target="_blank"
-            rel="noreferrer"
+            type="button"
+            onClick={() =>
+              setScanViewer({
+                cardName: item.card.name ?? "Card scan",
+                certificationNumber: item.certification_number ?? null,
+                scans,
+                activeIndex: index,
+              })
+            }
             className="group block w-20 rounded-md border border-border bg-deep p-1 transition-colors hover:border-owl"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1630,7 +1644,7 @@ export default function InventoryTabs({
             <div className="mt-1 text-center font-mono text-[10px] font-bold uppercase tracking-wider text-text-2 group-hover:text-owl">
               {scan.label}
             </div>
-          </a>
+          </button>
         ))}
       </div>
     );
@@ -1670,6 +1684,66 @@ export default function InventoryTabs({
         />
         <div className="mt-2 max-w-[238px] truncate font-mono text-xs font-semibold text-text">
           {hoverPreview.name}
+        </div>
+      </div>
+    );
+  }
+
+  function renderScanViewer() {
+    if (!scanViewer) return null;
+
+    const activeScan = scanViewer.scans[scanViewer.activeIndex] ?? scanViewer.scans[0];
+    if (!activeScan) return null;
+
+    return (
+      <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 px-4 py-8">
+        <div className="flex max-h-full w-full max-w-5xl flex-col rounded-lg border border-border bg-deep shadow-2xl">
+          <div className="flex items-start justify-between gap-4 border-b border-border p-4">
+            <div className="min-w-0">
+              <div className="font-mono text-xs font-bold uppercase tracking-wider text-owl">{activeScan.label} Scan</div>
+              <div className="mt-1 truncate text-xl font-bold text-text">{scanViewer.cardName}</div>
+              {scanViewer.certificationNumber && (
+                <div className="mt-1 font-mono text-xs font-semibold text-text-2">Cert {scanViewer.certificationNumber}</div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setScanViewer(null)}
+              className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-sm font-bold uppercase tracking-wider text-text hover:border-border-2 hover:text-owl"
+            >
+              Close
+            </button>
+          </div>
+          <div className="grid min-h-0 gap-4 p-4 lg:grid-cols-[1fr_160px]">
+            <div className="flex min-h-0 items-center justify-center rounded-md border border-border bg-black/30 p-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={activeScan.url}
+                alt={`${activeScan.label} scan`}
+                className="max-h-[72vh] max-w-full rounded-md object-contain"
+              />
+            </div>
+            <div className="flex gap-3 overflow-x-auto lg:flex-col lg:overflow-x-visible">
+              {scanViewer.scans.map((scan, index) => (
+                <button
+                  key={scan.label}
+                  type="button"
+                  onClick={() => setScanViewer((current) => (current ? { ...current, activeIndex: index } : current))}
+                  className={`shrink-0 rounded-md border bg-surface p-1 transition-colors ${
+                    index === scanViewer.activeIndex
+                      ? "border-owl text-owl"
+                      : "border-border text-text-2 hover:border-border-2 hover:text-owl"
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={scan.url} alt={`${scan.label} scan thumbnail`} className="h-24 w-16 rounded object-cover" />
+                  <div className="mt-1 text-center font-mono text-[10px] font-bold uppercase tracking-wider">
+                    {scan.label}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -2549,6 +2623,7 @@ export default function InventoryTabs({
       )}
       {renderHoverPreview()}
       {renderInventoryDetailModal()}
+      {renderScanViewer()}
     </div>
   );
 }
