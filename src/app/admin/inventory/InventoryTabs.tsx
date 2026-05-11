@@ -288,6 +288,28 @@ export default function InventoryTabs({
   }, [onItemsChange, rows]);
 
   useEffect(() => {
+    const timers = Object.entries(matchQueries).map(([itemId, query]) => {
+      const trimmed = query.trim();
+      if (trimmed.length < 2) return null;
+
+      return window.setTimeout(() => {
+        const item = rows.find((row) => row.id === itemId);
+        if (item?.pending_card_match) {
+          searchMatchCandidates(item, trimmed);
+        }
+      }, 250);
+    });
+
+    return () => {
+      timers.forEach((timer) => {
+        if (timer) window.clearTimeout(timer);
+      });
+    };
+    // matchQueries and rows are the intended debounce inputs; the search helper reads the current item/query when the timer fires.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchQueries, rows]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setPendingMatchOnly(params.get("review") === "needs-match");
   }, []);
@@ -464,8 +486,8 @@ export default function InventoryTabs({
     return [item.card.set_code, item.card.card_number, item.card.name].filter(Boolean).join(" ").trim();
   }
 
-  async function searchMatchCandidates(item: InventoryRow) {
-    const query = (matchQueries[item.id] ?? initialMatchQuery(item)).trim();
+  async function searchMatchCandidates(item: InventoryRow, queryOverride?: string) {
+    const query = (queryOverride ?? matchQueries[item.id] ?? initialMatchQuery(item)).trim();
     if (query.length < 2 || searchingMatchIds[item.id]) return;
 
     setMatchErrors((current) => {
