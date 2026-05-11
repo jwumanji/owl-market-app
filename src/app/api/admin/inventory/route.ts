@@ -224,3 +224,35 @@ export async function POST(request: Request) {
 
   return NextResponse.json(data);
 }
+
+export async function DELETE(request: Request) {
+  const body = await request.json().catch(() => null);
+  const ids = Array.isArray(body?.ids)
+    ? Array.from(new Set(body.ids.filter((id: unknown): id is string => typeof id === "string" && id.trim().length > 0).map((id: string) => id.trim())))
+    : [];
+
+  if (ids.length === 0) {
+    return NextResponse.json({ error: "Choose inventory items to delete" }, { status: 400 });
+  }
+
+  if (ids.length > 500) {
+    return NextResponse.json({ error: "Delete 500 inventory items or fewer at a time" }, { status: 400 });
+  }
+
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("inventory_items")
+    .delete()
+    .in("id", ids)
+    .select("id");
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    deleted_ids: (data ?? []).map((item) => item.id),
+    requested_count: ids.length,
+    deleted_count: data?.length ?? 0,
+  });
+}

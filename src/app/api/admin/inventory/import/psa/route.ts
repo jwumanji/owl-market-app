@@ -179,8 +179,9 @@ function setCodeFor(card: CardLookupForImport | null) {
   return set?.code ?? null;
 }
 
-function compactStrings(values: Array<string | null | undefined>) {
-  return values.filter((value): value is string => Boolean(value));
+function certificationKey(value: string | number | null | undefined) {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  return digits || null;
 }
 
 export async function POST(request: Request) {
@@ -209,21 +210,23 @@ export async function POST(request: Request) {
   const backFiles = filesFrom(formData, "back_images");
   const scanPairs = assignScans(rows, frontFiles, backFiles);
   const supabase = createServiceClient();
-  const certificationNumbers = Array.from(new Set(compactStrings(rows.map((row) => row.certificationNumber))));
-  const existingCertificationNumbers = new Set<string>();
+  const hasCertRows = rows.some((row) => certificationKey(row.certificationNumber));
+  const existingCertificationKeys = new Set<string>();
 
-  if (certificationNumbers.length > 0) {
+  if (hasCertRows) {
     const { data: existingCertData, error: existingCertError } = await supabase
       .from("inventory_items")
       .select("certification_number")
-      .in("certification_number", certificationNumbers);
+      .not("certification_number", "is", null)
+      .limit(50000);
 
     if (existingCertError) {
       return NextResponse.json({ error: existingCertError.message }, { status: 500 });
     }
 
     for (const item of existingCertData ?? []) {
-      if (item.certification_number) existingCertificationNumbers.add(item.certification_number);
+      const key = certificationKey(item.certification_number);
+      if (key) existingCertificationKeys.add(key);
     }
   }
 
@@ -242,12 +245,13 @@ export async function POST(request: Request) {
   const cards = (cardData ?? []) as unknown as CardLookupForImport[];
   const importRows = [];
   const summaryRows = [];
-  const importCertificationNumbers = new Set<string>();
+  const importCertificationKeys = new Set<string>();
 
   for (const row of rows) {
     const certificationNumber = row.certificationNumber;
-    const isExistingDuplicate = Boolean(certificationNumber && existingCertificationNumbers.has(certificationNumber));
-    const isFileDuplicate = Boolean(certificationNumber && importCertificationNumbers.has(certificationNumber));
+    const certKey = certificationKey(certificationNumber);
+    const isExistingDuplicate = Boolean(certKey && existingCertificationKeys.has(certKey));
+    const isFileDuplicate = Boolean(certKey && importCertificationKeys.has(certKey));
 
     if (isExistingDuplicate || isFileDuplicate) {
       summaryRows.push({
@@ -335,7 +339,7 @@ export async function POST(request: Request) {
       skipped_duplicate: false,
     });
 
-    if (certificationNumber) importCertificationNumbers.add(certificationNumber);
+    if (certKey) importCertificationKeys.add(certKey);
   }
 
   if (importRows.length === 0) {

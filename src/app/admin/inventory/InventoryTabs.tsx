@@ -770,17 +770,20 @@ export default function InventoryTabs({
     if (bulkDeleting || selectedIds.length === 0) return;
 
     const selectedSet = new Set(selectedIds);
+    const persistedIds = selectedIds.filter((id) => !isLocalOnlyItem(id));
     const previousRows = rows;
-    const itemsToDelete = rows.filter((item) => selectedSet.has(item.id));
 
     setActionError(null);
     setBulkDeleting(true);
     setRows((current) => current.filter((item) => !selectedSet.has(item.id)));
 
     try {
-      for (const item of itemsToDelete) {
-        if (isLocalOnlyItem(item.id)) continue;
-        const res = await fetch(`/api/admin/inventory/${item.id}`, { method: "DELETE" });
+      if (persistedIds.length > 0) {
+        const res = await fetch("/api/admin/inventory", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: persistedIds }),
+        });
         if (!res.ok) throw new Error("Failed to delete selected inventory items");
       }
       clearBulkSelection();
