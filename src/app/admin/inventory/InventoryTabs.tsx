@@ -245,6 +245,7 @@ export default function InventoryTabs({
   const [confirmingDeleteIds, setConfirmingDeleteIds] = useState<Record<string, boolean>>({});
   const [bulkSelectMode, setBulkSelectMode] = useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<Record<string, boolean>>({});
+  const [lastSelectedItemId, setLastSelectedItemId] = useState<string | null>(null);
   const [bulkDeleteStep, setBulkDeleteStep] = useState<0 | 1 | 2>(0);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [openActionMenuKey, setOpenActionMenuKey] = useState<string | null>(null);
@@ -673,10 +674,39 @@ export default function InventoryTabs({
   function clearBulkSelection() {
     setBulkSelectMode(false);
     setSelectedItemIds({});
+    setLastSelectedItemId(null);
     setBulkDeleteStep(0);
   }
 
-  function setGroupSelected(group: InventoryGroup, selected: boolean) {
+  function applyRangeSelection(targetIds: string[], selected: boolean) {
+    const anchorIndex = lastSelectedItemId ? visibleRows.findIndex((item) => item.id === lastSelectedItemId) : -1;
+    const targetIndexes = targetIds
+      .map((id) => visibleRows.findIndex((item) => item.id === id))
+      .filter((index) => index >= 0);
+
+    if (anchorIndex < 0 || targetIndexes.length === 0) return false;
+
+    const start = Math.min(anchorIndex, ...targetIndexes);
+    const end = Math.max(anchorIndex, ...targetIndexes);
+    setSelectedItemIds((current) => {
+      const next = { ...current };
+      for (const item of visibleRows.slice(start, end + 1)) {
+        if (selected) next[item.id] = true;
+        else delete next[item.id];
+      }
+      return next;
+    });
+    return true;
+  }
+
+  function setGroupSelected(group: InventoryGroup, selected: boolean, shiftKey = false) {
+    const groupIds = group.rows.map((item) => item.id);
+    if (shiftKey && applyRangeSelection(groupIds, selected)) {
+      setLastSelectedItemId(groupIds[groupIds.length - 1] ?? null);
+      setBulkDeleteStep(0);
+      return;
+    }
+
     setSelectedItemIds((current) => {
       const next = { ...current };
       for (const item of group.rows) {
@@ -685,16 +715,24 @@ export default function InventoryTabs({
       }
       return next;
     });
+    setLastSelectedItemId(groupIds[groupIds.length - 1] ?? null);
     setBulkDeleteStep(0);
   }
 
-  function setItemSelected(item: InventoryRow, selected: boolean) {
+  function setItemSelected(item: InventoryRow, selected: boolean, shiftKey = false) {
+    if (shiftKey && applyRangeSelection([item.id], selected)) {
+      setLastSelectedItemId(item.id);
+      setBulkDeleteStep(0);
+      return;
+    }
+
     setSelectedItemIds((current) => {
       const next = { ...current };
       if (selected) next[item.id] = true;
       else delete next[item.id];
       return next;
     });
+    setLastSelectedItemId(item.id);
     setBulkDeleteStep(0);
   }
 
@@ -779,7 +817,13 @@ export default function InventoryTabs({
           ref={(input) => {
             if (input) input.indeterminate = isPartiallySelected;
           }}
-          onChange={(event) => setGroupSelected(group, event.target.checked)}
+          onChange={(event) =>
+            setGroupSelected(
+              group,
+              event.target.checked,
+              Boolean((event.nativeEvent as globalThis.MouseEvent).shiftKey),
+            )
+          }
           className="h-4 w-4 accent-owl"
           aria-label={label}
         />
@@ -798,7 +842,13 @@ export default function InventoryTabs({
         <input
           type="checkbox"
           checked={Boolean(selectedItemIds[item.id])}
-          onChange={(event) => setItemSelected(item, event.target.checked)}
+          onChange={(event) =>
+            setItemSelected(
+              item,
+              event.target.checked,
+              Boolean((event.nativeEvent as globalThis.MouseEvent).shiftKey),
+            )
+          }
           className="h-4 w-4 accent-owl"
           aria-label={label}
         />

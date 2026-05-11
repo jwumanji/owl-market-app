@@ -145,24 +145,19 @@ function scanPairFromZip(buffer: Buffer) {
   } satisfies ScanPair;
 }
 
-async function downloadPsaImageArchive(url: string | null, certificationNumber: string | null) {
+async function downloadPsaImageArchive(url: string | null) {
   if (!url) return { front: null, back: null } satisfies ScanPair;
 
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
     if (!response.ok) {
-      throw new Error(`Could not download PSA image ZIP for cert ${certificationNumber ?? "unknown"}.`);
+      return { front: null, back: null } satisfies ScanPair;
     }
 
     const buffer = Buffer.from(await response.arrayBuffer());
-    const pair = scanPairFromZip(buffer);
-    if (!pair.front || !pair.back) {
-      throw new Error(`PSA image ZIP for cert ${certificationNumber ?? "unknown"} did not include both Front and Back images.`);
-    }
-    return pair;
-  } catch (error) {
-    if (error instanceof Error) throw error;
-    throw new Error(`Could not process PSA image ZIP for cert ${certificationNumber ?? "unknown"}.`);
+    return scanPairFromZip(buffer);
+  } catch {
+    return { front: null, back: null } satisfies ScanPair;
   }
 }
 
@@ -218,7 +213,7 @@ export async function POST(request: Request) {
     const pair = scanPairs.get(row.sourceIndex) ?? { front: null, back: null };
     const match = matchInventoryCard(row, cards);
     const psaCertDetails = await lookupPsaCertDetails(row.certificationNumber);
-    const archivePair = await downloadPsaImageArchive(row.imageArchiveUrl, row.certificationNumber);
+    const archivePair = await downloadPsaImageArchive(row.imageArchiveUrl);
     const frontScan = pair.front ?? archivePair.front;
     const backScan = pair.back ?? archivePair.back;
     const gradedRating = row.gradedRating ?? psaCertDetails.gradedRating;
