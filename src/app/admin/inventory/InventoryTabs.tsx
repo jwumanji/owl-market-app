@@ -201,6 +201,11 @@ function cardImageUrl(item: InventoryRow) {
   return item.custom_image_front_url ?? item.card.image_url_small ?? item.card.image_url;
 }
 
+function cardImageFallbackUrl(item: InventoryRow) {
+  if (item.custom_image_front_url) return item.card.image_url_small ?? item.card.image_url ?? null;
+  return null;
+}
+
 function inventoryCardId(item: InventoryRow) {
   const stableId = item.id.replace(/^(preview-|temp-)/, "");
   return stableId.slice(0, 8).toUpperCase();
@@ -1582,7 +1587,14 @@ export default function InventoryTabs({
         <img
           src={imageUrl}
           alt={item.card.name ?? "Card image"}
+          data-fallback-src={cardImageFallbackUrl(item) ?? undefined}
           onError={(event) => {
+            const fallbackSrc = event.currentTarget.dataset.fallbackSrc;
+            if (fallbackSrc && event.currentTarget.src !== fallbackSrc) {
+              event.currentTarget.src = fallbackSrc;
+              delete event.currentTarget.dataset.fallbackSrc;
+              return;
+            }
             event.currentTarget.style.display = "none";
           }}
           className="h-full w-full object-cover"

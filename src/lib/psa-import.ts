@@ -238,12 +238,6 @@ export function normalizePsaGrade(value: string | null | undefined): GradedRatin
   return GRADED_RATING_SET.has(rating) ? (rating as GradedRating) : null;
 }
 
-export function psaCertImageUrl(certificationNumber: string | null | undefined, side: "front" | "back") {
-  const cert = cleanCertDigits(certificationNumber);
-  if (!cert) return null;
-  return `https://cert-images.psa.com/${cert}/large/${cert}_${side === "front" ? "f" : "b"}.jpg`;
-}
-
 function decodeHtmlEntities(value: string) {
   return value
     .replace(/&nbsp;/gi, " ")
@@ -264,7 +258,7 @@ function imageFromHtml(html: string, certificationNumber: string, side: "front" 
   const suffix = side === "front" ? "f" : "b";
   const escapedCert = certificationNumber.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const imageMatch = html.match(new RegExp(`https?:[^"')\\s]+${escapedCert}[_-]${suffix}\\.(?:jpg|jpeg|png|webp)`, "i"));
-  return cleanUrl(imageMatch?.[0]) ?? psaCertImageUrl(certificationNumber, side);
+  return cleanUrl(imageMatch?.[0]);
 }
 
 export async function lookupPsaCertDetails(certificationNumber: string | null | undefined) {
@@ -284,8 +278,8 @@ export async function lookupPsaCertDetails(certificationNumber: string | null | 
     if (!response.ok) {
       return {
         gradedRating: null,
-        frontImageUrl: psaCertImageUrl(cert, "front"),
-        backImageUrl: psaCertImageUrl(cert, "back"),
+        frontImageUrl: null,
+        backImageUrl: null,
       };
     }
 
@@ -301,8 +295,8 @@ export async function lookupPsaCertDetails(certificationNumber: string | null | 
   } catch {
     return {
       gradedRating: null,
-      frontImageUrl: psaCertImageUrl(cert, "front"),
-      backImageUrl: psaCertImageUrl(cert, "back"),
+      frontImageUrl: null,
+      backImageUrl: null,
     };
   }
 }

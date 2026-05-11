@@ -73,6 +73,12 @@ type ZipImageEntry = {
   data: Buffer;
 };
 
+type ArchiveScanPair = ScanPair & {
+  attempted: boolean;
+  downloaded: boolean;
+  imageCount: number;
+};
+
 function contentTypeForZipImage(name: string) {
   const lower = name.toLowerCase();
   if (lower.endsWith(".png")) return "image/png";
@@ -134,8 +140,7 @@ function fileFromZipEntry(entry: ZipImageEntry) {
   });
 }
 
-function scanPairFromZip(buffer: Buffer) {
-  const entries = extractZipImageEntries(buffer);
+function scanPairFromEntries(entries: ZipImageEntry[]) {
   const front = entries.find((entry) => /front|obverse/i.test(entry.name)) ?? entries[0] ?? null;
   const back = entries.find((entry) => /back|reverse/i.test(entry.name)) ?? entries.find((entry) => entry !== front) ?? null;
 
@@ -146,18 +151,26 @@ function scanPairFromZip(buffer: Buffer) {
 }
 
 async function downloadPsaImageArchive(url: string | null) {
-  if (!url) return { front: null, back: null } satisfies ScanPair;
+  if (!url) {
+    return { front: null, back: null, attempted: false, downloaded: false, imageCount: 0 } satisfies ArchiveScanPair;
+  }
 
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
     if (!response.ok) {
-      return { front: null, back: null } satisfies ScanPair;
+      return { front: null, back: null, attempted: true, downloaded: false, imageCount: 0 } satisfies ArchiveScanPair;
     }
 
     const buffer = Buffer.from(await response.arrayBuffer());
-    return scanPairFromZip(buffer);
+    const entries = extractZipImageEntries(buffer);
+    return {
+      ...scanPairFromEntries(entries),
+      attempted: true,
+      downloaded: true,
+      imageCount: entries.length,
+    } satisfies ArchiveScanPair;
   } catch {
-    return { front: null, back: null } satisfies ScanPair;
+    return { front: null, back: null, attempted: true, downloaded: false, imageCount: 0 } satisfies ArchiveScanPair;
   }
 }
 
@@ -270,6 +283,14 @@ export async function POST(request: Request) {
       set_code: setCodeFor(match) ?? row.setCode,
       front_image_uploaded: Boolean(customImageFrontUrl),
       back_image_uploaded: Boolean(customImageBackUrl),
+      image_status:
+        customImageFrontUrl && customImageBackUrl
+          ? "Front/back scans imported"
+          : archivePair.attempted && !archivePair.downloaded
+            ? "PSA ZIP unavailable"
+            : archivePair.downloaded && archivePair.imageCount === 0
+              ? "PSA ZIP had no images"
+              : "No scans imported",
     });
   }
 

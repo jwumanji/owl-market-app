@@ -12,6 +12,7 @@ type PsaImportResult = {
     card_name: string | null;
     card_number: string | null;
     set_code: string | null;
+    image_status?: string | null;
   }[];
 };
 
@@ -109,6 +110,11 @@ export default function PsaImportForm() {
                 {row.card_number && <span>{row.card_number}</span>}
                 <span className="min-w-0 flex-1 truncate text-text">{row.card_name ?? "Unknown Card"}</span>
                 {row.certification_number && <span>Cert {row.certification_number}</span>}
+                {row.image_status && (
+                  <span className={row.image_status.includes("imported") ? "font-semibold text-gain" : "font-semibold text-text-2"}>
+                    {row.image_status}
+                  </span>
+                )}
               </div>
             ))}
           </div>
