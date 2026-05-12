@@ -1926,7 +1926,14 @@ export default function InventoryTabs({
     const item = selectedGroup.first;
 
     return (
-      <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 px-4 pb-8 pt-[120px]">
+      <div
+        className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 px-4 pb-8 pt-[120px]"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) {
+            setSelectedGroupKey(null);
+          }
+        }}
+      >
         <div className="w-full max-w-6xl rounded-lg border border-border bg-deep shadow-2xl">
           <div className="flex items-center justify-between gap-4 border-b border-border p-5">
             <div>
