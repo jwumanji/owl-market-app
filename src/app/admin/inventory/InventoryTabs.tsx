@@ -2215,20 +2215,6 @@ export default function InventoryTabs({
       )}
 
       <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            setNeedsMatchReview(false);
-            onStatusFilterChange?.("all");
-          }}
-          className={`rounded-md border px-4 py-2.5 font-mono text-sm font-semibold transition-colors ${
-            statusFilter === "all" && !pendingMatchOnly
-              ? "border-blue bg-blue/10 text-blue"
-              : "border-border bg-surface text-text hover:border-border-2 hover:text-owl"
-          }`}
-        >
-          All Statuses
-        </button>
         {TABS.map((tab) => (
           <button
             key={tab.id}
