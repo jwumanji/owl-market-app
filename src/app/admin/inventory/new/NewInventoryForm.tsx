@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { GRADED_RATINGS, type GradedRating, type InventoryStatus, type InventoryType } from "@/lib/inventory-options";
+import { GRADED_RATINGS, type CatalogMatchStatus, type GradedRating, type InventoryStatus, type InventoryType } from "@/lib/inventory-options";
 
 type PurchasedFrom = "facebook" | "ebay" | "instagram" | "direct_person" | "event";
 
@@ -56,6 +56,7 @@ export default function NewInventoryForm() {
   const [results, setResults] = useState<CardSearchResult[]>([]);
   const [selectedCard, setSelectedCard] = useState<CardSearchResult | null>(null);
   const [manualMode, setManualMode] = useState(false);
+  const [notInCatalog, setNotInCatalog] = useState(false);
   const [manualName, setManualName] = useState("");
   const [manualNumber, setManualNumber] = useState("");
   const [manualSet, setManualSet] = useState("");
@@ -76,14 +77,16 @@ export default function NewInventoryForm() {
   const [error, setError] = useState<string | null>(null);
 
   const canSubmit = useMemo(
-    () => (selectedCard || (manualMode && manualName.trim())) && quantity >= 1 && !saving,
-    [selectedCard, manualMode, manualName, quantity, saving]
+    () => (selectedCard || ((manualMode || notInCatalog) && manualName.trim())) && quantity >= 1 && !saving,
+    [selectedCard, manualMode, notInCatalog, manualName, quantity, saving]
   );
 
   async function searchCards(value: string) {
     setQuery(value);
     setSelectedCard(null);
-    setManualMode(false);
+    if (!notInCatalog) {
+      setManualMode(false);
+    }
 
     if (value.trim().length < 2) {
       setResults([]);
@@ -103,16 +106,23 @@ export default function NewInventoryForm() {
   }
 
   async function submit() {
-    if (!selectedCard && (!manualMode || !manualName.trim())) return;
+    if (!selectedCard && (!(manualMode || notInCatalog) || !manualName.trim())) return;
 
     setSaving(true);
     setError(null);
+
+    const catalogMatchStatus: CatalogMatchStatus = selectedCard
+      ? "matched"
+      : notInCatalog
+        ? "custom_verified"
+        : "needs_match";
 
     const payload = {
       card_id: selectedCard?.id ?? "",
       manual_card_name: manualMode ? manualName : "",
       manual_card_number: manualMode ? manualNumber : "",
       manual_set_code: manualMode ? manualSet : "",
+      catalog_match_status: catalogMatchStatus,
       item_nickname: nickname,
       inventory_type: condition,
       status,
@@ -176,6 +186,8 @@ export default function NewInventoryForm() {
               type="button"
               onClick={() => {
                 setSelectedCard(card);
+                setManualMode(false);
+                setNotInCatalog(false);
                 setQuery(card.name ?? "");
               }}
               className={`flex w-full items-center gap-4 border-b border-border p-3 text-left transition-colors last:border-b-0 hover:bg-surf2 ${
@@ -229,6 +241,31 @@ export default function NewInventoryForm() {
             </button>
           </div>
         </div>
+
+        <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-deep p-4 hover:border-border-2">
+          <input
+            type="checkbox"
+            checked={notInCatalog}
+            onChange={(event) => {
+              const checked = event.target.checked;
+              setNotInCatalog(checked);
+              if (checked) {
+                setSelectedCard(null);
+                setManualMode(true);
+                setManualName((current) => current || query);
+              }
+            }}
+            className="mt-1 h-4 w-4 shrink-0 accent-owl"
+          />
+          <span className="min-w-0">
+            <span className="block font-mono text-sm font-bold uppercase tracking-wider text-text">
+              Not in catalog
+            </span>
+            <span className="mt-1 block text-sm text-text-2">
+              This is a real item and does not need catalog matching.
+            </span>
+          </span>
+        </label>
       </div>
 
       <div className="rounded-lg border border-border bg-surface p-5">
@@ -238,14 +275,16 @@ export default function NewInventoryForm() {
           {manualMode && (
             <div className="rounded-lg border border-owl/30 bg-owl/10 p-4">
               <div className="mb-3 font-mono text-xs font-bold uppercase tracking-wider text-owl">
-                Manual Card Entry
+                {notInCatalog ? "Manual Item Entry" : "Manual Card Entry"}
               </div>
               <label className="block">
-                <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Card Name</span>
+                <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
+                  {notInCatalog ? "Item Name" : "Card Name"}
+                </span>
                 <input
                   value={manualName}
                   onChange={(event) => setManualName(event.target.value)}
-                  placeholder="Enter card name"
+                  placeholder={notInCatalog ? "Enter item name" : "Enter card name"}
                   className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-3 text-text outline-none focus:border-owl"
                 />
               </label>

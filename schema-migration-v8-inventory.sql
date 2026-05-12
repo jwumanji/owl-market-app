@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS inventory_items (
   manual_card_name text,
   manual_card_number text,
   manual_set_code text,
+  catalog_match_status text NOT NULL DEFAULT 'matched' CHECK (catalog_match_status IN ('matched', 'needs_match', 'custom_verified')),
   pending_card_match boolean NOT NULL DEFAULT false,
   inventory_type  text NOT NULL CHECK (inventory_type IN ('raw', 'damaged', 'graded', 'sealed')),
   status          text NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'grading', 'sale', 'sold')),
@@ -68,11 +69,34 @@ ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS purchased_from text;
 ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS manual_card_name text;
 ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS manual_card_number text;
 ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS manual_set_code text;
+ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS catalog_match_status text NOT NULL DEFAULT 'matched';
 ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS pending_card_match boolean NOT NULL DEFAULT false;
 ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS certification_number text;
 ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS custom_image_front_url text;
 ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS custom_image_back_url text;
 ALTER TABLE inventory_items ALTER COLUMN card_id DROP NOT NULL;
+
+ALTER TABLE inventory_items DROP CONSTRAINT IF EXISTS inventory_items_catalog_match_status_check;
+ALTER TABLE inventory_items ALTER COLUMN catalog_match_status SET DEFAULT 'matched';
+ALTER TABLE inventory_items
+  ADD CONSTRAINT inventory_items_catalog_match_status_check
+  CHECK (catalog_match_status IN ('matched', 'needs_match', 'custom_verified'));
+
+UPDATE inventory_items
+SET catalog_match_status = CASE
+  WHEN card_id IS NOT NULL THEN 'matched'
+  WHEN pending_card_match THEN 'needs_match'
+  ELSE 'custom_verified'
+END
+WHERE catalog_match_status IS NULL OR catalog_match_status = 'matched';
+
+UPDATE inventory_items
+SET pending_card_match = (catalog_match_status = 'needs_match');
+
+ALTER TABLE inventory_items ALTER COLUMN catalog_match_status SET NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_inventory_items_catalog_match_status
+  ON inventory_items(catalog_match_status);
 
 CREATE TABLE IF NOT EXISTS inventory_status_history (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),

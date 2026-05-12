@@ -304,6 +304,7 @@ export async function POST(request: Request) {
       manual_card_name: match ? null : row.cardName,
       manual_card_number: match ? null : row.cardNumber,
       manual_set_code: match ? null : row.setCode,
+      catalog_match_status: match ? "matched" : "needs_match",
       pending_card_match: !match,
       inventory_type: "graded",
       status: "new",

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
-import { GRADED_RATINGS } from "@/lib/inventory-options";
+import { CATALOG_MATCH_STATUSES, GRADED_RATINGS, type CatalogMatchStatus } from "@/lib/inventory-options";
 import { isUploadFile, uploadInventoryScan } from "@/lib/inventory-scans";
 
 type InventorySource = {
@@ -8,6 +8,7 @@ type InventorySource = {
   manual_card_name: string | null;
   manual_card_number: string | null;
   manual_set_code: string | null;
+  catalog_match_status: CatalogMatchStatus | null;
   item_nickname: string | null;
   pending_card_match: boolean | null;
   inventory_type: string;
@@ -32,6 +33,7 @@ type InventorySource = {
 const CONDITIONS = new Set(["raw", "damaged", "graded", "sealed"]);
 const STATUSES = new Set(["new", "grading", "sale", "ship", "sold"]);
 const GRADED_RATING_VALUES = new Set<string>(GRADED_RATINGS);
+const CATALOG_MATCH_STATUS_VALUES = new Set<string>(CATALOG_MATCH_STATUSES);
 const PURCHASED_FROM_OPTIONS = new Set(["facebook", "ebay", "instagram", "direct_person", "event"]);
 
 type RequestBody = Record<string, unknown>;
@@ -39,6 +41,21 @@ type RequestBody = Record<string, unknown>;
 function stringValue(body: RequestBody, key: string) {
   const value = body[key];
   return typeof value === "string" ? value : null;
+}
+
+function resolveCatalogMatchStatus(body: RequestBody, cardId: string | null) {
+  const requestedStatus = stringValue(body, "catalog_match_status")?.trim() || null;
+  if (requestedStatus && !CATALOG_MATCH_STATUS_VALUES.has(requestedStatus)) {
+    return { error: "Invalid catalog match status" };
+  }
+
+  if (cardId) {
+    return { value: "matched" as CatalogMatchStatus };
+  }
+
+  return {
+    value: requestedStatus === "custom_verified" ? "custom_verified" as const : "needs_match" as const,
+  };
 }
 
 async function readCreateRequest(request: Request) {
@@ -107,6 +124,11 @@ export async function POST(request: Request) {
     const manualName = stringValue(body, "manual_card_name")?.trim() ?? "";
     const inventoryType = stringValue(body, "inventory_type");
     const status = stringValue(body, "status");
+    const catalogMatchStatus = resolveCatalogMatchStatus(body, cardId);
+
+    if ("error" in catalogMatchStatus) {
+      return NextResponse.json({ error: catalogMatchStatus.error }, { status: 400 });
+    }
 
     if (!cardId && !manualName) {
       return NextResponse.json({ error: "Select a card or enter a manual card name" }, { status: 400 });
@@ -179,8 +201,9 @@ export async function POST(request: Request) {
       manual_card_name: cardId ? null : manualName,
       manual_card_number: cardId ? null : stringValue(body, "manual_card_number")?.trim() || null,
       manual_set_code: cardId ? null : stringValue(body, "manual_set_code")?.trim() || null,
+      catalog_match_status: catalogMatchStatus.value,
       item_nickname: stringValue(body, "item_nickname")?.trim() || null,
-      pending_card_match: !cardId,
+      pending_card_match: catalogMatchStatus.value === "needs_match",
       inventory_type: inventoryType,
       status,
       quantity: 1,
@@ -220,7 +243,7 @@ export async function POST(request: Request) {
 
   const { data: source, error: sourceError } = await supabase
     .from("inventory_items")
-    .select("card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match, inventory_type, status, graded_rating, certification_number, custom_image_front_url, custom_image_back_url, customer_name, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from, notes")
+    .select("card_id, manual_card_name, manual_card_number, manual_set_code, catalog_match_status, item_nickname, pending_card_match, inventory_type, status, graded_rating, certification_number, custom_image_front_url, custom_image_back_url, customer_name, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from, notes")
     .eq("id", sourceId)
     .single();
 
@@ -236,8 +259,11 @@ export async function POST(request: Request) {
       manual_card_name: item.manual_card_name,
       manual_card_number: item.manual_card_number,
       manual_set_code: item.manual_set_code,
+      catalog_match_status: item.catalog_match_status ?? (item.card_id ? "matched" : item.pending_card_match ? "needs_match" : "custom_verified"),
       item_nickname: item.item_nickname,
-      pending_card_match: item.pending_card_match ?? false,
+      pending_card_match: item.catalog_match_status
+        ? item.catalog_match_status === "needs_match"
+        : item.pending_card_match ?? false,
       inventory_type: item.inventory_type,
       status: item.status,
       quantity: 1,
@@ -257,7 +283,7 @@ export async function POST(request: Request) {
       purchased_from: item.purchased_from,
       notes: item.notes,
     })
-    .select("id, created_at, inventory_type, status, quantity, item_nickname, graded_rating, certification_number, custom_image_front_url, custom_image_back_url, customer_name, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from")
+    .select("id, created_at, inventory_type, status, quantity, catalog_match_status, item_nickname, graded_rating, certification_number, custom_image_front_url, custom_image_back_url, customer_name, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from")
     .single();
 
   if (error) {

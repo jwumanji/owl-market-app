@@ -1,7 +1,7 @@
 import InventoryShell from "./InventoryShell";
 import { InventoryRow } from "./InventoryTabs";
 import { createServiceClient } from "@/lib/supabase-server";
-import type { GradedRating } from "@/lib/inventory-options";
+import { CATALOG_MATCH_STATUSES, type CatalogMatchStatus, type GradedRating } from "@/lib/inventory-options";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +16,7 @@ type InventoryQueryRow = {
   manual_card_name: string | null;
   manual_card_number: string | null;
   manual_set_code: string | null;
+  catalog_match_status: CatalogMatchStatus | null;
   item_nickname: string | null;
   pending_card_match: boolean | null;
   inventory_type: "raw" | "damaged" | "graded" | "sealed";
@@ -48,18 +49,34 @@ type CardLookupRow = {
 };
 
 const INVENTORY_SELECT_WITH_PSA = `
-  id, created_at, card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match,
+  id, created_at, card_id, manual_card_name, manual_card_number, manual_set_code, catalog_match_status, item_nickname, pending_card_match,
   inventory_type, status, quantity, graded_rating, certification_number, custom_image_front_url, custom_image_back_url,
   customer_name, shipping_tracking, shipping_label_url, shipped_at,
   sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from, notes
 `;
 
 const INVENTORY_SELECT_BASE = `
+  id, created_at, card_id, manual_card_name, manual_card_number, manual_set_code, catalog_match_status, item_nickname, pending_card_match,
+  inventory_type, status, quantity, graded_rating,
+  customer_name, shipping_tracking, shipping_label_url, shipped_at,
+  sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from, notes
+`;
+
+const INVENTORY_SELECT_WITH_PSA_LEGACY_MATCH = `
+  id, created_at, card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match,
+  inventory_type, status, quantity, graded_rating, certification_number, custom_image_front_url, custom_image_back_url,
+  customer_name, shipping_tracking, shipping_label_url, shipped_at,
+  sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from, notes
+`;
+
+const INVENTORY_SELECT_BASE_LEGACY_MATCH = `
   id, created_at, card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match,
   inventory_type, status, quantity, graded_rating,
   customer_name, shipping_tracking, shipping_label_url, shipped_at,
   sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from, notes
 `;
+
+const CATALOG_MATCH_STATUS_VALUES = new Set<string>(CATALOG_MATCH_STATUSES);
 
 function isMissingPsaColumnsError(error: { message?: string } | null) {
   return Boolean(
@@ -72,9 +89,24 @@ function isMissingPsaColumnsError(error: { message?: string } | null) {
   );
 }
 
+function isMissingCatalogMatchStatusError(error: { message?: string } | null) {
+  return Boolean(error?.message && error.message.includes("catalog_match_status"));
+}
+
+function normalizeCatalogMatchStatus(row: InventoryQueryRow): CatalogMatchStatus {
+  if (row.catalog_match_status && CATALOG_MATCH_STATUS_VALUES.has(row.catalog_match_status)) {
+    return row.catalog_match_status;
+  }
+
+  if (row.card_id) return "matched";
+  if (row.pending_card_match) return "needs_match";
+  return "custom_verified";
+}
+
 function toInventoryRow(row: InventoryQueryRow, cardMap: Map<string, CardLookupRow>): InventoryRow {
   const card = row.card_id ? cardMap.get(row.card_id) ?? null : null;
   const set = Array.isArray(card?.sets) ? card?.sets[0] : card?.sets;
+  const catalogStatus = normalizeCatalogMatchStatus(row);
 
   return {
     id: row.id,
@@ -98,6 +130,8 @@ function toInventoryRow(row: InventoryQueryRow, cardMap: Map<string, CardLookupR
     cost_basis: row.cost_basis,
     purchased_from: row.purchased_from,
     notes: row.notes,
+    catalog_match_status: catalogStatus,
+    pending_card_match: catalogStatus === "needs_match",
     card: {
       name: card?.name ?? row.manual_card_name ?? null,
       image_url: card?.image_url ?? null,
@@ -105,7 +139,6 @@ function toInventoryRow(row: InventoryQueryRow, cardMap: Map<string, CardLookupR
       card_number: card?.card_number ?? row.manual_card_number ?? null,
       set_code: set?.code ?? row.manual_set_code ?? null,
     },
-    pending_card_match: row.pending_card_match ?? false,
   };
 }
 
@@ -131,18 +164,37 @@ export default async function AdminInventoryPage() {
   let data: unknown[] | null = inventoryResult.data as unknown[] | null;
   let error = inventoryResult.error;
 
-  if (supabase && isMissingPsaColumnsError(inventoryResult.error)) {
-    migrationWarning = "PSA fields are not available yet. Run schema-migration-v14-inventory-psa-scans.sql in Supabase to enable PSA certs and scan images.";
+  if (supabase && (isMissingPsaColumnsError(inventoryResult.error) || isMissingCatalogMatchStatusError(inventoryResult.error))) {
+    const missingPsaColumns = isMissingPsaColumnsError(inventoryResult.error);
+    const missingCatalogMatchStatus = isMissingCatalogMatchStatusError(inventoryResult.error);
+    migrationWarning = [
+      missingPsaColumns
+        ? "PSA fields are not available yet. Run schema-migration-v14-inventory-psa-scans.sql in Supabase to enable PSA certs and scan images."
+        : null,
+      missingCatalogMatchStatus
+        ? "Catalog match status is not available yet. Run schema-migration-v17-inventory-catalog-match-status.sql in Supabase to enable custom verified inventory items."
+        : null,
+    ].filter(Boolean).join(" ");
+    const fallbackInventorySelect: string = missingPsaColumns
+      ? missingCatalogMatchStatus
+        ? INVENTORY_SELECT_BASE_LEGACY_MATCH
+        : INVENTORY_SELECT_BASE
+      : INVENTORY_SELECT_WITH_PSA_LEGACY_MATCH;
     const baseResult = await supabase
       .from("inventory_items")
-      .select(INVENTORY_SELECT_BASE)
+      .select(fallbackInventorySelect)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false });
-    data = (baseResult.data ?? []).map((row) => ({
+    data = ((baseResult.data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
       ...row,
-      certification_number: null,
-      custom_image_front_url: null,
-      custom_image_back_url: null,
+      ...(missingPsaColumns
+        ? {
+            certification_number: null,
+            custom_image_front_url: null,
+            custom_image_back_url: null,
+          }
+        : {}),
+      ...(missingCatalogMatchStatus ? { catalog_match_status: null } : {}),
     }));
     error = baseResult.error;
   }

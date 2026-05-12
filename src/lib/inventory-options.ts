@@ -1,5 +1,6 @@
 export const INVENTORY_TYPES = ["raw", "damaged", "graded", "sealed"] as const;
 export const INVENTORY_STATUSES = ["new", "grading", "sale", "ship", "sold"] as const;
+export const CATALOG_MATCH_STATUSES = ["matched", "needs_match", "custom_verified"] as const;
 
 export const GRADED_RATINGS = [
   "TAG 10",
@@ -28,5 +29,6 @@ export const GRADED_RATINGS = [
 
 export type InventoryType = (typeof INVENTORY_TYPES)[number];
 export type InventoryStatus = (typeof INVENTORY_STATUSES)[number];
+export type CatalogMatchStatus = (typeof CATALOG_MATCH_STATUSES)[number];
 export type GradedRating = (typeof GRADED_RATINGS)[number];
 

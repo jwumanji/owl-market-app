@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, type MouseEvent, type SelectHTMLAttributes, useCallback, useEffect, useMemo, useState } from "react";
-import { GRADED_RATINGS, type GradedRating, type InventoryStatus, type InventoryType } from "@/lib/inventory-options";
+import { GRADED_RATINGS, type CatalogMatchStatus, type GradedRating, type InventoryStatus, type InventoryType } from "@/lib/inventory-options";
 
 type StatusFilter = InventoryStatus | "all";
 type SaleChannel = "not_sold" | "ebay" | "fb" | "instagram" | "in_person" | "traded";
@@ -29,6 +29,7 @@ export interface InventoryRow {
   cost_basis?: string | number | null;
   purchased_from?: PurchasedFrom | null;
   notes?: string | null;
+  catalog_match_status?: CatalogMatchStatus | null;
   pending_card_match?: boolean | null;
   card: {
     name: string | null;
@@ -103,6 +104,7 @@ type CreatedInventoryItem = Pick<
   "id" | "created_at" | "inventory_type" | "status" | "quantity" | "item_nickname" | "graded_rating" | "certification_number"
   | "custom_image_front_url" | "custom_image_back_url" | "customer_name" | "shipping_tracking" | "shipped_at"
   | "shipping_label_url" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "purchased_from"
+  | "catalog_match_status"
 >;
 
 type SelectFieldProps = SelectHTMLAttributes<HTMLSelectElement> & {
@@ -240,6 +242,22 @@ function cardFromMatch(card: CardMatchResult): InventoryRow["card"] {
   };
 }
 
+function catalogMatchStatus(item: Pick<InventoryRow, "catalog_match_status" | "pending_card_match">): CatalogMatchStatus {
+  return item.catalog_match_status ?? (item.pending_card_match ? "needs_match" : "custom_verified");
+}
+
+function needsCatalogMatch(item: Pick<InventoryRow, "catalog_match_status" | "pending_card_match">) {
+  return catalogMatchStatus(item) === "needs_match";
+}
+
+function withCatalogMatchStatus<T extends InventoryRow>(item: T, status: CatalogMatchStatus): T {
+  return {
+    ...item,
+    catalog_match_status: status,
+    pending_card_match: status === "needs_match",
+  };
+}
+
 export default function InventoryTabs({
   items,
   onItemsChange,
@@ -296,7 +314,7 @@ export default function InventoryTabs({
 
       return window.setTimeout(() => {
         const item = rows.find((row) => row.id === itemId);
-        if (item?.pending_card_match) {
+        if (item && needsCatalogMatch(item)) {
           searchMatchCandidates(item, trimmed);
         }
       }, 250);
@@ -334,7 +352,7 @@ export default function InventoryTabs({
 
   const statusFilteredRows = useMemo(() => {
     if (pendingMatchOnly) {
-      return rows.filter((item) => item.pending_card_match);
+      return rows.filter((item) => needsCatalogMatch(item));
     }
 
     return rows.filter((item) => {
@@ -368,6 +386,7 @@ export default function InventoryTabs({
   const itemMatchesSearch = useCallback((item: InventoryRow, query: string) => {
     const cardNumber = cardNumbers.get(item.id);
     const cardLabel = cardNumber ? `Card # ${cardNumber}` : null;
+    const matchStatus = catalogMatchStatus(item);
 
     return (
       [
@@ -389,6 +408,8 @@ export default function InventoryTabs({
         item.shipping_tracking,
         item.shipping_label_url,
         item.notes,
+        matchStatus,
+        matchStatus.replace("_", " "),
       ]
         .filter(Boolean)
         .join(" ")
@@ -453,7 +474,7 @@ export default function InventoryTabs({
   }, [countRows]);
 
   const pendingMatchCount = useMemo(() => {
-    return rows.reduce((sum, item) => sum + (item.pending_card_match ? item.quantity : 0), 0);
+    return rows.reduce((sum, item) => sum + (needsCatalogMatch(item) ? item.quantity : 0), 0);
   }, [rows]);
   const showNeedsMatchTab = pendingMatchCount > 0;
 
@@ -488,12 +509,19 @@ export default function InventoryTabs({
     };
   }, [rows, selectedGroupKey]);
 
+  type InventoryItemUpdates = Partial<Pick<InventoryRow, "status" | "graded_rating" | "certification_number" | "custom_image_front_url" | "custom_image_back_url" | "inventory_type" | "item_nickname" | "customer_name" | "shipping_tracking" | "shipping_label_url" | "shipped_at" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "purchased_from" | "notes" | "catalog_match_status" | "pending_card_match">>;
+
   async function updateItem(
     id: string,
-    updates: Partial<Pick<InventoryRow, "status" | "graded_rating" | "certification_number" | "custom_image_front_url" | "custom_image_back_url" | "inventory_type" | "item_nickname" | "customer_name" | "shipping_tracking" | "shipping_label_url" | "shipped_at" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "purchased_from" | "notes">>
+    updates: InventoryItemUpdates
   ) {
+    const normalizedUpdates =
+      updates.catalog_match_status
+        ? { ...updates, pending_card_match: updates.catalog_match_status === "needs_match" }
+        : updates;
+
     setRows((current) =>
-      current.map((item) => (item.id === id ? { ...item, ...updates } : item))
+      current.map((item) => (item.id === id ? { ...item, ...normalizedUpdates } : item))
     );
 
     if (isLocalOnlyItem(id)) {
@@ -503,7 +531,7 @@ export default function InventoryTabs({
     const res = await fetch(`/api/admin/inventory/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updates),
+      body: JSON.stringify(normalizedUpdates),
     });
 
     if (!res.ok) {
@@ -563,8 +591,7 @@ export default function InventoryTabs({
       current.map((row) =>
         row.id === item.id
           ? {
-              ...row,
-              pending_card_match: false,
+              ...withCatalogMatchStatus(row, "matched"),
               card: matchedCard,
             }
           : row
@@ -586,7 +613,7 @@ export default function InventoryTabs({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           card_id: card.id,
-          pending_card_match: false,
+          catalog_match_status: "matched",
         }),
       });
 
@@ -609,6 +636,31 @@ export default function InventoryTabs({
       setMatchErrors((current) => ({ ...current, [item.id]: "Could not save the card match." }));
     } finally {
       setMatchingItemIds((current) => {
+        const next = { ...current };
+        delete next[item.id];
+        return next;
+      });
+    }
+  }
+
+  function updateCustomVerified(item: InventoryRow, checked: boolean) {
+    if (catalogMatchStatus(item) === "matched") return;
+
+    const nextStatus: CatalogMatchStatus = checked ? "custom_verified" : "needs_match";
+    updateItem(item.id, { catalog_match_status: nextStatus });
+
+    if (checked) {
+      setMatchQueries((current) => {
+        const next = { ...current };
+        delete next[item.id];
+        return next;
+      });
+      setMatchResults((current) => {
+        const next = { ...current };
+        delete next[item.id];
+        return next;
+      });
+      setMatchErrors((current) => {
         const next = { ...current };
         delete next[item.id];
         return next;
@@ -689,6 +741,8 @@ export default function InventoryTabs({
                 acquired_at: created.acquired_at ?? null,
                 cost_basis: created.cost_basis ?? null,
                 purchased_from: created.purchased_from ?? null,
+                catalog_match_status: created.catalog_match_status ?? newItem.catalog_match_status,
+                pending_card_match: (created.catalog_match_status ?? newItem.catalog_match_status) === "needs_match",
               }
             : item
         )
@@ -989,9 +1043,9 @@ export default function InventoryTabs({
         aria-label="Remove item"
         disabled={isDeleting}
         onClick={() => setConfirmingDeleteIds((current) => ({ ...current, [item.id]: true }))}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-loss/70 bg-loss/10 font-mono text-base font-black leading-none text-loss transition-colors hover:border-loss hover:bg-loss/15 disabled:cursor-wait disabled:opacity-60"
+        className="inline-flex min-h-8 shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-loss/70 bg-loss/10 px-2.5 py-1.5 font-mono text-xs font-black uppercase leading-none tracking-wider text-loss transition-colors hover:border-loss hover:bg-loss/15 disabled:cursor-wait disabled:opacity-60"
       >
-        X
+        X Remove Item
       </button>
     );
   }
@@ -1537,7 +1591,7 @@ export default function InventoryTabs({
         )}
         {showCardBadge && renderInventoryCardBadge(item)}
         {item.certification_number && <span>Cert {item.certification_number}</span>}
-        {item.pending_card_match && (
+        {needsCatalogMatch(item) && (
           <span className="rounded border border-owl/40 bg-owl/10 px-2 py-0.5 text-owl">
             NEEDS MATCH
           </span>
@@ -1547,8 +1601,37 @@ export default function InventoryTabs({
     );
   }
 
+  function renderCatalogMatchStatusControl(item: InventoryRow) {
+    const status = catalogMatchStatus(item);
+    const isMatched = status === "matched";
+
+    return (
+      <label
+        className={`mb-3 flex items-start gap-3 rounded-lg border border-border bg-deep p-3 ${
+          isMatched ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:border-border-2"
+        }`}
+      >
+        <input
+          type="checkbox"
+          checked={status === "custom_verified"}
+          disabled={isMatched}
+          onChange={(event) => updateCustomVerified(item, event.target.checked)}
+          className="mt-1 h-4 w-4 shrink-0 accent-owl disabled:cursor-not-allowed"
+        />
+        <span className="min-w-0">
+          <span className="block font-mono text-xs font-bold uppercase tracking-wider text-text">
+            Not in catalog
+          </span>
+          <span className="mt-1 block text-sm text-text-2">
+            This is a real item and does not need catalog matching.
+          </span>
+        </span>
+      </label>
+    );
+  }
+
   function renderMatchControls(item: InventoryRow) {
-    if (!item.pending_card_match) return null;
+    if (!needsCatalogMatch(item)) return null;
 
     const query = matchQueries[item.id] ?? initialMatchQuery(item);
     const results = matchResults[item.id] ?? [];
@@ -1882,7 +1965,7 @@ export default function InventoryTabs({
               {selectedGroup.rows.map((row, index) => (
                 <div key={row.id} className="rounded-lg border border-border bg-surface p-4">
                   <div className="mb-4 flex items-start justify-between gap-3">
-                    <div>
+                    <div className="min-w-0">
                       <div className="font-mono text-sm font-bold uppercase tracking-wider text-text">
                         Item #{index + 1}
                       </div>
@@ -1891,6 +1974,7 @@ export default function InventoryTabs({
                     {renderDeleteControls(row)}
                   </div>
 
+                  {renderCatalogMatchStatusControl(row)}
                   {renderMatchControls(row)}
 
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">

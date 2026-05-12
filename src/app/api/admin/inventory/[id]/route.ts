@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
-import { GRADED_RATINGS } from "@/lib/inventory-options";
+import { CATALOG_MATCH_STATUSES, GRADED_RATINGS } from "@/lib/inventory-options";
 
 const STATUSES = new Set(["new", "grading", "sale", "ship", "sold"]);
 const CONDITIONS = new Set(["raw", "damaged", "graded", "sealed"]);
 const GRADED_RATING_VALUES = new Set<string>(GRADED_RATINGS);
+const CATALOG_MATCH_STATUS_VALUES = new Set<string>(CATALOG_MATCH_STATUSES);
 const SALE_CHANNELS = new Set(["not_sold", "ebay", "fb", "instagram", "in_person", "traded"]);
 const PURCHASED_FROM_OPTIONS = new Set(["facebook", "ebay", "instagram", "direct_person", "event"]);
 
@@ -50,6 +51,7 @@ export async function PATCH(
       updates.manual_card_name = null;
       updates.manual_card_number = null;
       updates.manual_set_code = null;
+      updates.catalog_match_status = "matched";
       updates.pending_card_match = false;
     }
   }
@@ -80,6 +82,16 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid match review state" }, { status: 400 });
     }
     updates.pending_card_match = body.pending_card_match;
+    updates.catalog_match_status = body.pending_card_match ? "needs_match" : "custom_verified";
+  }
+
+  if ("catalog_match_status" in body) {
+    if (typeof body.catalog_match_status !== "string" || !CATALOG_MATCH_STATUS_VALUES.has(body.catalog_match_status)) {
+      return NextResponse.json({ error: "Invalid catalog match status" }, { status: 400 });
+    }
+
+    updates.catalog_match_status = body.catalog_match_status;
+    updates.pending_card_match = body.catalog_match_status === "needs_match";
   }
 
   if ("status" in body) {
@@ -224,6 +236,11 @@ export async function PATCH(
     return NextResponse.json({ error: "No valid updates" }, { status: 400 });
   }
 
+  if (typeof updates.card_id === "string" && updates.card_id) {
+    updates.catalog_match_status = "matched";
+    updates.pending_card_match = false;
+  }
+
   updates.updated_at = new Date().toISOString();
 
   const supabase = createServiceClient();
@@ -237,7 +254,7 @@ export async function PATCH(
     .from("inventory_items")
     .update(updates)
     .eq("id", params.id)
-    .select("id, card_id, manual_card_name, manual_card_number, manual_set_code, pending_card_match, status, graded_rating, certification_number, custom_image_front_url, custom_image_back_url")
+    .select("id, card_id, manual_card_name, manual_card_number, manual_set_code, catalog_match_status, pending_card_match, status, graded_rating, certification_number, custom_image_front_url, custom_image_back_url")
     .single();
 
   if (error) {
