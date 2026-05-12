@@ -209,6 +209,9 @@ function prefixFromCardNumber(cardNumber) {
 function allowsCardNumberInSet(setCode, cardNumber) {
   const prefix = prefixFromCardNumber(cardNumber);
   if (!prefix) return false;
+  if (setCode === "OP14" || setCode === "OP15") {
+    return true;
+  }
   if (setCode === "P" || setCode.startsWith("EB") || setCode.startsWith("PRB")) {
     return true;
   }
@@ -255,6 +258,7 @@ function expectedVariantLabel(name) {
   if (joined.includes("gold-stamped signature")) return "Gold-Stamped Signature";
   if (joined.includes("alternate art")) return "Alternate Art";
   if (joined.includes("parallel")) return "Parallel";
+  if (joined.includes("dash pack")) return "Dash Pack";
   if (joined.includes("jolly roger foil")) return "Jolly Roger Foil";
   if (joined.includes("reprint")) return "Reprint";
   return null;
