@@ -249,6 +249,7 @@ const VARIANT_PATTERNS: [RegExp, string][] = [
   [/\(TR\)/i,                      "TR"],
   [/\(Wanted Poster\)/i,           "Wanted Poster"],
   [/\(Gold-Stamped Signature\)/i,  "Gold-Stamped Signature"],
+  [/\(Dash Pack\)/i,               "Dash Pack"],
   [/\(Alternate Art\)/i,           "Alternate Art"],
   [/\(Parallel\)/i,                "Parallel"],
   [/\(Best Selection\)/i,          "Alt Art"],
