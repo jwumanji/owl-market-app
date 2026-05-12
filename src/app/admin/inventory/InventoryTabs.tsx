@@ -1928,11 +1928,9 @@ export default function InventoryTabs({
     return (
       <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 px-4 pb-8 pt-[120px]">
         <div className="w-full max-w-6xl rounded-lg border border-border bg-deep shadow-2xl">
-          <div className="flex items-start justify-between gap-4 border-b border-border p-5">
+          <div className="flex items-center justify-between gap-4 border-b border-border p-5">
             <div>
               <div className="font-mono text-xs font-bold uppercase tracking-wider text-owl">Inventory Detail</div>
-              <div className="mt-1">{renderCardTitle(item, "text-2xl font-bold text-text")}</div>
-              {renderCardMeta(item, { showCardBadge: selectedGroup.rows.length === 1 })}
             </div>
             <button
               type="button"
@@ -1968,6 +1966,9 @@ export default function InventoryTabs({
                     <div className="min-w-0">
                       <div className="font-mono text-sm font-bold uppercase tracking-wider text-text">
                         Item #{index + 1}
+                      </div>
+                      <div className="mt-1">
+                        {renderCardTitle(row, "text-lg font-bold leading-snug text-text")}
                       </div>
                       {renderCardMeta(row, { showItemId: true })}
                     </div>
