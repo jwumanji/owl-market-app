@@ -55,10 +55,20 @@ const DEFAULT_COLOR = "#4F8EF7";
 
 const ALLOWED_CODES = new Set([
   "OP01","OP02","OP03","OP04","OP05","OP06","OP07","OP08","OP09","OP10",
-  "OP11","OP12","OP13","OP14","OP15","PRB01","PRB02","EB01","EB02","EB03","EB04",
+  "OP11","OP12","OP13","OP14","OP15","PRB01","PRB02","EB01","EB02","EB03",
 ]);
 
-const PINNED_INDEX_CODES = new Set(["EB04"]);
+const SET_NAME_SUFFIX_BY_CODE: Record<string, string> = {
+  OP14: "-EB04",
+  OP15: "-EB04",
+};
+
+function displaySetName(code: string, name: string | null | undefined): string {
+  const baseName = name ?? code;
+  const suffix = SET_NAME_SUFFIX_BY_CODE[code.toUpperCase()];
+  if (!suffix || baseName.toUpperCase().endsWith(suffix)) return baseName;
+  return `${baseName} ${suffix}`;
+}
 
 export type LoadedSets = {
   sets: Array<Record<string, unknown>>;
@@ -222,7 +232,8 @@ export async function loadSets(): Promise<LoadedSets> {
     const cards = cardsBySet[set.id] ?? [];
     const color = set.color || DEFAULT_COLOR;
     const displayCode = set.code ?? set.slug.toUpperCase();
-    const shouldShowInIndex = cards.length >= 1 || PINNED_INDEX_CODES.has(displayCode.toUpperCase());
+    const displayName = displaySetName(displayCode, set.name);
+    const shouldShowInIndex = cards.length >= 1;
 
     let totalValue = 0;
     let weightedChg1d = 0;
@@ -302,7 +313,7 @@ export async function loadSets(): Promise<LoadedSets> {
       sets.push({
         slug: set.slug,
         code: displayCode,
-        name: set.name,
+        name: displayName,
         year: set.year ?? 2024,
         color,
         colorD: hexToRgba(color, 0.14),
@@ -334,7 +345,7 @@ export async function loadSets(): Promise<LoadedSets> {
       extraSets.push({
         slug: set.slug,
         code: displayCode,
-        name: set.name,
+        name: displayName,
         year: set.year ?? 2024,
         color,
         price,
