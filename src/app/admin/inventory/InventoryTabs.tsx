@@ -9,6 +9,7 @@ type PurchasedFrom = "facebook" | "ebay" | "instagram" | "direct_person" | "even
 
 export interface InventoryRow {
   id: string;
+  created_at: string | null;
   inventory_type: InventoryType;
   status: InventoryStatus;
   quantity: number;
@@ -99,7 +100,7 @@ type InventoryGroup = {
 
 type CreatedInventoryItem = Pick<
   InventoryRow,
-  "id" | "inventory_type" | "status" | "quantity" | "item_nickname" | "graded_rating" | "certification_number"
+  "id" | "created_at" | "inventory_type" | "status" | "quantity" | "item_nickname" | "graded_rating" | "certification_number"
   | "custom_image_front_url" | "custom_image_back_url" | "customer_name" | "shipping_tracking" | "shipped_at"
   | "shipping_label_url" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "purchased_from"
 >;
@@ -218,9 +219,10 @@ function hasCustomScanImage(item: InventoryRow) {
   return Boolean(item.custom_image_front_url);
 }
 
-function inventoryCardId(item: InventoryRow) {
-  const stableId = item.id.replace(/^(preview-|temp-)/, "");
-  return stableId.slice(0, 8).toUpperCase();
+function createdAtSortValue(value?: string | null) {
+  if (!value) return Number.MAX_SAFE_INTEGER;
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? time : Number.MAX_SAFE_INTEGER;
 }
 
 function setCodeForMatch(card: CardMatchResult) {
@@ -281,7 +283,7 @@ export default function InventoryTabs({
   const showTracking = statusFilter === "ship" || statusFilter === "sold";
   const showShippingActions = statusFilter === "ship";
   const showSaleFields = statusFilter === "sold";
-  const standardTableMinWidth = showSaleFields ? "min-w-[1280px]" : "min-w-[940px]";
+  const standardTableMinWidth = showSaleFields ? "min-w-[1340px]" : "min-w-[1000px]";
 
   useEffect(() => {
     onItemsChange?.(rows);
@@ -340,7 +342,33 @@ export default function InventoryTabs({
     });
   }, [pendingMatchOnly, rows, statusFilter]);
 
+  const cardNumbers = useMemo(() => {
+    const sorted = rows
+      .map((item, index) => ({ item, index }))
+      .sort((a, b) => {
+        const createdAtDiff = createdAtSortValue(a.item.created_at) - createdAtSortValue(b.item.created_at);
+        if (createdAtDiff !== 0) return createdAtDiff;
+
+        const idDiff = a.item.id.localeCompare(b.item.id);
+        return idDiff || a.index - b.index;
+      });
+
+    return new Map(sorted.map(({ item }, index) => [item.id, index + 1]));
+  }, [rows]);
+
+  function inventoryCardNumber(item: InventoryRow) {
+    return cardNumbers.get(item.id);
+  }
+
+  function inventoryCardLabel(item: InventoryRow) {
+    const cardNumber = inventoryCardNumber(item);
+    return cardNumber ? `Card # ${cardNumber}` : "Card #";
+  }
+
   function itemMatchesSearch(item: InventoryRow, query: string) {
+    const cardNumber = cardNumbers.get(item.id);
+    const cardLabel = cardNumber ? `Card # ${cardNumber}` : null;
+
     return (
       [
         item.item_nickname,
@@ -348,7 +376,8 @@ export default function InventoryTabs({
         item.card.set_code,
         item.card.card_number,
         item.id,
-        inventoryCardId(item),
+        cardLabel,
+        cardNumber?.toString(),
         item.inventory_type,
         item.status,
         item.graded_rating,
@@ -373,7 +402,7 @@ export default function InventoryTabs({
     if (!query) return statusFilteredRows;
 
     return statusFilteredRows.filter((item) => itemMatchesSearch(item, query));
-  }, [searchQuery, statusFilteredRows]);
+  }, [cardNumbers, searchQuery, statusFilteredRows]);
 
   const filtered = useMemo(() => {
     if (pendingMatchOnly) return searchFilteredRows;
@@ -410,7 +439,7 @@ export default function InventoryTabs({
     const baseRows = rows.filter((item) => statusFilter === "all" || item.status === statusFilter);
     if (!query) return baseRows;
     return baseRows.filter((item) => itemMatchesSearch(item, query));
-  }, [rows, searchQuery, statusFilter]);
+  }, [cardNumbers, rows, searchQuery, statusFilter]);
 
   const counts = useMemo(() => {
     return countRows.reduce(
@@ -595,6 +624,7 @@ export default function InventoryTabs({
     const newItem: InventoryRow = {
       ...source,
       id: tempId,
+      created_at: new Date().toISOString(),
       quantity: 1,
       item_nickname: source.item_nickname ?? null,
       certification_number: source.certification_number ?? null,
@@ -640,6 +670,7 @@ export default function InventoryTabs({
             ? {
                 ...newItem,
                 id: created.id,
+                created_at: created.created_at ?? newItem.created_at,
                 inventory_type: created.inventory_type,
                 status: created.status,
                 quantity: created.quantity,
@@ -1467,10 +1498,10 @@ export default function InventoryTabs({
   function renderInventoryCardBadge(item: InventoryRow) {
     return (
       <span
-        title={`Inventory item ID: ${item.id}`}
+        title={`${inventoryCardLabel(item)} - Inventory item ID: ${item.id}`}
         className="inline-flex items-center rounded-full border border-owl/50 bg-owl px-2.5 py-1 font-mono text-[11px] font-black uppercase leading-none tracking-wider text-void shadow-[0_0_14px_rgba(245,166,35,0.28)]"
       >
-        Card # {inventoryCardId(item)}
+        {inventoryCardLabel(item)}
       </span>
     );
   }
@@ -2205,8 +2236,9 @@ export default function InventoryTabs({
 
       {statusFilter === "ship" ? (
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
-        <table className="w-full min-w-[1180px] table-fixed">
+        <table className="w-full min-w-[1240px] table-fixed">
           <colgroup>
+            <col className="w-[60px]" />
             <col className="w-[48px]" />
             <col className="w-[104px]" />
             <col className="w-[330px]" />
@@ -2217,6 +2249,7 @@ export default function InventoryTabs({
           </colgroup>
           <thead>
             <tr className="border-b border-border bg-surf2 text-left font-mono text-xs font-semibold uppercase tracking-wider text-text">
+              <th className="px-3 py-3.5 text-right">#</th>
               <th className="px-3 py-3.5">{renderSelectionHeader()}</th>
               <th className="px-4 py-3.5">Image</th>
               <th className="px-3 py-3.5">Card</th>
@@ -2236,6 +2269,9 @@ export default function InventoryTabs({
               return (
                 <Fragment key={group.key}>
                   <tr className={`border-b ${groupSelectionClass(group)}`}>
+                    <td className="px-3 py-4 text-right align-top font-mono text-xs font-bold text-text-2">
+                      {inventoryCardNumber(item) ?? "-"}
+                    </td>
                     <td className="px-3 py-4">
                       {bulkSelectMode ? renderSelectionCell(group, `Select ${item.card.name ?? "inventory group"}`) : hasNestedRows && (
                         <button
@@ -2340,6 +2376,9 @@ export default function InventoryTabs({
                           key={child.id}
                           className={`border-b transition-colors ${nestedRowSelectionClass(child)}`}
                         >
+                          <td className="px-3 py-3.5 text-right align-top font-mono text-xs font-bold text-blue">
+                            {inventoryCardNumber(child) ?? "-"}
+                          </td>
                           <td className="px-3 py-3.5">
                             {renderItemSelectionCell(child, `Select item ${index + 1}`)}
                           </td>
@@ -2365,7 +2404,7 @@ export default function InventoryTabs({
                                 >
                                   {renderCardTitle(child, "text-base font-semibold text-text")}
                                 </button>
-                                {renderCardMeta(child, { itemIndex: index + 1, showItemId: true })}
+                                {renderCardMeta(child, { showItemId: true })}
                               </div>
                               {renderRowActions({ group, item: child, canAdd: true, canRemove: true })}
                             </div>
@@ -2377,6 +2416,7 @@ export default function InventoryTabs({
                         </tr>
                       ))}
                       <tr className="border-b border-[rgba(79,142,247,0.16)] bg-[rgba(79,142,247,0.045)] shadow-[inset_3px_0_0_rgba(79,142,247,0.32)] last:border-b-0">
+                        <td className="px-3 py-3.5" />
                         <td className="px-3 py-3.5" />
                         <td colSpan={6} className="px-3 py-3.5">
                           <button
@@ -2398,7 +2438,7 @@ export default function InventoryTabs({
 
             {groups.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-12 text-center text-base text-text-2">
+                <td colSpan={8} className="px-3 py-12 text-center text-base text-text-2">
                   No inventory items need shipping yet.
                 </td>
               </tr>
@@ -2410,6 +2450,7 @@ export default function InventoryTabs({
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
         <table className={`w-full ${standardTableMinWidth} table-fixed`}>
           <colgroup>
+            <col className="w-[60px]" />
             <col className="w-[48px]" />
             <col className="w-[104px]" />
             <col className="w-[290px]" />
@@ -2423,6 +2464,7 @@ export default function InventoryTabs({
           </colgroup>
           <thead>
             <tr className="border-b border-border bg-surf2 text-left font-mono text-xs font-semibold uppercase tracking-wider text-text">
+              <th className="px-3 py-3.5 text-right">#</th>
               <th className="px-3 py-3.5">{renderSelectionHeader()}</th>
               <th className="px-4 py-3.5">Image</th>
               <th className="px-3 py-3.5">Card Name</th>
@@ -2448,6 +2490,9 @@ export default function InventoryTabs({
               return (
                 <Fragment key={group.key}>
                   <tr className={`border-b ${groupSelectionClass(group)}`}>
+                    <td className="px-3 py-4 text-right align-top font-mono text-xs font-bold text-text-2">
+                      {inventoryCardNumber(item) ?? "-"}
+                    </td>
                     <td className="px-3 py-4">
                       {bulkSelectMode ? renderSelectionCell(group, `Select ${item.card.name ?? "inventory group"}`) : hasNestedRows && (
                         <button
@@ -2587,6 +2632,9 @@ export default function InventoryTabs({
                           key={child.id}
                           className={`border-b transition-colors ${nestedRowSelectionClass(child)}`}
                         >
+                          <td className="px-3 py-3.5 text-right align-top font-mono text-xs font-bold text-blue">
+                            {inventoryCardNumber(child) ?? "-"}
+                          </td>
                           <td className="px-3 py-3.5">
                             {renderItemSelectionCell(child, "Select inventory item")}
                           </td>
@@ -2649,6 +2697,7 @@ export default function InventoryTabs({
                       ))}
                       <tr className="border-b border-[rgba(79,142,247,0.16)] bg-[rgba(79,142,247,0.045)] shadow-[inset_3px_0_0_rgba(79,142,247,0.32)] last:border-b-0">
                         <td className="px-3 py-3.5" />
+                        <td className="px-3 py-3.5" />
                         <td colSpan={(showTracking ? 6 : 5) + (showShippingActions ? 3 : 0) + (showSaleFields ? 3 : 0)} className="px-3 py-3.5">
                           <button
                             type="button"
@@ -2669,7 +2718,7 @@ export default function InventoryTabs({
 
             {groups.length === 0 && (
               <tr>
-                <td colSpan={(showTracking ? 7 : 6) + (showShippingActions ? 3 : 0) + (showSaleFields ? 3 : 0)} className="px-3 py-12 text-center text-base text-text-2">
+                <td colSpan={(showTracking ? 8 : 7) + (showShippingActions ? 3 : 0) + (showSaleFields ? 3 : 0)} className="px-3 py-12 text-center text-base text-text-2">
                   No inventory items in this view yet.
                 </td>
               </tr>

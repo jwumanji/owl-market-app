@@ -5,10 +5,13 @@ import { classifyRarity, SET_SLUG_MAP } from "@/lib/justtcg-match";
 
 export const maxDuration = 60;
 
-// Reverse map: internal code → first JustTCG set slug
-const CODE_TO_SLUG: Record<string, string> = {};
+// Reverse map: internal code → all JustTCG set slugs.
+// Some internal sets have multiple JustTCG aliases, especially PRB/promo
+// collections, so using only the first slug leaves variants unvisited.
+const CODE_TO_SLUGS: Record<string, string[]> = {};
 for (const [slug, code] of Object.entries(SET_SLUG_MAP)) {
-  if (!CODE_TO_SLUG[code]) CODE_TO_SLUG[code] = slug;
+  if (!CODE_TO_SLUGS[code]) CODE_TO_SLUGS[code] = [];
+  CODE_TO_SLUGS[code].push(slug);
 }
 
 // ---------------------------------------------------------------------------
@@ -60,7 +63,7 @@ export async function GET(request: Request) {
   }
 
   const syncableSets = (dbSets ?? []).filter((s: { id: string; code: string }) => {
-    if (!s.code || !CODE_TO_SLUG[s.code]) return false;
+    if (!s.code || !CODE_TO_SLUGS[s.code]) return false;
     if (setFilter) return s.code === setFilter;
     return true;
   });
@@ -71,7 +74,7 @@ export async function GET(request: Request) {
 
   for (const dbSet of syncableSets) {
     const setCode = dbSet.code;
-    const jtSlug = CODE_TO_SLUG[setCode];
+    const jtSlugs = CODE_TO_SLUGS[setCode] ?? [];
 
     // Fetch DB cards for this set
     const allDbCards: DbCard[] = [];
@@ -101,30 +104,35 @@ export async function GET(request: Request) {
       }
     }
 
-    // Fetch JustTCG cards for this set
-    const jtCards: JTCard[] = [];
-    let offset = 0;
+    // Fetch JustTCG cards for every slug mapped to this set.
+    const jtCardsByKey = new Map<string, JTCard>();
     try {
-      while (true) {
-        const response = await client.v1.cards.get({
-          game: "one-piece-card-game",
-          set: jtSlug,
-          include_null_prices: false,
-          limit: 100,
-          offset,
-        });
-        const cards = response.data ?? [];
-        for (const c of cards) {
-          jtCards.push({ name: c.name, number: c.number ?? null });
+      for (const jtSlug of jtSlugs) {
+        let offset = 0;
+        while (true) {
+          const response = await client.v1.cards.get({
+            game: "one-piece-card-game",
+            set: jtSlug,
+            include_null_prices: false,
+            limit: 100,
+            offset,
+          });
+          const cards = response.data ?? [];
+          for (const c of cards) {
+            const card = { name: c.name, number: c.number ?? null };
+            jtCardsByKey.set(`${card.number ?? ""}|${card.name}`, card);
+          }
+          if (!response.pagination?.hasMore) break;
+          offset += 100;
         }
-        if (!response.pagination?.hasMore) break;
-        offset += 100;
       }
     } catch {
       // Skip sets that fail to fetch
       setResults.push({ code: setCode, cards: allDbCards.length, changed: 0 });
       continue;
     }
+
+    const jtCards = Array.from(jtCardsByKey.values());
 
     // Match JustTCG → DB cards and reclassify
     let setChanged = 0;
@@ -143,7 +151,11 @@ export async function GET(request: Request) {
       const jtTags = extractTags(jtCard.name);
 
       const scored = unmatched.map((c) => {
-        const dbTags = extractTags(c.name ?? "");
+        const dbTags = extractTags(`${c.name ?? ""} ${c.variant_label ?? ""}`);
+        if (c.variant_label) {
+          const vl = c.variant_label.toLowerCase();
+          if (dbTags.indexOf(vl) < 0) dbTags.push(vl);
+        }
         let matchingTags = 0;
         const totalTags = Math.max(jtTags.length, dbTags.length);
         for (const t of jtTags) {

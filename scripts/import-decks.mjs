@@ -24,6 +24,21 @@ function toDbId(apiId) {
   return apiId.replace("-", ""); // "ST-01" -> "ST01"
 }
 
+function prefixFromCardNumber(cardNumber) {
+  const text = nullIfNullStr(cardNumber);
+  const match = text?.match(/^([A-Z]+\d+)-/i);
+  return match ? match[1].toUpperCase() : null;
+}
+
+function reprintSyntheticId(card, deckId) {
+  const imageId = nullIfNullStr(card.card_image_id);
+  const cardNumber = nullIfNullStr(card.card_set_id);
+  if (!imageId || !cardNumber) return imageId;
+  const prefix = prefixFromCardNumber(cardNumber);
+  if (!prefix || prefix === deckId) return imageId;
+  return `${imageId}-${deckId.toLowerCase()}-reprint`;
+}
+
 function nullIfNullStr(v) {
   if (v === null || v === undefined) return null;
   if (typeof v === "string") {
@@ -45,12 +60,25 @@ function nameBase(name) {
 }
 
 const VARIANT_PATTERNS = [
+  [/\(Manga\)/i, "Manga"],
+  [/\(Red Super Alternate Art\)/i, "Red Super Alternate Art"],
+  [/\(Super Alternate Art\)/i, "Super Alternate Art"],
+  [/\(SP\)[^)]*\(Gold\)/i, "SP Gold"],
+  [/\(SP\)[^)]*\(Silver\)/i, "SP Silver"],
+  [/\(SP\)/i, "SP"],
+  [/\(SPR\)/i, "SP"],
+  [/\(TR\)/i, "TR"],
+  [/\(Wanted Poster\)/i, "Wanted Poster"],
+  [/\(Gold-Stamped Signature\)/i, "Gold-Stamped Signature"],
+  [/\(Alternate Art\)/i, "Alternate Art"],
   [/\(Parallel\)/i, "Parallel"],
   [/\(Best Selection\)/i, "Alt Art"],
   [/\(Anniversary\)/i, "Anniversary"],
   [/\(Pre-Release\)/i, "Pre-Release"],
   [/\(Film Red\)/i, "Alt Art"],
   [/\(ONE PIECE DAY\)/i, "Alt Art"],
+  [/\(Jolly Roger Foil\)/i, "Jolly Roger Foil"],
+  [/\(Reprint\)/i, "Reprint"],
 ];
 function variantLabel(name) {
   for (const [re, label] of VARIANT_PATTERNS) if (re.test(name)) return label;
@@ -95,15 +123,15 @@ async function getSetUuid(dbId) {
 // so always include all columns — use null when the API has no value.
 // Columns omitted entirely (tcg_product_id, image_url_small, ...) are
 // preserved on update.
-function transformCard(c, setUuid) {
+function transformCard(c, setUuid, deckId) {
   const color = nullIfNullStr(c.card_color);
   const subs = nullIfNullStr(c.sub_types);
   return {
-    card_image_id: c.card_image_id,
+    card_image_id: reprintSyntheticId(c, deckId),
     card_number: c.card_set_id,
     name: c.card_name,
     name_base: nameBase(c.card_name),
-    variant_label: variantLabel(c.card_name),
+    variant_label: variantLabel(c.card_name) ?? (prefixFromCardNumber(c.card_set_id) === deckId ? null : "Reprint"),
     set_id: setUuid,
     rarity: nullIfNullStr(c.rarity),
     card_type: nullIfNullStr(c.card_type),
@@ -172,7 +200,7 @@ async function main() {
       //    within the batch — Postgres rejects ON CONFLICT touching the
       //    same row twice in one statement.
       const byId = new Map();
-      for (const c of cards) byId.set(c.card_image_id, transformCard(c, setUuid));
+      for (const c of cards) byId.set(reprintSyntheticId(c, dbId), transformCard(c, setUuid, dbId));
       const rows = Array.from(byId.values());
       const cardOk = await sbUpsert("cards", rows, "card_image_id");
       if (!cardOk) {

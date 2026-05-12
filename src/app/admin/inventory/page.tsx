@@ -11,6 +11,7 @@ export const metadata = {
 
 type InventoryQueryRow = {
   id: string;
+  created_at: string | null;
   card_id: string | null;
   manual_card_name: string | null;
   manual_card_number: string | null;
@@ -47,14 +48,14 @@ type CardLookupRow = {
 };
 
 const INVENTORY_SELECT_WITH_PSA = `
-  id, card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match,
+  id, created_at, card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match,
   inventory_type, status, quantity, graded_rating, certification_number, custom_image_front_url, custom_image_back_url,
   customer_name, shipping_tracking, shipping_label_url, shipped_at,
   sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from, notes
 `;
 
 const INVENTORY_SELECT_BASE = `
-  id, card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match,
+  id, created_at, card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match,
   inventory_type, status, quantity, graded_rating,
   customer_name, shipping_tracking, shipping_label_url, shipped_at,
   sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from, notes
@@ -77,6 +78,7 @@ function toInventoryRow(row: InventoryQueryRow, cardMap: Map<string, CardLookupR
 
   return {
     id: row.id,
+    created_at: row.created_at,
     inventory_type: row.inventory_type,
     status: row.status,
     quantity: row.quantity,
@@ -123,6 +125,7 @@ export default async function AdminInventoryPage() {
         .from("inventory_items")
         .select(INVENTORY_SELECT_WITH_PSA)
         .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
     : { data: null, error: null };
 
   let data: unknown[] | null = inventoryResult.data as unknown[] | null;
@@ -133,7 +136,8 @@ export default async function AdminInventoryPage() {
     const baseResult = await supabase
       .from("inventory_items")
       .select(INVENTORY_SELECT_BASE)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false });
     data = (baseResult.data ?? []).map((row) => ({
       ...row,
       certification_number: null,

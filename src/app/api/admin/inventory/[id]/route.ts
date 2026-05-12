@@ -8,6 +8,24 @@ const GRADED_RATING_VALUES = new Set<string>(GRADED_RATINGS);
 const SALE_CHANNELS = new Set(["not_sold", "ebay", "fb", "instagram", "in_person", "traded"]);
 const PURCHASED_FROM_OPTIONS = new Set(["facebook", "ebay", "instagram", "direct_person", "event"]);
 
+function parseOptionalNumeric(value: unknown, fieldName: string) {
+  if (value === null || value === undefined || value === "") {
+    return { value: null as string | number | null };
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return { value };
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return { value: null as string | number | null };
+    if (Number.isFinite(Number(trimmed))) return { value: trimmed };
+  }
+
+  return { error: `Invalid ${fieldName}` };
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
@@ -160,10 +178,11 @@ export async function PATCH(
   }
 
   if ("sold_price" in body) {
-    if (body.sold_price !== null && typeof body.sold_price !== "string") {
-      return NextResponse.json({ error: "Invalid sold price" }, { status: 400 });
+    const soldPrice = parseOptionalNumeric(body.sold_price, "sold price");
+    if ("error" in soldPrice) {
+      return NextResponse.json({ error: soldPrice.error }, { status: 400 });
     }
-    updates.sold_price = body.sold_price?.trim() || null;
+    updates.sold_price = soldPrice.value;
   }
 
   if ("acquired_at" in body) {
@@ -174,20 +193,24 @@ export async function PATCH(
   }
 
   if ("cost_basis" in body) {
-    if (body.cost_basis !== null && typeof body.cost_basis !== "string") {
-      return NextResponse.json({ error: "Invalid cost basis" }, { status: 400 });
+    const costBasis = parseOptionalNumeric(body.cost_basis, "cost basis");
+    if ("error" in costBasis) {
+      return NextResponse.json({ error: costBasis.error }, { status: 400 });
     }
-    updates.cost_basis = body.cost_basis?.trim() || null;
+    updates.cost_basis = costBasis.value;
   }
 
   if ("purchased_from" in body) {
+    const purchasedFrom =
+      typeof body.purchased_from === "string" ? body.purchased_from.trim() : body.purchased_from;
     if (
-      body.purchased_from !== null &&
-      (typeof body.purchased_from !== "string" || !PURCHASED_FROM_OPTIONS.has(body.purchased_from))
+      purchasedFrom !== null &&
+      purchasedFrom !== "" &&
+      (typeof purchasedFrom !== "string" || !PURCHASED_FROM_OPTIONS.has(purchasedFrom))
     ) {
       return NextResponse.json({ error: "Invalid purchase origin" }, { status: 400 });
     }
-    updates.purchased_from = body.purchased_from;
+    updates.purchased_from = purchasedFrom || null;
   }
 
   if ("notes" in body) {

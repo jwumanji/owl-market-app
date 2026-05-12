@@ -30,12 +30,25 @@ const GAME = "one-piece-card-game";
 // ?sets=OP01       → sync one set
 // ?sets=OP01,OP02  → sync multiple (may timeout on Hobby)
 // no sets param    → returns list of available set codes to sync
+//
+// By default this route is existing-only: it updates price_stats for matched
+// DB cards and leaves optcg-owned catalog rows alone. Catalog mutations require
+// ?allowCatalogMutations=1.
 // ---------------------------------------------------------------------------
 
 async function syncPrices(request: Request) {
-  const isVercelCron =
-    request.headers.get("authorization") === `Bearer ${process.env.CRON_SECRET}`;
   const { searchParams } = new URL(request.url);
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    return NextResponse.json({ error: "CRON_SECRET is not set" }, { status: 500 });
+  }
+  const isAuthorized =
+    request.headers.get("authorization") === `Bearer ${cronSecret}` ||
+    searchParams.get("secret") === cronSecret;
+
+  if (!isAuthorized) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const supabase = createServiceClient();
 
@@ -53,11 +66,12 @@ async function syncPrices(request: Request) {
 
   // If no sets param, return available sets (useful for chaining)
   const setsParam = searchParams.get("sets");
+  const allowCatalogMutations = searchParams.get("allowCatalogMutations") === "1";
   if (!setsParam) {
     // For Vercel Cron: auto-chain through sets one at a time
     const indexParam = searchParams.get("_index");
-    if (indexParam !== null || isVercelCron) {
-      return await syncByIndex(request, syncableSets, parseInt(indexParam ?? "0", 10));
+    if (indexParam !== null || request.headers.get("authorization") === `Bearer ${cronSecret}`) {
+      return await syncByIndex(request, syncableSets, parseInt(indexParam ?? "0", 10), allowCatalogMutations);
     }
 
     return NextResponse.json({
@@ -90,7 +104,7 @@ async function syncPrices(request: Request) {
   const cardMaps = buildCardMaps(allCards);
 
   for (const dbSet of setsToSync) {
-    const result = await syncOneSet(client, supabase, dbSet, prefixToSetId, cardMaps);
+    const result = await syncOneSet(client, supabase, dbSet, prefixToSetId, cardMaps, { allowCatalogMutations });
     results.push(result);
   }
 
@@ -112,7 +126,8 @@ async function syncByIndex(
   request: Request,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   syncableSets: any[],
-  index: number
+  index: number,
+  allowCatalogMutations = false
 ) {
   if (index >= syncableSets.length) {
     return NextResponse.json({
@@ -138,7 +153,7 @@ async function syncByIndex(
   const allCards = await loadAllCards(supabase);
   const cardMaps = buildCardMaps(allCards);
 
-  const result = await syncOneSet(client, supabase, dbSet, prefixToSetId, cardMaps);
+  const result = await syncOneSet(client, supabase, dbSet, prefixToSetId, cardMaps, { allowCatalogMutations });
 
   // Trigger next set in the chain (fire-and-forget)
   const nextIndex = index + 1;
@@ -167,6 +182,7 @@ async function syncByIndex(
 
 interface DbCard {
   id: string;
+  card_image_id: string | null;
   card_number: string | null;
   name: string | null;
   variant_label: string | null;
@@ -175,6 +191,7 @@ interface DbCard {
   // resolves to multiple DB rows (one per set), we prefer rows that live in
   // the set we're currently syncing.
   set_id: string;
+  tcg_product_id?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -200,7 +217,7 @@ async function loadAllCards(supabase: any): Promise<DbCard[]> {
   while (true) {
     const { data, error } = await supabase
       .from("cards")
-      .select("id, card_number, name, variant_label, rarity, set_id")
+      .select("id, card_image_id, card_number, name, variant_label, rarity, set_id, tcg_product_id")
       .range(offset, offset + PAGE - 1);
     if (error) throw new Error(`loadAllCards: ${error.message}`);
     if (!data || data.length === 0) break;
@@ -243,6 +260,15 @@ function prefixFromCardNumber(cardNumber: string | null | undefined): string | n
   return null;
 }
 
+function allowsCardNumberInSet(setCode: string, cardNumber: string | null | undefined): boolean {
+  const prefix = prefixFromCardNumber(cardNumber);
+  if (!prefix) return false;
+  if (setCode === "P" || setCode.startsWith("EB") || setCode.startsWith("PRB")) {
+    return true;
+  }
+  return prefix === setCode;
+}
+
 async function syncOneSet(
   client: JustTCG,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -250,7 +276,8 @@ async function syncOneSet(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dbSet: any,
   prefixToSetId: Record<string, string> = {},
-  cardMaps: CardMaps
+  cardMaps: CardMaps,
+  options: { allowCatalogMutations?: boolean } = {}
 ): Promise<{ code: string; updated: number; errors: string[] }> {
   const setCode = dbSet.code;
   const justTcgSlugs = CODE_TO_SLUGS[setCode];
@@ -296,6 +323,7 @@ async function syncOneSet(
 
       for (const jtCard of cards) {
         try {
+          if (!allowsCardNumberInSet(setCode, jtCard.number)) continue;
           const priceCountBefore = priceUpserts.length;
           matchAndCollect(jtCard, byNumber, byNameLower, priceUpserts, historyInserts, rarityUpdates, matchedCardIds, dbSet.id, unmatchedCards);
 
@@ -315,8 +343,10 @@ async function syncOneSet(
         }
       }
 
-      // Create new card rows for unmatched JustTCG cards
-      if (unmatchedCards.length > 0) {
+      // Create new card rows for unmatched JustTCG cards only when explicitly
+      // requested. Normal sync must enrich existing optcg rows, not invent or
+      // replace catalog data.
+      if (options.allowCatalogMutations && unmatchedCards.length > 0) {
         const newCards = unmatchedCards
           .filter((jt) => jt.number) // must have a card number
           .map((jt) => {
@@ -446,6 +476,11 @@ async function syncOneSet(
       const dedupedPrices = Array.from(
         new Map(priceUpserts.map((p) => [p.card_id, p])).values()
       );
+      const dedupedHistory = await filterNewHistoryRowsForToday(
+        supabase,
+        dedupeHistoryRows(historyInserts),
+        setErrors
+      );
 
       if (dedupedPrices.length > 0) {
         const { error: upErr } = await supabase
@@ -455,15 +490,15 @@ async function syncOneSet(
         else updatedCount += dedupedPrices.length;
       }
 
-      if (historyInserts.length > 0) {
+      if (dedupedHistory.length > 0) {
         const { error: hiErr } = await supabase
           .from("price_history")
-          .insert(historyInserts);
+          .insert(dedupedHistory);
         if (hiErr) setErrors.push(`price_history batch: ${hiErr.message}`);
       }
 
       // Apply rarity reclassifications
-      if (rarityUpdates.length > 0) {
+      if (options.allowCatalogMutations && rarityUpdates.length > 0) {
         const byRarity = new Map<string, string[]>();
         for (const u of rarityUpdates) {
           const ids = byRarity.get(u.rarity) ?? [];
@@ -490,7 +525,7 @@ async function syncOneSet(
   } // end slug loop
 
   // Bulk-update promo card images using TCGPlayer CDN (parallel, chunked)
-  if (allImageUpdates.length > 0) {
+  if (options.allowCatalogMutations && allImageUpdates.length > 0) {
     const CHUNK = 50;
     for (let i = 0; i < allImageUpdates.length; i += CHUNK) {
       const chunk = allImageUpdates.slice(i, i + CHUNK);
@@ -509,6 +544,74 @@ async function syncOneSet(
   }
 
   return { code: setCode, updated: updatedCount, errors: setErrors };
+}
+
+function utcDay(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+}
+
+function historyDayKey(cardId: string, recordedAt: string): string | null {
+  const day = utcDay(recordedAt);
+  return day ? `${cardId}|${day}` : null;
+}
+
+function dedupeHistoryRows(rows: HistoryInsert[]): HistoryInsert[] {
+  const byCardDay = new Map<string, HistoryInsert>();
+  for (const row of rows) {
+    const key = historyDayKey(row.card_id, row.recorded_at);
+    if (!key) continue;
+    const existing = byCardDay.get(key);
+    if (!existing || new Date(row.recorded_at).getTime() >= new Date(existing.recorded_at).getTime()) {
+      byCardDay.set(key, row);
+    }
+  }
+  return Array.from(byCardDay.values());
+}
+
+async function filterNewHistoryRowsForToday(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  rows: HistoryInsert[],
+  setErrors: string[]
+): Promise<HistoryInsert[]> {
+  if (rows.length === 0) return rows;
+
+  const existing = new Set<string>();
+  const ids = Array.from(new Set(rows.map((row) => row.card_id))).filter(Boolean);
+  const days = Array.from(new Set(rows.map((row) => utcDay(row.recorded_at)).filter(Boolean))) as string[];
+  const chunkSize = 100;
+
+  for (const day of days) {
+    const start = `${day}T00:00:00.000Z`;
+    const end = new Date(Date.parse(start) + 24 * 60 * 60 * 1000).toISOString();
+    for (let i = 0; i < ids.length; i += chunkSize) {
+      const chunk = ids.slice(i, i + chunkSize);
+      const { data, error } = await supabase
+        .from("price_history")
+        .select("card_id, recorded_at")
+        .in("card_id", chunk)
+        .gte("recorded_at", start)
+        .lt("recorded_at", end);
+
+      if (error) {
+        setErrors.push(`price_history dedupe precheck: ${error.message}`);
+        return rows;
+      }
+
+      for (const row of data ?? []) {
+        const key = historyDayKey(row.card_id, row.recorded_at);
+        if (key) existing.add(key);
+      }
+    }
+  }
+
+  return rows.filter((row) => {
+    const key = historyDayKey(row.card_id, row.recorded_at);
+    return key && !existing.has(key);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -604,6 +707,8 @@ function matchAndCollect(
   // Best variant: prefer foil for parallels/alt-arts, normal for base cards
   const bestVariant = nmVariant ?? foilVariant;
   if (!bestVariant) return;
+  const jtVariantKey = variantKey(extractVariantLabel(jtCard.name));
+  const jtNumber = jtCard.number ?? null;
 
   // Normalize: strip card number like "(119)" from names for comparison
   // JustTCG: "Monkey.D.Luffy (Alternate Art) (Manga)"
@@ -644,21 +749,32 @@ function matchAndCollect(
     }
     const dbTagSet = new Set(dbTags);
     const dbStripped = stripCardNum(c.name ?? "");
+    const dbVariantKey = variantKey(c.variant_label);
+    const exactBaseImage = Boolean(jtNumber && c.card_image_id === jtNumber);
+    const sameVariant = Boolean(jtVariantKey && variantsEquivalent(jtVariantKey, dbVariantKey));
+    let scoreAdjust = 0;
+
+    if (c.tcg_product_id && jtCard.id && String(c.tcg_product_id) === String(jtCard.id)) scoreAdjust -= 100;
+    if (c.tcg_product_id && jtCard.id && String(c.tcg_product_id) !== String(jtCard.id)) scoreAdjust += 10;
+    if (!jtVariantKey && exactBaseImage && !dbVariantKey) scoreAdjust -= 30;
+    if (!jtVariantKey && dbVariantKey) scoreAdjust += 50;
+    if (jtVariantKey && sameVariant) scoreAdjust -= 30;
+    if (jtVariantKey && exactBaseImage && !dbVariantKey) scoreAdjust += 100;
 
     if (dbStripped === jtStripped && jtTags.length === 0 && dbTags.length === 0)
-      return -2;
+      return -2 + scoreAdjust;
 
     const equal =
       jtTagSet.size === dbTagSet.size &&
       Array.from(jtTagSet).every((t) => dbTagSet.has(t));
-    if (equal) return -1;
+    if (equal) return -1 + scoreAdjust;
 
     const onlyJt = jtTags.filter((t) => !dbTagSet.has(t)).length;
     const onlyDb = dbTags.filter((t) => !jtTagSet.has(t)).length;
 
-    if (jtTags.length > 0 && dbTags.length === 0) return 100 + onlyJt;
-    if (jtTags.length === 0 && dbTags.length > 0) return 50 + onlyDb;
-    return onlyJt + onlyDb;
+    if (jtTags.length > 0 && dbTags.length === 0) return 100 + onlyJt + scoreAdjust;
+    if (jtTags.length === 0 && dbTags.length > 0) return 50 + onlyDb + scoreAdjust;
+    return onlyJt + onlyDb + scoreAdjust;
   }
 
   // Match by card number first (most reliable). With the global pre-load,
@@ -669,8 +785,38 @@ function matchAndCollect(
   if (jtCard.number) {
     const allDbCards = byNumber.get(jtCard.number);
     if (allDbCards && allDbCards.length > 0) {
+      const directProductMatches = jtCard.id
+        ? allDbCards.filter((c) => String(c.tcg_product_id ?? "") === String(jtCard.id) && !matchedCardIds.has(c.id))
+        : [];
+      if (directProductMatches.length === 1) {
+        const direct = directProductMatches[0];
+        const variant = jtVariantKey || direct.variant_label
+          ? foilVariant ?? nmVariant
+          : nmVariant ?? foilVariant;
+        if (variant) {
+          addToBatch(direct.id, variant, priceUpserts, historyInserts, rarityUpdates, direct, jtCard.name);
+          matchedCardIds.add(direct.id);
+        }
+        return;
+      }
+
       const unmatched = allDbCards.filter((c) => !matchedCardIds.has(c.id));
       if (unmatched.length === 0) return;
+
+      if (unmatched.length === 1) {
+        const only = unmatched[0];
+        const onlyVariantKey = variantKey(only.variant_label);
+        const exactBaseImage = Boolean(jtNumber && only.card_image_id === jtNumber);
+        const variantWouldHitBase = Boolean(jtVariantKey && !onlyVariantKey && exactBaseImage);
+        const baseWouldHitVariant = Boolean(!jtVariantKey && onlyVariantKey);
+        const productConflict = Boolean(
+          only.tcg_product_id && jtCard.id && String(only.tcg_product_id) !== String(jtCard.id)
+        );
+        if (variantWouldHitBase || baseWouldHitVariant || productConflict) {
+          if (unmatchedCards) unmatchedCards.push(jtCard);
+          return;
+        }
+      }
 
       const jtTags = extractTags(jtCard.name);
       const jtTagSet = new Set(jtTags);
@@ -769,6 +915,20 @@ function matchAndCollect(
   if (unmatchedCards) {
     unmatchedCards.push(jtCard);
   }
+}
+
+function variantKey(label: string | null | undefined): string {
+  const normalized = (label ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+  if (!normalized) return "";
+  if (normalized === "alternateart" || normalized === "parallel" || normalized === "altart") {
+    return "altart";
+  }
+  if (normalized === "spr") return "sp";
+  return normalized;
+}
+
+function variantsEquivalent(a: string, b: string): boolean {
+  return Boolean(a && b && a === b);
 }
 
 function addToBatch(
