@@ -28,7 +28,9 @@ export const SET_SLUG_MAP: Record<string, string> = {
   "a-fist-of-divine-speed-one-piece-card-game":          "OP11",
   "legacy-of-the-master-one-piece-card-game":            "OP12",
   "carrying-on-his-will-one-piece-card-game":            "OP13",
+  "the-azure-sea-s-seven-one-piece-card-game":           "OP14",
   "the-azure-seas-seven-one-piece-card-game":            "OP14",
+  "adventure-on-kami-s-island-one-piece-card-game":      "OP15",
   "adventure-on-kamis-island-one-piece-card-game":       "OP15",
   "the-time-of-battle-one-piece-card-game":              "OP16",
 
