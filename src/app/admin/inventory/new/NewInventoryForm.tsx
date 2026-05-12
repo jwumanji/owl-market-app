@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 type InventoryType = "raw" | "damaged" | "graded" | "sealed";
 type InventoryStatus = "new" | "grading" | "sale" | "ship" | "sold";
 type GradedRating = "TAG 10" | "PSA 10" | "PSA 9" | "BGS 10" | "BGS 9.5";
+type PurchasedFrom = "facebook" | "ebay" | "instagram" | "direct_person" | "event";
 
 type CardSearchResult = {
   id: string;
@@ -33,10 +34,23 @@ const STATUSES: { value: InventoryStatus; label: string }[] = [
 ];
 
 const GRADED_RATINGS: GradedRating[] = ["TAG 10", "PSA 10", "PSA 9", "BGS 10", "BGS 9.5"];
+const PURCHASED_FROM_OPTIONS: { value: PurchasedFrom; label: string }[] = [
+  { value: "facebook", label: "Facebook" },
+  { value: "ebay", label: "Ebay" },
+  { value: "instagram", label: "Instagram" },
+  { value: "direct_person", label: "Direct Person" },
+  { value: "event", label: "Event" },
+];
 
 function setCode(card: CardSearchResult) {
   const set = Array.isArray(card.sets) ? card.sets[0] : card.sets;
   return set?.code ?? null;
+}
+
+function todayDateString() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset();
+  return new Date(now.getTime() - offset * 60_000).toISOString().slice(0, 10);
 }
 
 export default function NewInventoryForm() {
@@ -53,7 +67,9 @@ export default function NewInventoryForm() {
   const [nickname, setNickname] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [gradedRating, setGradedRating] = useState<GradedRating | "">("");
+  const [acquiredAt, setAcquiredAt] = useState(() => todayDateString());
   const [costBasis, setCostBasis] = useState("");
+  const [purchasedFrom, setPurchasedFrom] = useState<PurchasedFrom | "">("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -105,7 +121,9 @@ export default function NewInventoryForm() {
         status,
         quantity,
         graded_rating: condition === "graded" ? gradedRating || null : null,
+        acquired_at: acquiredAt || null,
         cost_basis: costBasis || null,
+        purchased_from: purchasedFrom || null,
         notes,
       }),
     });
@@ -310,13 +328,40 @@ export default function NewInventoryForm() {
           </label>
 
           <label className="block">
+            <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Acquired Date</span>
+            <input
+              type="date"
+              value={acquiredAt}
+              onChange={(event) => setAcquiredAt(event.target.value)}
+              className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-3 text-text outline-none focus:border-owl"
+            />
+          </label>
+
+          <label className="block">
             <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Cost Basis</span>
             <input
+              inputMode="decimal"
               value={costBasis}
               onChange={(event) => setCostBasis(event.target.value)}
               placeholder="Optional"
               className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-3 text-text outline-none focus:border-owl"
             />
+          </label>
+
+          <label className="block">
+            <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Purchased From</span>
+            <select
+              value={purchasedFrom}
+              onChange={(event) => setPurchasedFrom(event.target.value as PurchasedFrom | "")}
+              className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-3 text-text outline-none focus:border-owl"
+            >
+              <option value="">Select origin</option>
+              {PURCHASED_FROM_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label className="block">

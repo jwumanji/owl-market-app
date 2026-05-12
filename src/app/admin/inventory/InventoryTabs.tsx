@@ -11,6 +11,7 @@ type PurchasedFrom = "facebook" | "ebay" | "instagram" | "direct_person" | "even
 
 export interface InventoryRow {
   id: string;
+  created_at: string | null;
   inventory_type: InventoryType;
   status: InventoryStatus;
   quantity: number;
@@ -89,7 +90,7 @@ type InventoryGroup = {
 
 type CreatedInventoryItem = Pick<
   InventoryRow,
-  "id" | "inventory_type" | "status" | "quantity" | "item_nickname" | "graded_rating" | "customer_name" | "shipping_tracking" | "shipped_at"
+  "id" | "created_at" | "inventory_type" | "status" | "quantity" | "item_nickname" | "graded_rating" | "customer_name" | "shipping_tracking" | "shipped_at"
   | "shipping_label_url" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "purchased_from"
 >;
 
@@ -190,9 +191,10 @@ function cardImageUrl(item: InventoryRow) {
   return item.card.image_url_small ?? item.card.image_url;
 }
 
-function inventoryCardId(item: InventoryRow) {
-  const stableId = item.id.replace(/^(preview-|temp-)/, "");
-  return stableId.slice(0, 8).toUpperCase();
+function createdAtSortValue(value?: string | null) {
+  if (!value) return Number.MAX_SAFE_INTEGER;
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? time : Number.MAX_SAFE_INTEGER;
 }
 
 export default function InventoryTabs({
@@ -217,7 +219,6 @@ export default function InventoryTabs({
   const [addingGroups, setAddingGroups] = useState<Record<string, boolean>>({});
   const [deletingItemIds, setDeletingItemIds] = useState<Record<string, boolean>>({});
   const [confirmingDeleteIds, setConfirmingDeleteIds] = useState<Record<string, boolean>>({});
-  const [openActionMenuKey, setOpenActionMenuKey] = useState<string | null>(null);
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null);
   const [hoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
   const [searchDraft, setSearchDraft] = useState("");
@@ -226,7 +227,7 @@ export default function InventoryTabs({
   const showTracking = statusFilter === "ship" || statusFilter === "sold";
   const showShippingActions = statusFilter === "ship";
   const showSaleFields = statusFilter === "sold";
-  const standardTableMinWidth = showSaleFields ? "min-w-[1280px]" : "min-w-[940px]";
+  const standardTableMinWidth = showSaleFields ? "min-w-[1340px]" : "min-w-[1000px]";
 
   useEffect(() => {
     onItemsChange?.(rows);
@@ -236,35 +237,70 @@ export default function InventoryTabs({
     return rows.filter((item) => statusFilter === "all" || item.status === statusFilter);
   }, [rows, statusFilter]);
 
+  const cardNumbers = useMemo(() => {
+    const sorted = rows
+      .map((item, index) => ({ item, index }))
+      .sort((a, b) => {
+        const createdAtDiff = createdAtSortValue(a.item.created_at) - createdAtSortValue(b.item.created_at);
+        if (createdAtDiff !== 0) return createdAtDiff;
+
+        const idDiff = a.item.id.localeCompare(b.item.id);
+        return idDiff || a.index - b.index;
+      });
+
+    return new Map(sorted.map(({ item }, index) => [item.id, index + 1]));
+  }, [rows]);
+
+  function inventoryCardNumber(item: InventoryRow) {
+    return cardNumbers.get(item.id);
+  }
+
+  function inventoryCardLabel(item: InventoryRow) {
+    const cardNumber = inventoryCardNumber(item);
+    return cardNumber ? `Card # ${cardNumber}` : "Card #";
+  }
+
   const searchFilteredRows = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return statusFilteredRows;
 
-    return statusFilteredRows.filter((item) =>
-      [
+    return statusFilteredRows.filter((item) => {
+      const cardNumber = cardNumbers.get(item.id);
+      const cardLabel = cardNumber ? `Card # ${cardNumber}` : null;
+
+      return [
         item.item_nickname,
         item.card.name,
         item.card.set_code,
         item.card.card_number,
         item.id,
-        inventoryCardId(item),
+        cardLabel,
+        cardNumber?.toString(),
         item.inventory_type,
+        CONDITION_LABELS[item.inventory_type],
         item.status,
+        STATUS_LABELS[item.status],
         item.graded_rating,
         item.sale_channel,
+        item.sale_channel ? SALE_CHANNEL_LABELS[item.sale_channel] : null,
         item.customer_name,
         item.purchased_from,
         item.purchased_from ? PURCHASED_FROM_LABELS[item.purchased_from] : null,
         item.shipping_tracking,
         item.shipping_label_url,
+        item.sold_date,
+        item.sold_price,
+        item.acquired_at,
+        item.cost_basis,
         item.notes,
+        item.pending_card_match ? "needs match pending card match" : null,
       ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
-        .includes(query)
-    );
-  }, [searchQuery, statusFilteredRows]);
+        .includes(query);
+    });
+  }, [cardNumbers, searchQuery, statusFilteredRows]);
 
   const filtered = useMemo(() => {
     return searchFilteredRows.filter((item) => activeTab === "all" || item.inventory_type === activeTab);
@@ -316,22 +352,30 @@ export default function InventoryTabs({
     id: string,
     updates: Partial<Pick<InventoryRow, "status" | "graded_rating" | "inventory_type" | "item_nickname" | "customer_name" | "shipping_tracking" | "shipping_label_url" | "shipped_at" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "purchased_from" | "notes">>
   ) {
-    setRows((current) =>
-      current.map((item) => (item.id === id ? { ...item, ...updates } : item))
-    );
+    let previousRows = rows;
+    setActionError(null);
+    setRows((current) => {
+      previousRows = current;
+      return current.map((item) => (item.id === id ? { ...item, ...updates } : item));
+    });
 
     if (isLocalOnlyItem(id)) {
       return;
     }
 
-    const res = await fetch(`/api/admin/inventory/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updates),
-    });
+    try {
+      const res = await fetch(`/api/admin/inventory/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
 
-    if (!res.ok) {
-      setRows(items);
+      if (!res.ok) {
+        throw new Error("Failed to update inventory item");
+      }
+    } catch {
+      setRows(previousRows);
+      setActionError("Could not save the inventory item. Try again.");
     }
   }
 
@@ -343,12 +387,13 @@ export default function InventoryTabs({
     const newItem: InventoryRow = {
       ...source,
       id: tempId,
+      created_at: new Date().toISOString(),
       quantity: 1,
       item_nickname: source.item_nickname ?? null,
       customer_name: source.customer_name ?? null,
-      shipping_tracking: null,
-      shipping_label_url: null,
-      shipped_at: null,
+      shipping_tracking: source.shipping_tracking ?? null,
+      shipping_label_url: source.shipping_label_url ?? null,
+      shipped_at: source.shipped_at ?? null,
       sale_channel: source.sale_channel ?? "not_sold",
       sold_date: source.sold_date ?? null,
       sold_price: source.sold_price ?? null,
@@ -385,6 +430,7 @@ export default function InventoryTabs({
             ? {
                 ...newItem,
                 id: created.id,
+                created_at: created.created_at ?? newItem.created_at,
                 inventory_type: created.inventory_type,
                 status: created.status,
                 quantity: created.quantity,
@@ -511,87 +557,23 @@ export default function InventoryTabs({
     canAdd?: boolean;
     canRemove?: boolean;
   }) {
-    const key = `${group.key}:${item.id}`;
-    const isOpen = openActionMenuKey === key;
     const isAdding = addingGroups[group.key] ?? false;
-    const isConfirmingDelete = confirmingDeleteIds[item.id] ?? false;
-    const isDeleting = deletingItemIds[item.id] ?? false;
 
     return (
-      <div className="relative shrink-0">
-        <button
-          type="button"
-          title="Inventory actions"
-          aria-label="Inventory actions"
-          onClick={() => setOpenActionMenuKey((current) => (current === key ? null : key))}
-          className="flex h-8 w-8 items-center justify-center rounded-md border border-border-2 bg-surface font-mono text-lg font-black leading-none text-text-2 transition-colors hover:border-owl hover:text-owl"
-        >
-          ...
-        </button>
-
-        {isOpen && (
-          <div className="absolute right-0 top-10 z-40 min-w-[190px] rounded-lg border border-border bg-deep p-2 shadow-2xl">
-            {canAdd && (
-              <button
-                type="button"
-                disabled={isAdding}
-                onClick={() => {
-                  addIndividualItem(group);
-                  setOpenActionMenuKey(null);
-                }}
-                className="block w-full rounded-md px-3 py-2 text-left font-mono text-xs font-bold uppercase tracking-wider text-gain transition-colors hover:bg-[rgba(0,214,143,0.10)] disabled:cursor-wait disabled:opacity-60"
-              >
-                Add item
-              </button>
-            )}
-
-            {canRemove && (
-              isConfirmingDelete ? (
-                <div className="space-y-2 p-1">
-                  <div className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
-                    Remove item?
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={isDeleting}
-                      onClick={() => {
-                        deleteItem(item);
-                        setOpenActionMenuKey(null);
-                      }}
-                      className="rounded-md border border-loss bg-loss/10 px-2.5 py-1.5 font-mono text-xs font-bold uppercase tracking-wider text-loss transition-colors hover:bg-loss/15 disabled:cursor-wait disabled:opacity-60"
-                    >
-                      Confirm
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isDeleting}
-                      onClick={() =>
-                        setConfirmingDeleteIds((current) => {
-                          const next = { ...current };
-                          delete next[item.id];
-                          return next;
-                        })
-                      }
-                      className="rounded-md border border-border-2 bg-surface px-2.5 py-1.5 font-mono text-xs font-bold uppercase tracking-wider text-text-2 transition-colors hover:text-text disabled:cursor-wait disabled:opacity-60"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  disabled={isDeleting}
-                  onClick={() => setConfirmingDeleteIds((current) => ({ ...current, [item.id]: true }))}
-                  className="block w-full rounded-md px-3 py-2 text-left font-mono text-xs font-bold uppercase tracking-wider text-loss transition-colors hover:bg-loss/10 disabled:cursor-wait disabled:opacity-60"
-                >
-                  Remove item
-                </button>
-              )
-            )}
-          </div>
+      <div className="flex shrink-0 items-center justify-end gap-2">
+        {canAdd && (
+          <button
+            type="button"
+            title="Add individual item"
+            aria-label="Add individual item"
+            disabled={isAdding}
+            onClick={() => addIndividualItem(group)}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-gain bg-[rgba(0,214,143,0.10)] font-mono text-base font-black leading-none text-gain transition-colors hover:bg-[rgba(0,214,143,0.16)] disabled:cursor-wait disabled:opacity-60"
+          >
+            +
+          </button>
         )}
+        {canRemove && renderDeleteControls(item)}
       </div>
     );
   }
@@ -986,10 +968,10 @@ export default function InventoryTabs({
   function renderInventoryCardBadge(item: InventoryRow) {
     return (
       <span
-        title={`Inventory item ID: ${item.id}`}
+        title={`${inventoryCardLabel(item)} - Inventory item ID: ${item.id}`}
         className="inline-flex items-center rounded-full border border-owl/50 bg-owl px-2.5 py-1 font-mono text-[11px] font-black uppercase leading-none tracking-wider text-void shadow-[0_0_14px_rgba(245,166,35,0.28)]"
       >
-        Card # {inventoryCardId(item)}
+        {inventoryCardLabel(item)}
       </span>
     );
   }
@@ -1206,7 +1188,7 @@ export default function InventoryTabs({
                     </div>
                   )}
 
-                  {row.status === "sold" && (
+                  {(row.status === "ship" || row.status === "sold") && (
                     <div className="mt-3 grid gap-3 md:grid-cols-3">
                       <label className="block">
                         <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Sold At</span>
@@ -1362,8 +1344,9 @@ export default function InventoryTabs({
 
       {statusFilter === "ship" ? (
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
-        <table className="w-full min-w-[1080px] table-fixed">
+        <table className="w-full min-w-[1140px] table-fixed">
           <colgroup>
+            <col className="w-[60px]" />
             <col className="w-[48px]" />
             <col className="w-[330px]" />
             <col className="w-[190px]" />
@@ -1373,6 +1356,7 @@ export default function InventoryTabs({
           </colgroup>
           <thead>
             <tr className="border-b border-border bg-surf2 text-left font-mono text-xs font-semibold uppercase tracking-wider text-text">
+              <th className="px-3 py-3.5 text-right">#</th>
               <th className="px-3 py-3.5" />
               <th className="px-3 py-3.5">Card</th>
               <th className="px-3 py-3.5">Customer Name</th>
@@ -1391,6 +1375,9 @@ export default function InventoryTabs({
               return (
                 <Fragment key={group.key}>
                   <tr className="border-b border-border hover:bg-surf2/70">
+                    <td className="px-3 py-4 text-right align-top font-mono text-xs font-bold text-text-2">
+                      {inventoryCardNumber(item) ?? "-"}
+                    </td>
                     <td className="px-3 py-4">
                       {hasNestedRows && (
                         <button
@@ -1484,11 +1471,14 @@ export default function InventoryTabs({
 
                   {isOpen && (
                     <>
-                      {group.rows.map((child, index) => (
+                      {group.rows.map((child) => (
                         <tr
                           key={child.id}
                           className="border-b border-[rgba(79,142,247,0.16)] bg-[rgba(79,142,247,0.075)] shadow-[inset_3px_0_0_rgba(79,142,247,0.45)] transition-colors hover:bg-[rgba(79,142,247,0.11)]"
                         >
+                          <td className="px-3 py-3.5 text-right align-top font-mono text-xs font-bold text-blue">
+                            {inventoryCardNumber(child) ?? "-"}
+                          </td>
                           <td className="px-3 py-3.5" />
                           <td className="px-3 py-3.5">
                             <div className="flex min-w-0 items-start justify-between gap-3">
@@ -1501,7 +1491,6 @@ export default function InventoryTabs({
                                   {renderCardTitle(child, "text-base font-semibold text-text")}
                                 </button>
                                 <div className="mt-1 flex items-center gap-2 font-mono text-xs text-text-2">
-                                  <span>#{index + 1}</span>
                                   {renderInventoryCardBadge(child)}
                                   <span className="truncate">{child.id}</span>
                                 </div>
@@ -1516,6 +1505,7 @@ export default function InventoryTabs({
                         </tr>
                       ))}
                       <tr className="border-b border-[rgba(79,142,247,0.16)] bg-[rgba(79,142,247,0.045)] shadow-[inset_3px_0_0_rgba(79,142,247,0.32)] last:border-b-0">
+                        <td className="px-3 py-3.5" />
                         <td className="px-3 py-3.5" />
                         <td colSpan={5} className="px-3 py-3.5">
                           <button
@@ -1537,7 +1527,7 @@ export default function InventoryTabs({
 
             {groups.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-12 text-center text-base text-text-2">
+                <td colSpan={7} className="px-3 py-12 text-center text-base text-text-2">
                   No inventory items need shipping yet.
                 </td>
               </tr>
@@ -1549,6 +1539,7 @@ export default function InventoryTabs({
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
         <table className={`w-full ${standardTableMinWidth} table-fixed`}>
           <colgroup>
+            <col className="w-[60px]" />
             <col className="w-[48px]" />
             <col className="w-[104px]" />
             <col className="w-[290px]" />
@@ -1562,6 +1553,7 @@ export default function InventoryTabs({
           </colgroup>
           <thead>
             <tr className="border-b border-border bg-surf2 text-left font-mono text-xs font-semibold uppercase tracking-wider text-text">
+              <th className="px-3 py-3.5 text-right">#</th>
               <th className="px-3 py-3.5" />
               <th className="px-4 py-3.5">Image</th>
               <th className="px-3 py-3.5">Card Name</th>
@@ -1587,6 +1579,9 @@ export default function InventoryTabs({
               return (
                 <Fragment key={group.key}>
                   <tr className="border-b border-border hover:bg-surf2/70">
+                    <td className="px-3 py-4 text-right align-top font-mono text-xs font-bold text-text-2">
+                      {inventoryCardNumber(item) ?? "-"}
+                    </td>
                     <td className="px-3 py-4">
                       {hasNestedRows && (
                         <button
@@ -1736,6 +1731,9 @@ export default function InventoryTabs({
                           key={child.id}
                           className="border-b border-[rgba(79,142,247,0.16)] bg-[rgba(79,142,247,0.075)] shadow-[inset_3px_0_0_rgba(79,142,247,0.45)] transition-colors hover:bg-[rgba(79,142,247,0.11)]"
                         >
+                          <td className="px-3 py-3.5 text-right align-top font-mono text-xs font-bold text-blue">
+                            {inventoryCardNumber(child) ?? "-"}
+                          </td>
                           <td className="px-3 py-3.5" />
                           <td className="px-3 py-3.5">
                             <button
@@ -1799,6 +1797,7 @@ export default function InventoryTabs({
                       ))}
                       <tr className="border-b border-[rgba(79,142,247,0.16)] bg-[rgba(79,142,247,0.045)] shadow-[inset_3px_0_0_rgba(79,142,247,0.32)] last:border-b-0">
                         <td className="px-3 py-3.5" />
+                        <td className="px-3 py-3.5" />
                         <td colSpan={(showTracking ? 6 : 5) + (showShippingActions ? 3 : 0) + (showSaleFields ? 3 : 0)} className="px-3 py-3.5">
                           <button
                             type="button"
@@ -1819,7 +1818,7 @@ export default function InventoryTabs({
 
             {groups.length === 0 && (
               <tr>
-                <td colSpan={(showTracking ? 7 : 6) + (showShippingActions ? 3 : 0) + (showSaleFields ? 3 : 0)} className="px-3 py-12 text-center text-base text-text-2">
+                <td colSpan={(showTracking ? 8 : 7) + (showShippingActions ? 3 : 0) + (showSaleFields ? 3 : 0)} className="px-3 py-12 text-center text-base text-text-2">
                   No inventory items in this view yet.
                 </td>
               </tr>

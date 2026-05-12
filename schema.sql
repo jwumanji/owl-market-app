@@ -78,10 +78,14 @@ CREATE TABLE price_history (
   ebay_avg    numeric,
   market_avg  numeric,
   volume      int,
-  recorded_at timestamptz DEFAULT now()
+  recorded_at timestamptz DEFAULT now(),
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  source      text NOT NULL DEFAULT 'app_sync',
+  metadata    jsonb NOT NULL DEFAULT '{}'::jsonb
 );
 
 CREATE INDEX idx_price_history_card_date ON price_history(card_id, recorded_at DESC);
+CREATE INDEX idx_price_history_source_created_at ON price_history(source, created_at DESC);
 
 -- 5. ebay_sales
 CREATE TABLE ebay_sales (
@@ -159,3 +163,15 @@ CREATE TABLE portfolio_items (
   notes           text,
   created_at      timestamptz DEFAULT now()
 );
+
+-- 10. sync_state
+CREATE TABLE sync_state (
+  key         text PRIMARY KEY,
+  state       jsonb NOT NULL DEFAULT '{}'::jsonb,
+  locked_at   timestamptz,
+  lock_owner  text,
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_sync_state_updated_at ON sync_state(updated_at DESC);

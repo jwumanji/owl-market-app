@@ -27,6 +27,25 @@ type InventorySource = {
 const CONDITIONS = new Set(["raw", "damaged", "graded", "sealed"]);
 const STATUSES = new Set(["new", "grading", "sale", "ship", "sold"]);
 const GRADED_RATINGS = new Set(["TAG 10", "PSA 10", "PSA 9", "BGS 10", "BGS 9.5"]);
+const PURCHASED_FROM_OPTIONS = new Set(["facebook", "ebay", "instagram", "direct_person", "event"]);
+
+function parseOptionalNumeric(value: unknown, fieldName: string) {
+  if (value === null || value === undefined || value === "") {
+    return { value: null as string | number | null };
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return { value };
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return { value: null as string | number | null };
+    if (Number.isFinite(Number(trimmed))) return { value: trimmed };
+  }
+
+  return { error: `Invalid ${fieldName}` };
+}
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -66,6 +85,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Quantity must be between 1 and 100" }, { status: 400 });
     }
 
+    const costBasis = parseOptionalNumeric(body.cost_basis, "cost basis");
+    if ("error" in costBasis) {
+      return NextResponse.json({ error: costBasis.error }, { status: 400 });
+    }
+
+    if (body.acquired_at !== null && body.acquired_at !== undefined && typeof body.acquired_at !== "string") {
+      return NextResponse.json({ error: "Invalid acquired date" }, { status: 400 });
+    }
+    const acquiredAt =
+      typeof body.acquired_at === "string" && body.acquired_at.trim() ? body.acquired_at.trim() : null;
+
+    const purchasedFromValue =
+      typeof body.purchased_from === "string" ? body.purchased_from.trim() : body.purchased_from;
+    if (
+      purchasedFromValue !== null &&
+      purchasedFromValue !== undefined &&
+      purchasedFromValue !== "" &&
+      (typeof purchasedFromValue !== "string" || !PURCHASED_FROM_OPTIONS.has(purchasedFromValue))
+    ) {
+      return NextResponse.json({ error: "Invalid purchase origin" }, { status: 400 });
+    }
+    const purchasedFrom = typeof purchasedFromValue === "string" && purchasedFromValue ? purchasedFromValue : null;
+
     const rows = Array.from({ length: quantity }, () => ({
       card_id: cardId,
       manual_card_name: cardId ? null : manualName,
@@ -80,8 +122,9 @@ export async function POST(request: Request) {
       sale_channel: "not_sold",
       sold_date: null,
       sold_price: null,
-      cost_basis: body.cost_basis ? body.cost_basis : 0,
-      purchased_from: null,
+      ...(acquiredAt ? { acquired_at: acquiredAt } : {}),
+      cost_basis: costBasis.value ?? 0,
+      purchased_from: purchasedFrom,
       notes: typeof body.notes === "string" ? body.notes.trim() || null : null,
     }));
 
@@ -142,7 +185,7 @@ export async function POST(request: Request) {
       purchased_from: item.purchased_from,
       notes: item.notes,
     })
-    .select("id, inventory_type, status, quantity, item_nickname, graded_rating, customer_name, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from")
+    .select("id, created_at, inventory_type, status, quantity, item_nickname, graded_rating, customer_name, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from")
     .single();
 
   if (error) {

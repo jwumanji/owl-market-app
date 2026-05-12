@@ -23,6 +23,13 @@ export async function GET() {
     .single();
   const promoSetId = promoSet?.id as string | null;
 
+  const applyPromoFilter = <T extends { or: (filters: string) => T; eq: (column: string, value: string) => T }>(
+    query: T
+  ): T => {
+    if (!promoSetId) return query.eq("rarity", "PR");
+    return query.or(`set_id.eq.${promoSetId},rarity.eq.PR`);
+  };
+
   // ── Step 1: Batch-fetch ALL card counts + price aggregation in one pass ──
   // Paginate all cards with price_stats to avoid 1000-row limit
   const allPriced: { rarity: string; tcg_market: number; chg_7d: number; chg_30d: number }[] = [];
@@ -31,11 +38,11 @@ export async function GET() {
   // Count all cards per rarity in parallel
   const countPromises = distinctRarities.map(async (code) => {
     if (code === "PROMO") {
-      if (!promoSetId) return { code, count: 0 };
-      const { count } = await supabase
+      let q = supabase
         .from("cards")
-        .select("id", { count: "exact", head: true })
-        .eq("set_id", promoSetId);
+        .select("id", { count: "exact", head: true });
+      q = applyPromoFilter(q);
+      const { count } = await q;
       return { code, count: count ?? 0 };
     }
     let q = supabase
@@ -83,37 +90,36 @@ export async function GET() {
   }
 
   // Paginate priced cards — promo set cards
-  if (promoSetId) {
-    let promoFrom = 0;
-    while (true) {
-      const { data: page } = await supabase
-        .from("cards")
-        .select("rarity, price_stats!inner (tcg_market, chg_7d, chg_30d)")
-        .eq("set_id", promoSetId)
-        .not("price_stats.tcg_market", "is", null)
-        .range(promoFrom, promoFrom + pricePageSize - 1);
+  let promoFrom = 0;
+  while (true) {
+    let q = supabase
+      .from("cards")
+      .select("rarity, price_stats!inner (tcg_market, chg_7d, chg_30d)")
+      .not("price_stats.tcg_market", "is", null)
+      .range(promoFrom, promoFrom + pricePageSize - 1);
+    q = applyPromoFilter(q);
+    const { data: page } = await q;
 
-      if (!page || page.length === 0) break;
+    if (!page || page.length === 0) break;
 
-      for (const card of page) {
-        const ps = card.price_stats as unknown as {
-          tcg_market: number | null;
-          chg_7d: number | null;
-          chg_30d: number | null;
-        };
-        if (ps?.tcg_market) {
-          allPriced.push({
-            rarity: "PROMO",
-            tcg_market: ps.tcg_market,
-            chg_7d: ps.chg_7d ?? 0,
-            chg_30d: ps.chg_30d ?? 0,
-          });
-        }
+    for (const card of page) {
+      const ps = card.price_stats as unknown as {
+        tcg_market: number | null;
+        chg_7d: number | null;
+        chg_30d: number | null;
+      };
+      if (ps?.tcg_market) {
+        allPriced.push({
+          rarity: "PROMO",
+          tcg_market: ps.tcg_market,
+          chg_7d: ps.chg_7d ?? 0,
+          chg_30d: ps.chg_30d ?? 0,
+        });
       }
-
-      if (page.length < pricePageSize) break;
-      promoFrom += pricePageSize;
     }
+
+    if (page.length < pricePageSize) break;
+    promoFrom += pricePageSize;
   }
 
   // Wait for counts
@@ -148,14 +154,14 @@ export async function GET() {
       `;
 
     if (code === "PROMO") {
-      if (!promoSetId) return { code, topCards: [] as never[] };
-      const { data: topCards } = await supabase
+      let q = supabase
         .from("cards")
         .select(fields)
-        .eq("set_id", promoSetId)
         .not("price_stats.tcg_market", "is", null)
         .order("price_stats(tcg_market)", { ascending: false })
         .limit(10);
+      q = applyPromoFilter(q);
+      const { data: topCards } = await q;
       return { code, topCards: topCards ?? [] };
     }
 

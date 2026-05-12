@@ -10,6 +10,7 @@ export const metadata = {
 
 type InventoryQueryRow = {
   id: string;
+  created_at: string | null;
   card_id: string | null;
   manual_card_name: string | null;
   manual_card_number: string | null;
@@ -48,6 +49,7 @@ function toInventoryRow(row: InventoryQueryRow, cardMap: Map<string, CardLookupR
 
   return {
     id: row.id,
+    created_at: row.created_at,
     inventory_type: row.inventory_type,
     status: row.status,
     quantity: row.quantity,
@@ -89,11 +91,12 @@ export default async function AdminInventoryPage() {
     ? await supabase
         .from("inventory_items")
         .select(`
-          id, card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match,
+          id, created_at, card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, pending_card_match,
           inventory_type, status, quantity, graded_rating, customer_name, shipping_tracking, shipping_label_url, shipped_at,
           sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from, notes
         `)
         .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
     : { data: null, error: null };
 
   const inventoryRows = (data ?? []) as unknown as InventoryQueryRow[];
