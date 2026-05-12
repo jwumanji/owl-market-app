@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, type MouseEvent, type SelectHTMLAttributes, useEffect, useMemo, useState } from "react";
+import { Fragment, type MouseEvent, type SelectHTMLAttributes, useCallback, useEffect, useMemo, useState } from "react";
 import { GRADED_RATINGS, type GradedRating, type InventoryStatus, type InventoryType } from "@/lib/inventory-options";
 
 type StatusFilter = InventoryStatus | "all";
@@ -365,7 +365,7 @@ export default function InventoryTabs({
     return cardNumber ? `Card # ${cardNumber}` : "Card #";
   }
 
-  function itemMatchesSearch(item: InventoryRow, query: string) {
+  const itemMatchesSearch = useCallback((item: InventoryRow, query: string) => {
     const cardNumber = cardNumbers.get(item.id);
     const cardLabel = cardNumber ? `Card # ${cardNumber}` : null;
 
@@ -395,14 +395,14 @@ export default function InventoryTabs({
         .toLowerCase()
         .includes(query)
     );
-  }
+  }, [cardNumbers]);
 
   const searchFilteredRows = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return statusFilteredRows;
 
     return statusFilteredRows.filter((item) => itemMatchesSearch(item, query));
-  }, [cardNumbers, searchQuery, statusFilteredRows]);
+  }, [itemMatchesSearch, searchQuery, statusFilteredRows]);
 
   const filtered = useMemo(() => {
     if (pendingMatchOnly) return searchFilteredRows;
@@ -439,7 +439,7 @@ export default function InventoryTabs({
     const baseRows = rows.filter((item) => statusFilter === "all" || item.status === statusFilter);
     if (!query) return baseRows;
     return baseRows.filter((item) => itemMatchesSearch(item, query));
-  }, [cardNumbers, rows, searchQuery, statusFilter]);
+  }, [itemMatchesSearch, rows, searchQuery, statusFilter]);
 
   const counts = useMemo(() => {
     return countRows.reduce(
