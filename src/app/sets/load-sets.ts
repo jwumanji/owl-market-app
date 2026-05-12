@@ -63,6 +63,11 @@ const SET_NAME_SUFFIX_BY_CODE: Record<string, string> = {
   OP15: "-EB04",
 };
 
+const SET_DISPLAY_CODE_BY_CODE: Record<string, string> = {
+  OP14: "OP14-EB04",
+  OP15: "OP15-EB04",
+};
+
 function displaySetName(code: string, name: string | null | undefined): string {
   const baseName = name ?? code;
   const suffix = SET_NAME_SUFFIX_BY_CODE[code.toUpperCase()];
@@ -231,8 +236,9 @@ export async function loadSets(): Promise<LoadedSets> {
   for (const set of filteredSets) {
     const cards = cardsBySet[set.id] ?? [];
     const color = set.color || DEFAULT_COLOR;
-    const displayCode = set.code ?? set.slug.toUpperCase();
-    const displayName = displaySetName(displayCode, set.name);
+    const code = set.code ?? set.slug.toUpperCase();
+    const displayCode = SET_DISPLAY_CODE_BY_CODE[code.toUpperCase()] ?? code;
+    const displayName = displaySetName(code, set.name);
     const shouldShowInIndex = cards.length >= 1;
 
     let totalValue = 0;
@@ -312,7 +318,8 @@ export async function loadSets(): Promise<LoadedSets> {
     if (shouldShowInIndex) {
       sets.push({
         slug: set.slug,
-        code: displayCode,
+        code,
+        displayCode,
         name: displayName,
         year: set.year ?? 2024,
         color,
@@ -344,7 +351,8 @@ export async function loadSets(): Promise<LoadedSets> {
     } else {
       extraSets.push({
         slug: set.slug,
-        code: displayCode,
+        code,
+        displayCode,
         name: displayName,
         year: set.year ?? 2024,
         color,

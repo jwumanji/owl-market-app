@@ -88,9 +88,14 @@ function generateChartData(s: SetData, period: string) {
   return pts;
 }
 
+function setDisplayCode(s: Pick<SetData, "code" | "displayCode">): string {
+  return s.displayCode ?? s.code;
+}
+
 /* ── Sub-components ── */
 
 function IndexCard({ s, active, onClick }: { s: SetData; active: boolean; onClick: () => void }) {
+  const code = setDisplayCode(s);
   return (
     <div
       className="sic"
@@ -102,7 +107,7 @@ function IndexCard({ s, active, onClick }: { s: SetData; active: boolean; onClic
     >
       {active && <style>{`.sic:nth-child(1)::before { opacity: 1 !important; }`}</style>}
       <div className="sic-header">
-        <div className="sic-code">{s.code}</div>
+        <div className="sic-code">{code}</div>
         <span className="sic-badge" style={{ background: s.colorD, color: s.color, border: `1px solid ${s.colorBd}` }}>{s.year}</span>
       </div>
       <div className="sic-name">{s.name}</div>
@@ -142,6 +147,7 @@ function setImageSlug(slug: string): string {
 function DetailCard({ s }: { s: SetData }) {
   const imgSlug = setImageSlug(s.slug);
   const imgFile = SET_IMAGE_MAP[imgSlug];
+  const code = setDisplayCode(s);
   return (
     <div className="set-detail-card">
       <div className="sdc-box-art" style={{ background: `linear-gradient(135deg,${s.colorD} 0%,rgba(3,5,13,0.9) 100%)` }}>
@@ -151,7 +157,7 @@ function DetailCard({ s }: { s: SetData }) {
             {imgFile ? (
               <Image
                 src={`/sets/${imgFile}`}
-                alt={`${s.code} ${s.name} Booster Box`}
+                alt={`${code} ${s.name} Booster Box`}
                 fill
                 style={{ objectFit: "cover" }}
                 sizes="160px"
@@ -160,14 +166,14 @@ function DetailCard({ s }: { s: SetData }) {
               <span style={{ fontSize: 38 }}>{"\uD83C\uDFB4"}</span>
             )}
           </div>
-          <div className="sdc-box-label">Booster Box &middot; {s.code}</div>
+          <div className="sdc-box-label">Booster Box &middot; {code}</div>
         </div>
       </div>
       <div className="sdc-header" style={{ background: `linear-gradient(135deg,${s.colorD},transparent)` }}>
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,transparent,${s.color},transparent)` }} />
-        <span className="sdc-code" style={{ background: s.colorD, color: s.color, border: `1px solid ${s.colorBd}` }}>{s.code} &middot; {s.year}</span>
+        <span className="sdc-code" style={{ background: s.colorD, color: s.color, border: `1px solid ${s.colorBd}` }}>{code} &middot; {s.year}</span>
         <div className="sdc-name">{s.name}</div>
-        <div className="sdc-desc">One Piece TCG {s.code} booster set &mdash; {s.cards} cards including Commons, Rares, Super Rares, Secret Rares and chase variants.</div>
+        <div className="sdc-desc">One Piece TCG {code} booster set &mdash; {s.cards} cards including Commons, Rares, Super Rares, Secret Rares and chase variants.</div>
       </div>
       <div>
         {[
@@ -215,6 +221,7 @@ function PerfStrip({ s }: { s: SetData }) {
 
 function IndexChart({ s, activeTime, onTimeChange }: { s: SetData; activeTime: string; onTimeChange: (t: string) => void }) {
   const [chartData, setChartData] = useState(() => generateChartData(s, activeTime));
+  const code = setDisplayCode(s);
 
   useEffect(() => {
     setChartData(generateChartData(s, activeTime));
@@ -288,7 +295,7 @@ function IndexChart({ s, activeTime, onTimeChange }: { s: SetData; activeTime: s
     <div className="index-chart-card">
       <div className="icc-header">
         <div>
-          <div className="icc-title">{s.code} {s.name} Index</div>
+          <div className="icc-title">{code} {s.name} Index</div>
           <div className="icc-price">${s.price.toLocaleString()}</div>
           <div className="icc-sub">Total card value &middot; {s.cards}{s.cardsTotal && s.cardsTotal !== s.cards ? `/${s.cardsTotal}` : ""} cards priced</div>
         </div>
@@ -311,12 +318,13 @@ function IndexChart({ s, activeTime, onTimeChange }: { s: SetData; activeTime: s
 function TopCardsTable({ s, sets, activeTab, onTabChange }: { s: SetData; sets: SetData[]; activeTab: string; onTabChange: (slug: string) => void }) {
   const router = useRouter();
   const tabSet = sets.find((x) => x.slug === activeTab) || s;
+  const tabCode = setDisplayCode(tabSet);
   return (
     <div className="top-cards-section">
       <div className="section-header">
         <div>
-          <div className="section-title">Top Cards &mdash; <span>{tabSet.code}</span></div>
-          <div className="section-sub">Top {tabSet.topCards.length} cards &middot; {tabSet.cards}{tabSet.cardsTotal && tabSet.cardsTotal !== tabSet.cards ? `/${tabSet.cardsTotal}` : ""} priced in {tabSet.code}</div>
+          <div className="section-title">Top Cards &mdash; <span>{tabCode}</span></div>
+          <div className="section-sub">Top {tabSet.topCards.length} cards &middot; {tabSet.cards}{tabSet.cardsTotal && tabSet.cardsTotal !== tabSet.cards ? `/${tabSet.cardsTotal}` : ""} priced in {tabCode}</div>
         </div>
         <Link href="/markets" className="section-action">View all in markets &rarr;</Link>
       </div>
@@ -328,7 +336,7 @@ function TopCardsTable({ s, sets, activeTab, onTabChange }: { s: SetData; sets: 
             style={activeTab === st.slug ? { background: st.colorD, color: st.color, borderColor: st.colorBd } : undefined}
             onClick={() => onTabChange(st.slug)}
           >
-            {st.code}
+            {setDisplayCode(st)}
           </button>
         ))}
       </div>
@@ -349,7 +357,7 @@ function TopCardsTable({ s, sets, activeTab, onTabChange }: { s: SetData; sets: 
             {tabSet.topCards.length === 0 ? (
               <tr>
                 <td colSpan={9} style={{ textAlign: "center", padding: "2rem 1rem", color: "var(--text2)", fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: 12 }}>
-                  No card data available for {tabSet.code}
+                  No card data available for {tabCode}
                 </td>
               </tr>
             ) : tabSet.topCards.map((c, i) => (
@@ -376,7 +384,7 @@ function TopCardsTable({ s, sets, activeTab, onTabChange }: { s: SetData; sets: 
                     <div style={{ minWidth: 0 }}>
                       <div className="card-name">{c.n}</div>
                       <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 1 }}>
-                        <span className="card-set-tag">{tabSet.code}</span>
+                        <span className="card-set-tag">{tabCode}</span>
                       </div>
                     </div>
                   </div>
@@ -401,11 +409,12 @@ function TopCardsTable({ s, sets, activeTab, onTabChange }: { s: SetData; sets: 
 function PullRatesSection({ s }: { s: SetData }) {
   const rates = PULL_RATES[s.slug] || DEFAULT_PULL_RATES;
   const maxPerPack = Math.max(...rates.map((r) => r.perPack));
+  const code = setDisplayCode(s);
   return (
     <div className="pull-rates-section">
       <div className="section-header" style={{ marginBottom: 14 }}>
         <div>
-          <div className="section-title">Pull Rates <span>&mdash; {s.code}</span></div>
+          <div className="section-title">Pull Rates <span>&mdash; {code}</span></div>
           <div className="section-sub">Est. odds per box (24 packs) &middot; Community data</div>
         </div>
       </div>
@@ -459,7 +468,7 @@ function ComparisonGrid({ sets, activeSet, onSelect }: { sets: SetData[]; active
           >
             <div className="comp-top">
               <div className="comp-code-row">
-                <span className="comp-code">{s.code}</span>
+                <span className="comp-code">{setDisplayCode(s)}</span>
                 <span className="comp-badge" style={{ background: s.colorD, color: s.color, border: `1px solid ${s.colorBd}` }}>{s.year}</span>
               </div>
               <span className="comp-chg" style={{ color: s.chg30d >= 0 ? "var(--green)" : "var(--red)" }}>
