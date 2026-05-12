@@ -2037,8 +2037,6 @@ export default function InventoryTabs({
                     </label>
                   </div>
 
-                  {renderScanImages(row)}
-
                   {(row.status === "ship" || row.status === "sold") && (
                     <div className="mt-3 grid gap-3 md:grid-cols-4">
                       {row.status === "ship" && (
