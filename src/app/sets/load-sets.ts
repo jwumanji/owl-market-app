@@ -55,8 +55,10 @@ const DEFAULT_COLOR = "#4F8EF7";
 
 const ALLOWED_CODES = new Set([
   "OP01","OP02","OP03","OP04","OP05","OP06","OP07","OP08","OP09","OP10",
-  "OP11","OP12","OP13","OP14","PRB01","PRB02","EB01","EB02","EB03",
+  "OP11","OP12","OP13","OP14","OP15","PRB01","PRB02","EB01","EB02","EB03","EB04",
 ]);
+
+const PINNED_INDEX_CODES = new Set(["EB04"]);
 
 export type LoadedSets = {
   sets: Array<Record<string, unknown>>;
@@ -219,6 +221,8 @@ export async function loadSets(): Promise<LoadedSets> {
   for (const set of filteredSets) {
     const cards = cardsBySet[set.id] ?? [];
     const color = set.color || DEFAULT_COLOR;
+    const displayCode = set.code ?? set.slug.toUpperCase();
+    const shouldShowInIndex = cards.length >= 1 || PINNED_INDEX_CODES.has(displayCode.toUpperCase());
 
     let totalValue = 0;
     let weightedChg1d = 0;
@@ -294,10 +298,10 @@ export async function loadSets(): Promise<LoadedSets> {
       };
     });
 
-    if (cards.length >= 1) {
+    if (shouldShowInIndex) {
       sets.push({
         slug: set.slug,
-        code: set.code ?? set.slug.toUpperCase(),
+        code: displayCode,
         name: set.name,
         year: set.year ?? 2024,
         color,
@@ -326,10 +330,10 @@ export async function loadSets(): Promise<LoadedSets> {
         perfUp: [true, chg1d >= 0, chg7d >= 0, chg30d >= 0, chgMax >= 0, chgMax >= 0],
         topCards,
       });
-    } else if (cards.length > 0) {
+    } else {
       extraSets.push({
         slug: set.slug,
-        code: set.code ?? set.slug.toUpperCase(),
+        code: displayCode,
         name: set.name,
         year: set.year ?? 2024,
         color,
