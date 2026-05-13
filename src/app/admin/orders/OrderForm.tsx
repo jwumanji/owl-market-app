@@ -175,7 +175,7 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
             />
           </label>
           <label>
-            <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">Nickname</span>
+            <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">Nickname Order</span>
             <input
               value={nickname}
               onChange={(event) => setNickname(event.target.value)}
@@ -225,8 +225,8 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
         </label>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.78fr)]">
-        <section className="rounded-lg border border-border bg-surface">
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.78fr)]">
+        <section className="min-w-0 rounded-lg border border-border bg-surface">
           <div className="border-b border-border p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -298,7 +298,7 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
           </div>
         </section>
 
-        <section className="rounded-lg border border-border bg-surface">
+        <section className="min-w-0 overflow-hidden rounded-lg border border-border bg-surface">
           <div className="border-b border-border p-4">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-xl font-bold text-text">Order Bundle</h2>
@@ -308,29 +308,47 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
             </div>
           </div>
 
-          <div className="grid gap-3 p-3">
+          <div className="grid min-w-0 gap-3 p-3">
             {groupSelectedItems(selectedItems).map(([group, items]) => (
-              <div key={group} className="rounded-lg border border-border bg-deep">
-                <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
-                  <div className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">{group}</div>
-                  <div className="font-mono text-xs font-bold text-text">{items.length}</div>
+              <div key={group} className="min-w-0 overflow-hidden rounded-lg border border-border bg-deep">
+                <div className="flex min-w-0 items-center justify-between gap-3 border-b border-border px-3 py-2">
+                  <div className="min-w-0 truncate font-mono text-xs font-bold uppercase tracking-wider text-text-2">
+                    {group}
+                  </div>
+                  <div className="shrink-0 font-mono text-xs font-bold text-text">{items.length}</div>
                 </div>
-                <div className="grid gap-2 p-2">
-                  {items.map((item) => (
-                    <div key={item.id} className="flex items-center gap-3 rounded-md border border-border bg-surface p-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-semibold text-text">{cardTitle(item)}</div>
-                        <div className="truncate font-mono text-[11px] text-text-2">{cardMeta(item)}</div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeItem(item.id)}
-                        className="rounded border border-loss/30 px-2 py-1 font-mono text-[10px] font-bold uppercase text-loss transition-colors hover:bg-loss/10"
+                <div className="grid min-w-0 gap-2 p-2">
+                  {items.map((item) => {
+                    const imageUrl = cardImageUrl(item);
+                    return (
+                      <div
+                        key={item.id}
+                        className="flex min-w-0 items-center gap-3 overflow-hidden rounded-md border border-border bg-surface p-2"
                       >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
+                        <div className="flex h-20 w-14 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-surf3">
+                          {imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <span className="font-mono text-[10px] text-text-3">NO IMG</span>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-base font-bold text-text">{cardTitle(item)}</div>
+                          <div className="mt-1 truncate font-mono text-sm font-semibold text-owl">
+                            {cardMeta(item)}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeItem(item.id)}
+                          className="shrink-0 rounded border border-loss/30 px-2 py-1 font-mono text-[10px] font-bold uppercase text-loss transition-colors hover:bg-loss/10"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}

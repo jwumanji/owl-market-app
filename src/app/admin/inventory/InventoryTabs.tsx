@@ -2,6 +2,7 @@
 
 import { Fragment, type MouseEvent, type SelectHTMLAttributes, useCallback, useEffect, useMemo, useState } from "react";
 import { GRADED_RATINGS, type CatalogMatchStatus, type GradedRating, type InventoryStatus, type InventoryType } from "@/lib/inventory-options";
+import type { CustomerOrderSummary } from "../orders/order-types";
 
 type StatusFilter = InventoryStatus | "all";
 type SaleChannel = "not_sold" | "ebay" | "fb" | "instagram" | "in_person" | "traded";
@@ -108,6 +109,8 @@ type InventoryGroup = {
   condition: InventoryType | null;
   status: InventoryStatus | null;
 };
+
+type StageOrderItem = CustomerOrderSummary["items"][number];
 
 type CreatedInventoryItem = Pick<
   InventoryRow,
@@ -237,6 +240,50 @@ function createdAtSortValue(value?: string | null) {
   return Number.isFinite(time) ? time : Number.MAX_SAFE_INTEGER;
 }
 
+function formatOrderDate(value?: string | null) {
+  if (!value) return "No date";
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
+function orderItemTitle(item: StageOrderItem) {
+  return item.item_nickname || item.card.name || "Untitled inventory item";
+}
+
+function orderItemImageUrl(item: StageOrderItem) {
+  return item.custom_image_front_url ?? item.card.image_url_small ?? item.card.image_url;
+}
+
+function orderMatchesSearch(order: CustomerOrderSummary, query: string) {
+  if (!query) return true;
+
+  return [
+    order.id,
+    order.nickname,
+    order.customer_name,
+    order.tracking_number,
+    order.shipping_label,
+    ...order.items.flatMap((item) => [
+      item.id,
+      item.item_nickname,
+      item.card.name,
+      item.card.set_code,
+      item.card.card_number,
+      item.inventory_type,
+      item.status,
+      item.graded_rating,
+      item.certification_number,
+    ]),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .includes(query);
+}
+
 function setCodeForMatch(card: CardMatchResult) {
   const set = Array.isArray(card.sets) ? card.sets[0] : card.sets;
   return set?.code ?? null;
@@ -270,11 +317,15 @@ function withCatalogMatchStatus<T extends InventoryRow>(item: T, status: Catalog
 
 export default function InventoryTabs({
   items,
+  orders = [],
+  ordersError = null,
   onItemsChange,
   statusFilter = "all",
   onStatusFilterChange,
 }: {
   items: InventoryRow[];
+  orders?: CustomerOrderSummary[];
+  ordersError?: string | null;
   onItemsChange?: (items: InventoryRow[]) => void;
   statusFilter?: StatusFilter;
   onStatusFilterChange?: (status: StatusFilter) => void;
@@ -487,6 +538,21 @@ export default function InventoryTabs({
     return rows.reduce((sum, item) => sum + (needsCatalogMatch(item) ? item.quantity : 0), 0);
   }, [rows]);
   const showNeedsMatchTab = pendingMatchCount > 0;
+  const stageOrders = useMemo(() => {
+    if (statusFilter !== "ship" && statusFilter !== "sold") return [];
+
+    const query = searchQuery.trim().toLowerCase();
+    const shipped = statusFilter === "sold";
+
+    return orders
+      .filter((order) => order.marked_shipped === shipped)
+      .filter((order) => activeTab === "all" || order.items.some((item) => item.inventory_type === activeTab))
+      .filter((order) => orderMatchesSearch(order, query));
+  }, [activeTab, orders, searchQuery, statusFilter]);
+  const stageOrderCardCount = useMemo(
+    () => stageOrders.reduce((sum, order) => sum + order.items.length, 0),
+    [stageOrders]
+  );
 
   useEffect(() => {
     if (!pendingMatchOnly || pendingMatchCount > 0) return;
@@ -2168,6 +2234,155 @@ export default function InventoryTabs({
     );
   }
 
+  function renderOrderThumbnail(item: StageOrderItem) {
+    const imageUrl = orderItemImageUrl(item);
+
+    if (!imageUrl) {
+      return (
+        <div className="flex h-16 w-12 shrink-0 items-center justify-center rounded border border-border bg-surf3 font-mono text-[10px] font-semibold text-text-3">
+          BOX
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex h-16 w-12 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-surf3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imageUrl}
+          alt={item.card.name ?? "Order card image"}
+          className="h-full w-full object-contain"
+          onError={(event) => {
+            event.currentTarget.style.display = "none";
+          }}
+        />
+      </div>
+    );
+  }
+
+  function renderStageOrdersSection() {
+    if (statusFilter !== "ship" && statusFilter !== "sold") return null;
+
+    const shippedStage = statusFilter === "sold";
+    const title = shippedStage ? "Sold Orders" : "Orders";
+    const emptyText = shippedStage ? "No shipped orders in Sold yet." : "No open orders need shipping yet.";
+
+    return (
+      <section className="rounded-lg border border-border bg-surface">
+        <div className="flex flex-col gap-3 border-b border-border p-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-text">{title}</h2>
+            <p className="mt-1 text-sm text-text-2">
+              {shippedStage
+                ? "Customer orders marked shipped and moved into Sold."
+                : "Customer order bundles waiting to ship."}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className="rounded-md border border-owl/30 bg-owl/10 px-3 py-2 font-mono text-xs font-bold uppercase text-owl">
+              {stageOrders.length} Orders
+            </span>
+            <span className="rounded-md border border-border bg-deep px-3 py-2 font-mono text-xs font-bold uppercase text-text-2">
+              {stageOrderCardCount} Cards
+            </span>
+          </div>
+        </div>
+
+        <div className="grid gap-3 p-3">
+          {ordersError ? (
+            <div className="rounded-lg border border-loss/30 bg-loss/10 p-4 text-sm font-semibold text-text">
+              Orders are not ready yet: {ordersError}
+            </div>
+          ) : stageOrders.length > 0 ? (
+            stageOrders.map((order) => (
+              <a
+                key={order.id}
+                href={`/admin/orders/${order.id}`}
+                className="group grid min-w-0 gap-3 rounded-lg border border-border bg-deep p-3 transition-colors hover:border-border-2 hover:bg-surf2"
+              >
+                <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0">
+                    <div className="font-mono text-xs font-bold uppercase tracking-wider text-owl">{order.id}</div>
+                    <div className="mt-1 truncate text-lg font-bold text-text group-hover:text-owl">
+                      {order.nickname || order.customer_name}
+                    </div>
+                    <div className="mt-1 truncate text-sm text-text-2">{order.customer_name}</div>
+                  </div>
+
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    <span
+                      className={`rounded border px-2 py-1 font-mono text-[10px] font-bold uppercase ${
+                        order.marked_shipped
+                          ? "border-gain/30 bg-gain/10 text-gain"
+                          : "border-owl/30 bg-owl/10 text-owl"
+                      }`}
+                    >
+                      {order.marked_shipped ? "Shipped" : "Open"}
+                    </span>
+                    <span className="rounded border border-border bg-surface px-2 py-1 font-mono text-[10px] font-bold uppercase text-text-2">
+                      {order.items.length} Cards
+                    </span>
+                    <span className="rounded border border-border bg-surface px-2 py-1 font-mono text-[10px] font-bold uppercase text-text-2">
+                      {formatOrderDate(order.updated_at ?? order.created_at)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 gap-2 overflow-hidden">
+                      {order.items.slice(0, 8).map((item) => (
+                        <div key={item.id} title={orderItemTitle(item)}>
+                          {renderOrderThumbnail(item)}
+                        </div>
+                      ))}
+                      {order.items.length > 8 && (
+                        <div className="flex h-16 w-12 shrink-0 items-center justify-center rounded border border-border bg-surface font-mono text-xs font-bold text-text-2">
+                          +{order.items.length - 8}
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-2 grid gap-1">
+                      {order.items.slice(0, 3).map((item) => (
+                        <div key={item.id} className="truncate text-sm font-semibold text-text">
+                          {orderItemTitle(item)}
+                        </div>
+                      ))}
+                      {order.items.length > 3 && (
+                        <div className="font-mono text-xs font-semibold text-text-2">
+                          +{order.items.length - 3} more cards
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2 rounded-md border border-border bg-surface p-3 font-mono text-xs">
+                    <div>
+                      <div className="font-bold uppercase tracking-wider text-text-2">Tracking</div>
+                      <div className={order.tracking_number ? "mt-1 truncate font-semibold text-gain" : "mt-1 text-text-2"}>
+                        {order.tracking_number || "No tracking"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="font-bold uppercase tracking-wider text-text-2">Shipping Label</div>
+                      <div className={order.shipping_label ? "mt-1 truncate font-semibold text-owl" : "mt-1 text-text-2"}>
+                        {order.shipping_label ? "Label saved" : "No label"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </a>
+            ))
+          ) : (
+            <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-text-2">
+              {emptyText}
+            </div>
+          )}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
@@ -2346,6 +2561,8 @@ export default function InventoryTabs({
           {actionError}
         </div>
       )}
+
+      {renderStageOrdersSection()}
 
       {statusFilter === "ship" ? (
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import InventoryTabs, { InventoryRow } from "./InventoryTabs";
+import type { CustomerOrderSummary } from "../orders/order-types";
 
 type InventoryStatus = "new" | "grading" | "sale" | "ship" | "sold";
 type StatusFilter = InventoryStatus | "all";
@@ -14,9 +15,19 @@ const STATUS_LABELS: Record<InventoryStatus, string> = {
   sold: "Sold",
 };
 
-export default function InventoryShell({ items }: { items: InventoryRow[] }) {
+export default function InventoryShell({
+  items,
+  orders = [],
+  ordersError = null,
+}: {
+  items: InventoryRow[];
+  orders?: CustomerOrderSummary[];
+  ordersError?: string | null;
+}) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [liveItems, setLiveItems] = useState(items);
+  const openOrderCount = orders.filter((order) => !order.marked_shipped).length;
+  const shippedOrderCount = orders.length - openOrderCount;
 
   const byStatus = useMemo(() => {
     return liveItems.reduce(
@@ -46,12 +57,19 @@ export default function InventoryShell({ items }: { items: InventoryRow[] }) {
               {STATUS_LABELS[status]}
             </div>
             <div className="mt-2 text-3xl font-bold text-text">{byStatus[status]}</div>
+            {(status === "ship" || status === "sold") && (
+              <div className="mt-1 font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
+                {status === "ship" ? openOrderCount : shippedOrderCount} Orders
+              </div>
+            )}
           </button>
         ))}
       </div>
 
       <InventoryTabs
         items={items}
+        orders={orders}
+        ordersError={ordersError}
         onItemsChange={setLiveItems}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}

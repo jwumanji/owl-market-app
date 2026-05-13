@@ -1,5 +1,6 @@
 import InventoryShell from "./InventoryShell";
 import { InventoryRow } from "./InventoryTabs";
+import { loadOrderSummaries } from "../orders/order-data";
 import { createServiceClient } from "@/lib/supabase-server";
 import { CATALOG_MATCH_STATUSES, type CatalogMatchStatus, type GradedRating } from "@/lib/inventory-options";
 import Link from "next/link";
@@ -220,6 +221,9 @@ export default async function AdminInventoryPage() {
 
   const items = inventoryRows.map((row) => toInventoryRow(row, cardMap));
   const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+  const orderResult = supabase
+    ? await loadOrderSummaries()
+    : { data: [], error: null };
 
   return (
     <section className="mx-auto max-w-[1920px] px-5 py-8 sm:px-7 lg:px-10 xl:px-12">
@@ -262,7 +266,7 @@ export default async function AdminInventoryPage() {
               {migrationWarning}
             </div>
           )}
-          <InventoryShell items={items} />
+          <InventoryShell items={items} orders={orderResult.data} ordersError={orderResult.error} />
         </>
       )}
     </section>
