@@ -96,6 +96,9 @@ const ROW_NUMBER_CELL_CLASS =
   "px-3 py-4 text-right align-top font-mono text-lg font-extrabold leading-none tabular-nums text-text";
 const NESTED_ROW_NUMBER_CELL_CLASS =
   "px-3 py-3.5 text-right align-top font-mono text-lg font-extrabold leading-none tabular-nums text-owl";
+const TABLE_IMAGE_COLUMN_CLASS = "w-[144px]";
+const TABLE_IMAGE_CELL_CLASS = "px-3 py-2";
+const NESTED_TABLE_IMAGE_BUTTON_CLASS = "mx-auto flex w-fit flex-col items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-owl";
 
 type InventoryGroup = {
   key: string;
@@ -308,7 +311,7 @@ export default function InventoryTabs({
   const showTracking = statusFilter === "ship" || statusFilter === "sold";
   const showShippingActions = statusFilter === "ship";
   const showSaleFields = statusFilter === "sold";
-  const standardTableMinWidth = showSaleFields ? "min-w-[1340px]" : "min-w-[1000px]";
+  const standardTableMinWidth = showSaleFields ? "min-w-[1380px]" : "min-w-[1040px]";
 
   useEffect(() => {
     onItemsChange?.(rows);
@@ -1514,13 +1517,19 @@ export default function InventoryTabs({
           </SelectField>
         )}
         {item.inventory_type === "graded" && (
-          <input
-            type="text"
-            value={item.certification_number ?? ""}
-            onChange={(event) => updateItem(item.id, { certification_number: event.target.value })}
-            placeholder="PSA cert number"
-            className="mt-2 w-full rounded-md border border-border bg-surface px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none transition-colors hover:border-border-2 hover:bg-surf2 focus:border-owl focus:bg-surf2"
-          />
+          <div className="mt-2">
+            <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
+              Certification Number
+            </span>
+            <input
+              type="text"
+              value={item.certification_number ?? ""}
+              onChange={(event) => updateItem(item.id, { certification_number: event.target.value })}
+              placeholder="PSA cert number"
+              aria-label="Certification number"
+              className="mt-1.5 w-full rounded-md border border-border bg-surface px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none transition-colors hover:border-border-2 hover:bg-surf2 focus:border-owl focus:bg-surf2"
+            />
+          </div>
         )}
       </>
     );
@@ -1608,13 +1617,13 @@ export default function InventoryTabs({
     );
   }
 
-  function renderCatalogMatchStatusControl(item: InventoryRow) {
+  function renderCatalogMatchStatusControl(item: InventoryRow, className = "") {
     const status = catalogMatchStatus(item);
     const isMatched = status === "matched";
 
     return (
       <label
-        className={`mb-3 flex items-start gap-3 rounded-lg border border-border bg-deep p-3 ${
+        className={`flex items-start gap-3 rounded-lg border border-border bg-deep p-3 ${className} ${
           isMatched ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:border-border-2"
         }`}
       >
@@ -1650,7 +1659,9 @@ export default function InventoryTabs({
       <div className="mt-3 rounded-lg border border-owl/40 bg-owl/10 p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
           <label className="block min-w-0 flex-1">
-            <span className="font-mono text-xs font-bold uppercase tracking-wider text-owl">Match Catalog Card</span>
+            <span className="font-mono text-xs font-bold uppercase tracking-wider text-owl">
+              Catalog Card Match Lookup
+            </span>
             <input
               type="text"
               value={query}
@@ -1680,6 +1691,8 @@ export default function InventoryTabs({
             {isSearching ? "Searching..." : "Search"}
           </button>
         </div>
+
+        {renderCatalogMatchStatusControl(item, "mt-3")}
 
         {error && (
           <div className="mt-3 rounded-md border border-loss/30 bg-loss/10 px-3 py-2 text-sm font-semibold text-text">
@@ -1735,13 +1748,14 @@ export default function InventoryTabs({
       ? size === "modal"
         ? "h-96 w-72"
         : size === "small"
-          ? "h-24 w-20"
-          : "h-32 w-24"
+          ? "h-[134px] w-24"
+          : "h-[156px] w-28"
       : size === "modal"
         ? "h-80 w-56"
         : size === "small"
-          ? "h-20 w-14"
-          : "h-28 w-20";
+          ? "h-28 w-20"
+          : "h-[134px] w-24";
+    const imageFitClass = isScanImage && size === "modal" ? "object-contain p-1" : "object-cover";
 
     if (!imageUrl) {
       return (
@@ -1767,7 +1781,7 @@ export default function InventoryTabs({
             }
             event.currentTarget.style.display = "none";
           }}
-          className={`h-full w-full ${isScanImage ? "object-contain p-1" : "object-cover"}`}
+          className={`h-full w-full ${imageFitClass}`}
         />
       </div>
     );
@@ -1977,20 +1991,26 @@ export default function InventoryTabs({
               {selectedGroup.rows.map((row, index) => (
                 <div key={row.id} className="rounded-lg border border-border bg-surface p-4">
                   <div className="mb-4 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="font-mono text-sm font-bold uppercase tracking-wider text-text">
-                        Item #{index + 1}
+                    <div className="flex min-w-0 items-start gap-3">
+                      <div className="shrink-0">
+                        {renderCardImage(row, "small")}
                       </div>
-                      <div className="mt-1">
-                        {renderCardTitle(row, "text-lg font-bold leading-snug text-text")}
+                      <div className="min-w-0">
+                        <div className="font-mono text-sm font-bold uppercase tracking-wider text-text">
+                          Item #{index + 1}
+                        </div>
+                        <div className="mt-1">
+                          {renderCardTitle(row, "text-lg font-bold leading-snug text-text")}
+                        </div>
+                        {renderCardMeta(row, { showItemId: true })}
                       </div>
-                      {renderCardMeta(row, { showItemId: true })}
                     </div>
                     {renderDeleteControls(row)}
                   </div>
 
-                  {renderCatalogMatchStatusControl(row)}
-                  {renderMatchControls(row)}
+                  {needsCatalogMatch(row)
+                    ? renderMatchControls(row)
+                    : renderCatalogMatchStatusControl(row, "mb-3")}
 
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <label className="block">
@@ -2319,11 +2339,11 @@ export default function InventoryTabs({
 
       {statusFilter === "ship" ? (
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
-        <table className="w-full min-w-[1240px] table-fixed">
+        <table className="w-full min-w-[1280px] table-fixed">
           <colgroup>
             <col className={ROW_NUMBER_COLUMN_CLASS} />
             <col className="w-[48px]" />
-            <col className="w-[104px]" />
+            <col className={TABLE_IMAGE_COLUMN_CLASS} />
             <col className="w-[330px]" />
             <col className="w-[190px]" />
             <col className="w-[210px]" />
@@ -2384,7 +2404,7 @@ export default function InventoryTabs({
                         </button>
                       )}
                     </td>
-                    <td className="px-4 py-4">
+                    <td className={TABLE_IMAGE_CELL_CLASS}>
                       <button
                         type="button"
                         onClick={() => setSelectedGroupKey(group.key)}
@@ -2465,14 +2485,14 @@ export default function InventoryTabs({
                           <td className="px-3 py-3.5">
                             {renderItemSelectionCell(child, `Select item ${index + 1}`)}
                           </td>
-                          <td className="px-3 py-3.5">
+                          <td className={TABLE_IMAGE_CELL_CLASS}>
                             <button
                               type="button"
                               onClick={() => setSelectedGroupKey(group.key)}
                               onMouseEnter={(event) => updateHoverPreview(event, child)}
                               onMouseMove={(event) => updateHoverPreview(event, child)}
                               onMouseLeave={() => setHoverPreview(null)}
-                              className="ml-auto mr-2 flex w-16 flex-col items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-owl"
+                              className={NESTED_TABLE_IMAGE_BUTTON_CLASS}
                             >
                               {renderCardImage(child, "small")}
                             </button>
@@ -2535,7 +2555,7 @@ export default function InventoryTabs({
           <colgroup>
             <col className={ROW_NUMBER_COLUMN_CLASS} />
             <col className="w-[48px]" />
-            <col className="w-[104px]" />
+            <col className={TABLE_IMAGE_COLUMN_CLASS} />
             <col className="w-[290px]" />
             <col className="w-[82px]" />
             {showTracking && <col className="w-[250px]" />}
@@ -2605,7 +2625,7 @@ export default function InventoryTabs({
                         </button>
                       )}
                     </td>
-                    <td className="px-4 py-4">
+                    <td className={TABLE_IMAGE_CELL_CLASS}>
                       <button
                         type="button"
                         onClick={() => setSelectedGroupKey(group.key)}
@@ -2721,14 +2741,14 @@ export default function InventoryTabs({
                           <td className="px-3 py-3.5">
                             {renderItemSelectionCell(child, "Select inventory item")}
                           </td>
-                          <td className="px-3 py-3.5">
+                          <td className={TABLE_IMAGE_CELL_CLASS}>
                             <button
                               type="button"
                               onClick={() => setSelectedGroupKey(group.key)}
                               onMouseEnter={(event) => updateHoverPreview(event, child)}
                               onMouseMove={(event) => updateHoverPreview(event, child)}
                               onMouseLeave={() => setHoverPreview(null)}
-                              className="ml-auto mr-2 flex w-16 flex-col items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-owl"
+                              className={NESTED_TABLE_IMAGE_BUTTON_CLASS}
                             >
                               {renderCardImage(child, "small")}
                             </button>
