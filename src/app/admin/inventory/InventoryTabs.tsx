@@ -1755,7 +1755,11 @@ export default function InventoryTabs({
         : size === "small"
           ? "h-24 w-16"
           : "h-32 w-24";
-    const imageFitClass = isScanImage && size === "modal" ? "object-contain p-1" : "object-cover";
+    const imageFitClass = size === "modal"
+      ? isScanImage
+        ? "object-contain p-1"
+        : "object-cover"
+      : "object-contain";
 
     if (!imageUrl) {
       return (
