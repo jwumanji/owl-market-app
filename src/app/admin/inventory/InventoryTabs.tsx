@@ -115,6 +115,12 @@ type InventoryGroup = {
 
 type StageOrderItem = CustomerOrderSummary["items"][number];
 
+type OrderDraft = {
+  customer_name: string;
+  shipping_label: string;
+  tracking_number: string;
+};
+
 type CreatedInventoryItem = Pick<
   InventoryRow,
   "id" | "created_at" | "inventory_type" | "status" | "quantity" | "item_nickname" | "graded_rating" | "certification_number"
@@ -335,6 +341,7 @@ export default function InventoryTabs({
   orders = [],
   ordersError = null,
   onItemsChange,
+  onOrdersChange,
   statusFilter = "all",
   onStatusFilterChange,
 }: {
@@ -342,6 +349,7 @@ export default function InventoryTabs({
   orders?: CustomerOrderSummary[];
   ordersError?: string | null;
   onItemsChange?: (items: InventoryRow[]) => void;
+  onOrdersChange?: (orders: CustomerOrderSummary[]) => void;
   statusFilter?: StatusFilter;
   onStatusFilterChange?: (status: StatusFilter) => void;
 }) {
@@ -354,6 +362,9 @@ export default function InventoryTabs({
   const [shippingLabelDrafts, setShippingLabelDrafts] = useState<Record<string, string>>({});
   const [editingShippingLabelIds, setEditingShippingLabelIds] = useState<Record<string, boolean>>({});
   const [confirmingShippedIds, setConfirmingShippedIds] = useState<Record<string, boolean>>({});
+  const [orderDrafts, setOrderDrafts] = useState<Record<string, OrderDraft>>({});
+  const [savingOrderIds, setSavingOrderIds] = useState<Record<string, boolean>>({});
+  const [confirmingShippedOrderIds, setConfirmingShippedOrderIds] = useState<Record<string, boolean>>({});
   const [addingGroups, setAddingGroups] = useState<Record<string, boolean>>({});
   const [deletingItemIds, setDeletingItemIds] = useState<Record<string, boolean>>({});
   const [confirmingDeleteIds, setConfirmingDeleteIds] = useState<Record<string, boolean>>({});
@@ -649,6 +660,121 @@ export default function InventoryTabs({
 
     if (!res.ok) {
       setRows(items);
+    }
+  }
+
+  function orderDraft(order: CustomerOrderSummary): OrderDraft {
+    return orderDrafts[order.id] ?? {
+      customer_name: order.customer_name ?? "",
+      shipping_label: order.shipping_label ?? "",
+      tracking_number: order.tracking_number ?? "",
+    };
+  }
+
+  function updateOrderDraft(orderId: string, field: keyof OrderDraft, value: string) {
+    const order = orders.find((candidate) => candidate.id === orderId);
+    setOrderDrafts((current) => ({
+      ...current,
+      [orderId]: {
+        customer_name: current[orderId]?.customer_name ?? order?.customer_name ?? "",
+        shipping_label: current[orderId]?.shipping_label ?? order?.shipping_label ?? "",
+        tracking_number: current[orderId]?.tracking_number ?? order?.tracking_number ?? "",
+        [field]: value,
+      },
+    }));
+  }
+
+  async function saveOrderQuickEdit(order: CustomerOrderSummary, options: { markedShipped?: boolean } = {}) {
+    if (savingOrderIds[order.id]) return;
+
+    const draft = orderDraft(order);
+    const customerName = draft.customer_name.trim();
+    const shippingLabel = draft.shipping_label.trim();
+    const trackingNumber = draft.tracking_number.trim();
+    const markedShipped = options.markedShipped ?? order.marked_shipped;
+
+    if (!customerName) {
+      setActionError("Customer name is required before saving an order.");
+      return;
+    }
+
+    setActionError(null);
+    setSavingOrderIds((current) => ({ ...current, [order.id]: true }));
+
+    const updatedAt = new Date().toISOString();
+    const shippedAt = markedShipped ? updatedAt : null;
+    const nextOrder: CustomerOrderSummary = {
+      ...order,
+      customer_name: customerName,
+      shipping_label: shippingLabel || null,
+      tracking_number: trackingNumber || null,
+      marked_shipped: markedShipped,
+      updated_at: updatedAt,
+      items: order.items.map((item) => ({
+        ...item,
+        status: markedShipped ? "sold" : "ship",
+        customer_name: customerName,
+        shipping_label_url: shippingLabel || null,
+        shipping_tracking: trackingNumber || null,
+        shipped_at: shippedAt,
+      })),
+    };
+
+    onOrdersChange?.(orders.map((candidate) => (candidate.id === order.id ? nextOrder : candidate)));
+    setRows((current) =>
+      current.map((row) =>
+        order.inventory_item_ids.includes(row.id)
+          ? {
+              ...row,
+              status: markedShipped ? "sold" : "ship",
+              customer_name: customerName,
+              shipping_label_url: shippingLabel || null,
+              shipping_tracking: trackingNumber || null,
+              shipped_at: shippedAt,
+            }
+          : row
+      )
+    );
+
+    try {
+      const res = await fetch(`/api/admin/orders/${order.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nickname: order.nickname ?? "",
+          customer_name: customerName,
+          shipping_label: shippingLabel,
+          marked_shipped: markedShipped,
+          tracking_number: trackingNumber,
+          inventory_item_ids: order.inventory_item_ids,
+        }),
+      });
+
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.error ?? "Could not save order.");
+      }
+
+      setOrderDrafts((current) => {
+        const next = { ...current };
+        delete next[order.id];
+        return next;
+      });
+      setConfirmingShippedOrderIds((current) => {
+        const next = { ...current };
+        delete next[order.id];
+        return next;
+      });
+    } catch (error) {
+      onOrdersChange?.(orders);
+      setRows(items);
+      setActionError(error instanceof Error ? error.message : "Could not save order.");
+    } finally {
+      setSavingOrderIds((current) => {
+        const next = { ...current };
+        delete next[order.id];
+        return next;
+      });
     }
   }
 
@@ -2334,11 +2460,20 @@ export default function InventoryTabs({
               Orders are not ready yet: {ordersError}
             </div>
           ) : stageOrders.length > 0 ? (
-            stageOrders.map((order) => (
-              <a
+            stageOrders.map((order) => {
+              const draft = orderDraft(order);
+              const shippingLabelHref = urlHref(draft.shipping_label);
+              const isSavingOrder = savingOrderIds[order.id] ?? false;
+              const isConfirmingShipped = confirmingShippedOrderIds[order.id] ?? false;
+              const hasDraftChanges =
+                draft.customer_name.trim() !== (order.customer_name ?? "") ||
+                draft.shipping_label.trim() !== (order.shipping_label ?? "") ||
+                draft.tracking_number.trim() !== (order.tracking_number ?? "");
+
+              return (
+              <div
                 key={order.id}
-                href={`/admin/orders/${order.id}`}
-                className="group grid min-w-0 gap-3 rounded-lg border border-border bg-deep p-3 transition-colors hover:border-border-2 hover:bg-surf2"
+                className="group grid min-w-0 gap-3 rounded-lg border border-border bg-deep p-3"
               >
                 <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
@@ -2365,6 +2500,12 @@ export default function InventoryTabs({
                     <span className="rounded border border-border bg-surface px-2 py-1 font-mono text-[10px] font-bold uppercase text-text-2">
                       {formatOrderDate(order.updated_at ?? order.created_at)}
                     </span>
+                    <a
+                      href={`/admin/orders/${order.id}`}
+                      className="rounded border border-border-2 bg-surface px-2 py-1 font-mono text-[10px] font-bold uppercase text-text transition-colors hover:border-owl hover:text-owl"
+                    >
+                      Open Order
+                    </a>
                   </div>
                 </div>
 
@@ -2396,23 +2537,115 @@ export default function InventoryTabs({
                     </div>
                   </div>
 
-                  <div className="grid gap-2 rounded-md border border-border bg-surface p-3 font-mono text-xs">
-                    <div>
-                      <div className="font-bold uppercase tracking-wider text-text-2">Tracking</div>
-                      <div className={order.tracking_number ? "mt-1 truncate font-semibold text-gain" : "mt-1 text-text-2"}>
-                        {order.tracking_number || "No tracking"}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="font-bold uppercase tracking-wider text-text-2">Shipping Label</div>
-                      <div className={order.shipping_label ? "mt-1 truncate font-semibold text-owl" : "mt-1 text-text-2"}>
-                        {order.shipping_label ? "Label saved" : "No label"}
-                      </div>
+                  <div className="grid gap-3 rounded-md border border-border bg-surface p-3">
+                    <label className="block">
+                      <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
+                        Customer Name
+                      </span>
+                      <input
+                        value={draft.customer_name}
+                        onChange={(event) => updateOrderDraft(order.id, "customer_name", event.target.value)}
+                        placeholder="Customer name"
+                        className="mt-1.5 w-full rounded-md border border-border bg-deep px-3 py-2.5 text-sm text-text outline-none focus:border-owl"
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
+                        Ship Label
+                      </span>
+                      <input
+                        value={draft.shipping_label}
+                        onChange={(event) => updateOrderDraft(order.id, "shipping_label", event.target.value)}
+                        placeholder="Paste ship label URL or note"
+                        className="mt-1.5 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-owl"
+                      />
+                      {shippingLabelHref ? (
+                        <a
+                          href={shippingLabelHref}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-2 inline-flex rounded-md border border-blue bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-blue transition-colors hover:bg-blue/15"
+                        >
+                          Print Shipping
+                        </a>
+                      ) : (
+                        <div className="mt-2 font-mono text-xs font-semibold text-text-2">No clickable label URL</div>
+                      )}
+                    </label>
+
+                    <label className="block">
+                      <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
+                        Tracking
+                      </span>
+                      <input
+                        value={draft.tracking_number}
+                        onChange={(event) => updateOrderDraft(order.id, "tracking_number", event.target.value)}
+                        placeholder="Paste tracking code or link"
+                        className="mt-1.5 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-owl"
+                      />
+                    </label>
+
+                    <div className="grid gap-2">
+                      {order.marked_shipped ? (
+                        <div className="rounded-md border border-gain/30 bg-gain/10 px-3 py-2 text-center font-mono text-xs font-bold uppercase tracking-wider text-gain">
+                          Marked Shipped
+                        </div>
+                      ) : isConfirmingShipped ? (
+                        <div className="grid gap-2">
+                          <div className="font-mono text-xs font-semibold text-text-2">
+                            Move this order to Sold?
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              disabled={isSavingOrder}
+                              onClick={() => saveOrderQuickEdit(order, { markedShipped: true })}
+                              className="rounded-md border border-blue bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-blue transition-colors hover:bg-blue/15 disabled:cursor-wait disabled:opacity-60"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isSavingOrder}
+                              onClick={() =>
+                                setConfirmingShippedOrderIds((current) => {
+                                  const next = { ...current };
+                                  delete next[order.id];
+                                  return next;
+                                })
+                              }
+                              className="rounded-md border border-border-2 bg-deep px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-text-2 transition-colors hover:text-text disabled:cursor-wait disabled:opacity-60"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={isSavingOrder}
+                          onClick={() => setConfirmingShippedOrderIds((current) => ({ ...current, [order.id]: true }))}
+                          className="rounded-md border border-blue bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-blue transition-colors hover:bg-blue/15 disabled:cursor-wait disabled:opacity-60"
+                        >
+                          Mark Shipped
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        disabled={isSavingOrder || !hasDraftChanges}
+                        onClick={() => saveOrderQuickEdit(order)}
+                        className="rounded-md border border-owl bg-owl/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/15 disabled:cursor-not-allowed disabled:border-border disabled:bg-deep disabled:text-text-3"
+                      >
+                        {isSavingOrder ? "Saving..." : "Save Order"}
+                      </button>
                     </div>
                   </div>
                 </div>
-              </a>
-            ))
+              </div>
+              );
+            })
           ) : (
             <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-text-2">
               {emptyText}

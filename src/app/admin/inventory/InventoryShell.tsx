@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import InventoryTabs, { InventoryRow } from "./InventoryTabs";
 import type { CustomerOrderSummary } from "../orders/order-types";
 
@@ -26,8 +26,13 @@ export default function InventoryShell({
 }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [liveItems, setLiveItems] = useState(items);
-  const openOrderCount = orders.filter((order) => !order.marked_shipped).length;
-  const shippedOrderCount = orders.length - openOrderCount;
+  const [liveOrders, setLiveOrders] = useState(orders);
+  const openOrderCount = liveOrders.filter((order) => !order.marked_shipped).length;
+  const shippedOrderCount = liveOrders.length - openOrderCount;
+
+  useEffect(() => {
+    setLiveOrders(orders);
+  }, [orders]);
 
   const byStatus = useMemo(() => {
     return liveItems.reduce(
@@ -68,9 +73,10 @@ export default function InventoryShell({
 
       <InventoryTabs
         items={items}
-        orders={orders}
+        orders={liveOrders}
         ordersError={ordersError}
         onItemsChange={setLiveItems}
+        onOrdersChange={setLiveOrders}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
       />
