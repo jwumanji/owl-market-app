@@ -2221,6 +2221,12 @@ export default function InventoryTabs({
             PSA Import
           </a>
           <a
+            href="/admin/orders/new"
+            className="h-10 rounded-md border border-owl/40 bg-owl/10 px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/15"
+          >
+            Add Order
+          </a>
+          <a
             href="/admin/inventory/new"
             className="h-10 rounded-md bg-owl px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
           >
