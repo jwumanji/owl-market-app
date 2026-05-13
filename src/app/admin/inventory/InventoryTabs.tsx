@@ -90,6 +90,13 @@ const PURCHASED_FROM_LABELS: Record<PurchasedFrom, string> = {
   event: "Event",
 };
 
+const ROW_NUMBER_LABEL = "Row #";
+const ROW_NUMBER_COLUMN_CLASS = "w-[82px]";
+const ROW_NUMBER_CELL_CLASS =
+  "px-3 py-4 text-right align-top font-mono text-lg font-extrabold leading-none tabular-nums text-text";
+const NESTED_ROW_NUMBER_CELL_CLASS =
+  "px-3 py-3.5 text-right align-top font-mono text-lg font-extrabold leading-none tabular-nums text-owl";
+
 type InventoryGroup = {
   key: string;
   rows: InventoryRow[];
@@ -380,12 +387,12 @@ export default function InventoryTabs({
 
   function inventoryCardLabel(item: InventoryRow) {
     const cardNumber = inventoryCardNumber(item);
-    return cardNumber ? `Card # ${cardNumber}` : "Card #";
+    return cardNumber ? `${ROW_NUMBER_LABEL} ${cardNumber}` : ROW_NUMBER_LABEL;
   }
 
   const itemMatchesSearch = useCallback((item: InventoryRow, query: string) => {
     const cardNumber = cardNumbers.get(item.id);
-    const cardLabel = cardNumber ? `Card # ${cardNumber}` : null;
+    const cardLabel = cardNumber ? `${ROW_NUMBER_LABEL} ${cardNumber}` : null;
     const matchStatus = catalogMatchStatus(item);
 
     return (
@@ -2314,7 +2321,7 @@ export default function InventoryTabs({
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
         <table className="w-full min-w-[1240px] table-fixed">
           <colgroup>
-            <col className="w-[60px]" />
+            <col className={ROW_NUMBER_COLUMN_CLASS} />
             <col className="w-[48px]" />
             <col className="w-[104px]" />
             <col className="w-[330px]" />
@@ -2325,7 +2332,7 @@ export default function InventoryTabs({
           </colgroup>
           <thead>
             <tr className="border-b border-border bg-surf2 text-left font-mono text-xs font-semibold uppercase tracking-wider text-text">
-              <th className="px-3 py-3.5 text-right">#</th>
+              <th className="px-3 py-3.5 text-right">{ROW_NUMBER_LABEL}</th>
               <th className="px-3 py-3.5">{renderSelectionHeader()}</th>
               <th className="px-4 py-3.5">Image</th>
               <th className="px-3 py-3.5">Card</th>
@@ -2345,7 +2352,7 @@ export default function InventoryTabs({
               return (
                 <Fragment key={group.key}>
                   <tr className={`border-b ${groupSelectionClass(group)}`}>
-                    <td className="px-3 py-4 text-right align-top font-mono text-xs font-bold text-text-2">
+                    <td className={ROW_NUMBER_CELL_CLASS}>
                       {inventoryCardNumber(item) ?? "-"}
                     </td>
                     <td className="px-3 py-4">
@@ -2452,7 +2459,7 @@ export default function InventoryTabs({
                           key={child.id}
                           className={`border-b transition-colors ${nestedRowSelectionClass(child)}`}
                         >
-                          <td className="px-3 py-3.5 text-right align-top font-mono text-xs font-bold text-blue">
+                          <td className={NESTED_ROW_NUMBER_CELL_CLASS}>
                             {inventoryCardNumber(child) ?? "-"}
                           </td>
                           <td className="px-3 py-3.5">
@@ -2526,7 +2533,7 @@ export default function InventoryTabs({
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
         <table className={`w-full ${standardTableMinWidth} table-fixed`}>
           <colgroup>
-            <col className="w-[60px]" />
+            <col className={ROW_NUMBER_COLUMN_CLASS} />
             <col className="w-[48px]" />
             <col className="w-[104px]" />
             <col className="w-[290px]" />
@@ -2540,7 +2547,7 @@ export default function InventoryTabs({
           </colgroup>
           <thead>
             <tr className="border-b border-border bg-surf2 text-left font-mono text-xs font-semibold uppercase tracking-wider text-text">
-              <th className="px-3 py-3.5 text-right">#</th>
+              <th className="px-3 py-3.5 text-right">{ROW_NUMBER_LABEL}</th>
               <th className="px-3 py-3.5">{renderSelectionHeader()}</th>
               <th className="px-4 py-3.5">Image</th>
               <th className="px-3 py-3.5">Card Name</th>
@@ -2566,7 +2573,7 @@ export default function InventoryTabs({
               return (
                 <Fragment key={group.key}>
                   <tr className={`border-b ${groupSelectionClass(group)}`}>
-                    <td className="px-3 py-4 text-right align-top font-mono text-xs font-bold text-text-2">
+                    <td className={ROW_NUMBER_CELL_CLASS}>
                       {inventoryCardNumber(item) ?? "-"}
                     </td>
                     <td className="px-3 py-4">
@@ -2708,7 +2715,7 @@ export default function InventoryTabs({
                           key={child.id}
                           className={`border-b transition-colors ${nestedRowSelectionClass(child)}`}
                         >
-                          <td className="px-3 py-3.5 text-right align-top font-mono text-xs font-bold text-blue">
+                          <td className={NESTED_ROW_NUMBER_CELL_CLASS}>
                             {inventoryCardNumber(child) ?? "-"}
                           </td>
                           <td className="px-3 py-3.5">
