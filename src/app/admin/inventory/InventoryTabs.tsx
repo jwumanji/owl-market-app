@@ -79,7 +79,7 @@ const CONDITION_LABELS: Record<InventoryType, string> = {
 };
 
 const SALE_CHANNEL_LABELS: Record<SaleChannel, string> = {
-  not_sold: "Not Sold",
+  not_sold: "----",
   ebay: "Ebay",
   fb: "FB",
   instagram: "Instagram",
@@ -98,9 +98,9 @@ const PURCHASED_FROM_LABELS: Record<PurchasedFrom, string> = {
 const ROW_NUMBER_LABEL = "Card #";
 const ROW_NUMBER_COLUMN_CLASS = "w-[130px]";
 const ROW_NUMBER_CELL_CLASS =
-  "px-3 py-4 align-top";
+  "px-3 py-4 align-middle";
 const NESTED_ROW_NUMBER_CELL_CLASS =
-  "px-3 py-3.5 align-top";
+  "px-3 py-3.5 align-middle";
 const TABLE_IMAGE_COLUMN_CLASS = "w-[120px]";
 const TABLE_IMAGE_CELL_CLASS = "px-3 py-2";
 const NESTED_TABLE_IMAGE_BUTTON_CLASS = "mx-auto flex w-fit flex-col items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-owl";
@@ -305,6 +305,18 @@ function formatOrderDate(value?: string | null) {
     day: "numeric",
     year: "numeric",
   }).format(new Date(value));
+}
+
+function formatShortDate(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "numeric",
+    day: "numeric",
+    year: "2-digit",
+  }).format(date);
 }
 
 function orderItemTitle(item: StageOrderItem) {
@@ -1892,9 +1904,10 @@ export default function InventoryTabs({
             <button
               type="button"
               onClick={() => markItemShipped(item)}
-              className="rounded-md border border-blue bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-blue hover:bg-blue/15"
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-gain bg-gain px-4 py-3 font-mono text-sm font-extrabold uppercase tracking-wider text-void transition-colors hover:bg-gain/90"
             >
-              Confirm
+              <span aria-hidden="true">📦</span>
+              <span>Confirm</span>
             </button>
             <button
               type="button"
@@ -1918,9 +1931,10 @@ export default function InventoryTabs({
       <button
         type="button"
         onClick={() => setConfirmingShippedIds((current) => ({ ...current, [item.id]: true }))}
-        className="rounded-md border border-blue bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-blue hover:bg-blue/15"
+        className="inline-flex items-center justify-center gap-2 rounded-md border border-gain bg-gain px-4 py-3 font-mono text-sm font-extrabold uppercase tracking-wider text-void transition-colors hover:bg-gain/90"
       >
-        Mark Shipped
+        <span aria-hidden="true">📦</span>
+        <span>Mark Shipped</span>
       </button>
     );
   }
@@ -2769,6 +2783,9 @@ export default function InventoryTabs({
               const editingTracking = isOrderFieldEditing(order.id, "tracking_number");
               const isSavingOrder = savingOrderIds[order.id] ?? false;
               const isConfirmingShipped = confirmingShippedOrderIds[order.id] ?? false;
+              const markedShippedDate = formatShortDate(
+                order.items.find((item) => item.shipped_at)?.shipped_at ?? order.updated_at ?? order.created_at
+              );
               const hasDraftChanges =
                 draft.customer_name.trim() !== (order.customer_name ?? "") ||
                 draft.shipping_label.trim() !== (order.shipping_label ?? "") ||
@@ -2855,7 +2872,7 @@ export default function InventoryTabs({
                     ))}
                   </div>
 
-                  <div className="grid gap-3 rounded-md border border-border-2 bg-surf2 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                  <div className="grid gap-3 rounded-md border border-blue/60 bg-[rgba(79,142,247,0.16)] p-4 shadow-[0_0_24px_rgba(79,142,247,0.12),inset_0_1px_0_rgba(255,255,255,0.08)]">
                     <div className="block">
                       <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
                         Customer Name
@@ -2963,7 +2980,7 @@ export default function InventoryTabs({
                       {order.marked_shipped ? (
                         <div className="inline-flex items-center justify-center gap-2 rounded-md border border-gain bg-gain px-4 py-3 text-center font-mono text-sm font-extrabold uppercase tracking-wider text-void sm:text-base">
                           <span aria-hidden="true">📦</span>
-                          <span>Marked Shipped</span>
+                          <span>Marked Shipped{markedShippedDate ? ` ${markedShippedDate}` : ""}</span>
                         </div>
                       ) : isConfirmingShipped ? (
                         <div className="grid gap-2">
