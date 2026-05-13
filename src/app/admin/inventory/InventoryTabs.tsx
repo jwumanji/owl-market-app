@@ -245,6 +245,14 @@ function detectCarrier(value?: string | null) {
     return "UPS";
   }
 
+  if (normalized.includes("FEDEX.COM")) {
+    return "FedEx";
+  }
+
+  if (normalized.includes("DHL.COM")) {
+    return "DHL";
+  }
+
   return null;
 }
 
@@ -2583,6 +2591,7 @@ export default function InventoryTabs({
               const trackingLinkHref = orderTrackingHref(draft.tracking_number);
               const customerNameValue = draft.customer_name.trim();
               const trackingValue = draft.tracking_number.trim();
+              const trackingCarrier = detectCarrier(trackingValue);
               const editingCustomerName = isOrderFieldEditing(order.id, "customer_name");
               const editingShippingLabel = isOrderFieldEditing(order.id, "shipping_label");
               const editingTracking = isOrderFieldEditing(order.id, "tracking_number");
@@ -2638,29 +2647,37 @@ export default function InventoryTabs({
                 <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_520px] 2xl:grid-cols-[minmax(0,1fr)_640px]">
                   <div className="grid min-w-0 gap-2 sm:grid-cols-2 2xl:grid-cols-3">
                     {order.items.map((item) => (
-                      <div key={item.id} className="flex min-w-0 gap-3 rounded-md border border-border bg-surface p-2">
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setHoverPreview(null);
+                          setSelectedGroupKey(`item:${item.id}`);
+                        }}
+                        className="flex min-w-0 gap-4 rounded-md border border-border bg-surface p-3 text-left transition-colors hover:border-border-2 hover:bg-surf2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-owl"
+                      >
                         {renderOrderThumbnail(item)}
                         <div className="min-w-0 flex-1">
-                          <div className="line-clamp-2 text-sm font-bold leading-snug text-text">
+                          <div className="line-clamp-3 text-base font-extrabold leading-snug text-text sm:text-lg">
                             {orderItemTitle(item)}
                           </div>
-                          <div className="mt-2 grid gap-1 font-mono text-xs font-semibold text-text-2">
+                          <div className="mt-3 grid gap-1.5 font-mono text-sm font-bold text-text-2">
                             <div>
                               Condition: <span className="text-text">{orderItemConditionLabel(item)}</span>
                             </div>
                             {item.inventory_type === "graded" && item.graded_rating && (
                               <div>
-                                Rating: <span className="text-owl">{item.graded_rating}</span>
+                                Rating: <span className="font-extrabold text-owl">{item.graded_rating}</span>
                               </div>
                             )}
                             {item.inventory_type === "graded" && item.certification_number && (
                               <div className="truncate">
-                                Cert: <span className="text-owl">{item.certification_number}</span>
+                                Cert: <span className="font-extrabold text-owl">{item.certification_number}</span>
                               </div>
                             )}
                           </div>
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
 
@@ -2732,14 +2749,21 @@ export default function InventoryTabs({
                       </span>
                       {trackingValue && !editingTracking ? (
                         <div className="mt-1.5 flex min-w-0 items-center gap-2">
-                          <a
-                            href={trackingLinkHref ?? undefined}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex min-w-0 flex-1 items-center justify-center truncate rounded-md border border-blue bg-blue px-3 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-void transition-colors hover:bg-blue/90"
-                          >
-                            {trackingValue}
-                          </a>
+                          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-border bg-deep px-3 py-2.5">
+                            <a
+                              href={trackingLinkHref ?? undefined}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="min-w-0 flex-1 truncate font-mono text-sm font-extrabold text-owl underline underline-offset-2 transition-colors hover:text-owl-light"
+                            >
+                              {trackingValue}
+                            </a>
+                            {trackingCarrier && (
+                              <span className="shrink-0 rounded border border-owl/40 bg-owl/10 px-2 py-1 font-mono text-[10px] font-extrabold uppercase tracking-wider text-owl">
+                                {trackingCarrier}
+                              </span>
+                            )}
+                          </div>
                           <button
                             type="button"
                             onClick={() => setOrderFieldEditing(order.id, "tracking_number", true)}
@@ -2760,24 +2784,26 @@ export default function InventoryTabs({
                       )}
                     </div>
 
-                    <div className="grid gap-2">
+                    <div className="mt-3 grid gap-2">
                       {order.marked_shipped ? (
-                        <div className="rounded-md border border-gain/30 bg-gain/10 px-3 py-2 text-center font-mono text-xs font-bold uppercase tracking-wider text-gain">
-                          Marked Shipped
+                        <div className="inline-flex items-center justify-center gap-2 rounded-md border border-gain bg-gain px-3 py-2.5 text-center font-mono text-xs font-extrabold uppercase tracking-wider text-void">
+                          <span aria-hidden="true">📦</span>
+                          <span>Marked Shipped</span>
                         </div>
                       ) : isConfirmingShipped ? (
                         <div className="grid gap-2">
-                          <div className="font-mono text-xs font-semibold text-text-2">
-                            Move this order to Sold?
+                          <div className="font-mono text-xs font-bold uppercase tracking-wider text-gain">
+                            Confirm move this order to Sold?
                           </div>
                           <div className="flex gap-2">
                             <button
                               type="button"
                               disabled={isSavingOrder}
                               onClick={() => saveOrderQuickEdit(order, { markedShipped: true })}
-                              className="rounded-md border border-blue bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-blue transition-colors hover:bg-blue/15 disabled:cursor-wait disabled:opacity-60"
+                              className="inline-flex items-center justify-center gap-2 rounded-md border border-gain bg-gain px-3 py-2.5 font-mono text-xs font-extrabold uppercase tracking-wider text-void transition-colors hover:bg-gain/90 disabled:cursor-wait disabled:opacity-60"
                             >
-                              Confirm
+                              <span aria-hidden="true">📦</span>
+                              <span>Confirm</span>
                             </button>
                             <button
                               type="button"
@@ -2800,9 +2826,10 @@ export default function InventoryTabs({
                           type="button"
                           disabled={isSavingOrder}
                           onClick={() => setConfirmingShippedOrderIds((current) => ({ ...current, [order.id]: true }))}
-                          className="rounded-md border border-blue bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-blue transition-colors hover:bg-blue/15 disabled:cursor-wait disabled:opacity-60"
+                          className="inline-flex items-center justify-center gap-2 rounded-md border border-gain bg-gain px-3 py-2.5 font-mono text-xs font-extrabold uppercase tracking-wider text-void transition-colors hover:bg-gain/90 disabled:cursor-wait disabled:opacity-60"
                         >
-                          Mark Shipped
+                          <span aria-hidden="true">📦</span>
+                          <span>Mark Shipped</span>
                         </button>
                       )}
 
