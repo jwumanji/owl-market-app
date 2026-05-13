@@ -59,6 +59,9 @@ const TABS = [
   { id: "sealed", label: "Sealed" },
 ] as const;
 
+type InventoryTabId = (typeof TABS)[number]["id"];
+type GradedFilter = "all" | GradedRating;
+
 const STATUS_LABELS: Record<InventoryStatus, string> = {
   new: "New",
   grading: "Grading",
@@ -91,7 +94,7 @@ const PURCHASED_FROM_LABELS: Record<PurchasedFrom, string> = {
   event: "Event",
 };
 
-const ROW_NUMBER_LABEL = "Row #";
+const ROW_NUMBER_LABEL = "Card #";
 const ROW_NUMBER_COLUMN_CLASS = "w-[82px]";
 const ROW_NUMBER_CELL_CLASS =
   "px-3 py-4 text-right align-top font-mono text-lg font-extrabold leading-none tabular-nums text-text";
@@ -173,6 +176,8 @@ function SelectField({
 
 function groupKey(item: InventoryRow) {
   return [
+    item.inventory_type,
+    item.inventory_type === "graded" ? item.graded_rating ?? "NO_GRADE" : "NO_GRADE",
     item.card.set_code ?? "NO_SET",
     item.card.card_number ?? "NO_NUMBER",
     item.card.name ?? "Unknown Card",
@@ -284,6 +289,16 @@ function orderMatchesSearch(order: CustomerOrderSummary, query: string) {
     .includes(query);
 }
 
+function itemMatchesInventoryTab(
+  item: Pick<InventoryRow, "inventory_type" | "graded_rating">,
+  tab: InventoryTabId,
+  gradedFilter: GradedFilter
+) {
+  if (tab === "all") return true;
+  if (item.inventory_type !== tab) return false;
+  return tab !== "graded" || gradedFilter === "all" || item.graded_rating === gradedFilter;
+}
+
 function setCodeForMatch(card: CardMatchResult) {
   const set = Array.isArray(card.sets) ? card.sets[0] : card.sets;
   return set?.code ?? null;
@@ -330,7 +345,8 @@ export default function InventoryTabs({
   statusFilter?: StatusFilter;
   onStatusFilterChange?: (status: StatusFilter) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<(typeof TABS)[number]["id"]>("all");
+  const [activeTab, setActiveTab] = useState<InventoryTabId>("all");
+  const [gradedFilter, setGradedFilter] = useState<GradedFilter>("all");
   const [rows, setRows] = useState(items);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [customerNameDrafts, setCustomerNameDrafts] = useState<Record<string, string>>({});
@@ -367,6 +383,12 @@ export default function InventoryTabs({
   useEffect(() => {
     onItemsChange?.(rows);
   }, [onItemsChange, rows]);
+
+  useEffect(() => {
+    if (activeTab !== "graded" && gradedFilter !== "all") {
+      setGradedFilter("all");
+    }
+  }, [activeTab, gradedFilter]);
 
   useEffect(() => {
     const timers = Object.entries(matchQueries).map(([itemId, query]) => {
@@ -488,8 +510,8 @@ export default function InventoryTabs({
 
   const filtered = useMemo(() => {
     if (pendingMatchOnly) return searchFilteredRows;
-    return searchFilteredRows.filter((item) => activeTab === "all" || item.inventory_type === activeTab);
-  }, [activeTab, pendingMatchOnly, searchFilteredRows]);
+    return searchFilteredRows.filter((item) => itemMatchesInventoryTab(item, activeTab, gradedFilter));
+  }, [activeTab, gradedFilter, pendingMatchOnly, searchFilteredRows]);
 
   const groups = useMemo<InventoryGroup[]>(() => {
     const map = new Map<string, InventoryRow[]>();
@@ -533,6 +555,21 @@ export default function InventoryTabs({
       { all: 0, raw: 0, damaged: 0, graded: 0, sealed: 0 }
     );
   }, [countRows]);
+  const gradedCounts = useMemo(() => {
+    return countRows.reduce(
+      (acc, item) => {
+        if (item.inventory_type === "graded" && item.graded_rating) {
+          acc[item.graded_rating] = (acc[item.graded_rating] ?? 0) + item.quantity;
+        }
+        return acc;
+      },
+      {} as Record<GradedRating, number>
+    );
+  }, [countRows]);
+  const visibleGradedFilters = useMemo(
+    () => GRADED_RATINGS.filter((rating) => (gradedCounts[rating] ?? 0) > 0 || gradedFilter === rating),
+    [gradedCounts, gradedFilter]
+  );
 
   const pendingMatchCount = useMemo(() => {
     return rows.reduce((sum, item) => sum + (needsCatalogMatch(item) ? item.quantity : 0), 0);
@@ -546,9 +583,9 @@ export default function InventoryTabs({
 
     return orders
       .filter((order) => order.marked_shipped === shipped)
-      .filter((order) => activeTab === "all" || order.items.some((item) => item.inventory_type === activeTab))
+      .filter((order) => order.items.some((item) => itemMatchesInventoryTab(item, activeTab, gradedFilter)))
       .filter((order) => orderMatchesSearch(order, query));
-  }, [activeTab, orders, searchQuery, statusFilter]);
+  }, [activeTab, gradedFilter, orders, searchQuery, statusFilter]);
   const stageOrderCardCount = useMemo(
     () => stageOrders.reduce((sum, order) => sum + order.items.length, 0),
     [stageOrders]
@@ -1664,6 +1701,7 @@ export default function InventoryTabs({
           {typeof itemIndex === "number" && <span>#{itemIndex}</span>}
           {item.card.set_code && <span>{item.card.set_code}</span>}
           {item.card.card_number && <span>{item.card.card_number}</span>}
+          {item.graded_rating && <span>{item.graded_rating}</span>}
           {typeof quantity === "number" && (
             <span className="rounded bg-surf3 px-2 py-0.5 text-text">Qty {quantity}</span>
           )}
@@ -2219,14 +2257,16 @@ export default function InventoryTabs({
                 </div>
               ))}
 
-              <button
-                type="button"
-                disabled={addingGroups[selectedGroup.key] ?? false}
-                onClick={() => addIndividualItem(selectedGroup)}
-                className="rounded-md border border-gain bg-[rgba(0,214,143,0.10)] px-4 py-3 font-mono text-sm font-bold uppercase tracking-wider text-gain transition-colors hover:bg-[rgba(0,214,143,0.16)] disabled:cursor-wait disabled:opacity-60"
-              >
-                Add Individual Item
-              </button>
+              {selectedGroup.rows.length > 1 && (
+                <button
+                  type="button"
+                  disabled={addingGroups[selectedGroup.key] ?? false}
+                  onClick={() => addIndividualItem(selectedGroup)}
+                  className="rounded-md border border-gain bg-[rgba(0,214,143,0.10)] px-4 py-3 font-mono text-sm font-bold uppercase tracking-wider text-gain transition-colors hover:bg-[rgba(0,214,143,0.16)] disabled:cursor-wait disabled:opacity-60"
+                >
+                  Add Individual Item
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -2503,6 +2543,38 @@ export default function InventoryTabs({
         )}
       </div>
 
+      {activeTab === "graded" && !pendingMatchOnly && (
+        <div className="flex flex-wrap gap-2 rounded-lg border border-border bg-surface p-2">
+          <button
+            type="button"
+            onClick={() => setGradedFilter("all")}
+            className={`rounded-md border px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
+              gradedFilter === "all"
+                ? "border-owl bg-owl/10 text-owl"
+                : "border-border bg-deep text-text hover:border-border-2 hover:text-owl"
+            }`}
+          >
+            All Grades
+            <span className="ml-2 text-text-2">{counts.graded}</span>
+          </button>
+          {visibleGradedFilters.map((rating) => (
+            <button
+              key={rating}
+              type="button"
+              onClick={() => setGradedFilter(rating)}
+              className={`rounded-md border px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
+                gradedFilter === rating
+                  ? "border-owl bg-owl/10 text-owl"
+                  : "border-border bg-deep text-text hover:border-border-2 hover:text-owl"
+              }`}
+            >
+              {rating}
+              <span className="ml-2 text-text-2">{gradedCounts[rating] ?? 0}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -2593,7 +2665,7 @@ export default function InventoryTabs({
             {groups.map((group) => {
               const item = group.first;
               const hasNestedRows = group.rows.length > 1;
-              const isOpen = hasNestedRows && (openGroups[group.key] ?? true);
+              const isOpen = hasNestedRows && (openGroups[group.key] ?? false);
               const isAdding = addingGroups[group.key] ?? false;
 
               return (
@@ -2814,7 +2886,7 @@ export default function InventoryTabs({
             {groups.map((group) => {
               const item = group.first;
               const hasNestedRows = group.rows.length > 1;
-              const isOpen = hasNestedRows && (openGroups[group.key] ?? true);
+              const isOpen = hasNestedRows && (openGroups[group.key] ?? false);
               const isAdding = addingGroups[group.key] ?? false;
 
               return (
@@ -2874,7 +2946,7 @@ export default function InventoryTabs({
                           >
                             {renderCardTitle(item)}
                           </button>
-                          {renderCardMeta(item, { groupLabel: "GROUP" })}
+                          {renderCardMeta(item, { groupLabel: hasNestedRows ? "GROUP" : undefined })}
                         </div>
                         {renderRowActions({
                           group,
