@@ -96,11 +96,11 @@ const PURCHASED_FROM_LABELS: Record<PurchasedFrom, string> = {
 };
 
 const ROW_NUMBER_LABEL = "Card #";
-const ROW_NUMBER_COLUMN_CLASS = "w-[110px]";
+const ROW_NUMBER_COLUMN_CLASS = "w-[130px]";
 const ROW_NUMBER_CELL_CLASS =
-  "px-3 py-4 text-center align-top";
+  "px-3 py-4 align-top";
 const NESTED_ROW_NUMBER_CELL_CLASS =
-  "px-3 py-3.5 text-center align-top";
+  "px-3 py-3.5 align-top";
 const TABLE_IMAGE_COLUMN_CLASS = "w-[120px]";
 const TABLE_IMAGE_CELL_CLASS = "px-3 py-2";
 const NESTED_TABLE_IMAGE_BUTTON_CLASS = "mx-auto flex w-fit flex-col items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-owl";
@@ -699,6 +699,13 @@ export default function InventoryTabs({
     () => stageOrders.reduce((sum, order) => sum + order.items.length, 0),
     [stageOrders]
   );
+  const stageStandaloneOrderCount = statusFilter === "ship" || statusFilter === "sold" ? tableRows.length : 0;
+  const stageStandaloneCardCount = useMemo(() => {
+    if (statusFilter !== "ship" && statusFilter !== "sold") return 0;
+    return tableRows.reduce((sum, item) => sum + item.quantity, 0);
+  }, [statusFilter, tableRows]);
+  const stageTotalOrderCount = stageOrders.length + stageStandaloneOrderCount;
+  const stageTotalCardCount = stageOrderCardCount + stageStandaloneCardCount;
 
   useEffect(() => {
     if (!pendingMatchOnly || pendingMatchCount > 0) return;
@@ -2009,7 +2016,7 @@ export default function InventoryTabs({
     return (
       <span
         title={`${inventoryCardLabel(item)} - Inventory item ID: ${item.id}`}
-        className="inline-flex items-center rounded-full border border-owl/50 bg-owl px-2.5 py-1 font-mono text-[11px] font-black uppercase leading-none tracking-wider text-void shadow-[0_0_14px_rgba(245,166,35,0.28)]"
+        className="inline-flex items-center rounded-full border border-owl/50 bg-owl px-3 py-1.5 font-mono text-sm font-black uppercase leading-none tracking-wider text-void shadow-[0_0_14px_rgba(245,166,35,0.28)]"
       >
         {inventoryCardLabel(item)}
       </span>
@@ -2018,10 +2025,14 @@ export default function InventoryTabs({
 
   function renderCardNumberCell(item: InventoryRow) {
     if (!inventoryCardNumber(item)) {
-      return <span className="font-mono text-sm font-semibold text-text-3">-</span>;
+      return (
+        <div className="flex w-full justify-center">
+          <span className="font-mono text-sm font-semibold text-text-3">-</span>
+        </div>
+      );
     }
 
-    return renderInventoryCardBadge(item);
+    return <div className="flex w-full justify-center">{renderInventoryCardBadge(item)}</div>;
   }
 
   function renderCardMeta(
@@ -2730,10 +2741,10 @@ export default function InventoryTabs({
           </div>
           <div className="flex flex-wrap gap-2">
             <span className="rounded-md border border-owl/30 bg-owl/10 px-3 py-2 font-mono text-xs font-bold uppercase text-owl">
-              {stageOrders.length} Orders
+              {stageTotalOrderCount} Orders
             </span>
-            <span className="rounded-md border border-border bg-deep px-3 py-2 font-mono text-xs font-bold uppercase text-text-2">
-              {stageOrderCardCount} Cards
+            <span className="rounded-md border border-blue/30 bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase text-blue">
+              {stageTotalCardCount} Cards
             </span>
           </div>
         </div>

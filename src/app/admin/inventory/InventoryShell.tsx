@@ -29,8 +29,13 @@ export default function InventoryShell({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatusFilter);
   const [liveItems, setLiveItems] = useState(items);
   const [liveOrders, setLiveOrders] = useState(orders);
-  const openOrderCount = liveOrders.filter((order) => !order.marked_shipped).length;
+  const openOrders = liveOrders.filter((order) => !order.marked_shipped);
+  const openOrderCount = openOrders.length;
   const shippedOrderCount = liveOrders.length - openOrderCount;
+  const openOrderItemIds = useMemo(
+    () => new Set(openOrders.flatMap((order) => order.inventory_item_ids)),
+    [openOrders]
+  );
 
   useEffect(() => {
     setStatusFilter(initialStatusFilter);
@@ -49,6 +54,10 @@ export default function InventoryShell({
       { new: 0, grading: 0, sale: 0, ship: 0, sold: 0 }
     );
   }, [liveItems]);
+  const standaloneShippingOrderCount = useMemo(() => {
+    return liveItems.filter((item) => item.status === "ship" && !openOrderItemIds.has(item.id)).length;
+  }, [liveItems, openOrderItemIds]);
+  const needShippingOrderCount = openOrderCount + standaloneShippingOrderCount;
 
   return (
     <>
@@ -67,11 +76,20 @@ export default function InventoryShell({
             <div className="font-mono text-sm font-semibold uppercase tracking-wider text-text">
               {STATUS_LABELS[status]}
             </div>
-            <div className="mt-2 text-3xl font-bold text-text">{byStatus[status]}</div>
-            {(status === "ship" || status === "sold") && (
-              <div className="mt-1 font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
-                {status === "ship" ? openOrderCount : shippedOrderCount} Orders
+            {status === "ship" ? (
+              <div className="mt-3 grid gap-1 font-mono font-bold uppercase tracking-wider">
+                <div className="text-2xl text-owl">{needShippingOrderCount} Orders</div>
+                <div className="text-lg text-blue">{byStatus.ship} Cards</div>
               </div>
+            ) : (
+              <>
+                <div className="mt-2 text-3xl font-bold text-text">{byStatus[status]}</div>
+                {status === "sold" && (
+                  <div className="mt-1 font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
+                    {shippedOrderCount} Orders
+                  </div>
+                )}
+              </>
             )}
           </button>
         ))}
