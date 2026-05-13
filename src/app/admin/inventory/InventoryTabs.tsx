@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, type MouseEvent, type SelectHTMLAttributes, useCallback, useEffect, useMemo, useState } from "react";
+import { displayCustomerOrderNumber } from "@/lib/customer-orders";
 import { GRADED_RATINGS, type CatalogMatchStatus, type GradedRating, type InventoryStatus, type InventoryType } from "@/lib/inventory-options";
 import type { CustomerOrderSummary } from "../orders/order-types";
 
@@ -95,11 +96,11 @@ const PURCHASED_FROM_LABELS: Record<PurchasedFrom, string> = {
 };
 
 const ROW_NUMBER_LABEL = "Card #";
-const ROW_NUMBER_COLUMN_CLASS = "w-[82px]";
+const ROW_NUMBER_COLUMN_CLASS = "w-[110px]";
 const ROW_NUMBER_CELL_CLASS =
-  "px-3 py-4 text-right align-top font-mono text-lg font-extrabold leading-none tabular-nums text-text";
+  "px-3 py-4 text-center align-top";
 const NESTED_ROW_NUMBER_CELL_CLASS =
-  "px-3 py-3.5 text-right align-top font-mono text-lg font-extrabold leading-none tabular-nums text-owl";
+  "px-3 py-3.5 text-center align-top";
 const TABLE_IMAGE_COLUMN_CLASS = "w-[120px]";
 const TABLE_IMAGE_CELL_CLASS = "px-3 py-2";
 const NESTED_TABLE_IMAGE_BUTTON_CLASS = "mx-auto flex w-fit flex-col items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-owl";
@@ -279,6 +280,24 @@ function createdAtSortValue(value?: string | null) {
   return Number.isFinite(time) ? time : Number.MAX_SAFE_INTEGER;
 }
 
+function certificationSortValue(value?: string | null) {
+  const digits = value?.replace(/\D/g, "");
+  if (!digits) return Number.MAX_SAFE_INTEGER;
+  const number = Number(digits);
+  return Number.isFinite(number) ? number : Number.MAX_SAFE_INTEGER;
+}
+
+function compareInventoryRowsByCertification(a: InventoryRow, b: InventoryRow) {
+  const certificationDiff =
+    certificationSortValue(a.certification_number) - certificationSortValue(b.certification_number);
+  if (certificationDiff !== 0) return certificationDiff;
+
+  const createdAtDiff = createdAtSortValue(a.created_at) - createdAtSortValue(b.created_at);
+  if (createdAtDiff !== 0) return createdAtDiff;
+
+  return a.id.localeCompare(b.id);
+}
+
 function formatOrderDate(value?: string | null) {
   if (!value) return "No date";
   return new Intl.DateTimeFormat("en", {
@@ -415,6 +434,10 @@ export default function InventoryTabs({
   const [lastSelectedItemId, setLastSelectedItemId] = useState<string | null>(null);
   const [bulkDeleteStep, setBulkDeleteStep] = useState<0 | 1 | 2>(0);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkStatusDraft, setBulkStatusDraft] = useState<InventoryStatus | "">("");
+  const [bulkConditionDraft, setBulkConditionDraft] = useState<InventoryType | "">("");
+  const [bulkApplyStep, setBulkApplyStep] = useState<0 | 1>(0);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
   const [openActionMenuKey, setOpenActionMenuKey] = useState<string | null>(null);
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null);
   const [hoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
@@ -582,20 +605,36 @@ export default function InventoryTabs({
     return filtered.filter((item) => !currentStageOrderItemIds.has(item.id));
   }, [currentStageOrderItemIds, filtered]);
 
+  const ordersByInventoryItemId = useMemo(() => {
+    const map = new Map<string, CustomerOrderSummary[]>();
+
+    for (const order of orders) {
+      for (const itemId of order.inventory_item_ids) {
+        map.set(itemId, [...(map.get(itemId) ?? []), order]);
+      }
+    }
+
+    return map;
+  }, [orders]);
+
   const groups = useMemo<InventoryGroup[]>(() => {
     const map = new Map<string, InventoryRow[]>();
     for (const item of tableRows) {
       const key = pendingMatchOnly ? `item:${item.id}` : groupKey(item);
       map.set(key, [...(map.get(key) ?? []), item]);
     }
-    return Array.from(map.entries()).map(([key, groupRows]) => ({
-      key,
-      rows: groupRows,
-      first: groupRows[0],
-      quantity: groupRows.reduce((sum, item) => sum + item.quantity, 0),
-      condition: sameValue(groupRows.map((item) => item.inventory_type)),
-      status: sameValue(groupRows.map((item) => item.status)),
-    }));
+    return Array.from(map.entries()).map(([key, groupRows]) => {
+      const sortedRows = [...groupRows].sort(compareInventoryRowsByCertification);
+
+      return {
+        key,
+        rows: sortedRows,
+        first: sortedRows[0],
+        quantity: sortedRows.reduce((sum, item) => sum + item.quantity, 0),
+        condition: sameValue(sortedRows.map((item) => item.inventory_type)),
+        status: sameValue(sortedRows.map((item) => item.status)),
+      };
+    });
   }, [pendingMatchOnly, tableRows]);
 
   const visibleRows = useMemo(() => groups.flatMap((group) => group.rows), [groups]);
@@ -604,6 +643,7 @@ export default function InventoryTabs({
     [selectedItemIds]
   );
   const selectedCount = selectedIds.length;
+  const hasBulkEditDraft = Boolean(bulkStatusDraft || bulkConditionDraft);
   const visibleSelectedCount = visibleRows.reduce((sum, item) => sum + (selectedItemIds[item.id] ? 1 : 0), 0);
   const allVisibleSelected = visibleRows.length > 0 && visibleSelectedCount === visibleRows.length;
 
@@ -680,14 +720,15 @@ export default function InventoryTabs({
       ? rows.filter((item) => item.id === selectedGroupKey.slice(5))
       : rows.filter((item) => groupKey(item) === selectedGroupKey);
     if (groupRows.length === 0) return null;
+    const sortedRows = [...groupRows].sort(compareInventoryRowsByCertification);
 
     return {
       key: selectedGroupKey,
-      rows: groupRows,
-      first: groupRows[0],
-      quantity: groupRows.reduce((sum, item) => sum + item.quantity, 0),
-      condition: sameValue(groupRows.map((item) => item.inventory_type)),
-      status: sameValue(groupRows.map((item) => item.status)),
+      rows: sortedRows,
+      first: sortedRows[0],
+      quantity: sortedRows.reduce((sum, item) => sum + item.quantity, 0),
+      condition: sameValue(sortedRows.map((item) => item.inventory_type)),
+      status: sameValue(sortedRows.map((item) => item.status)),
     };
   }, [rows, selectedGroupKey]);
 
@@ -1122,11 +1163,18 @@ export default function InventoryTabs({
     }
   }
 
+  function resetBulkActionConfirmations() {
+    setBulkDeleteStep(0);
+    setBulkApplyStep(0);
+  }
+
   function clearBulkSelection() {
     setBulkSelectMode(false);
     setSelectedItemIds({});
     setLastSelectedItemId(null);
-    setBulkDeleteStep(0);
+    setBulkStatusDraft("");
+    setBulkConditionDraft("");
+    resetBulkActionConfirmations();
   }
 
   function applyRangeSelection(targetIds: string[], selected: boolean) {
@@ -1154,7 +1202,7 @@ export default function InventoryTabs({
     const groupIds = group.rows.map((item) => item.id);
     if (shiftKey && applyRangeSelection(groupIds, selected)) {
       setLastSelectedItemId(groupIds[groupIds.length - 1] ?? null);
-      setBulkDeleteStep(0);
+      resetBulkActionConfirmations();
       return;
     }
 
@@ -1167,13 +1215,13 @@ export default function InventoryTabs({
       return next;
     });
     setLastSelectedItemId(groupIds[groupIds.length - 1] ?? null);
-    setBulkDeleteStep(0);
+    resetBulkActionConfirmations();
   }
 
   function setItemSelected(item: InventoryRow, selected: boolean, shiftKey = false) {
     if (shiftKey && applyRangeSelection([item.id], selected)) {
       setLastSelectedItemId(item.id);
-      setBulkDeleteStep(0);
+      resetBulkActionConfirmations();
       return;
     }
 
@@ -1184,7 +1232,7 @@ export default function InventoryTabs({
       return next;
     });
     setLastSelectedItemId(item.id);
-    setBulkDeleteStep(0);
+    resetBulkActionConfirmations();
   }
 
   function setAllVisibleSelected(selected: boolean) {
@@ -1196,7 +1244,7 @@ export default function InventoryTabs({
       }
       return next;
     });
-    setBulkDeleteStep(0);
+    resetBulkActionConfirmations();
   }
 
   async function deleteSelectedItems() {
@@ -1230,11 +1278,81 @@ export default function InventoryTabs({
 
   function handleBulkDeleteClick() {
     if (selectedCount === 0 || bulkDeleting) return;
+    setBulkApplyStep(0);
     if (bulkDeleteStep < 2) {
       setBulkDeleteStep((current) => (current + 1) as 0 | 1 | 2);
       return;
     }
     deleteSelectedItems();
+  }
+
+  function bulkEditUpdates(): InventoryItemUpdates {
+    const updates: InventoryItemUpdates = {};
+
+    if (bulkStatusDraft) {
+      updates.status = bulkStatusDraft;
+    }
+
+    if (bulkConditionDraft) {
+      updates.inventory_type = bulkConditionDraft;
+      if (bulkConditionDraft !== "graded") {
+        updates.graded_rating = null;
+        updates.certification_number = null;
+      }
+    }
+
+    return updates;
+  }
+
+  async function applyBulkChanges() {
+    if (bulkUpdating || selectedIds.length === 0 || !hasBulkEditDraft) return;
+
+    const updates = bulkEditUpdates();
+    const selectedSet = new Set(selectedIds);
+    const persistedIds = selectedIds.filter((id) => !isLocalOnlyItem(id));
+    const previousRows = rows;
+
+    setActionError(null);
+    setBulkUpdating(true);
+    setRows((current) => current.map((item) => (selectedSet.has(item.id) ? { ...item, ...updates } : item)));
+
+    try {
+      await Promise.all(
+        persistedIds.map(async (id) => {
+          const res = await fetch(`/api/admin/inventory/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updates),
+          });
+
+          if (!res.ok) {
+            const payload = await res.json().catch(() => null);
+            throw new Error(payload?.error ?? "Could not update selected inventory items.");
+          }
+        })
+      );
+
+      setBulkStatusDraft("");
+      setBulkConditionDraft("");
+      setBulkApplyStep(0);
+    } catch (error) {
+      setRows(previousRows);
+      setActionError(error instanceof Error ? error.message : "Could not update selected inventory items.");
+    } finally {
+      setBulkUpdating(false);
+    }
+  }
+
+  function handleBulkApplyClick() {
+    if (selectedCount === 0 || !hasBulkEditDraft || bulkUpdating) return;
+    setBulkDeleteStep(0);
+
+    if (bulkApplyStep === 0) {
+      setBulkApplyStep(1);
+      return;
+    }
+
+    applyBulkChanges();
   }
 
   function selectionStateFor(group: InventoryGroup) {
@@ -1898,19 +2016,25 @@ export default function InventoryTabs({
     );
   }
 
+  function renderCardNumberCell(item: InventoryRow) {
+    if (!inventoryCardNumber(item)) {
+      return <span className="font-mono text-sm font-semibold text-text-3">-</span>;
+    }
+
+    return renderInventoryCardBadge(item);
+  }
+
   function renderCardMeta(
     item: InventoryRow,
     {
       groupLabel,
       quantity,
       itemIndex,
-      showCardBadge = true,
       showItemId = false,
     }: {
       groupLabel?: string;
       quantity?: number;
       itemIndex?: number;
-      showCardBadge?: boolean;
       showItemId?: boolean;
     } = {}
   ) {
@@ -1928,7 +2052,6 @@ export default function InventoryTabs({
         {groupLabel && (
           <span className="rounded bg-surf3 px-2 py-0.5 text-text">{groupLabel}</span>
         )}
-        {showCardBadge && renderInventoryCardBadge(item)}
         {item.certification_number && <span>Cert {item.certification_number}</span>}
         {needsCatalogMatch(item) && (
           <span className="rounded border border-owl/40 bg-owl/10 px-2 py-0.5 text-owl">
@@ -2292,6 +2415,13 @@ export default function InventoryTabs({
     if (!selectedGroup) return null;
 
     const item = selectedGroup.first;
+    const selectedOrderMemberships = Array.from(
+      new Map(
+        selectedGroup.rows
+          .flatMap((row) => ordersByInventoryItemId.get(row.id) ?? [])
+          .map((order) => [order.id, order])
+      ).values()
+    );
 
     return (
       <div
@@ -2332,6 +2462,35 @@ export default function InventoryTabs({
                   </div>
                 </div>
               </div>
+
+              {selectedOrderMemberships.length > 0 && (
+                <section className="mt-3 rounded-md border border-owl/40 bg-owl/10 p-3">
+                  <div className="font-mono text-xs font-extrabold uppercase tracking-wider text-owl">
+                    Part of Order
+                  </div>
+                  <div className="mt-2 grid gap-2">
+                    {selectedOrderMemberships.map((order) => (
+                      <div key={order.id} className="rounded-md border border-border bg-deep p-3">
+                        <div className="font-mono text-[11px] font-bold uppercase tracking-wider text-text-2">
+                          Order #{displayCustomerOrderNumber(order.id)}
+                        </div>
+                        <div className="mt-1 text-base font-extrabold leading-snug text-owl">
+                          {order.nickname || order.customer_name || "Untitled Order"}
+                        </div>
+                        <div className="mt-1 text-sm font-semibold text-text-2">
+                          Customer: <span className="text-text">{order.customer_name}</span>
+                        </div>
+                        <a
+                          href={`/admin/orders/${order.id}`}
+                          className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-owl bg-owl px-3 py-2 font-mono text-xs font-extrabold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
+                        >
+                          Open Order
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
             </div>
 
             <div className="space-y-4">
@@ -2592,6 +2751,8 @@ export default function InventoryTabs({
               const customerNameValue = draft.customer_name.trim();
               const trackingValue = draft.tracking_number.trim();
               const trackingCarrier = detectCarrier(trackingValue);
+              const orderTitle = order.nickname?.trim() || order.customer_name || "Untitled Order";
+              const orderNumber = displayCustomerOrderNumber(order.id);
               const editingCustomerName = isOrderFieldEditing(order.id, "customer_name");
               const editingShippingLabel = isOrderFieldEditing(order.id, "shipping_label");
               const editingTracking = isOrderFieldEditing(order.id, "tracking_number");
@@ -2609,13 +2770,15 @@ export default function InventoryTabs({
               >
                 <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
-                    <div className="font-mono text-xs font-bold uppercase tracking-wider text-owl">{order.id}</div>
                     <a
                       href={`/admin/orders/${order.id}`}
-                      className="mt-1 block truncate text-lg font-bold text-text underline-offset-2 transition-colors hover:text-owl hover:underline"
+                      className="block truncate text-2xl font-black leading-tight text-owl underline-offset-2 transition-colors hover:text-owl-light hover:underline"
                     >
-                      {order.nickname || order.customer_name}
+                      {orderTitle}
                     </a>
+                    <div className="mt-1 font-mono text-xs font-bold uppercase tracking-wider text-text-2">
+                      Order #{orderNumber}
+                    </div>
                     <div className="mt-1 truncate text-sm text-text-2">{order.customer_name}</div>
                   </div>
 
@@ -2681,7 +2844,7 @@ export default function InventoryTabs({
                     ))}
                   </div>
 
-                  <div className="grid gap-3 rounded-md border border-border bg-surface p-3">
+                  <div className="grid gap-3 rounded-md border border-border-2 bg-surf2 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                     <div className="block">
                       <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
                         Customer Name
@@ -2719,9 +2882,10 @@ export default function InventoryTabs({
                             href={shippingLabelHref}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex min-w-0 flex-1 items-center justify-center rounded-md border border-blue bg-blue px-3 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-void transition-colors hover:bg-blue/90"
+                            className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-md border border-blue bg-blue px-3 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-void transition-colors hover:bg-blue/90"
                           >
-                            Print Shipping
+                            <span aria-hidden="true">🖨️</span>
+                            <span>Print Shipping</span>
                           </a>
                           <button
                             type="button"
@@ -2786,13 +2950,13 @@ export default function InventoryTabs({
 
                     <div className="mt-3 grid gap-2">
                       {order.marked_shipped ? (
-                        <div className="inline-flex items-center justify-center gap-2 rounded-md border border-gain bg-gain px-3 py-2.5 text-center font-mono text-xs font-extrabold uppercase tracking-wider text-void">
+                        <div className="inline-flex items-center justify-center gap-2 rounded-md border border-gain bg-gain px-4 py-3 text-center font-mono text-sm font-extrabold uppercase tracking-wider text-void sm:text-base">
                           <span aria-hidden="true">📦</span>
                           <span>Marked Shipped</span>
                         </div>
                       ) : isConfirmingShipped ? (
                         <div className="grid gap-2">
-                          <div className="font-mono text-xs font-bold uppercase tracking-wider text-gain">
+                          <div className="font-mono text-sm font-bold uppercase tracking-wider text-gain">
                             Confirm move this order to Sold?
                           </div>
                           <div className="flex gap-2">
@@ -2800,7 +2964,7 @@ export default function InventoryTabs({
                               type="button"
                               disabled={isSavingOrder}
                               onClick={() => saveOrderQuickEdit(order, { markedShipped: true })}
-                              className="inline-flex items-center justify-center gap-2 rounded-md border border-gain bg-gain px-3 py-2.5 font-mono text-xs font-extrabold uppercase tracking-wider text-void transition-colors hover:bg-gain/90 disabled:cursor-wait disabled:opacity-60"
+                              className="inline-flex items-center justify-center gap-2 rounded-md border border-gain bg-gain px-4 py-3 font-mono text-sm font-extrabold uppercase tracking-wider text-void transition-colors hover:bg-gain/90 disabled:cursor-wait disabled:opacity-60 sm:text-base"
                             >
                               <span aria-hidden="true">📦</span>
                               <span>Confirm</span>
@@ -2815,7 +2979,7 @@ export default function InventoryTabs({
                                   return next;
                                 })
                               }
-                              className="rounded-md border border-border-2 bg-deep px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-text-2 transition-colors hover:text-text disabled:cursor-wait disabled:opacity-60"
+                              className="rounded-md border border-border-2 bg-deep px-4 py-3 font-mono text-sm font-bold uppercase tracking-wider text-text-2 transition-colors hover:text-text disabled:cursor-wait disabled:opacity-60"
                             >
                               Cancel
                             </button>
@@ -2826,7 +2990,7 @@ export default function InventoryTabs({
                           type="button"
                           disabled={isSavingOrder}
                           onClick={() => setConfirmingShippedOrderIds((current) => ({ ...current, [order.id]: true }))}
-                          className="inline-flex items-center justify-center gap-2 rounded-md border border-gain bg-gain px-3 py-2.5 font-mono text-xs font-extrabold uppercase tracking-wider text-void transition-colors hover:bg-gain/90 disabled:cursor-wait disabled:opacity-60"
+                          className="inline-flex items-center justify-center gap-2 rounded-md border border-gain bg-gain px-4 py-3 font-mono text-sm font-extrabold uppercase tracking-wider text-void transition-colors hover:bg-gain/90 disabled:cursor-wait disabled:opacity-60 sm:text-base"
                         >
                           <span aria-hidden="true">📦</span>
                           <span>Mark Shipped</span>
@@ -3053,11 +3217,66 @@ export default function InventoryTabs({
                       : "Delete Permanently"}
               </button>
             )}
+            {selectedCount > 0 && (
+              <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface p-2">
+                <SelectField
+                  value={bulkStatusDraft}
+                  onChange={(event) => {
+                    setBulkStatusDraft(event.target.value as InventoryStatus | "");
+                    setBulkApplyStep(0);
+                    setBulkDeleteStep(0);
+                  }}
+                  wrapperClassName="w-[190px]"
+                  className="bg-deep"
+                >
+                  <option value="">Set status...</option>
+                  {(Object.keys(STATUS_LABELS) as InventoryStatus[]).map((status) => (
+                    <option key={status} value={status}>
+                      {STATUS_LABELS[status]}
+                    </option>
+                  ))}
+                </SelectField>
+                <SelectField
+                  value={bulkConditionDraft}
+                  onChange={(event) => {
+                    setBulkConditionDraft(event.target.value as InventoryType | "");
+                    setBulkApplyStep(0);
+                    setBulkDeleteStep(0);
+                  }}
+                  wrapperClassName="w-[190px]"
+                  className="bg-deep"
+                >
+                  <option value="">Set condition...</option>
+                  {(Object.keys(CONDITION_LABELS) as InventoryType[]).map((condition) => (
+                    <option key={condition} value={condition}>
+                      {CONDITION_LABELS[condition]}
+                    </option>
+                  ))}
+                </SelectField>
+                <button
+                  type="button"
+                  disabled={!hasBulkEditDraft || bulkUpdating}
+                  onClick={handleBulkApplyClick}
+                  className={`rounded-md border px-4 py-2.5 font-mono text-sm font-bold uppercase tracking-wider transition-colors disabled:cursor-not-allowed disabled:border-border disabled:bg-deep disabled:text-text-3 ${
+                    bulkApplyStep === 0
+                      ? "border-owl bg-owl/10 text-owl hover:bg-owl/15"
+                      : "border-owl bg-owl text-void hover:bg-owl-light"
+                  }`}
+                >
+                  {bulkUpdating ? "Applying..." : bulkApplyStep === 0 ? "Apply Change" : "Confirm Apply"}
+                </button>
+              </div>
+            )}
             {bulkDeleteStep > 0 && (
               <div className="rounded-md border border-loss/40 bg-loss/10 px-3 py-2 text-sm font-semibold text-text">
                 {bulkDeleteStep === 1
                   ? `Confirm once more to delete ${selectedCount} selected item${selectedCount === 1 ? "" : "s"}.`
                   : "Final confirmation. This permanently removes the selected inventory records."}
+              </div>
+            )}
+            {bulkApplyStep > 0 && (
+              <div className="rounded-md border border-owl/40 bg-owl/10 px-3 py-2 text-sm font-semibold text-text">
+                Confirm to apply selected status/condition changes to {selectedCount} item{selectedCount === 1 ? "" : "s"}.
               </div>
             )}
           </>
@@ -3087,7 +3306,7 @@ export default function InventoryTabs({
           </colgroup>
           <thead>
             <tr className="border-b border-border bg-surf2 text-left font-mono text-xs font-semibold uppercase tracking-wider text-text">
-              <th className="px-3 py-3.5 text-right">{ROW_NUMBER_LABEL}</th>
+              <th className="px-3 py-3.5 text-center">{ROW_NUMBER_LABEL}</th>
               <th className="px-3 py-3.5">{renderSelectionHeader()}</th>
               <th className="px-4 py-3.5">Image</th>
               <th className="px-3 py-3.5">Card</th>
@@ -3108,7 +3327,7 @@ export default function InventoryTabs({
                 <Fragment key={group.key}>
                   <tr className={`border-b ${groupSelectionClass(group)}`}>
                     <td className={ROW_NUMBER_CELL_CLASS}>
-                      {inventoryCardNumber(item) ?? "-"}
+                      {renderCardNumberCell(item)}
                     </td>
                     <td className="px-3 py-4">
                       {bulkSelectMode ? renderSelectionCell(group, `Select ${item.card.name ?? "inventory group"}`) : hasNestedRows && (
@@ -3215,7 +3434,7 @@ export default function InventoryTabs({
                           className={`border-b transition-colors ${nestedRowSelectionClass(child)}`}
                         >
                           <td className={NESTED_ROW_NUMBER_CELL_CLASS}>
-                            {inventoryCardNumber(child) ?? "-"}
+                            {renderCardNumberCell(child)}
                           </td>
                           <td className="px-3 py-3.5">
                             {renderItemSelectionCell(child, `Select item ${index + 1}`)}
@@ -3302,7 +3521,7 @@ export default function InventoryTabs({
           </colgroup>
           <thead>
             <tr className="border-b border-border bg-surf2 text-left font-mono text-xs font-semibold uppercase tracking-wider text-text">
-              <th className="px-3 py-3.5 text-right">{ROW_NUMBER_LABEL}</th>
+              <th className="px-3 py-3.5 text-center">{ROW_NUMBER_LABEL}</th>
               <th className="px-3 py-3.5">{renderSelectionHeader()}</th>
               <th className="px-4 py-3.5">Image</th>
               <th className="px-3 py-3.5">Card Name</th>
@@ -3329,7 +3548,7 @@ export default function InventoryTabs({
                 <Fragment key={group.key}>
                   <tr className={`border-b ${groupSelectionClass(group)}`}>
                     <td className={ROW_NUMBER_CELL_CLASS}>
-                      {inventoryCardNumber(item) ?? "-"}
+                      {renderCardNumberCell(item)}
                     </td>
                     <td className="px-3 py-4">
                       {bulkSelectMode ? renderSelectionCell(group, `Select ${item.card.name ?? "inventory group"}`) : hasNestedRows && (
@@ -3471,7 +3690,7 @@ export default function InventoryTabs({
                           className={`border-b transition-colors ${nestedRowSelectionClass(child)}`}
                         >
                           <td className={NESTED_ROW_NUMBER_CELL_CLASS}>
-                            {inventoryCardNumber(child) ?? "-"}
+                            {renderCardNumberCell(child)}
                           </td>
                           <td className="px-3 py-3.5">
                             {renderItemSelectionCell(child, "Select inventory item")}

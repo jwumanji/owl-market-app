@@ -80,6 +80,7 @@ export default function NewInventoryForm() {
     () => (selectedCard || ((manualMode || notInCatalog) && manualName.trim())) && quantity >= 1 && !saving,
     [selectedCard, manualMode, notInCatalog, manualName, quantity, saving]
   );
+  const showCustomPhotoUpload = condition === "graded" || ((manualMode || notInCatalog) && !selectedCard);
 
   async function searchCards(value: string) {
     setQuery(value);
@@ -135,7 +136,7 @@ export default function NewInventoryForm() {
       notes,
     };
 
-    const hasScanUploads = condition === "graded" && (frontScan || backScan);
+    const hasScanUploads = Boolean(frontScan || backScan);
     const res = hasScanUploads
       ? await fetch("/api/admin/inventory", {
           method: "POST",
@@ -188,6 +189,8 @@ export default function NewInventoryForm() {
                 setSelectedCard(card);
                 setManualMode(false);
                 setNotInCatalog(false);
+                setFrontScan(null);
+                setBackScan(null);
                 setQuery(card.name ?? "");
               }}
               className={`flex w-full items-center gap-4 border-b border-border p-3 text-left transition-colors last:border-b-0 hover:bg-surf2 ${
@@ -321,8 +324,6 @@ export default function NewInventoryForm() {
                 if (nextCondition !== "graded") {
                   setGradedRating("");
                   setCertificationNumber("");
-                  setFrontScan(null);
-                  setBackScan(null);
                 }
               }}
               className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-3 text-text outline-none focus:border-owl"
@@ -450,29 +451,48 @@ export default function NewInventoryForm() {
             />
           </label>
 
-          {condition === "graded" && (
+          {showCustomPhotoUpload && (
             <div className="rounded-lg border border-border bg-deep p-4">
               <div className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
-                Scan Images
+                {condition === "graded" ? "Scan Images" : "Custom Photos"}
               </div>
+              <p className="mt-2 text-sm text-text-2">
+                {condition === "graded"
+                  ? "Upload front and back slab scans for this graded item."
+                  : "Upload the first photo as the front of the card so custom items can be indexed."}
+              </p>
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <label className="block">
-                  <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Front Scan</span>
+                  <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
+                    {condition === "graded" ? "Front Scan" : "First Photo / Front"}
+                  </span>
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/gif"
                     onChange={(event) => setFrontScan(event.target.files?.[0] ?? null)}
                     className="mt-2 w-full rounded-md border border-border bg-surface px-3 py-2.5 text-sm text-text file:mr-3 file:rounded file:border-0 file:bg-owl file:px-3 file:py-2 file:font-mono file:text-xs file:font-bold file:uppercase file:text-void"
                   />
+                  {frontScan && (
+                    <span className="mt-2 block truncate font-mono text-xs font-semibold text-owl">
+                      {frontScan.name}
+                    </span>
+                  )}
                 </label>
                 <label className="block">
-                  <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Back Scan</span>
+                  <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
+                    {condition === "graded" ? "Back Scan" : "Back Photo"}
+                  </span>
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/gif"
                     onChange={(event) => setBackScan(event.target.files?.[0] ?? null)}
                     className="mt-2 w-full rounded-md border border-border bg-surface px-3 py-2.5 text-sm text-text file:mr-3 file:rounded file:border-0 file:bg-owl file:px-3 file:py-2 file:font-mono file:text-xs file:font-bold file:uppercase file:text-void"
                   />
+                  {backScan && (
+                    <span className="mt-2 block truncate font-mono text-xs font-semibold text-owl">
+                      {backScan.name}
+                    </span>
+                  )}
                 </label>
               </div>
             </div>

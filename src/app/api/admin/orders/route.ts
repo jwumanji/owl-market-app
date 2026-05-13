@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import {
+  CUSTOMER_ORDER_ID_MAX,
+  CUSTOMER_ORDER_ID_START,
+  isShortCustomerOrderId,
+} from "@/lib/customer-orders";
 import { createServiceClient } from "@/lib/supabase-server";
 
 type RequestBody = Record<string, unknown>;
@@ -31,31 +36,34 @@ function inventoryItemIds(body: RequestBody) {
   );
 }
 
-function todayStamp() {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, "0");
-  const day = String(today.getDate()).padStart(2, "0");
-  return `${year}${month}${day}`;
-}
-
 async function nextOrderId(supabase: ReturnType<typeof createServiceClient>) {
-  const prefix = `OM-${todayStamp()}-`;
   const { data, error } = await supabase
     .from("customer_orders")
-    .select("id")
-    .like("id", `${prefix}%`)
-    .order("id", { ascending: false })
-    .limit(1);
+    .select("id");
 
   if (error) {
     throw new Error(error.message);
   }
 
-  const lastId = data?.[0]?.id as string | undefined;
-  const lastSequence = lastId?.startsWith(prefix) ? Number(lastId.slice(prefix.length)) : 0;
-  const nextSequence = Number.isFinite(lastSequence) ? lastSequence + 1 : 1;
-  return `${prefix}${String(nextSequence).padStart(4, "0")}`;
+  const existingIds = new Set((data ?? []).map((row) => String(row.id)));
+  const numericIds = Array.from(existingIds)
+    .filter(isShortCustomerOrderId)
+    .map((id) => Number(id))
+    .filter(Number.isFinite);
+  const highestNumericId = numericIds.length > 0 ? Math.max(...numericIds) : CUSTOMER_ORDER_ID_START - 1;
+
+  for (
+    let nextId = Math.max(CUSTOMER_ORDER_ID_START, highestNumericId + 1);
+    nextId <= CUSTOMER_ORDER_ID_MAX;
+    nextId += 1
+  ) {
+    const candidate = String(nextId);
+    if (!existingIds.has(candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new Error("Customer order number range is full");
 }
 
 async function validateInventoryItems(

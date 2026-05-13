@@ -187,10 +187,12 @@ export async function POST(request: Request) {
       customImageFrontUrl = await uploadInventoryScan(supabase, frontFile, {
         certificationNumber,
         side: "front",
+        folder: inventoryType === "graded" ? "psa" : "custom",
       });
       customImageBackUrl = await uploadInventoryScan(supabase, backFile, {
         certificationNumber,
         side: "back",
+        folder: inventoryType === "graded" ? "psa" : "custom",
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not upload inventory scans.";
@@ -209,8 +211,8 @@ export async function POST(request: Request) {
       quantity: 1,
       graded_rating: inventoryType === "graded" ? gradedRating : null,
       certification_number: certificationNumber,
-      custom_image_front_url: inventoryType === "graded" ? customImageFrontUrl : null,
-      custom_image_back_url: inventoryType === "graded" ? customImageBackUrl : null,
+      custom_image_front_url: customImageFrontUrl,
+      custom_image_back_url: customImageBackUrl,
       sale_channel: "not_sold",
       sold_date: null,
       sold_price: null,

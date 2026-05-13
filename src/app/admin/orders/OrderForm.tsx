@@ -2,6 +2,7 @@
 
 import { type FormEvent, type MouseEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { displayCustomerOrderNumber } from "@/lib/customer-orders";
 import type { CustomerOrderFormValue, OrderInventoryItem } from "./order-types";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -167,7 +168,7 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
   }
 
   async function deleteOrder() {
-    if (!initialOrder || !window.confirm(`Delete order ${initialOrder.id}?`)) return;
+    if (!initialOrder || !window.confirm(`Delete order #${displayCustomerOrderNumber(initialOrder.id)}?`)) return;
 
     setDeleting(true);
     setError(null);
@@ -211,7 +212,7 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
           <label>
             <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">Customer Order #</span>
             <input
-              value={initialOrder?.id ?? "Generated when saved"}
+              value={initialOrder ? displayCustomerOrderNumber(initialOrder.id) : "Generated when saved"}
               readOnly
               className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-3 font-mono text-sm text-text-2 outline-none"
             />

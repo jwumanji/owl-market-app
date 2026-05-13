@@ -56,9 +56,11 @@ export async function uploadInventoryScan(
   {
     certificationNumber,
     side,
+    folder = "psa",
   }: {
     certificationNumber?: string | null;
     side: "front" | "back";
+    folder?: "psa" | "custom";
   }
 ) {
   if (!file) return null;
@@ -75,7 +77,7 @@ export async function uploadInventoryScan(
 
   const id = safePathSegment(certificationNumber ?? "") || crypto.randomUUID();
   const ext = extensionFor(file);
-  const path = `psa/${id}-${side}-${crypto.randomUUID()}.${ext}`;
+  const path = `${folder}/${id}-${side}-${crypto.randomUUID()}.${ext}`;
   const bytes = Buffer.from(await file.arrayBuffer());
   const { error } = await supabase.storage
     .from(INVENTORY_SCAN_BUCKET)
