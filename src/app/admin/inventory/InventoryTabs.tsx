@@ -288,6 +288,15 @@ function orderItemImageUrl(item: StageOrderItem) {
   return item.custom_image_front_url ?? item.card.image_url_small ?? item.card.image_url;
 }
 
+function orderItemImageFallbackUrl(item: StageOrderItem) {
+  if (item.custom_image_front_url) return item.card.image_url_small ?? item.card.image_url ?? null;
+  return null;
+}
+
+function orderItemHasCustomScanImage(item: StageOrderItem) {
+  return Boolean(item.custom_image_front_url);
+}
+
 function orderItemConditionLabel(item: StageOrderItem) {
   return CONDITION_LABELS[item.inventory_type] ?? item.inventory_type;
 }
@@ -549,9 +558,25 @@ export default function InventoryTabs({
     return searchFilteredRows.filter((item) => itemMatchesInventoryTab(item, activeTab, gradedFilter));
   }, [activeTab, gradedFilter, pendingMatchOnly, searchFilteredRows]);
 
+  const currentStageOrderItemIds = useMemo(() => {
+    if (statusFilter !== "ship" && statusFilter !== "sold") return new Set<string>();
+
+    const shipped = statusFilter === "sold";
+    return new Set(
+      orders
+        .filter((order) => order.marked_shipped === shipped)
+        .flatMap((order) => order.inventory_item_ids)
+    );
+  }, [orders, statusFilter]);
+
+  const tableRows = useMemo(() => {
+    if (currentStageOrderItemIds.size === 0) return filtered;
+    return filtered.filter((item) => !currentStageOrderItemIds.has(item.id));
+  }, [currentStageOrderItemIds, filtered]);
+
   const groups = useMemo<InventoryGroup[]>(() => {
     const map = new Map<string, InventoryRow[]>();
-    for (const item of filtered) {
+    for (const item of tableRows) {
       const key = pendingMatchOnly ? `item:${item.id}` : groupKey(item);
       map.set(key, [...(map.get(key) ?? []), item]);
     }
@@ -563,7 +588,7 @@ export default function InventoryTabs({
       condition: sameValue(groupRows.map((item) => item.inventory_type)),
       status: sameValue(groupRows.map((item) => item.status)),
     }));
-  }, [filtered, pendingMatchOnly]);
+  }, [pendingMatchOnly, tableRows]);
 
   const visibleRows = useMemo(() => groups.flatMap((group) => group.rows), [groups]);
   const selectedIds = useMemo(
@@ -2140,6 +2165,26 @@ export default function InventoryTabs({
     });
   }
 
+  function updateOrderItemHoverPreview(event: MouseEvent, item: StageOrderItem) {
+    const imageUrl = orderItemImageUrl(item);
+    if (!imageUrl) return;
+
+    const isScanImage = orderItemHasCustomScanImage(item);
+    const previewWidth = isScanImage ? 320 : 260;
+    const previewHeight = isScanImage ? 430 : 360;
+    const margin = 18;
+    const x = Math.min(event.clientX + margin, window.innerWidth - previewWidth - margin);
+    const y = Math.min(event.clientY + margin, window.innerHeight - previewHeight - margin);
+
+    setHoverPreview({
+      src: imageUrl,
+      name: orderItemTitle(item),
+      x: Math.max(margin, x),
+      y: Math.max(margin, y),
+      isScanImage,
+    });
+  }
+
   function renderHoverPreview() {
     if (!hoverPreview) return null;
 
@@ -2465,20 +2510,32 @@ export default function InventoryTabs({
 
     if (!imageUrl) {
       return (
-        <div className="flex h-16 w-12 shrink-0 items-center justify-center rounded border border-border bg-surf3 font-mono text-[10px] font-semibold text-text-3">
+        <div className="flex h-28 w-20 shrink-0 items-center justify-center rounded-md border border-border bg-surf3 font-mono text-xs font-semibold text-text-3">
           BOX
         </div>
       );
     }
 
     return (
-      <div className="flex h-16 w-12 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-surf3">
+      <div
+        className="flex h-28 w-20 shrink-0 cursor-zoom-in items-center justify-center overflow-hidden rounded-md border border-border bg-surf3 transition-transform hover:scale-[1.02]"
+        onMouseEnter={(event) => updateOrderItemHoverPreview(event, item)}
+        onMouseMove={(event) => updateOrderItemHoverPreview(event, item)}
+        onMouseLeave={() => setHoverPreview(null)}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageUrl}
           alt={item.card.name ?? "Order card image"}
+          data-fallback-src={orderItemImageFallbackUrl(item) ?? undefined}
           className="h-full w-full object-contain"
           onError={(event) => {
+            const fallbackSrc = event.currentTarget.dataset.fallbackSrc;
+            if (fallbackSrc && event.currentTarget.src !== fallbackSrc) {
+              event.currentTarget.src = fallbackSrc;
+              delete event.currentTarget.dataset.fallbackSrc;
+              return;
+            }
             event.currentTarget.style.display = "none";
           }}
         />
