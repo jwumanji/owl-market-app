@@ -50,6 +50,19 @@ type CardLookupRow = {
   sets: { code: string | null } | { code: string | null }[] | null;
 };
 
+type InventoryPageSearchParams = {
+  status?: string | string[];
+};
+
+const INVENTORY_STATUS_FILTERS = ["new", "grading", "sale", "ship", "sold"] as const;
+type InventoryStatusFilter = (typeof INVENTORY_STATUS_FILTERS)[number];
+
+function getInitialStatusFilter(searchParams?: InventoryPageSearchParams): InventoryStatusFilter | "all" {
+  const status = Array.isArray(searchParams?.status) ? searchParams?.status[0] : searchParams?.status;
+
+  return INVENTORY_STATUS_FILTERS.includes(status as InventoryStatusFilter) ? (status as InventoryStatusFilter) : "all";
+}
+
 const INVENTORY_SELECT_WITH_PSA = `
   id, created_at, card_id, manual_card_name, manual_card_number, manual_set_code, catalog_match_status, item_nickname, pending_card_match,
   inventory_type, status, quantity, graded_rating, certification_number, custom_image_front_url, custom_image_back_url,
@@ -144,7 +157,13 @@ function toInventoryRow(row: InventoryQueryRow, cardMap: Map<string, CardLookupR
   };
 }
 
-export default async function AdminInventoryPage() {
+export default async function AdminInventoryPage({
+  searchParams,
+}: {
+  searchParams?: InventoryPageSearchParams | Promise<InventoryPageSearchParams>;
+}) {
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const initialStatusFilter = getInitialStatusFilter(resolvedSearchParams);
   let supabase;
   let configError: string | null = null;
 
@@ -242,12 +261,6 @@ export default async function AdminInventoryPage() {
           >
             Add Order
           </Link>
-          <Link
-            href="/admin/orders"
-            className="rounded-md border border-border bg-surface px-4 py-3 font-mono text-sm font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl"
-          >
-            Orders
-          </Link>
           <div className="rounded-lg border border-border bg-surface px-4 py-3 text-right">
             <div className="font-mono text-sm font-semibold uppercase tracking-wider text-text">Total Quantity</div>
             <div className="mt-1 text-3xl font-bold text-text">{totalQuantity}</div>
@@ -266,7 +279,12 @@ export default async function AdminInventoryPage() {
               {migrationWarning}
             </div>
           )}
-          <InventoryShell items={items} orders={orderResult.data} ordersError={orderResult.error} />
+          <InventoryShell
+            items={items}
+            orders={orderResult.data}
+            ordersError={orderResult.error}
+            initialStatusFilter={initialStatusFilter}
+          />
         </>
       )}
     </section>

@@ -19,16 +19,22 @@ export default function InventoryShell({
   items,
   orders = [],
   ordersError = null,
+  initialStatusFilter = "all",
 }: {
   items: InventoryRow[];
   orders?: CustomerOrderSummary[];
   ordersError?: string | null;
+  initialStatusFilter?: StatusFilter;
 }) {
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatusFilter);
   const [liveItems, setLiveItems] = useState(items);
   const [liveOrders, setLiveOrders] = useState(orders);
   const openOrderCount = liveOrders.filter((order) => !order.marked_shipped).length;
   const shippedOrderCount = liveOrders.length - openOrderCount;
+
+  useEffect(() => {
+    setStatusFilter(initialStatusFilter);
+  }, [initialStatusFilter]);
 
   useEffect(() => {
     setLiveOrders(orders);

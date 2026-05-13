@@ -121,6 +121,8 @@ type OrderDraft = {
   tracking_number: string;
 };
 
+type OrderEditField = keyof OrderDraft;
+
 type CreatedInventoryItem = Pick<
   InventoryRow,
   "id" | "created_at" | "inventory_type" | "status" | "quantity" | "item_nickname" | "graded_rating" | "certification_number"
@@ -132,6 +134,24 @@ type CreatedInventoryItem = Pick<
 type SelectFieldProps = SelectHTMLAttributes<HTMLSelectElement> & {
   wrapperClassName?: string;
 };
+
+function EditIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
 
 type HoverPreview = {
   src: string;
@@ -367,6 +387,7 @@ export default function InventoryTabs({
   const [editingShippingLabelIds, setEditingShippingLabelIds] = useState<Record<string, boolean>>({});
   const [confirmingShippedIds, setConfirmingShippedIds] = useState<Record<string, boolean>>({});
   const [orderDrafts, setOrderDrafts] = useState<Record<string, OrderDraft>>({});
+  const [editingOrderFields, setEditingOrderFields] = useState<Record<string, Partial<Record<OrderEditField, boolean>>>>({});
   const [savingOrderIds, setSavingOrderIds] = useState<Record<string, boolean>>({});
   const [confirmingShippedOrderIds, setConfirmingShippedOrderIds] = useState<Record<string, boolean>>({});
   const [addingGroups, setAddingGroups] = useState<Record<string, boolean>>({});
@@ -688,6 +709,30 @@ export default function InventoryTabs({
     }));
   }
 
+  function isOrderFieldEditing(orderId: string, field: OrderEditField) {
+    return editingOrderFields[orderId]?.[field] ?? false;
+  }
+
+  function setOrderFieldEditing(orderId: string, field: OrderEditField, editing: boolean) {
+    setEditingOrderFields((current) => {
+      const next = { ...current };
+      const orderFields = { ...(next[orderId] ?? {}) };
+      if (editing) {
+        orderFields[field] = true;
+      } else {
+        delete orderFields[field];
+      }
+
+      if (Object.keys(orderFields).length > 0) {
+        next[orderId] = orderFields;
+      } else {
+        delete next[orderId];
+      }
+
+      return next;
+    });
+  }
+
   async function saveOrderQuickEdit(order: CustomerOrderSummary, options: { markedShipped?: boolean } = {}) {
     if (savingOrderIds[order.id]) return;
 
@@ -760,6 +805,11 @@ export default function InventoryTabs({
       }
 
       setOrderDrafts((current) => {
+        const next = { ...current };
+        delete next[order.id];
+        return next;
+      });
+      setEditingOrderFields((current) => {
         const next = { ...current };
         delete next[order.id];
         return next;
@@ -1406,6 +1456,12 @@ export default function InventoryTabs({
   function urlHref(value?: string | null) {
     if (!value) return null;
     return /^https?:\/\//i.test(value.trim()) ? value.trim() : null;
+  }
+
+  function orderTrackingHref(value?: string | null) {
+    const trimmed = value?.trim();
+    if (!trimmed) return null;
+    return trackingHref(trimmed) ?? `https://www.google.com/search?q=${encodeURIComponent(`${trimmed} tracking`)}`;
   }
 
   function todayDateString() {
@@ -2467,6 +2523,12 @@ export default function InventoryTabs({
             stageOrders.map((order) => {
               const draft = orderDraft(order);
               const shippingLabelHref = urlHref(draft.shipping_label);
+              const trackingLinkHref = orderTrackingHref(draft.tracking_number);
+              const customerNameValue = draft.customer_name.trim();
+              const trackingValue = draft.tracking_number.trim();
+              const editingCustomerName = isOrderFieldEditing(order.id, "customer_name");
+              const editingShippingLabel = isOrderFieldEditing(order.id, "shipping_label");
+              const editingTracking = isOrderFieldEditing(order.id, "tracking_number");
               const isSavingOrder = savingOrderIds[order.id] ?? false;
               const isConfirmingShipped = confirmingShippedOrderIds[order.id] ?? false;
               const hasDraftChanges =
@@ -2491,9 +2553,9 @@ export default function InventoryTabs({
                     <div className="mt-1 truncate text-sm text-text-2">{order.customer_name}</div>
                   </div>
 
-                  <div className="flex shrink-0 flex-wrap gap-2">
+                  <div className="flex shrink-0 flex-wrap gap-2.5">
                     <span
-                      className={`rounded border px-2 py-1 font-mono text-[10px] font-bold uppercase ${
+                      className={`rounded-md border px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide sm:text-sm ${
                         order.marked_shipped
                           ? "border-gain/30 bg-gain/10 text-gain"
                           : "border-owl/30 bg-owl/10 text-owl"
@@ -2501,15 +2563,15 @@ export default function InventoryTabs({
                     >
                       {order.marked_shipped ? "Shipped" : "Open"}
                     </span>
-                    <span className="rounded border border-border bg-surface px-2 py-1 font-mono text-[10px] font-bold uppercase text-text-2">
+                    <span className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-text-2 sm:text-sm">
                       {order.items.length} Cards
                     </span>
-                    <span className="rounded border border-border bg-surface px-2 py-1 font-mono text-[10px] font-bold uppercase text-text-2">
+                    <span className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-text-2 sm:text-sm">
                       {formatOrderDate(order.updated_at ?? order.created_at)}
                     </span>
                     <a
                       href={`/admin/orders/${order.id}`}
-                      className="rounded border border-border-2 bg-surface px-2 py-1 font-mono text-[10px] font-bold uppercase text-text transition-colors hover:border-owl hover:text-owl"
+                      className="rounded-md border border-border-2 bg-surface px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-text transition-colors hover:border-owl hover:text-owl sm:text-sm"
                     >
                       Open Order
                     </a>
@@ -2546,53 +2608,100 @@ export default function InventoryTabs({
                   </div>
 
                   <div className="grid gap-3 rounded-md border border-border bg-surface p-3">
-                    <label className="block">
+                    <div className="block">
                       <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
                         Customer Name
                       </span>
-                      <input
-                        value={draft.customer_name}
-                        onChange={(event) => updateOrderDraft(order.id, "customer_name", event.target.value)}
-                        placeholder="Customer name"
-                        className="mt-1.5 w-full rounded-md border border-border bg-deep px-3 py-2.5 text-sm text-text outline-none focus:border-owl"
-                      />
-                    </label>
+                      {customerNameValue && !editingCustomerName ? (
+                        <div className="mt-1.5 flex min-w-0 items-center justify-between gap-2 rounded-md border border-border bg-deep px-3 py-2.5">
+                          <div className="min-w-0 truncate text-lg font-extrabold text-text">{customerNameValue}</div>
+                          <button
+                            type="button"
+                            onClick={() => setOrderFieldEditing(order.id, "customer_name", true)}
+                            className="shrink-0 rounded border border-border-2 bg-surface p-2 text-text-2 transition-colors hover:border-owl hover:text-owl"
+                            aria-label="Edit customer name"
+                            title="Edit customer name"
+                          >
+                            <EditIcon />
+                          </button>
+                        </div>
+                      ) : (
+                        <input
+                          value={draft.customer_name}
+                          onChange={(event) => updateOrderDraft(order.id, "customer_name", event.target.value)}
+                          placeholder="Customer name"
+                          className="mt-1.5 w-full rounded-md border border-border bg-deep px-3 py-2.5 text-sm text-text outline-none focus:border-owl"
+                        />
+                      )}
+                    </div>
 
-                    <label className="block">
+                    <div className="block">
                       <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
                         Ship Label
                       </span>
-                      <input
-                        value={draft.shipping_label}
-                        onChange={(event) => updateOrderDraft(order.id, "shipping_label", event.target.value)}
-                        placeholder="Paste ship label URL or note"
-                        className="mt-1.5 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-owl"
-                      />
-                      {shippingLabelHref ? (
-                        <a
-                          href={shippingLabelHref}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-2 inline-flex rounded-md border border-blue bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-blue transition-colors hover:bg-blue/15"
-                        >
-                          Print Shipping
-                        </a>
+                      {shippingLabelHref && !editingShippingLabel ? (
+                        <div className="mt-1.5 flex min-w-0 items-center gap-2">
+                          <a
+                            href={shippingLabelHref}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex min-w-0 flex-1 items-center justify-center rounded-md border border-blue bg-blue px-3 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-void transition-colors hover:bg-blue/90"
+                          >
+                            Print Shipping
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => setOrderFieldEditing(order.id, "shipping_label", true)}
+                            className="shrink-0 rounded border border-border-2 bg-deep p-2.5 text-text-2 transition-colors hover:border-owl hover:text-owl"
+                            aria-label="Edit shipping label URL"
+                            title="Edit shipping label URL"
+                          >
+                            <EditIcon />
+                          </button>
+                        </div>
                       ) : (
-                        <div className="mt-2 font-mono text-xs font-semibold text-text-2">No clickable label URL</div>
+                        <input
+                          value={draft.shipping_label}
+                          onChange={(event) => updateOrderDraft(order.id, "shipping_label", event.target.value)}
+                          placeholder="Paste ship label URL"
+                          className="mt-1.5 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-owl"
+                        />
                       )}
-                    </label>
+                    </div>
 
-                    <label className="block">
+                    <div className="block">
                       <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
                         Tracking
                       </span>
-                      <input
-                        value={draft.tracking_number}
-                        onChange={(event) => updateOrderDraft(order.id, "tracking_number", event.target.value)}
-                        placeholder="Paste tracking code or link"
-                        className="mt-1.5 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-owl"
-                      />
-                    </label>
+                      {trackingValue && !editingTracking ? (
+                        <div className="mt-1.5 flex min-w-0 items-center gap-2">
+                          <a
+                            href={trackingLinkHref ?? undefined}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex min-w-0 flex-1 items-center justify-center truncate rounded-md border border-blue bg-blue px-3 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-void transition-colors hover:bg-blue/90"
+                          >
+                            {trackingValue}
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => setOrderFieldEditing(order.id, "tracking_number", true)}
+                            className="shrink-0 rounded border border-border-2 bg-deep p-2.5 text-text-2 transition-colors hover:border-owl hover:text-owl"
+                            aria-label="Edit tracking"
+                            title="Edit tracking"
+                          >
+                            <EditIcon />
+                          </button>
+                        </div>
+                      ) : (
+                        <input
+                          value={draft.tracking_number}
+                          onChange={(event) => updateOrderDraft(order.id, "tracking_number", event.target.value)}
+                          placeholder="Paste tracking code or link"
+                          className="mt-1.5 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-owl"
+                        />
+                      )}
+                    </div>
 
                     <div className="grid gap-2">
                       {order.marked_shipped ? (

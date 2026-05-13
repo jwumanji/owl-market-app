@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, type MouseEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CustomerOrderFormValue, OrderInventoryItem } from "./order-types";
 
@@ -22,6 +22,14 @@ const TYPE_LABELS: Record<string, string> = {
 type Props = {
   inventoryItems: OrderInventoryItem[];
   initialOrder?: CustomerOrderFormValue | null;
+};
+
+type HoverPreview = {
+  src: string;
+  title: string;
+  x: number;
+  y: number;
+  placement: "left" | "right";
 };
 
 function cardTitle(item: OrderInventoryItem) {
@@ -86,6 +94,7 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
 
   const itemMap = useMemo(() => new Map(inventoryItems.map((item) => [item.id, item])), [inventoryItems]);
   const selectedItems = useMemo(
@@ -107,6 +116,19 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
 
   function removeItem(itemId: string) {
     setSelectedIds((current) => current.filter((id) => id !== itemId));
+  }
+
+  function updateHoverPreview(item: OrderInventoryItem, event: MouseEvent<HTMLElement>) {
+    const imageUrl = cardImageUrl(item);
+    if (!imageUrl) return;
+
+    setHoverPreview({
+      src: imageUrl,
+      title: cardTitle(item),
+      x: event.clientX,
+      y: event.clientY,
+      placement: event.clientX > window.innerWidth - 320 ? "left" : "right",
+    });
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -158,12 +180,32 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
       return;
     }
 
-    router.push("/admin/orders");
+    router.push("/admin/inventory?status=ship");
     router.refresh();
   }
 
   return (
     <form onSubmit={onSubmit} className="grid gap-5">
+      {hoverPreview && (
+        <div
+          className="pointer-events-none fixed z-50 hidden w-56 rounded-lg border border-border-2 bg-surface p-2 shadow-2xl shadow-black/50 lg:block"
+          style={{
+            left: hoverPreview.x,
+            top: hoverPreview.y,
+            transform:
+              hoverPreview.placement === "left"
+                ? "translate(-100%, -35%) translateX(-18px)"
+                : "translate(18px, -35%)",
+          }}
+        >
+          <div className="overflow-hidden rounded-md border border-border bg-deep">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={hoverPreview.src} alt={hoverPreview.title} className="max-h-80 w-full object-contain" />
+          </div>
+          <div className="mt-2 line-clamp-2 text-xs font-bold leading-snug text-text">{hoverPreview.title}</div>
+        </div>
+      )}
+
       <div className="grid gap-4 rounded-lg border border-border bg-surface p-4">
         <div className="grid gap-4 lg:grid-cols-2">
           <label>
@@ -325,10 +367,15 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
                         key={item.id}
                         className="flex min-w-0 items-center gap-3 overflow-hidden rounded-md border border-border bg-surface p-2"
                       >
-                        <div className="flex h-20 w-14 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-surf3">
+                        <div
+                          className="flex h-24 w-16 shrink-0 cursor-zoom-in items-center justify-center overflow-hidden rounded border border-border bg-surf3"
+                          onMouseEnter={(event) => updateHoverPreview(item, event)}
+                          onMouseMove={(event) => updateHoverPreview(item, event)}
+                          onMouseLeave={() => setHoverPreview(null)}
+                        >
                           {imageUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+                            <img src={imageUrl} alt="" className="h-full w-full object-contain" />
                           ) : (
                             <span className="font-mono text-[10px] text-text-3">NO IMG</span>
                           )}
