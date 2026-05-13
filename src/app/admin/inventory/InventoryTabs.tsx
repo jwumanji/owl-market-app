@@ -96,7 +96,7 @@ const ROW_NUMBER_CELL_CLASS =
   "px-3 py-4 text-right align-top font-mono text-lg font-extrabold leading-none tabular-nums text-text";
 const NESTED_ROW_NUMBER_CELL_CLASS =
   "px-3 py-3.5 text-right align-top font-mono text-lg font-extrabold leading-none tabular-nums text-owl";
-const TABLE_IMAGE_COLUMN_CLASS = "w-[144px]";
+const TABLE_IMAGE_COLUMN_CLASS = "w-[120px]";
 const TABLE_IMAGE_CELL_CLASS = "px-3 py-2";
 const NESTED_TABLE_IMAGE_BUTTON_CLASS = "mx-auto flex w-fit flex-col items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-owl";
 
@@ -311,7 +311,7 @@ export default function InventoryTabs({
   const showTracking = statusFilter === "ship" || statusFilter === "sold";
   const showShippingActions = statusFilter === "ship";
   const showSaleFields = statusFilter === "sold";
-  const standardTableMinWidth = showSaleFields ? "min-w-[1380px]" : "min-w-[1040px]";
+  const standardTableMinWidth = showSaleFields ? "min-w-[1360px]" : "min-w-[1020px]";
 
   useEffect(() => {
     onItemsChange?.(rows);
@@ -1277,7 +1277,6 @@ export default function InventoryTabs({
 
     return (
       <div className="space-y-2">
-        <div className="font-mono text-xs font-semibold text-text-2">Not shipped yet</div>
         <input
           value={trackingDrafts[item.id] ?? ""}
           onChange={(event) =>
@@ -1301,6 +1300,7 @@ export default function InventoryTabs({
         >
           Save Tracking
         </button>
+        <div className="font-mono text-xs font-semibold text-text-2">Not shipped yet</div>
       </div>
     );
   }
@@ -1748,13 +1748,13 @@ export default function InventoryTabs({
       ? size === "modal"
         ? "h-96 w-72"
         : size === "small"
-          ? "h-[134px] w-24"
-          : "h-[156px] w-28"
+          ? "h-28 w-20"
+          : "h-32 w-24"
       : size === "modal"
         ? "h-80 w-56"
         : size === "small"
-          ? "h-28 w-20"
-          : "h-[134px] w-24";
+          ? "h-24 w-16"
+          : "h-32 w-24";
     const imageFitClass = isScanImage && size === "modal" ? "object-contain p-1" : "object-cover";
 
     if (!imageUrl) {
@@ -2339,7 +2339,7 @@ export default function InventoryTabs({
 
       {statusFilter === "ship" ? (
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
-        <table className="w-full min-w-[1280px] table-fixed">
+        <table className="w-full min-w-[1260px] table-fixed">
           <colgroup>
             <col className={ROW_NUMBER_COLUMN_CLASS} />
             <col className="w-[48px]" />
