@@ -1582,7 +1582,15 @@ export default function InventoryTabs({
                 </div>
               </div>
             ) : (
-              <div className="flex min-w-[230px] gap-2">
+              <div className="flex min-w-[330px] gap-2">
+                <a
+                  href={`/admin/inventory/${item.id}/centering`}
+                  onClick={() => setOpenActionMenuKey(null)}
+                  className="flex-1 rounded-md px-3 py-2 text-center font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/10"
+                >
+                  Measure centering
+                </a>
+
                 {canAdd && (
                   <button
                     type="button"
@@ -2490,6 +2498,12 @@ export default function InventoryTabs({
             <div>
               {renderCardImage(item, "modal")}
               {renderScanImages(item)}
+              <a
+                href={`/admin/inventory/${item.id}/centering`}
+                className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-owl bg-owl/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/15"
+              >
+                Measure Centering
+              </a>
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <div className="rounded-md border border-border bg-surface p-3">
                   <div className="font-mono text-xs uppercase tracking-wider text-text-2">Quantity</div>
