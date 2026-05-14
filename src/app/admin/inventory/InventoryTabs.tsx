@@ -1705,6 +1705,9 @@ export default function InventoryTabs({
   }
 
   function renderTrackingCell(item: InventoryRow) {
+    const draftValue = trackingDrafts[item.id] ?? "";
+    const canSaveTracking = Boolean(draftValue.trim());
+
     if (item.shipping_tracking) {
       return (
         <div className="space-y-2">
@@ -1737,7 +1740,7 @@ export default function InventoryTabs({
     return (
       <div className="space-y-2">
         <input
-          value={trackingDrafts[item.id] ?? ""}
+          value={draftValue}
           onChange={(event) =>
             setTrackingDrafts((current) => ({
               ...current,
@@ -1747,18 +1750,19 @@ export default function InventoryTabs({
           placeholder="Paste tracking code or link"
           className="w-full rounded-md border border-border bg-surface px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-owl"
         />
-        <button
-          type="button"
-          disabled={!trackingDrafts[item.id]?.trim()}
-          onClick={() =>
-            updateItem(item.id, {
-              shipping_tracking: trackingDrafts[item.id]?.trim() ?? "",
-            })
-          }
-          className="rounded-md border border-owl bg-owl/10 px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-owl disabled:cursor-not-allowed disabled:border-border disabled:bg-surface disabled:text-text-3"
-        >
-          Save Tracking
-        </button>
+        {canSaveTracking && (
+          <button
+            type="button"
+            onClick={() =>
+              updateItem(item.id, {
+                shipping_tracking: draftValue.trim(),
+              })
+            }
+            className="rounded-md border border-owl bg-owl/10 px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-owl hover:bg-owl/15"
+          >
+            Save Tracking
+          </button>
+        )}
         <div className="font-mono text-xs font-semibold text-text-2">Not shipped yet</div>
       </div>
     );
@@ -1767,6 +1771,8 @@ export default function InventoryTabs({
   function renderShippingLabelCell(item: InventoryRow) {
     const savedLabel = item.shipping_label_url?.trim() ?? "";
     const draftValue = shippingLabelDrafts[item.id] ?? savedLabel;
+    const trimmedDraft = draftValue.trim();
+    const canConfirmChange = Boolean(trimmedDraft) && trimmedDraft !== savedLabel;
     const href = urlHref(savedLabel);
     const isEditing = editingShippingLabelIds[item.id] ?? !savedLabel;
 
@@ -1825,22 +1831,24 @@ export default function InventoryTabs({
           placeholder="Paste ship label URL or note"
           className="w-full rounded-md border border-border bg-surface px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-owl"
         />
+        {(canConfirmChange || savedLabel) && (
         <div className="flex gap-2">
-          <button
-            type="button"
-            disabled={draftValue.trim() === savedLabel}
-            onClick={() => {
-              updateItem(item.id, { shipping_label_url: draftValue.trim() || null });
-              setEditingShippingLabelIds((current) => {
-                const next = { ...current };
-                delete next[item.id];
-                return next;
-              });
-            }}
-            className="rounded-md border border-owl bg-owl/10 px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-owl disabled:cursor-not-allowed disabled:border-border disabled:bg-surface disabled:text-text-3"
-          >
-            Confirm Change
-          </button>
+          {canConfirmChange && (
+            <button
+              type="button"
+              onClick={() => {
+                updateItem(item.id, { shipping_label_url: trimmedDraft });
+                setEditingShippingLabelIds((current) => {
+                  const next = { ...current };
+                  delete next[item.id];
+                  return next;
+                });
+              }}
+              className="rounded-md border border-owl bg-owl/10 px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-owl hover:bg-owl/15"
+            >
+              Confirm Change
+            </button>
+          )}
           {savedLabel && (
             <button
               type="button"
@@ -1858,6 +1866,7 @@ export default function InventoryTabs({
             </button>
           )}
         </div>
+        )}
       </div>
     );
   }
@@ -1865,6 +1874,7 @@ export default function InventoryTabs({
   function renderCustomerNameCell(item: InventoryRow) {
     const savedName = item.customer_name?.trim() ?? "";
     const draftValue = customerNameDrafts[item.id] ?? savedName;
+    const canSaveName = Boolean(draftValue.trim()) && draftValue.trim() !== savedName;
 
     return (
       <div className="space-y-2">
@@ -1879,14 +1889,15 @@ export default function InventoryTabs({
           placeholder="Customer name"
           className="w-full rounded-md border border-border bg-surface px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-owl"
         />
-        <button
-          type="button"
-          disabled={draftValue.trim() === savedName}
-          onClick={() => updateItem(item.id, { customer_name: draftValue.trim() || null })}
-          className="rounded-md border border-owl bg-owl/10 px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-owl disabled:cursor-not-allowed disabled:border-border disabled:bg-surface disabled:text-text-3"
-        >
-          Save Name
-        </button>
+        {canSaveName && (
+          <button
+            type="button"
+            onClick={() => updateItem(item.id, { customer_name: draftValue.trim() })}
+            className="rounded-md border border-owl bg-owl/10 px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-owl hover:bg-owl/15"
+          >
+            Save Name
+          </button>
+        )}
       </div>
     );
   }
@@ -2509,7 +2520,7 @@ export default function InventoryTabs({
                           href={`/admin/orders/${order.id}`}
                           className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-owl bg-owl px-3 py-2 font-mono text-xs font-extrabold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
                         >
-                          Open Order
+                          View Order
                         </a>
                       </div>
                     ))}
@@ -2739,7 +2750,7 @@ export default function InventoryTabs({
     if (statusFilter !== "ship" && statusFilter !== "sold") return null;
 
     const shippedStage = statusFilter === "sold";
-    const title = shippedStage ? "Sold Orders" : "Orders";
+    const title = shippedStage ? "Sold Orders" : "Bulk Orders";
     const emptyText = shippedStage ? "No shipped orders in Sold yet." : "No open orders need shipping yet.";
 
     return (
@@ -2830,7 +2841,7 @@ export default function InventoryTabs({
                       href={`/admin/orders/${order.id}`}
                       className="rounded-md border border-border-2 bg-surface px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-text transition-colors hover:border-owl hover:text-owl sm:text-sm"
                     >
-                      Open Order
+                      View Order
                     </a>
                   </div>
                 </div>
@@ -3318,6 +3329,15 @@ export default function InventoryTabs({
       )}
 
       {renderStageOrdersSection()}
+
+      {(statusFilter === "ship" || statusFilter === "sold") && (
+        <div className="flex items-center justify-between rounded-lg border border-border bg-surface px-4 py-3">
+          <div>
+            <h2 className="text-xl font-bold text-text">Single Card Order</h2>
+            <p className="mt-1 text-sm text-text-2">Individual cards waiting for shipping or sale completion.</p>
+          </div>
+        </div>
+      )}
 
       {statusFilter === "ship" ? (
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
