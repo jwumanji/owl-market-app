@@ -310,6 +310,24 @@ export async function DELETE(request: Request) {
   }
 
   const supabase = createServiceClient();
+  const { error: orderLinkError } = await supabase
+    .from("customer_order_items")
+    .delete()
+    .in("inventory_item_id", ids);
+
+  if (orderLinkError) {
+    return NextResponse.json({ error: `Could not unlink deleted items from orders: ${orderLinkError.message}` }, { status: 500 });
+  }
+
+  const { error: psaLinkError } = await supabase
+    .from("psa_submission_items")
+    .update({ inventory_item_id: null })
+    .in("inventory_item_id", ids);
+
+  if (psaLinkError) {
+    return NextResponse.json({ error: `Could not preserve PSA submission links: ${psaLinkError.message}` }, { status: 500 });
+  }
+
   const { data, error } = await supabase
     .from("inventory_items")
     .delete()

@@ -1166,13 +1166,14 @@ export default function InventoryTabs({
       const res = await fetch(`/api/admin/inventory/${item.id}`, {
         method: "DELETE",
       });
+      const payload = await res.json().catch(() => null);
 
       if (!res.ok) {
-        throw new Error("Failed to remove individual item");
+        throw new Error(payload?.error ?? "Failed to remove individual item");
       }
-    } catch {
+    } catch (error) {
       setRows((current) => insertAfterGroupRows(current, groupKey(item), item));
-      setActionError("Could not remove the inventory item. Try again.");
+      setActionError(error instanceof Error ? error.message : "Could not remove the inventory item. Try again.");
     } finally {
       setDeletingItemIds((current) => {
         const next = { ...current };
@@ -1272,6 +1273,7 @@ export default function InventoryTabs({
     const selectedSet = new Set(selectedIds);
     const persistedIds = selectedIds.filter((id) => !isLocalOnlyItem(id));
     const previousRows = rows;
+    const previousSelection = selectedItemIds;
 
     setActionError(null);
     setBulkDeleting(true);
@@ -1284,12 +1286,14 @@ export default function InventoryTabs({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ids: persistedIds }),
         });
-        if (!res.ok) throw new Error("Failed to delete selected inventory items");
+        const payload = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(payload?.error ?? "Failed to delete selected inventory items");
       }
       clearBulkSelection();
-    } catch {
+    } catch (error) {
       setRows(previousRows);
-      setActionError("Could not delete the selected inventory items. Try again.");
+      setSelectedItemIds(previousSelection);
+      setActionError(error instanceof Error ? error.message : "Could not delete the selected inventory items. Try again.");
     } finally {
       setBulkDeleting(false);
     }
