@@ -4,11 +4,13 @@ import {
   CUSTOMER_ORDER_ID_START,
   isShortCustomerOrderId,
 } from "@/lib/customer-orders";
+import { SALE_CHANNELS, type SaleChannel } from "@/lib/sale-options";
 import { createServiceClient } from "@/lib/supabase-server";
 
 type RequestBody = Record<string, unknown>;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SALE_CHANNEL_VALUES = new Set<string>(SALE_CHANNELS);
 
 function stringValue(body: RequestBody, key: string) {
   const value = body[key];
@@ -22,6 +24,37 @@ function nullableStringValue(body: RequestBody, key: string) {
 
 function booleanValue(body: RequestBody, key: string) {
   return body[key] === true;
+}
+
+function saleChannelValue(body: RequestBody) {
+  const value = stringValue(body, "sale_channel") || "not_sold";
+  if (!SALE_CHANNEL_VALUES.has(value)) {
+    return { error: "Invalid sold at value" };
+  }
+
+  return { value: value as SaleChannel };
+}
+
+function parseOptionalNumeric(value: unknown, fieldName: string) {
+  if (value === null || value === undefined || value === "") {
+    return { value: null as string | number | null };
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return { value };
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return { value: null as string | number | null };
+    if (Number.isFinite(Number(trimmed))) return { value: trimmed };
+  }
+
+  return { error: `Invalid ${fieldName}` };
+}
+
+function missingOrderSaleColumns(error: { message?: string } | null) {
+  return Boolean(error?.message?.includes("sale_channel") || error?.message?.includes("sold_date") || error?.message?.includes("sold_price"));
 }
 
 function inventoryItemIds(body: RequestBody) {
@@ -126,24 +159,55 @@ export async function POST(request: Request) {
   const markedShipped = booleanValue(requestBody, "marked_shipped");
   const shippingLabel = nullableStringValue(requestBody, "shipping_label");
   const trackingNumber = nullableStringValue(requestBody, "tracking_number");
+  const saleChannel = saleChannelValue(requestBody);
+  if (saleChannel.error || !saleChannel.value) {
+    return NextResponse.json({ error: saleChannel.error ?? "Invalid sold at value" }, { status: 400 });
+  }
+  const soldDate = nullableStringValue(requestBody, "sold_date");
+  const soldPrice = parseOptionalNumeric(requestBody.sold_price, "sold price");
+  if (soldPrice.error) {
+    return NextResponse.json({ error: soldPrice.error }, { status: 400 });
+  }
   const orderId = await nextOrderId(supabase);
 
-  const { data: order, error: orderError } = await supabase
+  const orderInsert = {
+    id: orderId,
+    nickname: nullableStringValue(requestBody, "nickname"),
+    customer_name: customerName,
+    shipping_label: shippingLabel,
+    marked_shipped: markedShipped,
+    tracking_number: trackingNumber,
+    sale_channel: saleChannel.value,
+    sold_date: saleChannel.value === "not_sold" ? null : soldDate,
+    sold_price: soldPrice.value,
+    updated_at: new Date().toISOString(),
+  };
+
+  let orderRes = await supabase
     .from("customer_orders")
-    .insert({
-      id: orderId,
-      nickname: nullableStringValue(requestBody, "nickname"),
-      customer_name: customerName,
-      shipping_label: shippingLabel,
-      marked_shipped: markedShipped,
-      tracking_number: trackingNumber,
-      updated_at: new Date().toISOString(),
-    })
+    .insert(orderInsert)
     .select("id")
     .single();
 
-  if (orderError) {
-    return NextResponse.json({ error: orderError.message }, { status: 500 });
+  if (missingOrderSaleColumns(orderRes.error)) {
+    const legacyOrderInsert = {
+      id: orderInsert.id,
+      nickname: orderInsert.nickname,
+      customer_name: orderInsert.customer_name,
+      shipping_label: orderInsert.shipping_label,
+      marked_shipped: orderInsert.marked_shipped,
+      tracking_number: orderInsert.tracking_number,
+      updated_at: orderInsert.updated_at,
+    };
+    orderRes = await supabase
+      .from("customer_orders")
+      .insert(legacyOrderInsert)
+      .select("id")
+      .single();
+  }
+
+  if (orderRes.error) {
+    return NextResponse.json({ error: orderRes.error.message }, { status: 500 });
   }
 
   const linkRows = ids.map((inventoryItemId) => ({
@@ -165,6 +229,8 @@ export async function POST(request: Request) {
       shipping_label_url: shippingLabel,
       shipping_tracking: trackingNumber,
       shipped_at: markedShipped ? new Date().toISOString() : null,
+      sale_channel: saleChannel.value,
+      sold_date: saleChannel.value === "not_sold" ? null : soldDate,
     })
     .in("id", ids);
 
@@ -172,5 +238,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: inventoryError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ id: (order as { id: string }).id });
+  return NextResponse.json({ id: (orderRes.data as { id: string }).id });
 }

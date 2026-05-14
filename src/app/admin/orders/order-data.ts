@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase-server";
 import type { GradedRating, InventoryStatus, InventoryType } from "@/lib/inventory-options";
+import type { SaleChannel } from "@/lib/sale-options";
 import type { CustomerOrderFormValue, CustomerOrderSummary, OrderInventoryItem } from "./order-types";
 
 type LoadResult<T> = {
@@ -24,6 +25,9 @@ type InventoryQueryRow = {
   shipping_tracking: string | null;
   shipping_label_url: string | null;
   shipped_at: string | null;
+  sale_channel: SaleChannel | null;
+  sold_date: string | null;
+  sold_price: string | number | null;
 };
 
 type CardLookupRow = {
@@ -42,6 +46,9 @@ type OrderRow = {
   shipping_label: string | null;
   marked_shipped: boolean;
   tracking_number: string | null;
+  sale_channel?: SaleChannel | null;
+  sold_date?: string | null;
+  sold_price?: string | number | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -54,8 +61,12 @@ type OrderItemRow = {
 const INVENTORY_SELECT = `
   id, created_at, card_id, manual_card_name, manual_card_number, manual_set_code,
   item_nickname, inventory_type, status, graded_rating, certification_number,
-  custom_image_front_url, customer_name, shipping_tracking, shipping_label_url, shipped_at
+  custom_image_front_url, customer_name, shipping_tracking, shipping_label_url, shipped_at,
+  sale_channel, sold_date, sold_price
 `;
+
+const ORDER_SELECT = "id, nickname, customer_name, shipping_label, marked_shipped, tracking_number, sale_channel, sold_date, sold_price, created_at, updated_at";
+const LEGACY_ORDER_SELECT = "id, nickname, customer_name, shipping_label, marked_shipped, tracking_number, created_at, updated_at";
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unknown error";
@@ -69,6 +80,9 @@ function toOrderFormValue(order: OrderRow, inventoryItemIds: string[]): Customer
     shipping_label: order.shipping_label,
     marked_shipped: order.marked_shipped,
     tracking_number: order.tracking_number,
+    sale_channel: order.sale_channel ?? "not_sold",
+    sold_date: order.sold_date ?? null,
+    sold_price: order.sold_price ?? null,
     inventory_item_ids: inventoryItemIds,
   };
 }
@@ -90,6 +104,9 @@ function toInventoryItem(row: InventoryQueryRow, cardMap: Map<string, CardLookup
     shipping_tracking: row.shipping_tracking,
     shipping_label_url: row.shipping_label_url,
     shipped_at: row.shipped_at,
+    sale_channel: row.sale_channel,
+    sold_date: row.sold_date,
+    sold_price: row.sold_price,
     card: {
       name: card?.name ?? row.manual_card_name ?? null,
       image_url: card?.image_url ?? null,
@@ -170,14 +187,25 @@ export async function loadOrderSummaries(): Promise<LoadResult<CustomerOrderSumm
     const supabase = createServiceClient();
     const ordersRes = await supabase
       .from("customer_orders")
-      .select("id, nickname, customer_name, shipping_label, marked_shipped, tracking_number, created_at, updated_at")
+      .select(ORDER_SELECT)
       .order("created_at", { ascending: false });
+    let orderRows = ordersRes.data as OrderRow[] | null;
+    let orderError = ordersRes.error;
 
     if (ordersRes.error) {
-      return { data: [], error: ordersRes.error.message };
+      const legacyOrdersRes = await supabase
+        .from("customer_orders")
+        .select(LEGACY_ORDER_SELECT)
+        .order("created_at", { ascending: false });
+      orderRows = legacyOrdersRes.data as OrderRow[] | null;
+      orderError = legacyOrdersRes.error;
     }
 
-    const orders = (ordersRes.data ?? []) as OrderRow[];
+    if (orderError) {
+      return { data: [], error: orderError.message };
+    }
+
+    const orders = orderRows ?? [];
     if (orders.length === 0) {
       return { data: [], error: null };
     }
@@ -236,12 +264,24 @@ export async function loadOrderForEdit(orderId: string): Promise<LoadResult<Cust
     const supabase = createServiceClient();
     const orderRes = await supabase
       .from("customer_orders")
-      .select("id, nickname, customer_name, shipping_label, marked_shipped, tracking_number, created_at, updated_at")
+      .select(ORDER_SELECT)
       .eq("id", orderId)
       .single();
+    let orderRow = orderRes.data as OrderRow | null;
+    let orderError = orderRes.error;
 
     if (orderRes.error) {
-      return { data: null, error: orderRes.error.message };
+      const legacyOrderRes = await supabase
+        .from("customer_orders")
+        .select(LEGACY_ORDER_SELECT)
+        .eq("id", orderId)
+        .single();
+      orderRow = legacyOrderRes.data as OrderRow | null;
+      orderError = legacyOrderRes.error;
+    }
+
+    if (orderError) {
+      return { data: null, error: orderError.message };
     }
 
     const linksRes = await supabase
@@ -255,7 +295,7 @@ export async function loadOrderForEdit(orderId: string): Promise<LoadResult<Cust
 
     return {
       data: toOrderFormValue(
-        orderRes.data as OrderRow,
+        orderRow as OrderRow,
         ((linksRes.data ?? []) as Pick<OrderItemRow, "inventory_item_id">[]).map((row) => row.inventory_item_id)
       ),
       error: null,

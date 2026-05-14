@@ -3,6 +3,7 @@
 import { type FormEvent, type MouseEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { displayCustomerOrderNumber } from "@/lib/customer-orders";
+import { SALE_CHANNEL_LABELS, SALE_CHANNELS, type SaleChannel } from "@/lib/sale-options";
 import type { CustomerOrderFormValue, OrderInventoryItem } from "./order-types";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -83,6 +84,10 @@ function groupSelectedItems(items: OrderInventoryItem[]) {
   return Array.from(groups.entries());
 }
 
+function todayDateString() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export default function OrderForm({ inventoryItems, initialOrder }: Props) {
   const router = useRouter();
   const [nickname, setNickname] = useState(initialOrder?.nickname ?? "");
@@ -90,6 +95,9 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
   const [shippingLabel, setShippingLabel] = useState(initialOrder?.shipping_label ?? "");
   const [markedShipped, setMarkedShipped] = useState(initialOrder?.marked_shipped ?? false);
   const [trackingNumber, setTrackingNumber] = useState(initialOrder?.tracking_number ?? "");
+  const [saleChannel, setSaleChannel] = useState<SaleChannel>(initialOrder?.sale_channel ?? "not_sold");
+  const [soldDate, setSoldDate] = useState(initialOrder?.sold_date ?? "");
+  const [soldPrice, setSoldPrice] = useState(initialOrder?.sold_price?.toString() ?? "");
   const [selectedIds, setSelectedIds] = useState<string[]>(initialOrder?.inventory_item_ids ?? []);
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
@@ -117,6 +125,16 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
 
   function removeItem(itemId: string) {
     setSelectedIds((current) => current.filter((id) => id !== itemId));
+  }
+
+  function updateSaleChannel(nextChannel: SaleChannel) {
+    setSaleChannel(nextChannel);
+    if (nextChannel === "not_sold") {
+      setSoldDate("");
+      return;
+    }
+
+    setSoldDate((current) => current || todayDateString());
   }
 
   function updateHoverPreview(item: OrderInventoryItem, event: MouseEvent<HTMLElement>) {
@@ -151,6 +169,9 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
         shipping_label: shippingLabel,
         marked_shipped: markedShipped,
         tracking_number: trackingNumber,
+        sale_channel: saleChannel,
+        sold_date: soldDate,
+        sold_price: soldPrice,
         inventory_item_ids: selectedIds,
       }),
     });
@@ -266,6 +287,48 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
           />
           <span className="font-mono text-sm font-bold uppercase tracking-wider text-text">Marked Shipped</span>
         </label>
+
+        <div className="rounded-md border border-border bg-deep p-3">
+          <div className="mb-3 font-mono text-xs font-bold uppercase tracking-wider text-owl">
+            Order Sale Details
+          </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <label>
+              <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">Sold At</span>
+              <select
+                value={saleChannel}
+                onChange={(event) => updateSaleChannel(event.target.value as SaleChannel)}
+                className="mt-2 w-full rounded-md border border-border bg-surface px-3 py-3 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
+              >
+                {SALE_CHANNELS.map((channel) => (
+                  <option key={channel} value={channel}>
+                    {SALE_CHANNEL_LABELS[channel]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">Sold Date</span>
+              <input
+                type="date"
+                value={soldDate}
+                onChange={(event) => setSoldDate(event.target.value)}
+                className="mt-2 w-full rounded-md border border-border bg-surface px-3 py-3 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
+              />
+            </label>
+            <label>
+              <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">Sold Price</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={soldPrice}
+                onChange={(event) => setSoldPrice(event.target.value)}
+                placeholder="0.00"
+                className="mt-2 w-full rounded-md border border-border bg-surface px-3 py-3 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
+              />
+            </label>
+          </div>
+        </div>
       </div>
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.78fr)]">

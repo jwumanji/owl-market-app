@@ -1,4 +1,5 @@
 import type { InventoryStatus, InventoryType, GradedRating } from "@/lib/inventory-options";
+import type { SaleChannel } from "@/lib/sale-options";
 
 export type OrderInventoryItem = {
   id: string;
@@ -13,6 +14,9 @@ export type OrderInventoryItem = {
   shipping_tracking: string | null;
   shipping_label_url: string | null;
   shipped_at: string | null;
+  sale_channel: SaleChannel | null;
+  sold_date: string | null;
+  sold_price: string | number | null;
   card: {
     name: string | null;
     image_url: string | null;
@@ -29,6 +33,9 @@ export type CustomerOrderFormValue = {
   shipping_label: string | null;
   marked_shipped: boolean;
   tracking_number: string | null;
+  sale_channel: SaleChannel | null;
+  sold_date: string | null;
+  sold_price: string | number | null;
   inventory_item_ids: string[];
 };
 

@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import { SALE_CHANNELS, type SaleChannel } from "@/lib/sale-options";
 import { createServiceClient } from "@/lib/supabase-server";
 
 type RequestBody = Record<string, unknown>;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SALE_CHANNEL_VALUES = new Set<string>(SALE_CHANNELS);
 
 function stringValue(body: RequestBody, key: string) {
   const value = body[key];
@@ -17,6 +19,41 @@ function nullableStringValue(body: RequestBody, key: string) {
 
 function booleanValue(body: RequestBody, key: string) {
   return body[key] === true;
+}
+
+function saleChannelValue(body: RequestBody) {
+  if (!("sale_channel" in body)) {
+    return { provided: false as const };
+  }
+
+  const value = stringValue(body, "sale_channel") || "not_sold";
+  if (!SALE_CHANNEL_VALUES.has(value)) {
+    return { provided: true as const, error: "Invalid sold at value" };
+  }
+
+  return { provided: true as const, value: value as SaleChannel };
+}
+
+function parseOptionalNumeric(value: unknown, fieldName: string) {
+  if (value === null || value === undefined || value === "") {
+    return { value: null as string | number | null };
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return { value };
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return { value: null as string | number | null };
+    if (Number.isFinite(Number(trimmed))) return { value: trimmed };
+  }
+
+  return { error: `Invalid ${fieldName}` };
+}
+
+function missingOrderSaleColumns(error: { message?: string } | null) {
+  return Boolean(error?.message?.includes("sale_channel") || error?.message?.includes("sold_date") || error?.message?.includes("sold_price"));
 }
 
 function inventoryItemIds(body: RequestBody) {
@@ -111,21 +148,59 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const markedShipped = booleanValue(requestBody, "marked_shipped");
   const shippingLabel = nullableStringValue(requestBody, "shipping_label");
   const trackingNumber = nullableStringValue(requestBody, "tracking_number");
+  const saleChannel = saleChannelValue(requestBody);
+  if (saleChannel.error) {
+    return NextResponse.json({ error: saleChannel.error }, { status: 400 });
+  }
+  const soldDateProvided = "sold_date" in requestBody;
+  const soldDate = soldDateProvided ? nullableStringValue(requestBody, "sold_date") : null;
+  const soldPriceProvided = "sold_price" in requestBody;
+  const soldPrice = soldPriceProvided ? parseOptionalNumeric(requestBody.sold_price, "sold price") : { value: null };
+  if (soldPrice.error) {
+    return NextResponse.json({ error: soldPrice.error }, { status: 400 });
+  }
+  const clearSoldDate = saleChannel.provided && saleChannel.value === "not_sold";
 
-  const { error: orderError } = await supabase
+  const orderUpdates: Record<string, string | number | boolean | null> = {
+    nickname: nullableStringValue(requestBody, "nickname"),
+    customer_name: customerName,
+    shipping_label: shippingLabel,
+    marked_shipped: markedShipped,
+    tracking_number: trackingNumber,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (saleChannel.provided && saleChannel.value) {
+    orderUpdates.sale_channel = saleChannel.value;
+  }
+
+  if (soldDateProvided) {
+    orderUpdates.sold_date = clearSoldDate ? null : soldDate;
+  }
+
+  if (soldPriceProvided) {
+    const orderSoldPrice = "value" in soldPrice ? soldPrice.value ?? null : null;
+    orderUpdates.sold_price = orderSoldPrice;
+  }
+
+  let orderRes = await supabase
     .from("customer_orders")
-    .update({
-      nickname: nullableStringValue(requestBody, "nickname"),
-      customer_name: customerName,
-      shipping_label: shippingLabel,
-      marked_shipped: markedShipped,
-      tracking_number: trackingNumber,
-      updated_at: new Date().toISOString(),
-    })
+    .update(orderUpdates)
     .eq("id", params.id);
 
-  if (orderError) {
-    return NextResponse.json({ error: orderError.message }, { status: 500 });
+  if (missingOrderSaleColumns(orderRes.error)) {
+    const legacyOrderUpdates = { ...orderUpdates };
+    delete legacyOrderUpdates.sale_channel;
+    delete legacyOrderUpdates.sold_date;
+    delete legacyOrderUpdates.sold_price;
+    orderRes = await supabase
+      .from("customer_orders")
+      .update(legacyOrderUpdates)
+      .eq("id", params.id);
+  }
+
+  if (orderRes.error) {
+    return NextResponse.json({ error: orderRes.error.message }, { status: 500 });
   }
 
   if (removedIds.length > 0) {
@@ -161,15 +236,25 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
   }
 
+  const inventoryUpdates: Record<string, string | boolean | null> = {
+    status: markedShipped ? "sold" : "ship",
+    customer_name: customerName,
+    shipping_label_url: shippingLabel,
+    shipping_tracking: trackingNumber,
+    shipped_at: markedShipped ? new Date().toISOString() : null,
+  };
+
+  if (saleChannel.provided && saleChannel.value) {
+    inventoryUpdates.sale_channel = saleChannel.value;
+  }
+
+  if (soldDateProvided) {
+    inventoryUpdates.sold_date = clearSoldDate ? null : soldDate;
+  }
+
   const { error: inventoryError } = await supabase
     .from("inventory_items")
-    .update({
-      status: markedShipped ? "sold" : "ship",
-      customer_name: customerName,
-      shipping_label_url: shippingLabel,
-      shipping_tracking: trackingNumber,
-      shipped_at: markedShipped ? new Date().toISOString() : null,
-    })
+    .update(inventoryUpdates)
     .in("id", ids);
 
   if (inventoryError) {
