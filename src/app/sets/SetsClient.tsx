@@ -96,6 +96,7 @@ function HeadlineCard({
     );
   }
   const style = { ["--hl-color" as string]: set.color, ["--hl-color-d" as string]: colorD } as React.CSSProperties;
+  const imgUrl = getSetImageUrl(set.slug);
   return (
     <Link href={`/sets/${set.slug}`} className="sets-v2-hl" style={style}>
       <div className="sets-v2-hl-glow" />
@@ -107,7 +108,19 @@ function HeadlineCard({
         <span className="sets-v2-hl-code" style={{ color: set.color }}>{set.code}</span>
         {set.year && <span className="sets-v2-hl-year">{set.year}</span>}
       </div>
-      <div className="sets-v2-hl-name">{set.name}</div>
+      <div className="sets-v2-hl-title-row">
+        <div className="sets-v2-hl-thumb" style={{ ["--thumb-color" as string]: set.color } as React.CSSProperties}>
+          {imgUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={imgUrl} alt={`${set.code} box art`} loading="lazy" />
+          ) : (
+            <span className="sets-v2-hl-thumb-placeholder" aria-hidden>
+              {set.code.replace(/[0-9]/g, "")[0] ?? "·"}
+            </span>
+          )}
+        </div>
+        <div className="sets-v2-hl-name">{set.name}</div>
+      </div>
       <div className="sets-v2-hl-stat-row">
         <span className="sets-v2-hl-value">{fmtUsd(set.price)}</span>
         {footer}
