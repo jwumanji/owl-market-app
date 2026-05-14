@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { SetData } from "./sets-data";
+import { getSetImageUrl } from "./set-images";
 import "./sets.css";
 
 type SortKey = "rank" | "code" | "name" | "price" | "chg1d" | "chg7d" | "chg30d" | "cards";
@@ -265,6 +266,7 @@ export default function SetsClient({ initialSets }: { initialSets: SetData[] }) 
         <table className="sets-v2-table">
           <colgroup>
             <col className="c-rank" />
+            <col className="c-thumb" />
             <col className="c-code" />
             <col className="c-name" />
             <col className="c-val" />
@@ -279,6 +281,7 @@ export default function SetsClient({ initialSets }: { initialSets: SetData[] }) 
               <th className={`r${sort === "rank" ? " sorted" : ""}`} onClick={() => toggleSort("rank")}>
                 # {sortIndicator("rank")}
               </th>
+              <th aria-label="Box art" />
               <th className={sort === "code" ? "sorted" : ""} onClick={() => toggleSort("code")}>
                 Set {sortIndicator("code")}
               </th>
@@ -306,16 +309,29 @@ export default function SetsClient({ initialSets }: { initialSets: SetData[] }) 
           <tbody>
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={9} style={{ textAlign: "center", color: "var(--text3)", padding: 40 }}>
+                <td colSpan={10} style={{ textAlign: "center", color: "var(--text3)", padding: 40 }}>
                   No sets match these filters.
                 </td>
               </tr>
             ) : (
               sorted.map((s, i) => {
                 const empty = s.comingSoon || s.cards === 0;
+                const imgUrl = getSetImageUrl(s.slug);
                 return (
                   <tr key={s.code} onClick={() => router.push(`/sets/${s.slug}`)}>
                     <td className="sv2-rank">{i + 1}</td>
+                    <td className="sv2-thumb-cell">
+                      <div className="sv2-thumb" style={{ ["--thumb-color" as string]: s.color } as React.CSSProperties}>
+                        {imgUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={imgUrl} alt={`${s.code} box art`} loading="lazy" />
+                        ) : (
+                          <span className="sv2-thumb-placeholder" aria-hidden>
+                            {s.code.replace(/[0-9]/g, "")[0] ?? "·"}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td>
                       <div className="sv2-code-cell">
                         <span className="sv2-dot" style={{ background: s.color }} />
