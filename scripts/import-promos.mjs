@@ -265,7 +265,7 @@ function buildInsertRow(c, setUuid, segment, syntheticId) {
     effect: nullIfNullStr(c.card_text),
     color: color ? [color] : null,
     types: subs ? [subs] : null,
-    image_url: `${OPT_IMAGE_BASE}/${c.card_set_id}.jpg`,
+    image_url: nullIfNullStr(c.card_image),
     promo_segment: segment,
   };
 }
@@ -298,8 +298,10 @@ function buildBackfillPatch(c, existing, segment) {
     patch.types = [subs];
   }
 
-  // Image: only fill if currently null.
-  if (!existing.image_url) patch.image_url = `${OPT_IMAGE_BASE}/${c.card_set_id}.jpg`;
+  // Image: only fill from a real source image. Do not synthesize a base
+  // card-number URL for promo variants; that creates wrong catalog art.
+  const sourceImage = nullIfNullStr(c.card_image);
+  if (!existing.image_url && sourceImage) patch.image_url = sourceImage;
 
   // promo_segment: only fill if null (uniform rule).
   if (!existing.promo_segment) patch.promo_segment = segment;

@@ -331,9 +331,7 @@ function expectedRow(rawCard, source, setByCode) {
 
   const color = nullIfNullStr(rawCard.card_color);
   const types = nullIfNullStr(rawCard.sub_types);
-  const imageUrl =
-    nullIfNullStr(rawCard.card_image) ??
-    (source.kind === "promo" && cardNumber ? `${OPT_IMAGE_BASE}/${cardNumber}.jpg` : null);
+  const imageUrl = nullIfNullStr(rawCard.card_image);
   const trigger = nullIfNullStr(rawCard.trigger ?? rawCard.card_trigger);
   const override = bandaiBaseOverride(rawCard);
 

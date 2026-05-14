@@ -269,6 +269,16 @@ function allowsCardNumberInSet(setCode: string, cardNumber: string | null | unde
   return prefix === setCode;
 }
 
+function catalogImageUrlForNewCard(
+  setCode: string,
+  cardNumber: string | null | undefined,
+  variantLabel: string | null
+): string | null {
+  if (!cardNumber) return null;
+  if (setCode === "P" || variantLabel) return null;
+  return `https://optcgapi.com/media/static/Card_Images/${cardNumber}.jpg`;
+}
+
 async function syncOneSet(
   client: JustTCG,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -288,8 +298,6 @@ async function syncOneSet(
 
   const setErrors: string[] = [];
   let updatedCount = 0;
-  // Collect promo image updates across all slugs/pages, apply in bulk at end
-  const allImageUpdates: { id: string; image_url: string; image_url_small: string }[] = [];
 
   // Use the globally pre-loaded card maps. Aliased to the existing names so
   // the rest of the function reads unchanged.
@@ -324,18 +332,7 @@ async function syncOneSet(
       for (const jtCard of cards) {
         try {
           if (!allowsCardNumberInSet(setCode, jtCard.number)) continue;
-          const priceCountBefore = priceUpserts.length;
           matchAndCollect(jtCard, byNumber, byNameLower, priceUpserts, historyInserts, rarityUpdates, matchedCardIds, dbSet.id, unmatchedCards);
-
-          // For promo set: collect image updates (applied in bulk at end)
-          if (setCode === "P" && jtCard.tcgplayerId && priceUpserts.length > priceCountBefore) {
-            const matchedCardId = priceUpserts[priceUpserts.length - 1].card_id;
-            allImageUpdates.push({
-              id: matchedCardId,
-              image_url: `https://product-images.tcgplayer.com/fit-in/437x437/${jtCard.tcgplayerId}.jpg`,
-              image_url_small: `https://tcgplayer-cdn.tcgplayer.com/product/${jtCard.tcgplayerId}_200w.jpg`,
-            });
-          }
         } catch (err) {
           setErrors.push(
             `Card ${jtCard.name}: ${err instanceof Error ? err.message : String(err)}`
@@ -377,12 +374,7 @@ async function syncOneSet(
               // policy A: synthesize id
               const tagSlug = variantLabel.replace(/[^a-zA-Z0-9]/g, "").toLowerCase().substring(0, 10);
               const cardImageId = `${jt.number}_${tagSlug}_${setCode.toLowerCase()}`;
-              const imageUrl = jt.tcgplayerId
-                ? `https://product-images.tcgplayer.com/fit-in/437x437/${jt.tcgplayerId}.jpg`
-                : `https://optcgapi.com/media/static/Card_Images/${jt.number}.jpg`;
-              const imageUrlSmall = jt.tcgplayerId
-                ? `https://tcgplayer-cdn.tcgplayer.com/product/${jt.tcgplayerId}_200w.jpg`
-                : null;
+              const imageUrl = catalogImageUrlForNewCard(setCode, jt.number, variantLabel);
               return {
                 card_image_id: cardImageId,
                 card_number: jt.number,
@@ -393,7 +385,7 @@ async function syncOneSet(
                 rarity,
                 tcg_product_id: jt.id,
                 image_url: imageUrl,
-                image_url_small: imageUrlSmall,
+                image_url_small: null,
               };
             }
 
@@ -401,16 +393,7 @@ async function syncOneSet(
             const resolvedSetId = (numberPrefix && prefixToSetId[numberPrefix]) || dbSet.id;
             const suffix = variantLabel ? `-${variantLabel.replace(/[^a-zA-Z0-9]/g, "").substring(0, 10)}` : "";
             const cardImageId = `${setCode}-${jt.number}${suffix}`;
-            // Use TCGPlayer CDN images for promo cards (optcgapi only has base art)
-            const isPromo = setCode === "P";
-            const imageUrl = isPromo && jt.tcgplayerId
-              ? `https://product-images.tcgplayer.com/fit-in/437x437/${jt.tcgplayerId}.jpg`
-              : jt.number
-                ? `https://optcgapi.com/media/static/Card_Images/${jt.number}.jpg`
-                : null;
-            const imageUrlSmall = isPromo && jt.tcgplayerId
-              ? `https://tcgplayer-cdn.tcgplayer.com/product/${jt.tcgplayerId}_200w.jpg`
-              : null;
+            const imageUrl = catalogImageUrlForNewCard(setCode, jt.number, variantLabel);
             return {
               card_image_id: cardImageId,
               card_number: jt.number,
@@ -421,7 +404,7 @@ async function syncOneSet(
               rarity,
               tcg_product_id: jt.id,
               image_url: imageUrl,
-              image_url_small: imageUrlSmall,
+              image_url_small: null,
             };
           })
           .filter((c): c is NonNullable<typeof c> => c !== null);
@@ -523,25 +506,6 @@ async function syncOneSet(
     );
   }
   } // end slug loop
-
-  // Bulk-update promo card images using TCGPlayer CDN (parallel, chunked)
-  if (options.allowCatalogMutations && allImageUpdates.length > 0) {
-    const CHUNK = 50;
-    for (let i = 0; i < allImageUpdates.length; i += CHUNK) {
-      const chunk = allImageUpdates.slice(i, i + CHUNK);
-      const results = await Promise.all(
-        chunk.map((img) =>
-          supabase
-            .from("cards")
-            .update({ image_url: img.image_url, image_url_small: img.image_url_small })
-            .eq("id", img.id)
-        )
-      );
-      for (const { error } of results) {
-        if (error) setErrors.push(`image update: ${error.message}`);
-      }
-    }
-  }
 
   return { code: setCode, updated: updatedCount, errors: setErrors };
 }
