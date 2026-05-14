@@ -3,7 +3,8 @@ export interface SetData {
   code: string;
   displayCode?: string;
   name: string;
-  year: number;
+  year: number | null;
+  type?: "op" | "eb" | "prb" | "st" | "promo";
   color: string;
   colorD: string;
   colorBd: string;
@@ -22,6 +23,7 @@ export interface SetData {
   perf: { h1: string; h24: string; d7: string; m1: string; y1: string; max: string };
   perfUp: boolean[];
   topCards: TopCard[];
+  comingSoon?: boolean;
 }
 
 export interface TopCard {

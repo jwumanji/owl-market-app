@@ -1,8 +1,9 @@
 import { createServiceClient } from "@/lib/supabase-server";
 
 // ---------------------------------------------------------------------------
-// loadSets() — shared loader used by both /api/sets and the /sets page (SSR).
-// Returns aggregated set data + extras, or throws on DB error.
+// loadSets() — groups cards by cards.printed_set_code so EB04, OP14, OP15 etc
+// surface as canonical print runs rather than mirroring the distribution
+// products in the `sets` table. Returns SetData[] consumed by /sets and /sets/[slug].
 // ---------------------------------------------------------------------------
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -16,6 +17,7 @@ function hexToRgba(hex: string, alpha: number): string {
 const RARITY_LABELS: Record<string, string> = {
   MR: "MANGA RARE",
   GMR: "GOLDEN MR",
+  SAR: "SAR",
   SP: "SPECIAL RARE",
   SEC: "SECRET RARE",
   TR: "TREAS. RARE",
@@ -23,18 +25,23 @@ const RARITY_LABELS: Record<string, string> = {
   SR: "SUPER RARE",
   L: "LEADER",
   R: "RARE",
+  UC: "UNCOMMON",
+  C: "COMMON",
 };
 
 const RARITY_EMOJI: Record<string, string> = {
-  MR: "\u2620",
-  GMR: "\uD83D\uDC51",
-  SP: "\uD83D\uDD25",
-  SEC: "\uD83D\uDD34",
-  TR: "\uD83C\uDFF4",
-  AA: "\uD83C\uDFB4",
-  SR: "\uD83C\uDF0A",
-  L: "\u2694",
-  R: "\uD83D\uDC8E",
+  MR: "☠",
+  GMR: "👑",
+  SAR: "✨",
+  SP: "🔥",
+  SEC: "🔴",
+  TR: "🏴",
+  AA: "🎴",
+  SR: "🌊",
+  L: "⚔",
+  R: "💎",
+  UC: "🔹",
+  C: "⚪",
 };
 
 function formatVolume(v: number): string {
@@ -51,29 +58,28 @@ function formatChg(v: number): string {
   return `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
 }
 
-const DEFAULT_COLOR = "#4F8EF7";
-
-const ALLOWED_CODES = new Set([
-  "OP01","OP02","OP03","OP04","OP05","OP06","OP07","OP08","OP09","OP10",
-  "OP11","OP12","OP13","OP14","OP15","PRB01","PRB02","EB01","EB02","EB03",
-]);
-
-const SET_NAME_SUFFIX_BY_CODE: Record<string, string> = {
-  OP14: "-EB04",
-  OP15: "-EB04",
-};
-
-const SET_DISPLAY_CODE_BY_CODE: Record<string, string> = {
-  OP14: "OP14-EB04",
-  OP15: "OP15-EB04",
-};
-
-function displaySetName(code: string, name: string | null | undefined): string {
-  const baseName = name ?? code;
-  const suffix = SET_NAME_SUFFIX_BY_CODE[code.toUpperCase()];
-  if (!suffix || baseName.toUpperCase().endsWith(suffix)) return baseName;
-  return `${baseName} ${suffix}`;
+function classifyType(code: string): "op" | "eb" | "prb" | "st" | "promo" {
+  if (code === "P" || code === "N") return "promo";
+  if (code.startsWith("PRB")) return "prb";
+  if (code.startsWith("OP")) return "op";
+  if (code.startsWith("EB")) return "eb";
+  if (code.startsWith("ST")) return "st";
+  return "promo";
 }
+
+function normalizeCode(code: string): string {
+  // Roll N (judge promos, ~6 cards) into P (promo bin) per Phase 1 decision.
+  return code === "N" ? "P" : code;
+}
+
+const DEFAULT_COLOR = "#4F8EF7";
+const TYPE_COLOR: Record<string, string> = {
+  op: "#E8A020",
+  eb: "#9B72FF",
+  prb: "#00D68F",
+  st: "#4F8EF7",
+  promo: "#F472B6",
+};
 
 export type LoadedSets = {
   sets: Array<Record<string, unknown>>;
@@ -83,29 +89,45 @@ export type LoadedSets = {
 export async function loadSets(): Promise<LoadedSets> {
   const supabase = createServiceClient();
 
+  // 1. All sets meta (for name / year / color lookup keyed by code)
   const { data: allSets, error: setsErr } = await supabase
     .from("sets")
     .select("id, slug, code, name, year, color, card_count")
     .order("code");
 
   if (setsErr) throw new Error(setsErr.message);
-  if (!allSets || allSets.length === 0) return { sets: [], extraSets: [] };
 
-  const filteredSets = allSets.filter((s) => ALLOWED_CODES.has((s.code ?? "").toUpperCase()));
+  type SetMeta = {
+    id: string;
+    slug: string;
+    code: string | null;
+    name: string;
+    year: number | null;
+    color: string | null;
+    card_count: number | null;
+  };
 
+  const setByCode = new Map<string, SetMeta>();
+  for (const s of (allSets ?? []) as unknown as SetMeta[]) {
+    if (s.code) setByCode.set(s.code, s);
+  }
+
+  // 2. All cards. Group by printed_set_code in JS.
   const allCards: Record<string, unknown>[] = [];
   const pageSize = 1000;
   let from = 0;
-
   while (true) {
     const { data: batch, error: cardsErr } = await supabase
       .from("cards")
       .select(`
         id,
         set_id,
+        printed_set_code,
         name,
         card_number,
+        card_image_id,
         rarity,
+        variant_label,
         image_url,
         image_url_small,
         price_stats (
@@ -129,11 +151,13 @@ export async function loadSets(): Promise<LoadedSets> {
     from += pageSize;
   }
 
-  const cardsBySet: Record<string, Array<{
+  type CardCore = {
     id: string;
     name: string;
     card_number: string | null;
+    card_image_id: string | null;
     rarity: string;
+    variant_label: string | null;
     image_url: string | null;
     image_url_small: string | null;
     ps: {
@@ -146,27 +170,30 @@ export async function loadSets(): Promise<LoadedSets> {
       ath: number;
       atl: number;
     };
-  }>> = {};
+  };
 
-  // Total row count per set (includes unpriced rows). Used to surface
-  // coverage like "N/M priced" so a sync gap can't silently shrink the
-  // headline value without anyone noticing.
-  const totalRowsBySet: Record<string, number> = {};
+  const cardsByCode: Record<string, CardCore[]> = {};
+  const totalRowsByCode: Record<string, number> = {};
 
   for (const card of allCards) {
-    const setId = card.set_id as string;
-    if (setId) totalRowsBySet[setId] = (totalRowsBySet[setId] ?? 0) + 1;
-    const ps = card.price_stats as Record<string, number> | null;
-    if (!setId || !ps || !ps.tcg_market) continue;
+    const rawCode = (card.printed_set_code as string | null) ?? null;
+    if (!rawCode) continue;
+    const code = normalizeCode(rawCode);
+    totalRowsByCode[code] = (totalRowsByCode[code] ?? 0) + 1;
 
-    if (!cardsBySet[setId]) cardsBySet[setId] = [];
-    cardsBySet[setId].push({
+    const ps = card.price_stats as Record<string, number> | null;
+    if (!ps || !ps.tcg_market) continue;
+
+    if (!cardsByCode[code]) cardsByCode[code] = [];
+    cardsByCode[code].push({
       id: card.id as string,
       name: card.name as string,
       card_number: (card.card_number as string | null) ?? null,
-      rarity: card.rarity as string,
-      image_url: card.image_url as string | null,
-      image_url_small: card.image_url_small as string | null,
+      card_image_id: (card.card_image_id as string | null) ?? null,
+      rarity: (card.rarity as string) ?? "",
+      variant_label: (card.variant_label as string | null) ?? null,
+      image_url: (card.image_url as string | null) ?? null,
+      image_url_small: (card.image_url_small as string | null) ?? null,
       ps: {
         market_avg: ps.market_avg ?? ps.tcg_market ?? 0,
         tcg_market: ps.tcg_market ?? 0,
@@ -180,22 +207,27 @@ export async function loadSets(): Promise<LoadedSets> {
     });
   }
 
+  // Surface every code with cards plus every sets-table row even if empty.
+  const allCodes = new Set<string>([
+    ...Object.keys(cardsByCode),
+    ...Object.keys(totalRowsByCode),
+    ...Array.from(setByCode.keys()),
+  ]);
+
+  // 3. Top 10 cards per code
   const CHASE_RANK: Record<string, number> = {
     MR: 0, GMR: 0, SAR: 1, SP: 2, AA: 3, TR: 4, SEC: 5, SR: 6, L: 7, R: 8,
   };
   const rankOf = (r: string) => CHASE_RANK[r] ?? 99;
-  const top5BySet: Record<string, typeof cardsBySet[string]> = {};
-  const allTop5Ids: string[] = [];
+  const top10ByCode: Record<string, CardCore[]> = {};
+  const allTopIds: string[] = [];
 
-  for (const [setId, cards] of Object.entries(cardsBySet)) {
-    const byNum = new Map<string, typeof cards[number]>();
+  for (const [code, cards] of Object.entries(cardsByCode)) {
+    const byNum = new Map<string, CardCore>();
     for (const c of cards) {
       const key = c.card_number ?? `id:${c.id}`;
       const cur = byNum.get(key);
-      if (!cur) {
-        byNum.set(key, c);
-        continue;
-      }
+      if (!cur) { byNum.set(key, c); continue; }
       const a = rankOf(cur.rarity);
       const b = rankOf(c.rarity);
       if (b < a) byNum.set(key, c);
@@ -204,23 +236,22 @@ export async function loadSets(): Promise<LoadedSets> {
     const deduped = Array.from(byNum.values())
       .sort((a, b) => b.ps.tcg_market - a.ps.tcg_market)
       .slice(0, 10);
-    top5BySet[setId] = deduped;
-    allTop5Ids.push(...deduped.map((c) => c.id));
+    top10ByCode[code] = deduped;
+    allTopIds.push(...deduped.map((c) => c.id));
   }
 
+  // 4. Price history for top cards → sparkline data
   const historyMap: Record<string, number[]> = {};
-
-  if (allTop5Ids.length > 0) {
+  if (allTopIds.length > 0) {
     const chunkSize = 200;
-    for (let i = 0; i < allTop5Ids.length; i += chunkSize) {
-      const chunk = allTop5Ids.slice(i, i + chunkSize);
+    for (let i = 0; i < allTopIds.length; i += chunkSize) {
+      const chunk = allTopIds.slice(i, i + chunkSize);
       const { data: history } = await supabase
         .from("price_history")
         .select("card_id, tcg_market, recorded_at")
         .in("card_id", chunk)
         .order("recorded_at", { ascending: false })
         .limit(chunk.length * 13);
-
       for (const row of history ?? []) {
         if (!historyMap[row.card_id]) historyMap[row.card_id] = [];
         if (historyMap[row.card_id].length < 13) {
@@ -230,16 +261,15 @@ export async function loadSets(): Promise<LoadedSets> {
     }
   }
 
+  // 5. Compose SetData rows
   const sets: Array<Record<string, unknown>> = [];
   const extraSets: Array<Record<string, unknown>> = [];
 
-  for (const set of filteredSets) {
-    const cards = cardsBySet[set.id] ?? [];
-    const color = set.color || DEFAULT_COLOR;
-    const code = set.code ?? set.slug.toUpperCase();
-    const displayCode = SET_DISPLAY_CODE_BY_CODE[code.toUpperCase()] ?? code;
-    const displayName = displaySetName(code, set.name);
-    const shouldShowInIndex = cards.length >= 1;
+  for (const code of Array.from(allCodes)) {
+    const cards = cardsByCode[code] ?? [];
+    const meta = setByCode.get(code);
+    const type = classifyType(code);
+    const color = meta?.color || TYPE_COLOR[type] || DEFAULT_COLOR;
 
     let totalValue = 0;
     let weightedChg1d = 0;
@@ -263,46 +293,39 @@ export async function loadSets(): Promise<LoadedSets> {
     const chg1d = totalValue > 0 ? +(weightedChg1d / totalValue).toFixed(1) : 0;
     const chg7d = totalValue > 0 ? +(weightedChg7d / totalValue).toFixed(1) : 0;
     const chg30d = totalValue > 0 ? +(weightedChg30d / totalValue).toFixed(1) : 0;
-    const chgMax = totalAtl > 0 ? +((totalValue - totalAtl) / totalAtl * 100).toFixed(1) : 0;
+    const chgMax = totalAtl > 0 ? +(((totalValue - totalAtl) / totalAtl) * 100).toFixed(1) : 0;
     const up = chg7d >= 0;
 
-    const top5 = top5BySet[set.id] ?? [];
+    const top = top10ByCode[code] ?? [];
     let spark: number[] = [];
-
-    if (top5.length > 0) {
-      const sparklines = top5.map((c) => historyMap[c.id] ?? [c.ps.tcg_market]);
+    if (top.length > 0) {
+      const sparklines = top.map((c) => historyMap[c.id] ?? [c.ps.tcg_market]);
       const maxLen = Math.max(...sparklines.map((s) => s.length));
-
       if (maxLen > 1) {
         spark = Array(maxLen).fill(0);
         for (const sl of sparklines) {
           const padded = Array(maxLen - sl.length).fill(sl[0] ?? 0).concat(sl);
-          for (let j = 0; j < maxLen; j++) {
-            spark[j] += padded[j];
-          }
+          for (let j = 0; j < maxLen; j++) spark[j] += padded[j];
         }
         const mn = Math.min(...spark);
         const mx = Math.max(...spark);
         const rng = mx - mn || 1;
-        spark = spark.map((v) => +((v - mn) / rng * 20).toFixed(1));
+        spark = spark.map((v) => +((((v - mn) / rng) * 20)).toFixed(1));
       }
     }
+    if (spark.length < 2) spark = [10, 10];
 
-    if (spark.length < 2) {
-      spark = [10, 10];
-    }
-
-    const topCards = top5.map((c) => {
+    const topCards = top.map((c) => {
       const cardSpark = historyMap[c.id] ?? [c.ps.tcg_market, c.ps.tcg_market];
       const cmn = Math.min(...cardSpark);
       const cmx = Math.max(...cardSpark);
       const crng = cmx - cmn || 1;
-      const normSpark = cardSpark.map((v) => +((v - cmn) / crng * 20).toFixed(1));
-
+      const normSpark = cardSpark.map((v) => +((((v - cmn) / crng) * 20)).toFixed(1));
       return {
         id: c.id,
+        card_image_id: c.card_image_id ?? c.card_number ?? c.id,
         img: c.image_url_small ?? c.image_url,
-        e: RARITY_EMOJI[c.rarity] ?? "\uD83C\uDFB4",
+        e: RARITY_EMOJI[c.rarity] ?? "🎴",
         n: c.name ?? "Unknown",
         rb: `rb-${(c.rarity ?? "r").toLowerCase()}`,
         rl: RARITY_LABELS[c.rarity] ?? c.rarity ?? "RARE",
@@ -315,13 +338,16 @@ export async function loadSets(): Promise<LoadedSets> {
       };
     });
 
-    if (shouldShowInIndex) {
+    const totalRows = totalRowsByCode[code] ?? cards.length;
+    const slug = meta?.slug ?? code.toLowerCase();
+
+    if (cards.length > 0 || totalRows > 0 || meta) {
       sets.push({
-        slug: set.slug,
+        slug,
         code,
-        displayCode,
-        name: displayName,
-        year: set.year ?? 2024,
+        name: meta?.name ?? code,
+        year: meta?.year ?? null,
+        type,
         color,
         colorD: hexToRgba(color, 0.14),
         colorBd: hexToRgba(color, 0.3),
@@ -331,8 +357,8 @@ export async function loadSets(): Promise<LoadedSets> {
         chg30d,
         chgMax,
         cards: cards.length,
-        cardsTotal: totalRowsBySet[set.id] ?? cards.length,
-        volume: formatVolume(totalVolume),
+        cardsTotal: totalRows,
+        volume: totalVolume > 0 ? formatVolume(totalVolume) : "— no data",
         ath: formatPrice(totalAth),
         atl: formatPrice(totalAtl),
         up,
@@ -347,23 +373,16 @@ export async function loadSets(): Promise<LoadedSets> {
         },
         perfUp: [true, chg1d >= 0, chg7d >= 0, chg30d >= 0, chgMax >= 0, chgMax >= 0],
         topCards,
-      });
-    } else {
-      extraSets.push({
-        slug: set.slug,
-        code,
-        displayCode,
-        name: displayName,
-        year: set.year ?? 2024,
-        color,
-        price,
-        chg7d,
-        up,
+        comingSoon: cards.length === 0,
       });
     }
   }
 
-  sets.sort((a, b) => (b.price as number) - (a.price as number));
+  sets.sort((a, b) => {
+    const pv = (b.price as number) - (a.price as number);
+    if (pv !== 0) return pv;
+    return String(a.code).localeCompare(String(b.code));
+  });
 
   return { sets, extraSets };
 }
