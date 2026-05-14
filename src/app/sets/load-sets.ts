@@ -240,9 +240,14 @@ export async function loadSets(): Promise<LoadedSets> {
     allTopIds.push(...deduped.map((c) => c.id));
   }
 
-  // 4. Price history for top cards → sparkline data
+  // 4. Price history for top cards → sparkline data.
+  // True 7-day window so the "7D Trend" column actually shows 7 days, not the
+  // last 13 records (which can drift longer/shorter than a week depending on
+  // sync cadence).
+  const SPARK_DAYS = 7;
   const historyMap: Record<string, number[]> = {};
   if (allTopIds.length > 0) {
+    const sinceIso = new Date(Date.now() - SPARK_DAYS * 24 * 60 * 60 * 1000).toISOString();
     const chunkSize = 200;
     for (let i = 0; i < allTopIds.length; i += chunkSize) {
       const chunk = allTopIds.slice(i, i + chunkSize);
@@ -250,13 +255,11 @@ export async function loadSets(): Promise<LoadedSets> {
         .from("price_history")
         .select("card_id, tcg_market, recorded_at")
         .in("card_id", chunk)
-        .order("recorded_at", { ascending: false })
-        .limit(chunk.length * 13);
+        .gte("recorded_at", sinceIso)
+        .order("recorded_at", { ascending: true });
       for (const row of history ?? []) {
         if (!historyMap[row.card_id]) historyMap[row.card_id] = [];
-        if (historyMap[row.card_id].length < 13) {
-          historyMap[row.card_id].unshift(row.tcg_market ?? 0);
-        }
+        historyMap[row.card_id].push(row.tcg_market ?? 0);
       }
     }
   }

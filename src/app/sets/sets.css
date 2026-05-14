@@ -29,7 +29,11 @@
 .sets-v2-hl-code-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; position: relative; }
 .sets-v2-hl-code { font-family: var(--font-ibm-plex-mono), monospace; font-size: 13px; font-weight: 700; letter-spacing: 0.03em; }
 .sets-v2-hl-year { font-family: var(--font-ibm-plex-mono), monospace; font-size: 9px; padding: 2px 6px; border-radius: 3px; background: var(--surf3); color: var(--text2); letter-spacing: 0.05em; }
-.sets-v2-hl-name { font-size: 13px; color: var(--text2); font-weight: 400; line-height: 1.4; margin-bottom: 14px; position: relative; min-height: 36px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sets-v2-hl-title-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; position: relative; min-height: 48px; }
+.sets-v2-hl-thumb { width: 64px; height: 44px; border-radius: 5px; overflow: hidden; flex-shrink: 0; background: linear-gradient(135deg, color-mix(in srgb, var(--thumb-color, var(--owl)) 18%, transparent), var(--surf3)); border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.35); }
+.sets-v2-hl-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sets-v2-hl-thumb-placeholder { font-family: var(--font-ibm-plex-mono), monospace; font-size: 18px; font-weight: 800; color: var(--thumb-color, var(--text2)); letter-spacing: 0.04em; }
+.sets-v2-hl-name { font-size: 13px; color: var(--text2); font-weight: 400; line-height: 1.4; position: relative; min-height: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; flex: 1; min-width: 0; }
 .sets-v2-hl-stat-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; position: relative; }
 .sets-v2-hl-value { font-size: 24px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; line-height: 1; }
 .sets-v2-hl-pct { font-family: var(--font-ibm-plex-mono), monospace; font-size: 14px; font-weight: 700; letter-spacing: -0.2px; }
