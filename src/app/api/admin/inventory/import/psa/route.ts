@@ -94,6 +94,19 @@ type PsaImportSummaryRow = {
   image_status: string;
 };
 
+type ExistingCertificationItem = {
+  id: string;
+  certification_number: string | null;
+  card_id: string | null;
+  manual_card_name: string | null;
+  manual_card_number: string | null;
+  manual_set_code: string | null;
+  graded_rating: string | null;
+  custom_image_front_url: string | null;
+  custom_image_back_url: string | null;
+  catalog_match_status: string | null;
+};
+
 function contentTypeForZipImage(name: string) {
   const lower = name.toLowerCase();
   if (lower.endsWith(".png")) return "image/png";
@@ -262,7 +275,13 @@ async function recordPsaSubmission({
     matched: row.matched,
     skipped_duplicate: row.skipped_duplicate,
     image_status: row.image_status,
-    result_status: row.skipped_duplicate ? "skipped_duplicate" : row.matched ? "matched" : "needs_match",
+    result_status: row.skipped_duplicate
+      ? row.inventory_item_id
+        ? "already_in_inventory"
+        : "skipped_duplicate"
+      : row.matched
+        ? "matched"
+        : "needs_match",
   }));
 
   const { error: itemsError } = await supabase.from("psa_submission_items").insert(itemRows);
@@ -302,12 +321,15 @@ export async function POST(request: Request) {
   const scanPairs = assignScans(rows, frontFiles, backFiles);
   const supabase = createServiceClient();
   const hasCertRows = rows.some((row) => certificationKey(row.certificationNumber));
-  const existingCertificationKeys = new Set<string>();
+  const existingCertificationItems = new Map<string, ExistingCertificationItem>();
 
   if (hasCertRows) {
     const { data: existingCertData, error: existingCertError } = await supabase
       .from("inventory_items")
-      .select("certification_number")
+      .select(`
+        id, certification_number, card_id, manual_card_name, manual_card_number, manual_set_code, graded_rating,
+        custom_image_front_url, custom_image_back_url, catalog_match_status
+      `)
       .not("certification_number", "is", null)
       .limit(50000);
 
@@ -315,9 +337,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: existingCertError.message }, { status: 500 });
     }
 
-    for (const item of existingCertData ?? []) {
+    for (const item of (existingCertData ?? []) as ExistingCertificationItem[]) {
       const key = certificationKey(item.certification_number);
-      if (key) existingCertificationKeys.add(key);
+      if (key) existingCertificationItems.set(key, item);
     }
   }
 
@@ -342,23 +364,25 @@ export async function POST(request: Request) {
   for (const row of rows) {
     const certificationNumber = row.certificationNumber;
     const certKey = certificationKey(certificationNumber);
-    const isExistingDuplicate = Boolean(certKey && existingCertificationKeys.has(certKey));
+    const existingItem = certKey ? existingCertificationItems.get(certKey) ?? null : null;
+    const isExistingDuplicate = Boolean(existingItem);
     const isFileDuplicate = Boolean(certKey && importCertificationKeys.has(certKey));
 
     if (isExistingDuplicate || isFileDuplicate) {
+      const match = matchInventoryCard(row, cards);
       summaryRows.push({
         source_index: row.sourceIndex,
-        inventory_item_id: null,
+        inventory_item_id: existingItem?.id ?? null,
         certification_number: certificationNumber,
-        graded_rating: row.gradedRating,
-        matched: false,
-        card_name: row.cardName,
-        card_number: row.cardNumber,
-        set_code: row.setCode,
-        front_image_uploaded: false,
-        back_image_uploaded: false,
+        graded_rating: row.gradedRating ?? existingItem?.graded_rating ?? null,
+        matched: Boolean(match || existingItem?.card_id || existingItem?.catalog_match_status === "matched"),
+        card_name: match?.name ?? row.cardName ?? existingItem?.manual_card_name ?? null,
+        card_number: match?.card_number ?? row.cardNumber ?? existingItem?.manual_card_number ?? null,
+        set_code: setCodeFor(match) ?? row.setCode ?? existingItem?.manual_set_code ?? null,
+        front_image_uploaded: Boolean(existingItem?.custom_image_front_url),
+        back_image_uploaded: Boolean(existingItem?.custom_image_back_url),
         skipped_duplicate: true,
-        image_status: isExistingDuplicate ? "Skipped - cert already in inventory" : "Skipped - duplicate cert in CSV",
+        image_status: isExistingDuplicate ? "Already in inventory - linked to existing item" : "Skipped - duplicate cert in CSV",
       });
       continue;
     }
@@ -453,8 +477,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       count: 0,
-      matched: 0,
-      pending_match: 0,
+      matched: summaryRows.filter((row) => row.matched).length,
+      pending_match: summaryRows.filter((row) => !row.matched && !row.skipped_duplicate).length,
       skipped_duplicates: summaryRows.filter((row) => row.skipped_duplicate).length,
       submission_id: submissionResult.submissionId,
       submission_warning: submissionResult.warning,

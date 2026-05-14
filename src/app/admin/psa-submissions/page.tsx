@@ -49,12 +49,14 @@ function formatDate(value?: string | null) {
 }
 
 function resultLabel(item: PsaSubmissionItemRow) {
+  if (item.result_status === "already_in_inventory") return "Already in Inventory";
   if (item.skipped_duplicate) return "Skipped";
   if (item.result_status === "needs_match" || !item.matched) return "Needs Match";
   return "Matched";
 }
 
 function resultClassName(item: PsaSubmissionItemRow) {
+  if (item.result_status === "already_in_inventory") return "border-blue/50 bg-blue/10 text-blue";
   if (item.skipped_duplicate) return "border-border bg-surf2 text-text-2";
   if (item.result_status === "needs_match" || !item.matched) return "border-owl/50 bg-owl/10 text-owl";
   return "border-gain/50 bg-gain/10 text-gain";

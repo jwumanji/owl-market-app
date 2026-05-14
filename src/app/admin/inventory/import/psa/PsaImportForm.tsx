@@ -161,8 +161,14 @@ export default function PsaImportForm() {
           <div className="mt-3 max-h-48 overflow-y-auto rounded border border-border bg-deep">
             {result.rows.map((row, index) => (
               <div key={`${row.certification_number ?? "row"}-${index}`} className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2 text-xs text-text-2 last:border-b-0">
-                <span className={row.skipped_duplicate ? "font-semibold text-text-2" : row.matched ? "font-semibold text-gain" : "font-semibold text-owl"}>
-                  {row.skipped_duplicate ? "Skipped" : row.matched ? "Matched" : "Needs Match"}
+                <span className={row.skipped_duplicate ? "font-semibold text-blue" : row.matched ? "font-semibold text-gain" : "font-semibold text-owl"}>
+                  {row.skipped_duplicate && row.image_status?.includes("Already in inventory")
+                    ? "Already in Inventory"
+                    : row.skipped_duplicate
+                      ? "Skipped"
+                      : row.matched
+                        ? "Matched"
+                        : "Needs Match"}
                 </span>
                 {row.set_code && <span>{row.set_code}</span>}
                 {row.card_number && <span>{row.card_number}</span>}
