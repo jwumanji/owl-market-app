@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { SetData } from "./sets-data";
-import { getSetImageUrl } from "./set-images";
+import SetThumb from "./SetThumb";
 import "./sets.css";
 
 type SortKey = "rank" | "code" | "name" | "price" | "chg1d" | "chg7d" | "chg30d" | "cards";
@@ -96,7 +96,6 @@ function HeadlineCard({
     );
   }
   const style = { ["--hl-color" as string]: set.color, ["--hl-color-d" as string]: colorD } as React.CSSProperties;
-  const imgUrl = getSetImageUrl(set.slug);
   return (
     <Link href={`/sets/${set.slug}`} className="sets-v2-hl" style={style}>
       <div className="sets-v2-hl-glow" />
@@ -109,16 +108,7 @@ function HeadlineCard({
         {set.year && <span className="sets-v2-hl-year">{set.year}</span>}
       </div>
       <div className="sets-v2-hl-title-row">
-        <div className="sets-v2-hl-thumb" style={{ ["--thumb-color" as string]: set.color } as React.CSSProperties}>
-          {imgUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={imgUrl} alt={`${set.code} box art`} loading="lazy" />
-          ) : (
-            <span className="sets-v2-hl-thumb-placeholder" aria-hidden>
-              {set.code.replace(/[0-9]/g, "")[0] ?? "·"}
-            </span>
-          )}
-        </div>
+        <SetThumb slug={set.slug} code={set.code} color={set.color} variant="headline" />
         <div className="sets-v2-hl-name">{set.name}</div>
       </div>
       <div className="sets-v2-hl-stat-row">
@@ -329,21 +319,11 @@ export default function SetsClient({ initialSets }: { initialSets: SetData[] }) 
             ) : (
               sorted.map((s, i) => {
                 const empty = s.comingSoon || s.cards === 0;
-                const imgUrl = getSetImageUrl(s.slug);
                 return (
                   <tr key={s.code} onClick={() => router.push(`/sets/${s.slug}`)}>
                     <td className="sv2-rank">{i + 1}</td>
                     <td className="sv2-thumb-cell">
-                      <div className="sv2-thumb" style={{ ["--thumb-color" as string]: s.color } as React.CSSProperties}>
-                        {imgUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={imgUrl} alt={`${s.code} box art`} loading="lazy" />
-                        ) : (
-                          <span className="sv2-thumb-placeholder" aria-hidden>
-                            {s.code.replace(/[0-9]/g, "")[0] ?? "·"}
-                          </span>
-                        )}
-                      </div>
+                      <SetThumb slug={s.slug} code={s.code} color={s.color} variant="table" />
                     </td>
                     <td>
                       <div className="sv2-code-cell">
