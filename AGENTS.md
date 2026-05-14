@@ -92,7 +92,7 @@ From `package.json`:
 
 ```powershell
 npm run dev      # next dev
-npm run build    # next build; Owl Lens contract drift check is added by the centering integration slice
+npm run build    # next build; Owl Lens drift-check wiring is deferred to Phase 2
 npm run start    # next start
 npm run lint     # next lint
 ```
@@ -125,7 +125,7 @@ Integration rules from [ADR 001](./docs/adr/001-owl-lens-centering-integration.m
 - The proxy route must reject anonymous requests with `401` before forwarding to `OWL_LENS_CV_URL`.
 - TypeScript contract types are generated from Owl Lens `contracts/openapi.yaml`.
 - The contract pipeline is `owl-lens:sync-contract`, `owl-lens:generate-types`, and `owl-lens:check-types`.
-- `npm run build` must fail on contract drift once the pipeline is scaffolded.
+- Once the upstream contract is published and generated types are committed, `npm run build` will run `owl-lens:check-types` first. See Phase 2 in ADR 001.
 - Phase 1 is ephemeral: measurement results live in component state only, with no DB writes.
 - Persisting measurements per inventory item is a Phase 2 goal.
 
