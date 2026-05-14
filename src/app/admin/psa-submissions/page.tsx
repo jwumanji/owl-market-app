@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PsaSubmissionsClient, { type PsaSubmissionView } from "./PsaSubmissionsClient";
 import { createServiceClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -35,32 +36,18 @@ type PsaSubmissionItemRow = {
   result_status: string | null;
 };
 
-function formatDate(value?: string | null) {
-  if (!value) return "No date";
-  const normalized = value.length === 10 ? `${value}T00:00:00` : value;
-  const date = new Date(normalized);
-  if (Number.isNaN(date.getTime())) return value;
+type InventoryImageRow = {
+  id: string;
+  card_id: string | null;
+  custom_image_front_url: string | null;
+  custom_image_back_url: string | null;
+};
 
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(date);
-}
-
-function resultLabel(item: PsaSubmissionItemRow) {
-  if (item.result_status === "already_in_inventory") return "Already in Inventory";
-  if (item.skipped_duplicate) return "Skipped";
-  if (item.result_status === "needs_match" || !item.matched) return "Needs Match";
-  return "Matched";
-}
-
-function resultClassName(item: PsaSubmissionItemRow) {
-  if (item.result_status === "already_in_inventory") return "border-blue/50 bg-blue/10 text-blue";
-  if (item.skipped_duplicate) return "border-border bg-surf2 text-text-2";
-  if (item.result_status === "needs_match" || !item.matched) return "border-owl/50 bg-owl/10 text-owl";
-  return "border-gain/50 bg-gain/10 text-gain";
-}
+type CardImageRow = {
+  id: string;
+  image_url: string | null;
+  image_url_small: string | null;
+};
 
 async function loadSubmissions() {
   const supabase = createServiceClient();
@@ -73,19 +60,13 @@ async function loadSubmissions() {
     .order("created_at", { ascending: false });
 
   if (submissionsRes.error) {
-    return {
-      submissions: [] as PsaSubmissionRow[],
-      itemsBySubmission: new Map<string, PsaSubmissionItemRow[]>(),
-      error: submissionsRes.error.message,
-    };
+    return { submissions: [] as PsaSubmissionView[], error: submissionsRes.error.message };
   }
 
   const submissions = (submissionsRes.data ?? []) as PsaSubmissionRow[];
   const submissionIds = submissions.map((submission) => submission.id);
-  const itemsBySubmission = new Map<string, PsaSubmissionItemRow[]>();
-
   if (submissionIds.length === 0) {
-    return { submissions, itemsBySubmission, error: null };
+    return { submissions: [] as PsaSubmissionView[], error: null };
   }
 
   const itemsRes = await supabase
@@ -97,18 +78,79 @@ async function loadSubmissions() {
     .order("row_number", { ascending: true });
 
   if (itemsRes.error) {
-    return { submissions, itemsBySubmission, error: itemsRes.error.message };
+    return { submissions: [] as PsaSubmissionView[], error: itemsRes.error.message };
   }
 
-  for (const item of (itemsRes.data ?? []) as PsaSubmissionItemRow[]) {
-    itemsBySubmission.set(item.submission_id, [...(itemsBySubmission.get(item.submission_id) ?? []), item]);
+  const itemRows = (itemsRes.data ?? []) as PsaSubmissionItemRow[];
+  const inventoryIds = Array.from(new Set(itemRows.map((item) => item.inventory_item_id).filter(Boolean))) as string[];
+  const inventoryMap = new Map<string, InventoryImageRow>();
+  const cardMap = new Map<string, CardImageRow>();
+
+  if (inventoryIds.length > 0) {
+    const inventoryRes = await supabase
+      .from("inventory_items")
+      .select("id, card_id, custom_image_front_url, custom_image_back_url")
+      .in("id", inventoryIds);
+
+    if (inventoryRes.error) {
+      return { submissions: [] as PsaSubmissionView[], error: inventoryRes.error.message };
+    }
+
+    const inventoryRows = (inventoryRes.data ?? []) as InventoryImageRow[];
+    inventoryRows.forEach((row) => inventoryMap.set(row.id, row));
+    const cardIds = Array.from(new Set(inventoryRows.map((row) => row.card_id).filter(Boolean))) as string[];
+
+    if (cardIds.length > 0) {
+      const cardsRes = await supabase
+        .from("cards")
+        .select("id, image_url, image_url_small")
+        .in("id", cardIds);
+
+      if (cardsRes.error) {
+        return { submissions: [] as PsaSubmissionView[], error: cardsRes.error.message };
+      }
+
+      ((cardsRes.data ?? []) as CardImageRow[]).forEach((row) => cardMap.set(row.id, row));
+    }
   }
 
-  return { submissions, itemsBySubmission, error: null };
+  const itemsBySubmission = new Map<string, PsaSubmissionView["items"]>();
+  for (const item of itemRows) {
+    const inventoryItem = item.inventory_item_id ? inventoryMap.get(item.inventory_item_id) ?? null : null;
+    const cardImage = inventoryItem?.card_id ? cardMap.get(inventoryItem.card_id) ?? null : null;
+    const thumbnailUrl =
+      inventoryItem?.custom_image_front_url ?? cardImage?.image_url_small ?? cardImage?.image_url ?? null;
+
+    itemsBySubmission.set(item.submission_id, [
+      ...(itemsBySubmission.get(item.submission_id) ?? []),
+      {
+        row_number: item.row_number,
+        inventory_item_id: item.inventory_item_id,
+        certification_number: item.certification_number,
+        graded_rating: item.graded_rating,
+        card_name: item.card_name,
+        card_number: item.card_number,
+        set_code: item.set_code,
+        matched: item.matched,
+        skipped_duplicate: item.skipped_duplicate,
+        image_status: item.image_status,
+        result_status: item.result_status,
+        thumbnail_url: thumbnailUrl,
+      },
+    ]);
+  }
+
+  return {
+    submissions: submissions.map((submission) => ({
+      ...submission,
+      items: itemsBySubmission.get(submission.id) ?? [],
+    })),
+    error: null,
+  };
 }
 
 export default async function PsaSubmissionsPage() {
-  const { submissions, itemsBySubmission, error } = await loadSubmissions();
+  const { submissions, error } = await loadSubmissions();
 
   return (
     <section className="mx-auto max-w-[1480px] px-4 py-8">
@@ -117,7 +159,7 @@ export default async function PsaSubmissionsPage() {
           <p className="mb-2 font-mono text-sm font-semibold uppercase tracking-wider text-owl">Internal Tool</p>
           <h1 className="text-4xl font-bold tracking-tight text-text">PSA Submissions</h1>
           <p className="mt-2 max-w-3xl text-base text-text">
-            Track historical PSA imports by submission, then review every row, grade, certification, match result, and scan status.
+            Review submissions by date, card count, grade results, and open the itemized card list only when needed.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -151,100 +193,7 @@ export default async function PsaSubmissionsPage() {
         </div>
       )}
 
-      <div className="grid gap-4">
-        {submissions.map((submission) => {
-          const items = itemsBySubmission.get(submission.id) ?? [];
-
-          return (
-            <article
-              key={submission.id}
-              id={`submission-${submission.id}`}
-              className="rounded-lg border border-border bg-surface"
-            >
-              <div className="flex flex-col gap-4 border-b border-border p-5 xl:flex-row xl:items-start xl:justify-between">
-                <div>
-                  <div className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
-                    {formatDate(submission.submitted_at)}
-                  </div>
-                  <h2 className="mt-1 text-2xl font-bold text-owl">{submission.name}</h2>
-                  <div className="mt-2 flex flex-wrap gap-2 font-mono text-xs text-text-2">
-                    {submission.source_filename && <span>Source: {submission.source_filename}</span>}
-                    <span>Created: {formatDate(submission.created_at)}</span>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-                  <div className="rounded-md border border-border bg-deep px-3 py-2 text-center">
-                    <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-text-2">Rows</div>
-                    <div className="text-lg font-bold text-text">{submission.total_rows ?? 0}</div>
-                  </div>
-                  <div className="rounded-md border border-border bg-deep px-3 py-2 text-center">
-                    <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-text-2">Imported</div>
-                    <div className="text-lg font-bold text-blue">{submission.imported_count ?? 0}</div>
-                  </div>
-                  <div className="rounded-md border border-border bg-deep px-3 py-2 text-center">
-                    <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-text-2">Matched</div>
-                    <div className="text-lg font-bold text-gain">{submission.matched_count ?? 0}</div>
-                  </div>
-                  <div className="rounded-md border border-border bg-deep px-3 py-2 text-center">
-                    <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-text-2">Needs Match</div>
-                    <div className="text-lg font-bold text-owl">{submission.pending_match_count ?? 0}</div>
-                  </div>
-                  <div className="rounded-md border border-border bg-deep px-3 py-2 text-center">
-                    <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-text-2">Skipped</div>
-                    <div className="text-lg font-bold text-text-2">{submission.skipped_duplicate_count ?? 0}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[980px] border-collapse text-left">
-                  <thead className="bg-surf2">
-                    <tr className="font-mono text-xs font-bold uppercase tracking-wider text-text">
-                      <th className="px-4 py-3">Row</th>
-                      <th className="px-4 py-3">Result</th>
-                      <th className="px-4 py-3">Card</th>
-                      <th className="px-4 py-3">Set</th>
-                      <th className="px-4 py-3">Card #</th>
-                      <th className="px-4 py-3">Grade</th>
-                      <th className="px-4 py-3">Certification</th>
-                      <th className="px-4 py-3">Images</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.length === 0 && (
-                      <tr>
-                        <td colSpan={8} className="px-4 py-8 text-center text-sm text-text-2">
-                          No item rows were recorded for this submission.
-                        </td>
-                      </tr>
-                    )}
-                    {items.map((item) => (
-                      <tr key={`${item.submission_id}-${item.row_number}`} className="border-t border-border text-sm text-text">
-                        <td className="px-4 py-3 font-mono text-text-2">{item.row_number ?? "-"}</td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex rounded border px-2 py-1 font-mono text-xs font-bold uppercase tracking-wider ${resultClassName(
-                              item
-                            )}`}
-                          >
-                            {resultLabel(item)}
-                          </span>
-                        </td>
-                        <td className="max-w-[360px] px-4 py-3 font-bold text-text">{item.card_name ?? "Unknown Card"}</td>
-                        <td className="px-4 py-3 font-mono text-text-2">{item.set_code ?? "-"}</td>
-                        <td className="px-4 py-3 font-mono text-text-2">{item.card_number ?? "-"}</td>
-                        <td className="px-4 py-3 font-mono font-bold text-owl">{item.graded_rating ?? "-"}</td>
-                        <td className="px-4 py-3 font-mono text-text">{item.certification_number ?? "-"}</td>
-                        <td className="px-4 py-3 text-xs text-text-2">{item.image_status ?? "-"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </article>
-          );
-        })}
-      </div>
+      {!error && submissions.length > 0 && <PsaSubmissionsClient initialSubmissions={submissions} />}
     </section>
   );
 }

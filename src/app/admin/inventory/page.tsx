@@ -3,7 +3,6 @@ import { InventoryRow } from "./InventoryTabs";
 import { loadOrderSummaries } from "../orders/order-data";
 import { createServiceClient } from "@/lib/supabase-server";
 import { CATALOG_MATCH_STATUSES, type CatalogMatchStatus, type GradedRating } from "@/lib/inventory-options";
-import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -255,18 +254,6 @@ export default async function AdminInventoryPage({
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-3">
-          <Link
-            href="/admin/psa-submissions"
-            className="rounded-md border border-border bg-surface px-4 py-3 font-mono text-sm font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl"
-          >
-            PSA Submissions
-          </Link>
-          <Link
-            href="/admin/orders/new"
-            className="rounded-md bg-owl px-4 py-3 font-mono text-sm font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
-          >
-            Add Order
-          </Link>
           <div className="rounded-lg border border-border bg-surface px-4 py-3 text-right">
             <div className="font-mono text-sm font-semibold uppercase tracking-wider text-text">Total Quantity</div>
             <div className="mt-1 text-3xl font-bold text-text">{totalQuantity}</div>
