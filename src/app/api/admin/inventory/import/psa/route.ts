@@ -79,6 +79,21 @@ type ArchiveScanPair = ScanPair & {
   imageCount: number;
 };
 
+type PsaImportSummaryRow = {
+  source_index: number;
+  inventory_item_id: string | null;
+  certification_number: string | null;
+  graded_rating: string | null;
+  matched: boolean;
+  card_name: string | null;
+  card_number: string | null;
+  set_code: string | null;
+  front_image_uploaded: boolean;
+  back_image_uploaded: boolean;
+  skipped_duplicate: boolean;
+  image_status: string;
+};
+
 function contentTypeForZipImage(name: string) {
   const lower = name.toLowerCase();
   if (lower.endsWith(".png")) return "image/png";
@@ -184,6 +199,80 @@ function certificationKey(value: string | number | null | undefined) {
   return digits || null;
 }
 
+function formStringValue(formData: FormData, key: string) {
+  const value = formData.get(key);
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function defaultSubmissionName(fileName: string) {
+  return fileName.replace(/\.[^.]+$/, "").trim() || "PSA Submission";
+}
+
+function submittedAtValue(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : new Date().toISOString().slice(0, 10);
+}
+
+async function recordPsaSubmission({
+  supabase,
+  submissionName,
+  sourceFilename,
+  submittedAt,
+  summaryRows,
+}: {
+  supabase: ReturnType<typeof createServiceClient>;
+  submissionName: string;
+  sourceFilename: string;
+  submittedAt: string;
+  summaryRows: PsaImportSummaryRow[];
+}) {
+  const skippedDuplicates = summaryRows.filter((row) => row.skipped_duplicate).length;
+  const matched = summaryRows.filter((row) => row.matched).length;
+  const pendingMatch = summaryRows.filter((row) => !row.matched && !row.skipped_duplicate).length;
+  const imported = summaryRows.filter((row) => !row.skipped_duplicate && row.inventory_item_id).length;
+
+  const { data: submission, error: submissionError } = await supabase
+    .from("psa_submissions")
+    .insert({
+      name: submissionName,
+      source_filename: sourceFilename,
+      submitted_at: submittedAt,
+      total_rows: summaryRows.length,
+      imported_count: imported,
+      matched_count: matched,
+      pending_match_count: pendingMatch,
+      skipped_duplicate_count: skippedDuplicates,
+    })
+    .select("id")
+    .single();
+
+  if (submissionError) {
+    return { warning: submissionError.message, submissionId: null };
+  }
+
+  const submissionId = (submission as { id: string }).id;
+  const itemRows = summaryRows.map((row, index) => ({
+    submission_id: submissionId,
+    inventory_item_id: row.inventory_item_id,
+    row_number: index + 1,
+    certification_number: row.certification_number,
+    graded_rating: row.graded_rating,
+    card_name: row.card_name,
+    card_number: row.card_number,
+    set_code: row.set_code,
+    matched: row.matched,
+    skipped_duplicate: row.skipped_duplicate,
+    image_status: row.image_status,
+    result_status: row.skipped_duplicate ? "skipped_duplicate" : row.matched ? "matched" : "needs_match",
+  }));
+
+  const { error: itemsError } = await supabase.from("psa_submission_items").insert(itemRows);
+  if (itemsError) {
+    return { warning: itemsError.message, submissionId };
+  }
+
+  return { warning: null, submissionId };
+}
+
 export async function POST(request: Request) {
   const formData = await request.formData().catch(() => null);
   if (!formData) {
@@ -195,6 +284,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Choose a PSA CSV file to import" }, { status: 400 });
   }
 
+  const submissionName = formStringValue(formData, "submission_name") || defaultSubmissionName(psaFile.name);
+  const submittedAt = submittedAtValue(formStringValue(formData, "submitted_at"));
   const text = await psaFile.text();
   const rows = parsePsaImport(text).filter((row) => row.certificationNumber || row.cardName || row.cardNumber);
 
@@ -244,7 +335,8 @@ export async function POST(request: Request) {
 
   const cards = (cardData ?? []) as unknown as CardLookupForImport[];
   const importRows = [];
-  const summaryRows = [];
+  const importSummaryIndexes: number[] = [];
+  const summaryRows: PsaImportSummaryRow[] = [];
   const importCertificationKeys = new Set<string>();
 
   for (const row of rows) {
@@ -255,7 +347,10 @@ export async function POST(request: Request) {
 
     if (isExistingDuplicate || isFileDuplicate) {
       summaryRows.push({
+        source_index: row.sourceIndex,
+        inventory_item_id: null,
         certification_number: certificationNumber,
+        graded_rating: row.gradedRating,
         matched: false,
         card_name: row.cardName,
         card_number: row.cardNumber,
@@ -322,7 +417,10 @@ export async function POST(request: Request) {
     });
 
     summaryRows.push({
+      source_index: row.sourceIndex,
+      inventory_item_id: null,
       certification_number: row.certificationNumber,
+      graded_rating: gradedRating,
       matched: Boolean(match),
       card_name: match?.name ?? row.cardName,
       card_number: match?.card_number ?? row.cardNumber,
@@ -341,14 +439,25 @@ export async function POST(request: Request) {
     });
 
     if (certKey) importCertificationKeys.add(certKey);
+    importSummaryIndexes.push(summaryRows.length - 1);
   }
 
   if (importRows.length === 0) {
+    const submissionResult = await recordPsaSubmission({
+      supabase,
+      submissionName,
+      sourceFilename: psaFile.name,
+      submittedAt,
+      summaryRows,
+    });
+
     return NextResponse.json({
       count: 0,
       matched: 0,
       pending_match: 0,
       skipped_duplicates: summaryRows.filter((row) => row.skipped_duplicate).length,
+      submission_id: submissionResult.submissionId,
+      submission_warning: submissionResult.warning,
       rows: summaryRows,
     });
   }
@@ -362,11 +471,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  ((data ?? []) as { id: string }[]).forEach((insertedRow, index) => {
+    const summaryIndex = importSummaryIndexes[index];
+    if (typeof summaryIndex === "number" && summaryRows[summaryIndex]) {
+      summaryRows[summaryIndex].inventory_item_id = insertedRow.id;
+    }
+  });
+
+  const submissionResult = await recordPsaSubmission({
+    supabase,
+    submissionName,
+    sourceFilename: psaFile.name,
+    submittedAt,
+    summaryRows,
+  });
+
   return NextResponse.json({
     count: data?.length ?? 0,
     matched: summaryRows.filter((row) => row.matched).length,
     pending_match: summaryRows.filter((row) => !row.matched && !row.skipped_duplicate).length,
     skipped_duplicates: summaryRows.filter((row) => row.skipped_duplicate).length,
+    submission_id: submissionResult.submissionId,
+    submission_warning: submissionResult.warning,
     rows: summaryRows,
   });
 }

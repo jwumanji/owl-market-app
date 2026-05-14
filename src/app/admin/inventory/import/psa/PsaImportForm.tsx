@@ -7,19 +7,33 @@ type PsaImportResult = {
   matched: number;
   pending_match: number;
   skipped_duplicates?: number;
+  submission_id?: string | null;
+  submission_warning?: string | null;
   rows: {
     certification_number: string | null;
     matched: boolean;
     card_name: string | null;
     card_number: string | null;
     set_code: string | null;
+    graded_rating?: string | null;
     skipped_duplicate?: boolean;
     image_status?: string | null;
   }[];
 };
 
+function todayDateString() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function defaultSubmissionName(file: File | null) {
+  if (!file) return "";
+  return file.name.replace(/\.[^.]+$/, "").trim();
+}
+
 export default function PsaImportForm() {
   const [psaFile, setPsaFile] = useState<File | null>(null);
+  const [submissionName, setSubmissionName] = useState("");
+  const [submittedAt, setSubmittedAt] = useState(todayDateString);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<PsaImportResult | null>(null);
@@ -29,6 +43,8 @@ export default function PsaImportForm() {
 
     const formData = new FormData();
     formData.append("psa_file", psaFile);
+    formData.append("submission_name", submissionName || defaultSubmissionName(psaFile) || "PSA Submission");
+    formData.append("submitted_at", submittedAt);
 
     setImporting(true);
     setError(null);
@@ -56,7 +72,7 @@ export default function PsaImportForm() {
         <div>
           <h2 className="text-xl font-bold text-text">PSA Import</h2>
           <p className="mt-1 max-w-2xl text-sm text-text-2">
-            Import a PSA CSV as individual Graded Card entries.
+            Import a PSA CSV as individual Graded Card entries and save it as a tracked submission.
           </p>
         </div>
       </div>
@@ -67,10 +83,34 @@ export default function PsaImportForm() {
           <input
             type="file"
             accept=".csv,text/csv,text/plain"
-            onChange={(event) => setPsaFile(event.target.files?.[0] ?? null)}
+            onChange={(event) => {
+              const nextFile = event.target.files?.[0] ?? null;
+              setPsaFile(nextFile);
+              if (!submissionName) setSubmissionName(defaultSubmissionName(nextFile));
+            }}
             className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 text-sm text-text file:mr-3 file:rounded file:border-0 file:bg-owl file:px-3 file:py-2 file:font-mono file:text-xs file:font-bold file:uppercase file:text-void"
           />
         </label>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <label className="block">
+            <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Submission Name</span>
+            <input
+              value={submissionName}
+              onChange={(event) => setSubmissionName(event.target.value)}
+              placeholder="PSA submission name"
+              className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 text-sm text-text outline-none focus:border-owl"
+            />
+          </label>
+          <label className="block">
+            <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Submission Date</span>
+            <input
+              type="date"
+              value={submittedAt}
+              onChange={(event) => setSubmittedAt(event.target.value)}
+              className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-owl"
+            />
+          </label>
+        </div>
         <div className="mt-4">
           <button
             type="button"
@@ -78,7 +118,7 @@ export default function PsaImportForm() {
             onClick={submit}
             className="rounded-md bg-owl px-4 py-3 font-mono text-sm font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light disabled:cursor-not-allowed disabled:bg-surf3 disabled:text-text-3"
           >
-            {importing ? "Importing..." : "Import to Graded Card"}
+            {importing ? "Importing..." : "Import and Track Submission"}
           </button>
         </div>
       </div>
@@ -103,6 +143,21 @@ export default function PsaImportForm() {
               )}
             </div>
           </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {result.submission_id && (
+              <a
+                href={`/admin/psa-submissions#submission-${result.submission_id}`}
+                className="rounded border border-blue/60 bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-blue transition-colors hover:bg-blue/15"
+              >
+                View Submission
+              </a>
+            )}
+            {result.submission_warning && (
+              <span className="rounded border border-owl/40 bg-owl/10 px-3 py-2 text-xs font-semibold text-text">
+                Submission tracking skipped: {result.submission_warning}
+              </span>
+            )}
+          </div>
           <div className="mt-3 max-h-48 overflow-y-auto rounded border border-border bg-deep">
             {result.rows.map((row, index) => (
               <div key={`${row.certification_number ?? "row"}-${index}`} className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2 text-xs text-text-2 last:border-b-0">
@@ -111,6 +166,7 @@ export default function PsaImportForm() {
                 </span>
                 {row.set_code && <span>{row.set_code}</span>}
                 {row.card_number && <span>{row.card_number}</span>}
+                {row.graded_rating && <span>{row.graded_rating}</span>}
                 <span className="min-w-0 flex-1 truncate text-text">{row.card_name ?? "Unknown Card"}</span>
                 {row.certification_number && <span>Cert {row.certification_number}</span>}
                 {row.image_status && (

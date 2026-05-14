@@ -3113,6 +3113,12 @@ export default function InventoryTabs({
 
         <div className="flex shrink-0 justify-start gap-2 xl:justify-end">
           <a
+            href="/admin/psa-submissions"
+            className="h-10 rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl"
+          >
+            PSA Submissions
+          </a>
+          <a
             href="/admin/inventory/import/psa"
             className="h-10 rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl"
           >

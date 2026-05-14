@@ -256,6 +256,12 @@ export default async function AdminInventoryPage({
         </div>
         <div className="flex flex-wrap items-end gap-3">
           <Link
+            href="/admin/psa-submissions"
+            className="rounded-md border border-border bg-surface px-4 py-3 font-mono text-sm font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl"
+          >
+            PSA Submissions
+          </Link>
+          <Link
             href="/admin/orders/new"
             className="rounded-md bg-owl px-4 py-3 font-mono text-sm font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
           >
