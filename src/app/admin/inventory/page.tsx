@@ -1,5 +1,5 @@
 import InventoryShell from "./InventoryShell";
-import { InventoryRow } from "./InventoryTabs";
+import type { CenteringCeiling, InventoryRow } from "./InventoryTabs";
 import { loadOrderSummaries } from "../orders/order-data";
 import { createServiceClient } from "@/lib/supabase-server";
 import { CATALOG_MATCH_STATUSES, type CatalogMatchStatus, type GradedRating } from "@/lib/inventory-options";
@@ -38,7 +38,13 @@ type InventoryQueryRow = {
   cost_basis: string | number | null;
   purchased_from: "facebook" | "ebay" | "instagram" | "direct_person" | "event" | null;
   notes: string | null;
+  inventory_centering_latest?: InventoryCenteringLatestRelation;
 };
+
+type InventoryCenteringLatestRelation =
+  | { psa_ceiling: string | null }
+  | { psa_ceiling: string | null }[]
+  | null;
 
 type CardLookupRow = {
   id: string;
@@ -51,15 +57,23 @@ type CardLookupRow = {
 
 type InventoryPageSearchParams = {
   status?: string | string[];
+  centering?: string | string[];
 };
 
 const INVENTORY_STATUS_FILTERS = ["new", "grading", "sale", "ship", "sold"] as const;
 type InventoryStatusFilter = (typeof INVENTORY_STATUS_FILTERS)[number];
+const CENTERING_CEILING_VALUES = new Set<CenteringCeiling>(["PSA_10", "PSA_9", "PSA_8", "PSA_7", "BELOW_PSA_7"]);
 
 function getInitialStatusFilter(searchParams?: InventoryPageSearchParams): InventoryStatusFilter | "all" {
   const status = Array.isArray(searchParams?.status) ? searchParams?.status[0] : searchParams?.status;
 
   return INVENTORY_STATUS_FILTERS.includes(status as InventoryStatusFilter) ? (status as InventoryStatusFilter) : "all";
+}
+
+function getInitialPsa10CandidatesOnly(searchParams?: InventoryPageSearchParams) {
+  const centering = Array.isArray(searchParams?.centering) ? searchParams?.centering[0] : searchParams?.centering;
+
+  return centering === "psa10";
 }
 
 const INVENTORY_SELECT_WITH_PSA = `
@@ -92,6 +106,10 @@ const INVENTORY_SELECT_BASE_LEGACY_MATCH = `
 
 const CATALOG_MATCH_STATUS_VALUES = new Set<string>(CATALOG_MATCH_STATUSES);
 
+function inventorySelectWithCentering(columns: string, psa10CandidatesOnly: boolean) {
+  return `${columns}, inventory_centering_latest${psa10CandidatesOnly ? "!inner" : ""}(psa_ceiling)`;
+}
+
 function isMissingPsaColumnsError(error: { message?: string } | null) {
   return Boolean(
     error?.message &&
@@ -115,6 +133,13 @@ function normalizeCatalogMatchStatus(row: InventoryQueryRow): CatalogMatchStatus
   if (row.card_id) return "matched";
   if (row.pending_card_match) return "needs_match";
   return "custom_verified";
+}
+
+function normalizeCenteringCeiling(relation: InventoryCenteringLatestRelation): CenteringCeiling | null {
+  const latest = Array.isArray(relation) ? relation[0] : relation;
+  const ceiling = latest?.psa_ceiling;
+
+  return CENTERING_CEILING_VALUES.has(ceiling as CenteringCeiling) ? (ceiling as CenteringCeiling) : null;
 }
 
 function toInventoryRow(row: InventoryQueryRow, cardMap: Map<string, CardLookupRow>): InventoryRow {
@@ -146,6 +171,7 @@ function toInventoryRow(row: InventoryQueryRow, cardMap: Map<string, CardLookupR
     notes: row.notes,
     catalog_match_status: catalogStatus,
     pending_card_match: catalogStatus === "needs_match",
+    centering_ceiling: normalizeCenteringCeiling(row.inventory_centering_latest ?? null),
     card: {
       name: card?.name ?? row.manual_card_name ?? null,
       image_url: card?.image_url ?? null,
@@ -163,6 +189,7 @@ export default async function AdminInventoryPage({
 }) {
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const initialStatusFilter = getInitialStatusFilter(resolvedSearchParams);
+  const initialPsa10CandidatesOnly = getInitialPsa10CandidatesOnly(resolvedSearchParams);
   let supabase;
   let configError: string | null = null;
 
@@ -174,11 +201,17 @@ export default async function AdminInventoryPage({
 
   let migrationWarning: string | null = null;
   const inventoryResult = supabase
-    ? await supabase
-        .from("inventory_items")
-        .select(INVENTORY_SELECT_WITH_PSA)
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false })
+    ? await (() => {
+        let query = supabase
+          .from("inventory_items")
+          .select(inventorySelectWithCentering(INVENTORY_SELECT_WITH_PSA, initialPsa10CandidatesOnly));
+
+        if (initialPsa10CandidatesOnly) {
+          query = query.eq("inventory_centering_latest.psa_ceiling", "PSA_10");
+        }
+
+        return query.order("created_at", { ascending: false }).order("id", { ascending: false });
+      })()
     : { data: null, error: null };
 
   let data: unknown[] | null = inventoryResult.data as unknown[] | null;
@@ -200,11 +233,15 @@ export default async function AdminInventoryPage({
         ? INVENTORY_SELECT_BASE_LEGACY_MATCH
         : INVENTORY_SELECT_BASE
       : INVENTORY_SELECT_WITH_PSA_LEGACY_MATCH;
-    const baseResult = await supabase
+    let fallbackQuery = supabase
       .from("inventory_items")
-      .select(fallbackInventorySelect)
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false });
+      .select(inventorySelectWithCentering(fallbackInventorySelect, initialPsa10CandidatesOnly));
+
+    if (initialPsa10CandidatesOnly) {
+      fallbackQuery = fallbackQuery.eq("inventory_centering_latest.psa_ceiling", "PSA_10");
+    }
+
+    const baseResult = await fallbackQuery.order("created_at", { ascending: false }).order("id", { ascending: false });
     data = ((baseResult.data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
       ...row,
       ...(missingPsaColumns
@@ -277,6 +314,7 @@ export default async function AdminInventoryPage({
             orders={orderResult.data}
             ordersError={orderResult.error}
             initialStatusFilter={initialStatusFilter}
+            initialPsa10CandidatesOnly={initialPsa10CandidatesOnly}
           />
         </>
       )}

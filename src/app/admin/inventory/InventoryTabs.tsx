@@ -8,6 +8,50 @@ import type { CustomerOrderSummary } from "../orders/order-types";
 type StatusFilter = InventoryStatus | "all";
 type SaleChannel = "not_sold" | "ebay" | "fb" | "instagram" | "in_person" | "traded";
 type PurchasedFrom = "facebook" | "ebay" | "instagram" | "direct_person" | "event";
+export type CenteringCeiling = "PSA_10" | "PSA_9" | "PSA_8" | "PSA_7" | "BELOW_PSA_7";
+
+const CENTERING_CEILING_LABELS: Record<CenteringCeiling, string> = {
+  PSA_10: "PSA 10",
+  PSA_9: "PSA 9",
+  PSA_8: "PSA 8",
+  PSA_7: "PSA 7",
+  BELOW_PSA_7: "< PSA 7",
+};
+
+const CENTERING_CEILING_CLASSES: Record<CenteringCeiling, string> = {
+  PSA_10: "border-gain/40 bg-gain/10 text-gain",
+  PSA_9: "border-owl/40 bg-owl/10 text-owl",
+  PSA_8: "border-owl/40 bg-owl/10 text-owl",
+  PSA_7: "border-loss/40 bg-loss/10 text-loss",
+  BELOW_PSA_7: "border-loss/40 bg-loss/10 text-loss",
+};
+
+export function isCenteringCeiling(value: unknown): value is CenteringCeiling {
+  return typeof value === "string" && value in CENTERING_CEILING_LABELS;
+}
+
+export function shouldShowItemForPsa10Candidates(
+  item: Pick<InventoryRow, "centering_ceiling">,
+  psa10CandidatesOnly: boolean
+) {
+  return !psa10CandidatesOnly || item.centering_ceiling === "PSA_10";
+}
+
+export function centeringCeilingBadgeClassName(ceiling: CenteringCeiling) {
+  return CENTERING_CEILING_CLASSES[ceiling];
+}
+
+export function renderCenteringCeilingBadge(ceiling?: CenteringCeiling | null, className = "") {
+  if (!ceiling) return null;
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2.5 py-1 font-mono text-xs font-black uppercase leading-none tracking-wider ${CENTERING_CEILING_CLASSES[ceiling]} ${className}`}
+    >
+      {CENTERING_CEILING_LABELS[ceiling]}
+    </span>
+  );
+}
 
 export interface InventoryRow {
   id: string;
@@ -33,6 +77,7 @@ export interface InventoryRow {
   notes?: string | null;
   catalog_match_status?: CatalogMatchStatus | null;
   pending_card_match?: boolean | null;
+  centering_ceiling?: CenteringCeiling | null;
   card: {
     name: string | null;
     image_url: string | null;
@@ -416,6 +461,7 @@ export default function InventoryTabs({
   onOrdersChange,
   statusFilter = "all",
   onStatusFilterChange,
+  psa10CandidatesOnly = false,
 }: {
   items: InventoryRow[];
   orders?: CustomerOrderSummary[];
@@ -424,6 +470,7 @@ export default function InventoryTabs({
   onOrdersChange?: (orders: CustomerOrderSummary[]) => void;
   statusFilter?: StatusFilter;
   onStatusFilterChange?: (status: StatusFilter) => void;
+  psa10CandidatesOnly?: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<InventoryTabId>("all");
   const [gradedFilter, setGradedFilter] = useState<GradedFilter>("all");
@@ -466,7 +513,11 @@ export default function InventoryTabs({
   const showTracking = statusFilter === "ship" || statusFilter === "sold";
   const showShippingActions = statusFilter === "ship";
   const showSaleFields = statusFilter === "sold";
-  const standardTableMinWidth = showSaleFields ? "min-w-[1360px]" : "min-w-[1020px]";
+  const standardTableMinWidth = showSaleFields ? "min-w-[1490px]" : "min-w-[1150px]";
+
+  useEffect(() => {
+    setRows(items);
+  }, [items]);
 
   useEffect(() => {
     onItemsChange?.(rows);
@@ -521,15 +572,19 @@ export default function InventoryTabs({
     window.history.replaceState(null, "", url);
   }
 
+  const psa10FilteredRows = useMemo(() => {
+    return rows.filter((item) => shouldShowItemForPsa10Candidates(item, psa10CandidatesOnly));
+  }, [psa10CandidatesOnly, rows]);
+
   const statusFilteredRows = useMemo(() => {
     if (pendingMatchOnly) {
-      return rows.filter((item) => needsCatalogMatch(item));
+      return psa10FilteredRows.filter((item) => needsCatalogMatch(item));
     }
 
-    return rows.filter((item) => {
+    return psa10FilteredRows.filter((item) => {
       return statusFilter === "all" || item.status === statusFilter;
     });
-  }, [pendingMatchOnly, rows, statusFilter]);
+  }, [pendingMatchOnly, psa10FilteredRows, statusFilter]);
 
   const cardNumbers = useMemo(() => {
     const sorted = rows
@@ -579,6 +634,8 @@ export default function InventoryTabs({
         item.shipping_tracking,
         item.shipping_label_url,
         item.notes,
+        item.centering_ceiling,
+        item.centering_ceiling ? CENTERING_CEILING_LABELS[item.centering_ceiling] : null,
         matchStatus,
         matchStatus.replace("_", " "),
       ]
@@ -2072,6 +2129,25 @@ export default function InventoryTabs({
     return <div className="flex w-full justify-center">{renderInventoryCardBadge(item)}</div>;
   }
 
+  function renderGroupCenteringCeiling(group: InventoryGroup) {
+    const measuredCeilings = group.rows
+      .map((row) => row.centering_ceiling)
+      .filter((ceiling): ceiling is CenteringCeiling => Boolean(ceiling));
+
+    if (measuredCeilings.length === 0) return null;
+
+    const sharedCeiling = sameValue(measuredCeilings);
+    if (sharedCeiling) {
+      return renderCenteringCeilingBadge(sharedCeiling);
+    }
+
+    return (
+      <span className="inline-flex items-center rounded-full border border-border-2 bg-surf3 px-2.5 py-1 font-mono text-xs font-black uppercase leading-none tracking-wider text-text-2">
+        Mixed
+      </span>
+    );
+  }
+
   function renderCardMeta(
     item: InventoryRow,
     {
@@ -3365,12 +3441,13 @@ export default function InventoryTabs({
 
       {statusFilter === "ship" ? (
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
-        <table className="w-full min-w-[1260px] table-fixed">
+        <table className="w-full min-w-[1390px] table-fixed">
           <colgroup>
             <col className={ROW_NUMBER_COLUMN_CLASS} />
             <col className="w-[48px]" />
             <col className={TABLE_IMAGE_COLUMN_CLASS} />
             <col className="w-[330px]" />
+            <col className="w-[130px]" />
             <col className="w-[190px]" />
             <col className="w-[210px]" />
             <col className="w-[145px]" />
@@ -3382,6 +3459,7 @@ export default function InventoryTabs({
               <th className="px-3 py-3.5">{renderSelectionHeader()}</th>
               <th className="px-4 py-3.5">Image</th>
               <th className="px-3 py-3.5">Card</th>
+              <th className="px-3 py-3.5">Centering</th>
               <th className="px-3 py-3.5">Customer Name</th>
               <th className="px-3 py-3.5">Ship Label</th>
               <th className="px-3 py-3.5">Shipped</th>
@@ -3466,6 +3544,7 @@ export default function InventoryTabs({
                         })}
                       </div>
                     </td>
+                    <td className="px-3 py-4">{renderGroupCenteringCeiling(group)}</td>
                     <td className="px-3 py-4 font-mono text-sm">
                       {group.rows.length === 1 ? (
                         renderCustomerNameCell(group.rows[0])
@@ -3538,6 +3617,7 @@ export default function InventoryTabs({
                               {renderRowActions({ group, item: child, canAdd: true, canRemove: true })}
                             </div>
                           </td>
+                          <td className="px-3 py-3.5">{renderCenteringCeilingBadge(child.centering_ceiling)}</td>
                           <td className="px-3 py-3.5">{renderCustomerNameCell(child)}</td>
                           <td className="px-3 py-3.5">{renderShippingLabelCell(child)}</td>
                           <td className="px-3 py-3.5">{renderShippedCell(child)}</td>
@@ -3547,7 +3627,7 @@ export default function InventoryTabs({
                       <tr className="border-b border-[rgba(79,142,247,0.16)] bg-[rgba(79,142,247,0.045)] shadow-[inset_3px_0_0_rgba(79,142,247,0.32)] last:border-b-0">
                         <td className="px-3 py-3.5" />
                         <td className="px-3 py-3.5" />
-                        <td colSpan={6} className="px-3 py-3.5">
+                        <td colSpan={7} className="px-3 py-3.5">
                           <button
                             type="button"
                             disabled={isAdding}
@@ -3567,7 +3647,7 @@ export default function InventoryTabs({
 
             {groups.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-12 text-center text-base text-text-2">
+                <td colSpan={9} className="px-3 py-12 text-center text-base text-text-2">
                   No inventory items need shipping yet.
                 </td>
               </tr>
@@ -3584,6 +3664,7 @@ export default function InventoryTabs({
             <col className={TABLE_IMAGE_COLUMN_CLASS} />
             <col className="w-[290px]" />
             <col className="w-[82px]" />
+            <col className="w-[130px]" />
             {showTracking && <col className="w-[250px]" />}
             {showSaleFields && <col className="w-[145px]" />}
             {showSaleFields && <col className="w-[132px]" />}
@@ -3598,6 +3679,7 @@ export default function InventoryTabs({
               <th className="px-4 py-3.5">Image</th>
               <th className="px-3 py-3.5">Card Name</th>
               <th className="px-3 py-3.5 text-right">Quantity</th>
+              <th className="px-3 py-3.5">Centering</th>
               {showShippingActions && <th className="px-3 py-3.5">Customer Name</th>}
               {showShippingActions && <th className="px-3 py-3.5">Ship Label</th>}
               {showShippingActions && <th className="px-3 py-3.5">Shipped</th>}
@@ -3684,6 +3766,7 @@ export default function InventoryTabs({
                       </div>
                     </td>
                     <td className="px-3 py-4 text-right font-mono text-base font-semibold text-text">{group.quantity}</td>
+                    <td className="px-3 py-4">{renderGroupCenteringCeiling(group)}</td>
                     {showShippingActions && (
                       <td className="px-3 py-4 font-mono text-sm">
                         {group.rows.length === 1 ? (
@@ -3795,6 +3878,7 @@ export default function InventoryTabs({
                             </div>
                           </td>
                           <td className="px-3 py-3.5 text-right font-mono text-base font-semibold text-text">{child.quantity}</td>
+                          <td className="px-3 py-3.5">{renderCenteringCeilingBadge(child.centering_ceiling)}</td>
                           {showShippingActions && (
                             <td className="px-3 py-3.5">
                               {renderCustomerNameCell(child)}
@@ -3827,7 +3911,7 @@ export default function InventoryTabs({
                       <tr className="border-b border-[rgba(79,142,247,0.16)] bg-[rgba(79,142,247,0.045)] shadow-[inset_3px_0_0_rgba(79,142,247,0.32)] last:border-b-0">
                         <td className="px-3 py-3.5" />
                         <td className="px-3 py-3.5" />
-                        <td colSpan={(showTracking ? 6 : 5) + (showShippingActions ? 3 : 0) + (showSaleFields ? 3 : 0)} className="px-3 py-3.5">
+                        <td colSpan={(showTracking ? 7 : 6) + (showShippingActions ? 3 : 0) + (showSaleFields ? 3 : 0)} className="px-3 py-3.5">
                           <button
                             type="button"
                             disabled={isAdding}
@@ -3847,7 +3931,7 @@ export default function InventoryTabs({
 
             {groups.length === 0 && (
               <tr>
-                <td colSpan={(showTracking ? 8 : 7) + (showShippingActions ? 3 : 0) + (showSaleFields ? 3 : 0)} className="px-3 py-12 text-center text-base text-text-2">
+                <td colSpan={(showTracking ? 9 : 8) + (showShippingActions ? 3 : 0) + (showSaleFields ? 3 : 0)} className="px-3 py-12 text-center text-base text-text-2">
                   No inventory items in this view yet.
                 </td>
               </tr>

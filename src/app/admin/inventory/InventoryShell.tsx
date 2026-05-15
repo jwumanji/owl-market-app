@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import InventoryTabs, { InventoryRow } from "./InventoryTabs";
 import type { CustomerOrderSummary } from "../orders/order-types";
 
@@ -20,13 +21,17 @@ export default function InventoryShell({
   orders = [],
   ordersError = null,
   initialStatusFilter = "all",
+  initialPsa10CandidatesOnly = false,
 }: {
   items: InventoryRow[];
   orders?: CustomerOrderSummary[];
   ordersError?: string | null;
   initialStatusFilter?: StatusFilter;
+  initialPsa10CandidatesOnly?: boolean;
 }) {
+  const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatusFilter);
+  const [psa10CandidatesOnly, setPsa10CandidatesOnly] = useState(initialPsa10CandidatesOnly);
   const [liveItems, setLiveItems] = useState(items);
   const [liveOrders, setLiveOrders] = useState(orders);
   const openOrders = liveOrders.filter((order) => !order.marked_shipped);
@@ -40,6 +45,14 @@ export default function InventoryShell({
   useEffect(() => {
     setStatusFilter(initialStatusFilter);
   }, [initialStatusFilter]);
+
+  useEffect(() => {
+    setPsa10CandidatesOnly(initialPsa10CandidatesOnly);
+  }, [initialPsa10CandidatesOnly]);
+
+  useEffect(() => {
+    setLiveItems(items);
+  }, [items]);
 
   useEffect(() => {
     setLiveOrders(orders);
@@ -58,6 +71,29 @@ export default function InventoryShell({
     return liveItems.filter((item) => item.status === "ship" && !openOrderItemIds.has(item.id)).length;
   }, [liveItems, openOrderItemIds]);
   const needShippingOrderCount = openOrderCount + standaloneShippingOrderCount;
+  const psa10CandidateCount = useMemo(() => {
+    return liveItems.filter((item) => item.centering_ceiling === "PSA_10").length;
+  }, [liveItems]);
+
+  function setPsa10CandidateFilter(next: boolean) {
+    setPsa10CandidatesOnly(next);
+
+    const params = new URLSearchParams(window.location.search);
+    if (next) {
+      params.set("centering", "psa10");
+    } else {
+      params.delete("centering");
+    }
+
+    if (statusFilter === "all") {
+      params.delete("status");
+    } else {
+      params.set("status", statusFilter);
+    }
+
+    const query = params.toString();
+    router.push(query ? `${window.location.pathname}?${query}` : window.location.pathname);
+  }
 
   return (
     <>
@@ -95,6 +131,33 @@ export default function InventoryShell({
         ))}
       </div>
 
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface px-4 py-3">
+        <div>
+          <div className="font-mono text-sm font-semibold uppercase tracking-wider text-text">
+            Centering Filter
+          </div>
+          <div className="mt-1 text-sm text-text-2">
+            {psa10CandidateCount} item{psa10CandidateCount === 1 ? "" : "s"} currently measure as PSA 10 candidates.
+          </div>
+        </div>
+        <button
+          type="button"
+          aria-pressed={psa10CandidatesOnly}
+          onClick={() => setPsa10CandidateFilter(!psa10CandidatesOnly)}
+          className={`inline-flex items-center gap-2 rounded-md border px-4 py-2.5 font-mono text-sm font-bold uppercase tracking-wider transition-colors ${
+            psa10CandidatesOnly
+              ? "border-gain bg-gain/10 text-gain"
+              : "border-border-2 bg-deep text-text hover:border-owl hover:text-owl"
+          }`}
+        >
+          <span
+            aria-hidden="true"
+            className={`h-2.5 w-2.5 rounded-full ${psa10CandidatesOnly ? "bg-gain" : "bg-text-3"}`}
+          />
+          Show only PSA 10 candidates
+        </button>
+      </div>
+
       <InventoryTabs
         items={items}
         orders={liveOrders}
@@ -103,6 +166,7 @@ export default function InventoryShell({
         onOrdersChange={setLiveOrders}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
+        psa10CandidatesOnly={psa10CandidatesOnly}
       />
     </>
   );
