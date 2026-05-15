@@ -65,6 +65,7 @@ const INITIAL_STATE: WorkspaceState = {
 };
 
 const RETRYABLE_ERROR_CODES = new Set<ApiErrorCode>(["CARD_NOT_DETECTED", "IMAGE_UNREADABLE"]);
+export const PRELOAD_FETCH_ERROR_MESSAGE = "Couldn't load saved scan. Upload a fresh image instead.";
 const PROCESSING_STEPS = [
   "Validating image",
   "Finding card boundary",
@@ -302,6 +303,143 @@ function readErrorBody(body: unknown): CenteringError {
   return error && typeof error === "object" ? error : null;
 }
 
+function extensionForContentType(contentType: string) {
+  if (contentType === "image/png") return ".png";
+  if (contentType === "image/webp") return ".webp";
+  return ".jpg";
+}
+
+export function preloadedImageFileName(imageUrl: string, contentType: string) {
+  const extension = extensionForContentType(contentType);
+
+  try {
+    const url = new URL(imageUrl);
+    const name = decodeURIComponent(url.pathname.split("/").filter(Boolean).pop() ?? "");
+    if (/\.(jpe?g|png|webp)$/i.test(name)) return name;
+    if (name) return `${name}${extension}`;
+  } catch {
+    // Fall through to the stable default for relative or malformed URLs.
+  }
+
+  return `saved-card-scan${extension}`;
+}
+
+export async function fetchPreloadedImageFile({
+  imageUrl,
+  fetchImpl = fetch,
+}: {
+  imageUrl: string;
+  fetchImpl?: typeof fetch;
+}) {
+  const response = await fetchImpl(imageUrl);
+  if (!response.ok) {
+    throw new Error(`Could not load saved scan: ${response.status}`);
+  }
+
+  const headerContentType = response.headers.get("content-type")?.split(";")[0]?.trim();
+  const blob = await response.blob();
+  const contentType = headerContentType || blob.type || "image/jpeg";
+
+  return new File([blob], preloadedImageFileName(imageUrl, contentType), { type: contentType });
+}
+
+export async function submitMeasurementRequest({
+  inventoryItemId,
+  file,
+  manualOverlay,
+  fetchImpl = fetch,
+}: {
+  inventoryItemId: string;
+  file: File;
+  manualOverlay?: MeasurementOverlay | null;
+  fetchImpl?: typeof fetch;
+}): Promise<{ ok: true; result: MeasurementResponse } | { ok: false; error: CenteringError }> {
+  const response = await fetchImpl("/api/centering/measure", {
+    method: "POST",
+    body: buildMeasurementFormData({
+      inventoryItemId,
+      file,
+      manualOverlay,
+    }),
+  }).catch(() => null);
+
+  if (!response) {
+    return {
+      ok: false,
+      error: { code: "MEASUREMENT_FAILED", message: "Could not reach the centering service." },
+    };
+  }
+
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    return {
+      ok: false,
+      error: readErrorBody(body) ?? { code: "MEASUREMENT_FAILED", message: "Measurement failed." },
+    };
+  }
+
+  return { ok: true, result: body as MeasurementResponse };
+}
+
+export async function measurePreloadedImage({
+  imageUrl,
+  inventoryItemId,
+  dispatchAction,
+  onFile,
+  fetchImpl = fetch,
+  wait = delay,
+}: {
+  imageUrl: string;
+  inventoryItemId: string;
+  dispatchAction: (action: WorkspaceAction) => void;
+  onFile: (file: File) => void;
+  fetchImpl?: typeof fetch;
+  wait?: (ms: number) => Promise<unknown>;
+}): Promise<
+  | { ok: true; file: File; result: MeasurementResponse }
+  | { ok: false; file?: File; error: CenteringError; preloadError?: string }
+> {
+  dispatchAction({ type: "startUpload" });
+
+  let file: File;
+  try {
+    file = await fetchPreloadedImageFile({ imageUrl, fetchImpl });
+  } catch {
+    dispatchAction({ type: "reset" });
+    return {
+      ok: false,
+      error: null,
+      preloadError: PRELOAD_FETCH_ERROR_MESSAGE,
+    };
+  }
+
+  onFile(file);
+  await wait(250);
+  dispatchAction({ type: "startProcessing" });
+
+  const outcome = await submitMeasurementRequest({
+    inventoryItemId,
+    file,
+    fetchImpl,
+  });
+
+  if (!outcome.ok) {
+    dispatchAction({ type: "failure", error: outcome.error });
+    return {
+      ok: false,
+      file,
+      error: outcome.error,
+    };
+  }
+
+  dispatchAction({ type: "success", result: outcome.result });
+  return {
+    ok: true,
+    file,
+    result: outcome.result,
+  };
+}
+
 function StatusPanel({ status }: { status: WorkspaceStatus }) {
   const activeIndex = status === "uploading" ? 0 : status === "processing" ? 2 : -1;
 
@@ -389,6 +527,45 @@ function UploadZone({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function PreloadedImagePanel({
+  imageSrc,
+  onMeasure,
+  onUploadDifferent,
+}: {
+  imageSrc: string;
+  onMeasure: () => void;
+  onUploadDifferent: () => void;
+}) {
+  return (
+    <div className="flex min-h-[560px] flex-col items-center justify-center rounded-lg border border-border bg-surface p-8 text-center">
+      <div className="w-full">
+        <div className="mb-4 font-mono text-xs font-bold uppercase text-text-2">Ready to measure</div>
+        <div className="mx-auto flex aspect-[5/7] max-h-[420px] max-w-[300px] items-center justify-center rounded-md border border-border bg-deep">
+          <svg viewBox="0 0 100 140" role="img" aria-label="Saved card image preview" className="h-full w-full">
+            <image href={imageSrc} x="0" y="0" width="100" height="140" preserveAspectRatio="xMidYMid meet" />
+          </svg>
+        </div>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <button
+            type="button"
+            onClick={onMeasure}
+            className="rounded-md border border-owl/40 bg-owl px-4 py-2.5 font-mono text-xs font-bold uppercase text-void transition-colors hover:bg-owl-light"
+          >
+            Measure this card
+          </button>
+          <button
+            type="button"
+            onClick={onUploadDifferent}
+            className="rounded-md border border-border bg-deep px-4 py-2.5 font-mono text-xs font-bold uppercase text-text transition-colors hover:border-border-2 hover:bg-surf2"
+          >
+            Upload a different image
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -821,10 +998,13 @@ export default function CenteringWorkspace({
   const [state, dispatch] = useReducer(centeringReducer, INITIAL_STATE);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [showUploadZone, setShowUploadZone] = useState(!preloadImageUrl);
+  const [preloadFetchError, setPreloadFetchError] = useState<string | null>(null);
   const [manualOverlay, setManualOverlay] = useState<MeasurementOverlay>(() => defaultManualOverlay(1024, 1428));
   const [imageSize, setImageSize] = useState({ width: 1024, height: 1428 });
   const reportRef = useRef<HTMLDivElement>(null);
   const imageSrc = previewUrl ?? preloadImageUrl ?? null;
+  const showPreloadedPanel = Boolean(preloadImageUrl && !showUploadZone && !selectedFile);
 
   useEffect(() => {
     if (!selectedFile) return;
@@ -849,50 +1029,58 @@ export default function CenteringWorkspace({
     image.src = imageSrc;
   }, [imageSrc]);
 
+  useEffect(() => {
+    setShowUploadZone(!preloadImageUrl);
+    setPreloadFetchError(null);
+  }, [preloadImageUrl]);
+
   const submitMeasurement = useCallback(
     async (file: File, overlay?: MeasurementOverlay | null) => {
       dispatch({ type: "startUpload" });
       await delay(250);
       dispatch({ type: "startProcessing" });
 
-      const response = await fetch("/api/centering/measure", {
-        method: "POST",
-        body: buildMeasurementFormData({
-          inventoryItemId,
-          file,
-          manualOverlay: overlay,
-        }),
-      }).catch(() => null);
+      const outcome = await submitMeasurementRequest({
+        inventoryItemId,
+        file,
+        manualOverlay: overlay,
+      });
 
-      if (!response) {
-        dispatch({
-          type: "failure",
-          error: { code: "MEASUREMENT_FAILED", message: "Could not reach the centering service." },
-        });
+      if (!outcome.ok) {
+        dispatch({ type: "failure", error: outcome.error });
         return;
       }
 
-      const body = await response.json().catch(() => null);
-      if (!response.ok) {
-        dispatch({
-          type: "failure",
-          error: readErrorBody(body) ?? { code: "MEASUREMENT_FAILED", message: "Measurement failed." },
-        });
-        return;
-      }
-
-      dispatch({ type: "success", result: body as MeasurementResponse });
+      dispatch({ type: "success", result: outcome.result });
     },
     [inventoryItemId]
   );
 
   const measureFile = useCallback(
     (file: File) => {
+      setPreloadFetchError(null);
       setSelectedFile(file);
       void submitMeasurement(file);
     },
     [submitMeasurement]
   );
+
+  const measurePreloadedFile = useCallback(() => {
+    if (!preloadImageUrl) return;
+
+    setPreloadFetchError(null);
+    void measurePreloadedImage({
+      imageUrl: preloadImageUrl,
+      inventoryItemId,
+      dispatchAction: dispatch,
+      onFile: setSelectedFile,
+    }).then((outcome) => {
+      if (!outcome.ok && outcome.preloadError) {
+        setPreloadFetchError(outcome.preloadError);
+        setShowUploadZone(true);
+      }
+    });
+  }, [inventoryItemId, preloadImageUrl]);
 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
@@ -948,12 +1136,30 @@ export default function CenteringWorkspace({
       </div>
 
       {state.status === "idle" && (
-        <UploadZone
-          getRootProps={dropzone.getRootProps}
-          getInputProps={dropzone.getInputProps}
-          isDragActive={dropzone.isDragActive}
-          imageSrc={imageSrc}
-        />
+        <>
+          {preloadFetchError && (
+            <div className="rounded-md border border-loss/40 bg-loss/10 px-4 py-3 text-sm font-semibold text-text">
+              {preloadFetchError}
+            </div>
+          )}
+          {showPreloadedPanel && preloadImageUrl ? (
+            <PreloadedImagePanel
+              imageSrc={preloadImageUrl}
+              onMeasure={measurePreloadedFile}
+              onUploadDifferent={() => {
+                setPreloadFetchError(null);
+                setShowUploadZone(true);
+              }}
+            />
+          ) : (
+            <UploadZone
+              getRootProps={dropzone.getRootProps}
+              getInputProps={dropzone.getInputProps}
+              isDragActive={dropzone.isDragActive}
+              imageSrc={selectedFile ? previewUrl : null}
+            />
+          )}
+        </>
       )}
 
       {(state.status === "uploading" || state.status === "processing") && <StatusPanel status={state.status} />}

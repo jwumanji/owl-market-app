@@ -4,6 +4,8 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import test from "node:test";
 import vm from "node:vm";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
 
 const requireFromTest = createRequire(import.meta.url);
@@ -19,13 +21,28 @@ const componentJavaScript = ts.transpileModule(componentSource, {
 }).outputText;
 
 type Exports = {
+  default: React.ComponentType<{
+    inventoryItemId: string;
+    preloadImageUrl?: string | null;
+    cardIdentity: { name: string; setCode?: string | null; cardNumber?: string | null; rarity?: string | null };
+  }>;
   buildMeasurementFormData: (input: { inventoryItemId: string; file: File; manualOverlay?: unknown }) => FormData;
   buildResultViewModel: (result: Record<string, unknown>) => Record<string, unknown>;
   centeringReducer: (state: Record<string, unknown>, action: Record<string, unknown>) => Record<string, unknown>;
   defaultManualOverlay: (width: number, height: number) => Record<string, unknown>;
   downloadReportElement: (input: { element: HTMLElement; filename: string; toPngImpl: () => Promise<string> }) => Promise<void>;
+  fetchPreloadedImageFile: (input: { imageUrl: string; fetchImpl: typeof fetch }) => Promise<File>;
   isManualCorrectionError: (error: { code?: string } | null) => boolean;
+  measurePreloadedImage: (input: {
+    imageUrl: string;
+    inventoryItemId: string;
+    dispatchAction: (action: { type: string; result?: unknown; error?: unknown }) => void;
+    onFile: (file: File) => void;
+    fetchImpl: typeof fetch;
+    wait: () => Promise<void>;
+  }) => Promise<{ ok: boolean; file?: File; preloadError?: string }>;
   moveManualCorner: (input: Record<string, unknown>) => Record<string, unknown>;
+  PRELOAD_FETCH_ERROR_MESSAGE: string;
   psaTone: (ceiling: string) => string;
   reportFileName: (cardName: string) => string;
 };
@@ -150,6 +167,70 @@ function measurementResponse() {
   };
 }
 
+function renderWorkspace(preloadImageUrl?: string | null) {
+  const { exports } = loadComponent();
+
+  return renderToStaticMarkup(
+    React.createElement(exports.default, {
+      inventoryItemId: "inventory-1",
+      preloadImageUrl,
+      cardIdentity: {
+        name: "Nami",
+        setCode: "OP01",
+        cardNumber: "OP01-016",
+        rarity: "R",
+      },
+    })
+  );
+}
+
+function responseLike({
+  ok,
+  status = ok ? 200 : 500,
+  contentType = "application/json",
+  body,
+  blob,
+}: {
+  ok: boolean;
+  status?: number;
+  contentType?: string;
+  body?: unknown;
+  blob?: Blob;
+}) {
+  return {
+    ok,
+    status,
+    headers: {
+      get(name: string) {
+        return name.toLowerCase() === "content-type" ? contentType : null;
+      },
+    },
+    async blob() {
+      return blob ?? new Blob(["image"], { type: contentType });
+    },
+    async json() {
+      return body ?? null;
+    },
+  } as Response;
+}
+
+test("workspace renders measure-this-card button when preload URL is passed", () => {
+  const html = renderWorkspace("https://cdn.example/cards/front.png");
+
+  assert.match(html, /Ready to measure/);
+  assert.match(html, /Measure this card/);
+  assert.match(html, /Upload a different image/);
+  assert.doesNotMatch(html, /Upload a front scan/);
+});
+
+test("workspace renders upload zone when no preload URL is passed", () => {
+  const html = renderWorkspace(null);
+
+  assert.match(html, /Upload a front scan/);
+  assert.match(html, /Browse scan/);
+  assert.doesNotMatch(html, /Measure this card/);
+});
+
 test("workspace reducer moves through upload, processing, results, failure, and reset states", () => {
   const { exports } = loadComponent();
   const initial = { status: "idle", result: null, error: null };
@@ -220,6 +301,80 @@ test("manual correction retry payload includes manual_adjustment and corrected c
   assert.deepEqual(JSON.parse(String(formData.get("corrected_overlay"))), JSON.parse(JSON.stringify(overlay)));
   assert.equal(exports.isManualCorrectionError({ code: "CARD_NOT_DETECTED" }), true);
   assert.equal(exports.isManualCorrectionError({ code: "FILE_TOO_LARGE" }), false);
+});
+
+test("measure-this-card action fetches the preloaded image and posts it for measurement", async () => {
+  const { exports } = loadComponent();
+  const actions: string[] = [];
+  const files: File[] = [];
+  const postBodies: FormData[] = [];
+  const fetchCalls: string[] = [];
+  const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    fetchCalls.push(url);
+
+    if (url === "https://cdn.example/cards/front.png") {
+      return responseLike({
+        ok: true,
+        contentType: "image/png",
+        blob: new Blob(["saved scan"], { type: "image/png" }),
+      });
+    }
+
+    if (url === "/api/centering/measure") {
+      postBodies.push(init?.body as FormData);
+      return responseLike({ ok: true, body: measurementResponse() });
+    }
+
+    throw new Error(`Unexpected fetch ${url}`);
+  };
+
+  const outcome = await exports.measurePreloadedImage({
+    imageUrl: "https://cdn.example/cards/front.png",
+    inventoryItemId: "inventory-1",
+    dispatchAction(action) {
+      actions.push(action.type);
+    },
+    onFile(file) {
+      files.push(file);
+    },
+    fetchImpl,
+    wait: async () => undefined,
+  });
+
+  assert.equal(outcome.ok, true);
+  assert.deepEqual(actions, ["startUpload", "startProcessing", "success"]);
+  assert.deepEqual(fetchCalls, ["https://cdn.example/cards/front.png", "/api/centering/measure"]);
+  assert.equal(files[0].name, "front.png");
+  assert.equal(files[0].type, "image/png");
+  assert.equal(postBodies[0].get("inventoryItemId"), "inventory-1");
+  assert.equal(postBodies[0].get("file"), files[0]);
+});
+
+test("preloaded image fetch failure returns inline error path and leaves upload zone available", async () => {
+  const { exports } = loadComponent();
+  const actions: string[] = [];
+  const fetchImpl = async () => responseLike({ ok: false, status: 404, contentType: "text/plain" });
+
+  const outcome = await exports.measurePreloadedImage({
+    imageUrl: "https://cdn.example/cards/missing.png",
+    inventoryItemId: "inventory-1",
+    dispatchAction(action) {
+      actions.push(action.type);
+    },
+    onFile() {
+      throw new Error("onFile should not be called when preload fetch fails");
+    },
+    fetchImpl,
+    wait: async () => undefined,
+  });
+  const uploadZoneHtml = renderWorkspace(null);
+
+  assert.equal(outcome.ok, false);
+  assert.equal(outcome.preloadError, exports.PRELOAD_FETCH_ERROR_MESSAGE);
+  assert.equal(exports.PRELOAD_FETCH_ERROR_MESSAGE, "Couldn't load saved scan. Upload a fresh image instead.");
+  assert.deepEqual(actions, ["startUpload", "reset"]);
+  assert.match(uploadZoneHtml, /Upload a front scan/);
 });
 
 test("download report trigger writes a PNG filename and clicks a download link", async () => {
