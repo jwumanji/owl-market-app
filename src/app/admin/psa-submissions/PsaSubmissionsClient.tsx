@@ -62,6 +62,32 @@ function orderNumberFromFilename(value?: string | null) {
   return value.match(/psa[-_\s]?order[-_\s]?(\d+)/i)?.[1] ?? value.match(/(\d{5,})/)?.[1] ?? null;
 }
 
+function orderNumberSortValue(value?: string | null) {
+  const orderNumber = orderNumberFromFilename(value);
+  if (!orderNumber) return null;
+  const parsed = Number(orderNumber);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function dateSortValue(value?: string | null) {
+  if (!value) return 0;
+  const normalized = value.length === 10 ? `${value}T00:00:00` : value;
+  const timestamp = new Date(normalized).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function compareSubmissions(a: PsaSubmissionView, b: PsaSubmissionView) {
+  const aOrder = orderNumberSortValue(a.source_filename);
+  const bOrder = orderNumberSortValue(b.source_filename);
+  if (aOrder !== null && bOrder !== null && aOrder !== bOrder) return bOrder - aOrder;
+  if (aOrder !== null && bOrder === null) return -1;
+  if (aOrder === null && bOrder !== null) return 1;
+
+  const aDate = dateSortValue(a.submitted_at ?? a.created_at);
+  const bDate = dateSortValue(b.submitted_at ?? b.created_at);
+  return bDate - aDate;
+}
+
 function gradeSortValue(label: string) {
   const number = Number(label.match(/\d+(?:\.\d+)?/)?.[0]);
   return Number.isFinite(number) ? number : -1;
@@ -146,6 +172,7 @@ export default function PsaSubmissionsClient({ initialSubmissions }: Props) {
     () => submissions.find((submission) => submission.id === selectedId) ?? null,
     [selectedId, submissions]
   );
+  const sortedSubmissions = useMemo(() => [...submissions].sort(compareSubmissions), [submissions]);
   const selectedOrderNumber = orderNumberFromFilename(selectedSubmission?.source_filename);
 
   function beginRename(submission: PsaSubmissionView) {
@@ -188,7 +215,7 @@ export default function PsaSubmissionsClient({ initialSubmissions }: Props) {
       )}
 
       <div className="grid gap-4">
-        {submissions.map((submission) => {
+        {sortedSubmissions.map((submission) => {
           const grades = gradeCounts(submission.items);
           const thumbnails = sampleThumbnails(submission.items);
           const isEditing = editingId === submission.id;
