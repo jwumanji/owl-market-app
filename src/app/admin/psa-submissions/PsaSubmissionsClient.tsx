@@ -79,7 +79,7 @@ function dateSortValue(value?: string | null) {
 function compareSubmissions(a: PsaSubmissionView, b: PsaSubmissionView) {
   const aOrder = orderNumberSortValue(a.source_filename);
   const bOrder = orderNumberSortValue(b.source_filename);
-  if (aOrder !== null && bOrder !== null && aOrder !== bOrder) return aOrder - bOrder;
+  if (aOrder !== null && bOrder !== null && aOrder !== bOrder) return bOrder - aOrder;
   if (aOrder !== null && bOrder === null) return -1;
   if (aOrder === null && bOrder !== null) return 1;
 
