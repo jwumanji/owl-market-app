@@ -107,6 +107,14 @@ type ExistingCertificationItem = {
   catalog_match_status: string | null;
 };
 
+type ExistingPsaSubmission = {
+  id: string;
+  name: string | null;
+  source_filename: string | null;
+  submitted_at: string | null;
+  created_at: string | null;
+};
+
 function contentTypeForZipImage(name: string) {
   const lower = name.toLowerCase();
   if (lower.endsWith(".png")) return "image/png";
@@ -221,8 +229,44 @@ function defaultSubmissionName(fileName: string) {
   return fileName.replace(/\.[^.]+$/, "").trim() || "PSA Submission";
 }
 
+function psaOrderNumberFromFilename(value: string | null | undefined) {
+  if (!value) return null;
+  return value.match(/psa[-_\s]?order[-_\s]?(\d+)/i)?.[1] ?? value.match(/(\d{5,})/)?.[1] ?? null;
+}
+
+function dateRank(value: string | null | undefined) {
+  if (!value) return 0;
+  const normalized = value.length === 10 ? `${value}T00:00:00` : value;
+  const timestamp = new Date(normalized).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 function submittedAtValue(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : new Date().toISOString().slice(0, 10);
+}
+
+async function findExistingPsaSubmissionByOrderNumber({
+  supabase,
+  orderNumber,
+}: {
+  supabase: ReturnType<typeof createServiceClient>;
+  orderNumber: string;
+}) {
+  const { data, error } = await supabase
+    .from("psa_submissions")
+    .select("id, name, source_filename, submitted_at, created_at")
+    .not("source_filename", "is", null)
+    .limit(50000);
+
+  if (error) {
+    return { submission: null, error };
+  }
+
+  const existing = ((data ?? []) as ExistingPsaSubmission[])
+    .filter((submission) => psaOrderNumberFromFilename(submission.source_filename) === orderNumber)
+    .sort((a, b) => dateRank(b.created_at ?? b.submitted_at) - dateRank(a.created_at ?? a.submitted_at))[0];
+
+  return { submission: existing ?? null, error: null };
 }
 
 async function recordPsaSubmission({
@@ -305,6 +349,34 @@ export async function POST(request: Request) {
 
   const submissionName = formStringValue(formData, "submission_name") || defaultSubmissionName(psaFile.name);
   const submittedAt = submittedAtValue(formStringValue(formData, "submitted_at"));
+  const supabase = createServiceClient();
+  const psaOrderNumber = psaOrderNumberFromFilename(psaFile.name);
+
+  if (psaOrderNumber) {
+    const duplicateResult = await findExistingPsaSubmissionByOrderNumber({
+      supabase,
+      orderNumber: psaOrderNumber,
+    });
+
+    if (duplicateResult.error) {
+      return NextResponse.json({ error: duplicateResult.error.message }, { status: 500 });
+    }
+
+    if (duplicateResult.submission) {
+      return NextResponse.json(
+        {
+          error: `PSA order #${psaOrderNumber} has already been imported as "${
+            duplicateResult.submission.name ?? "PSA Submission"
+          }". Duplicate submissions are not allowed.`,
+          existing_submission_id: duplicateResult.submission.id,
+          existing_submission_name: duplicateResult.submission.name,
+          existing_source_filename: duplicateResult.submission.source_filename,
+        },
+        { status: 409 }
+      );
+    }
+  }
+
   const text = await psaFile.text();
   const rows = parsePsaImport(text).filter((row) => row.certificationNumber || row.cardName || row.cardNumber);
 
@@ -319,7 +391,6 @@ export async function POST(request: Request) {
   const frontFiles = filesFrom(formData, "front_images");
   const backFiles = filesFrom(formData, "back_images");
   const scanPairs = assignScans(rows, frontFiles, backFiles);
-  const supabase = createServiceClient();
   const hasCertRows = rows.some((row) => certificationKey(row.certificationNumber));
   const existingCertificationItems = new Map<string, ExistingCertificationItem>();
 

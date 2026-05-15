@@ -79,13 +79,58 @@ function dateSortValue(value?: string | null) {
 function compareSubmissions(a: PsaSubmissionView, b: PsaSubmissionView) {
   const aOrder = orderNumberSortValue(a.source_filename);
   const bOrder = orderNumberSortValue(b.source_filename);
-  if (aOrder !== null && bOrder !== null && aOrder !== bOrder) return bOrder - aOrder;
+  if (aOrder !== null && bOrder !== null && aOrder !== bOrder) return aOrder - bOrder;
   if (aOrder !== null && bOrder === null) return -1;
   if (aOrder === null && bOrder !== null) return 1;
 
   const aDate = dateSortValue(a.submitted_at ?? a.created_at);
   const bDate = dateSortValue(b.submitted_at ?? b.created_at);
   return bDate - aDate;
+}
+
+function shouldUseSubmission(candidate: PsaSubmissionView, current: PsaSubmissionView) {
+  const candidateValues = [
+    candidate.items.filter((item) => item.thumbnail_url).length,
+    candidate.items.filter((item) => item.inventory_item_id).length,
+    candidate.imported_count ?? 0,
+    candidate.matched_count ?? 0,
+    dateSortValue(candidate.created_at ?? candidate.submitted_at),
+  ];
+  const currentValues = [
+    current.items.filter((item) => item.thumbnail_url).length,
+    current.items.filter((item) => item.inventory_item_id).length,
+    current.imported_count ?? 0,
+    current.matched_count ?? 0,
+    dateSortValue(current.created_at ?? current.submitted_at),
+  ];
+
+  for (let index = 0; index < candidateValues.length; index += 1) {
+    const candidateValue = candidateValues[index] ?? 0;
+    const currentValue = currentValues[index] ?? 0;
+    if (candidateValue !== currentValue) return candidateValue > currentValue;
+  }
+
+  return false;
+}
+
+function dedupeSubmissionsByOrderNumber(submissions: PsaSubmissionView[]) {
+  const byOrderNumber = new Map<string, PsaSubmissionView>();
+  const withoutOrderNumber: PsaSubmissionView[] = [];
+
+  submissions.forEach((submission) => {
+    const orderNumber = orderNumberFromFilename(submission.source_filename);
+    if (!orderNumber) {
+      withoutOrderNumber.push(submission);
+      return;
+    }
+
+    const current = byOrderNumber.get(orderNumber);
+    if (!current || shouldUseSubmission(submission, current)) {
+      byOrderNumber.set(orderNumber, submission);
+    }
+  });
+
+  return [...Array.from(byOrderNumber.values()), ...withoutOrderNumber];
 }
 
 function gradeSortValue(label: string) {
@@ -168,11 +213,14 @@ export default function PsaSubmissionsClient({ initialSubmissions }: Props) {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const sortedSubmissions = useMemo(
+    () => dedupeSubmissionsByOrderNumber(submissions).sort(compareSubmissions),
+    [submissions]
+  );
   const selectedSubmission = useMemo(
     () => submissions.find((submission) => submission.id === selectedId) ?? null,
     [selectedId, submissions]
   );
-  const sortedSubmissions = useMemo(() => [...submissions].sort(compareSubmissions), [submissions]);
   const selectedOrderNumber = orderNumberFromFilename(selectedSubmission?.source_filename);
 
   function beginRename(submission: PsaSubmissionView) {
