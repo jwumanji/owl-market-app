@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { findCardAliasMatches, loadCardMatchAliases } from "@/lib/card-match-aliases";
 import { createServiceClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -82,6 +83,29 @@ export async function GET(request: Request) {
   const supabase = createServiceClient();
   const tokens = searchTokens(query);
   const candidates = new Map<string, CardSearchRow>();
+  const aliasBoosts = new Map<string, number>();
+  const aliasResult = await loadCardMatchAliases(supabase);
+  const aliasMatches = findCardAliasMatches({ rawName: query, sourceType: "psa_import" }, aliasResult.aliases, 60).slice(0, 12);
+  const aliasCardIds = Array.from(new Set(aliasMatches.map(({ alias }) => alias.card_id)));
+
+  if (aliasCardIds.length > 0) {
+    const { data, error } = await supabase
+      .from("cards")
+      .select(SEARCH_SELECT)
+      .in("id", aliasCardIds);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    for (const card of (data ?? []) as unknown as CardSearchRow[]) {
+      candidates.set(card.id, card);
+    }
+
+    for (const match of aliasMatches) {
+      aliasBoosts.set(match.alias.card_id, Math.max(aliasBoosts.get(match.alias.card_id) ?? 0, match.score + 120));
+    }
+  }
 
   for (const token of tokens.length > 0 ? tokens : [query]) {
     const { data, error } = await supabase
@@ -129,7 +153,7 @@ export async function GET(request: Request) {
   }
 
   const scored = Array.from(candidates.values())
-    .map((card) => ({ card, score: scoreCard(card, query, tokens) }))
+    .map((card) => ({ card, score: scoreCard(card, query, tokens) + (aliasBoosts.get(card.id) ?? 0) }))
     .filter(({ score }) => score > 0)
     .sort((a, b) => b.score - a.score || (a.card.name ?? "").localeCompare(b.card.name ?? ""))
     .slice(0, 30)

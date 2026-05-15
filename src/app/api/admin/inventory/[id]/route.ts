@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { saveCardMatchAlias, type CardMatchAliasSource } from "@/lib/card-match-aliases";
 import { CATALOG_MATCH_STATUSES, GRADED_RATINGS } from "@/lib/inventory-options";
 
 const STATUSES = new Set(["new", "grading", "sale", "ship", "sold"]);
@@ -8,6 +9,16 @@ const GRADED_RATING_VALUES = new Set<string>(GRADED_RATINGS);
 const CATALOG_MATCH_STATUS_VALUES = new Set<string>(CATALOG_MATCH_STATUSES);
 const SALE_CHANNELS = new Set(["not_sold", "ebay", "fb", "instagram", "in_person", "traded"]);
 const PURCHASED_FROM_OPTIONS = new Set(["facebook", "ebay", "instagram", "direct_person", "event"]);
+
+type ExistingInventoryItem = {
+  status: string | null;
+  inventory_type: string | null;
+  manual_card_name: string | null;
+  manual_card_number: string | null;
+  manual_set_code: string | null;
+  item_nickname: string | null;
+  certification_number: string | null;
+};
 
 function parseOptionalNumeric(value: unknown, fieldName: string) {
   if (value === null || value === undefined || value === "") {
@@ -246,7 +257,7 @@ export async function PATCH(
   const supabase = createServiceClient();
   const { data: existing } = await supabase
     .from("inventory_items")
-    .select("status")
+    .select("status, inventory_type, manual_card_name, manual_card_number, manual_set_code, item_nickname, certification_number")
     .eq("id", params.id)
     .single();
 
@@ -266,6 +277,22 @@ export async function PATCH(
       inventory_item_id: params.id,
       from_status: existing?.status ?? null,
       to_status: updates.status,
+    });
+  }
+
+  if (typeof updates.card_id === "string" && updates.card_id && existing) {
+    const existingItem = existing as ExistingInventoryItem;
+    const sourceType: CardMatchAliasSource =
+      existingItem.inventory_type === "graded" && existingItem.certification_number ? "psa_import" : "manual_inventory";
+    await saveCardMatchAlias(supabase, {
+      rawName:
+        existingItem.manual_card_name ??
+        existingItem.item_nickname ??
+        [existingItem.manual_set_code, existingItem.manual_card_number].filter(Boolean).join(" "),
+      rawCardNumber: existingItem.manual_card_number,
+      rawSetHint: existingItem.manual_set_code,
+      sourceType,
+      cardId: updates.card_id,
     });
   }
 

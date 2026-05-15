@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { inflateRawSync } from "zlib";
+import { findBestCardAliasMatch, loadCardMatchAliases, type CardMatchAliasRow } from "@/lib/card-match-aliases";
 import { createServiceClient } from "@/lib/supabase-server";
 import { isUploadFile, uploadInventoryScan } from "@/lib/inventory-scans";
 import {
@@ -213,6 +214,20 @@ async function downloadPsaImageArchive(url: string | null) {
 function setCodeFor(card: CardLookupForImport | null) {
   const set = Array.isArray(card?.sets) ? card?.sets[0] : card?.sets;
   return set?.code ?? null;
+}
+
+function matchImportedCard(row: PsaImportRow, cards: CardLookupForImport[], aliases: CardMatchAliasRow[]) {
+  const alias = findBestCardAliasMatch(
+    {
+      rawName: row.cardName,
+      rawCardNumber: row.cardNumber,
+      rawSetHint: row.setCode,
+      sourceType: "psa_import",
+    },
+    aliases
+  );
+  const aliasCard = alias ? cards.find((card) => card.id === alias.card_id) ?? null : null;
+  return aliasCard ?? matchInventoryCard(row, cards);
 }
 
 function certificationKey(value: string | number | null | undefined) {
@@ -513,6 +528,8 @@ export async function POST(request: Request) {
   }
 
   const cards = (cardData ?? []) as unknown as CardLookupForImport[];
+  const aliasResult = await loadCardMatchAliases(supabase);
+  const aliases = aliasResult.aliases;
   const importRows = [];
   const importSummaryIndexes: number[] = [];
   const summaryRows: PsaImportSummaryRow[] = [];
@@ -526,7 +543,7 @@ export async function POST(request: Request) {
     const isFileDuplicate = Boolean(certKey && importCertificationKeys.has(certKey));
 
     if (isExistingDuplicate || isFileDuplicate) {
-      const match = matchInventoryCard(row, cards);
+      const match = matchImportedCard(row, cards, aliases);
       summaryRows.push({
         source_index: row.sourceIndex,
         inventory_item_id: existingItem?.id ?? null,
@@ -545,7 +562,7 @@ export async function POST(request: Request) {
     }
 
     const pair = scanPairs.get(row.sourceIndex) ?? { front: null, back: null };
-    const match = matchInventoryCard(row, cards);
+    const match = matchImportedCard(row, cards, aliases);
     const psaCertDetails = await lookupPsaCertDetails(row.certificationNumber);
     const archivePair = await downloadPsaImageArchive(row.imageArchiveUrl);
     const frontScan = pair.front ?? archivePair.front;
