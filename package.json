@@ -15,11 +15,13 @@
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.101.1",
     "chart.js": "^4.5.1",
+    "html-to-image": "^1.11.13",
     "justtcg-js": "^0.1.22",
     "next": "14.2.35",
     "react": "^18",
     "react-chartjs-2": "^5.3.1",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "react-dropzone": "^15.0.0"
   },
   "devDependencies": {
     "@types/node": "^20",
