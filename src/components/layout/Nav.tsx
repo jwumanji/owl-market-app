@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { label: "CHARACTERS", href: "/characters" },
   { label: "PORTFOLIO", href: "/portfolio" },
   { label: "INVENTORY", href: "/admin/inventory" },
+  { label: "OWL LENS", href: "/admin/lens" },
 ];
 
 export default function Nav() {
