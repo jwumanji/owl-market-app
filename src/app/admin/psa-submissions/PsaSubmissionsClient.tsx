@@ -57,6 +57,11 @@ function normalizeGrade(value?: string | null) {
   return value?.replace(/\s+/g, " ").trim().toUpperCase() || "Ungraded";
 }
 
+function submissionNumberFromFilename(value?: string | null) {
+  if (!value) return null;
+  return value.match(/psa[-_\s]?order[-_\s]?(\d+)/i)?.[1] ?? value.match(/(\d{5,})/)?.[1] ?? null;
+}
+
 function gradeSortValue(label: string) {
   const number = Number(label.match(/\d+(?:\.\d+)?/)?.[0]);
   return Number.isFinite(number) ? number : -1;
@@ -141,6 +146,7 @@ export default function PsaSubmissionsClient({ initialSubmissions }: Props) {
     () => submissions.find((submission) => submission.id === selectedId) ?? null,
     [selectedId, submissions]
   );
+  const selectedSubmissionNumber = submissionNumberFromFilename(selectedSubmission?.source_filename);
 
   function beginRename(submission: PsaSubmissionView) {
     setEditingId(submission.id);
@@ -186,6 +192,7 @@ export default function PsaSubmissionsClient({ initialSubmissions }: Props) {
           const grades = gradeCounts(submission.items);
           const thumbnails = sampleThumbnails(submission.items);
           const isEditing = editingId === submission.id;
+          const submissionNumber = submissionNumberFromFilename(submission.source_filename);
 
           return (
             <article
@@ -233,6 +240,11 @@ export default function PsaSubmissionsClient({ initialSubmissions }: Props) {
                       >
                         <EditIcon />
                       </button>
+                    </div>
+                  )}
+                  {submissionNumber && (
+                    <div className="mt-1 font-mono text-sm font-extrabold uppercase tracking-wider text-blue">
+                      Submission # <span className="text-owl">{submissionNumber}</span>
                     </div>
                   )}
                   <div className="mt-2 flex flex-wrap gap-2 font-mono text-xs text-text-2">
@@ -294,6 +306,11 @@ export default function PsaSubmissionsClient({ initialSubmissions }: Props) {
                   {formatDate(selectedSubmission.submitted_at)}
                 </div>
                 <h2 className="mt-1 text-2xl font-bold text-owl">{selectedSubmission.name}</h2>
+                {selectedSubmissionNumber && (
+                  <div className="mt-1 font-mono text-sm font-extrabold uppercase tracking-wider text-blue">
+                    Submission # <span className="text-owl">{selectedSubmissionNumber}</span>
+                  </div>
+                )}
                 <div className="mt-2 flex flex-wrap gap-2">
                   <GradePills counts={gradeCounts(selectedSubmission.items)} />
                 </div>
