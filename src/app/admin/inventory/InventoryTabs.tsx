@@ -3213,6 +3213,12 @@ export default function InventoryTabs({
             PSA Submissions
           </a>
           <a
+            href="/admin/bundles"
+            className="h-10 rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl"
+          >
+            Bundles
+          </a>
+          <a
             href="/admin/inventory/import/psa"
             className="h-10 rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl"
           >
@@ -3223,6 +3229,12 @@ export default function InventoryTabs({
             className="h-10 rounded-md border border-owl/40 bg-owl/10 px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/15"
           >
             Add Order
+          </a>
+          <a
+            href="/admin/bundles/new"
+            className="h-10 rounded-md border border-owl/40 bg-owl/10 px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/15"
+          >
+            Create Bundle
           </a>
           <a
             href="/admin/inventory/new"
