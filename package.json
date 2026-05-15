@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run owl-lens:check-types && next build",
     "start": "next start",
     "lint": "next lint",
     "owl-lens:sync-contract": "node scripts/owl-lens-sync.mjs",

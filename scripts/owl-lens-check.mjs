@@ -20,7 +20,12 @@ const tempPath = path.join(
   `owl-lens-openapi-${process.pid}-${Date.now()}.generated.ts`
 );
 const require = createRequire(import.meta.url);
-const openApiTypescriptCli = require.resolve("openapi-typescript/bin/cli.js");
+const openApiTypescriptPackagePath = require.resolve("openapi-typescript/package.json");
+const openApiTypescriptCli = path.join(
+  path.dirname(openApiTypescriptPackagePath),
+  "bin",
+  "cli.js"
+);
 
 if (!existsSync(contractPath)) {
   console.error(

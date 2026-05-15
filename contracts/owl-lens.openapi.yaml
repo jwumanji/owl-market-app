@@ -1,0 +1,525 @@
+openapi: 3.1.0
+info:
+  title: Owl Lens CV Service API
+  version: 0.1.0
+  description: >
+    HTTP contract for the Owl Lens centering CV service. Phase 1 uses a
+    deterministic mock measurement keyed from an in-memory hash of the uploaded
+    file bytes so the integrated owl-market-app flow can validate the contract
+    before the OpenCV pipeline ships.
+servers:
+  - url: http://localhost:8000
+    description: Local development
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Health check
+      responses:
+        "200":
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              examples:
+                ok:
+                  value:
+                    status: ok
+  /measure:
+    post:
+      operationId: measureCardCentering
+      summary: Measure front-of-card centering
+      description: >
+        Upload a front-of-card JPEG, PNG, or WEBP image and receive a front
+        centering measurement, PSA centering ceiling, overlay coordinates, and
+        processing metadata. Phase 1 returns a deterministic mock measurement
+        keyed from an in-memory hash of the uploaded file bytes.
+
+        Image bytes are streamed, hashed in memory, and discarded before the
+        handler returns. Bytes are never persisted to disk or logged.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/MeasureRequest"
+            encoding:
+              file:
+                contentType: image/jpeg, image/png, image/webp
+      responses:
+        "200":
+          description: Front centering measurement completed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeasurementResponse"
+              examples:
+                mockMeasurement:
+                  value:
+                    image:
+                      contentType: image/jpeg
+                      widthPx: 1024
+                      heightPx: 1428
+                    centering:
+                      leftRight:
+                        leftPercent: 52
+                        rightPercent: 48
+                      topBottom:
+                        topPercent: 49
+                        bottomPercent: 51
+                      worstAxis: leftRight
+                      worstAxisMaxPercent: 52
+                    psa:
+                      ceiling: PSA_10
+                      label: PSA 10 centering ceiling
+                      thresholds:
+                        - ceiling: PSA_10
+                          label: PSA 10
+                          maxMajorPercent: 55
+                          ratioLabel: 55/45
+                        - ceiling: PSA_9
+                          label: PSA 9
+                          maxMajorPercent: 60
+                          ratioLabel: 60/40
+                        - ceiling: PSA_8
+                          label: PSA 8
+                          maxMajorPercent: 65
+                          ratioLabel: 65/35
+                        - ceiling: PSA_7
+                          label: PSA 7
+                          maxMajorPercent: 70
+                          ratioLabel: 70/30
+                    overlay:
+                      coordinateSpace: imagePixels
+                      outerCard:
+                        x: 32
+                        y: 28
+                        width: 960
+                        height: 1372
+                      innerFrame:
+                        x: 118
+                        y: 134
+                        width: 792
+                        height: 1164
+                      gaps:
+                        leftPx: 86
+                        rightPx: 82
+                        topPx: 106
+                        bottomPx: 102
+                    pipeline:
+                      mode: mock
+                      version: 0.1.0
+                    metadata:
+                      processingMs: 42
+                      warnings: []
+        "400":
+          description: The upload request is malformed or missing the file field.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalidUpload:
+                  value:
+                    error:
+                      code: INVALID_UPLOAD
+                      message: Multipart form must include a file field.
+                      details:
+                        requestId: 8d4dbb2f-6c2e-4a9a-8a61-6a4ef3d1a317
+        "413":
+          description: The uploaded file exceeds the 20 MB limit.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                fileTooLarge:
+                  value:
+                    error:
+                      code: FILE_TOO_LARGE
+                      message: File must be 20 MB or smaller.
+                      details:
+                        requestId: 2a0be0f8-e7f7-4b29-9681-816f5f447f01
+        "415":
+          description: The uploaded file content type is not JPEG, PNG, or WEBP.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                unsupportedMediaType:
+                  value:
+                    error:
+                      code: UNSUPPORTED_MEDIA_TYPE
+                      message: File must be a JPEG, PNG, or WEBP image.
+                      details:
+                        requestId: e58f27de-9a7c-44f1-8c11-8d03dd3f5458
+        "422":
+          description: The image was accepted but could not be interpreted or measured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                imageUnreadable:
+                  value:
+                    error:
+                      code: IMAGE_UNREADABLE
+                      message: Image bytes could not be decoded.
+                      details:
+                        requestId: 5f76c4b5-c99a-4fd8-a7f4-a3c0df5b7a46
+                cardNotDetected:
+                  value:
+                    error:
+                      code: CARD_NOT_DETECTED
+                      message: No card boundary could be detected.
+                      details:
+                        requestId: aaec7ab1-771a-4320-a34e-22381c4f1d21
+        "500":
+          description: The measurement pipeline failed unexpectedly.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                measurementFailed:
+                  value:
+                    error:
+                      code: MEASUREMENT_FAILED
+                      message: Measurement pipeline failed.
+                      details:
+                        requestId: 9f97838c-72cb-4a99-b2be-031207f11ccf
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+          description: Service health status.
+    MeasureRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - file
+      properties:
+        file:
+          type: string
+          format: binary
+          maxLength: 20971520
+          description: JPEG, PNG, or WEBP image file. Maximum size is 20 MB.
+    MeasurementResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - image
+        - centering
+        - psa
+        - overlay
+        - pipeline
+        - metadata
+      properties:
+        image:
+          $ref: "#/components/schemas/ImageMetadata"
+        centering:
+          $ref: "#/components/schemas/CenteringMeasurement"
+        psa:
+          $ref: "#/components/schemas/PsaAssessment"
+        overlay:
+          $ref: "#/components/schemas/MeasurementOverlay"
+        pipeline:
+          $ref: "#/components/schemas/PipelineInfo"
+        metadata:
+          $ref: "#/components/schemas/ProcessingMetadata"
+    ImageMetadata:
+      type: object
+      additionalProperties: false
+      required:
+        - contentType
+        - widthPx
+        - heightPx
+      properties:
+        contentType:
+          type: string
+          enum:
+            - image/jpeg
+            - image/png
+            - image/webp
+          description: Validated media type of the uploaded image.
+        widthPx:
+          type: integer
+          minimum: 1
+          description: Uploaded image width in pixels.
+        heightPx:
+          type: integer
+          minimum: 1
+          description: Uploaded image height in pixels.
+    CenteringMeasurement:
+      type: object
+      additionalProperties: false
+      required:
+        - leftRight
+        - topBottom
+        - worstAxis
+        - worstAxisMaxPercent
+      properties:
+        leftRight:
+          $ref: "#/components/schemas/LeftRightRatio"
+        topBottom:
+          $ref: "#/components/schemas/TopBottomRatio"
+        worstAxis:
+          type: string
+          enum:
+            - leftRight
+            - topBottom
+          description: Axis with the larger major-side centering percentage.
+        worstAxisMaxPercent:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Larger side percentage on the worst axis, used for PSA ceiling lookup.
+    LeftRightRatio:
+      type: object
+      additionalProperties: false
+      required:
+        - leftPercent
+        - rightPercent
+      properties:
+        leftPercent:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Left-side share of the horizontal centering ratio.
+        rightPercent:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Right-side share of the horizontal centering ratio.
+    TopBottomRatio:
+      type: object
+      additionalProperties: false
+      required:
+        - topPercent
+        - bottomPercent
+      properties:
+        topPercent:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Top-side share of the vertical centering ratio.
+        bottomPercent:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Bottom-side share of the vertical centering ratio.
+    PsaAssessment:
+      type: object
+      additionalProperties: false
+      required:
+        - ceiling
+        - label
+        - thresholds
+      properties:
+        ceiling:
+          type: string
+          enum:
+            - PSA_10
+            - PSA_9
+            - PSA_8
+            - PSA_7
+            - BELOW_PSA_7
+          description: Centering-only PSA ceiling based on the worst axis.
+        label:
+          type: string
+          description: Human-readable PSA centering ceiling label.
+        thresholds:
+          type: array
+          minItems: 4
+          maxItems: 4
+          description: Server-echoed PSA centering threshold rows for client rendering.
+          items:
+            $ref: "#/components/schemas/PsaThreshold"
+    PsaThreshold:
+      type: object
+      additionalProperties: false
+      required:
+        - ceiling
+        - label
+        - maxMajorPercent
+        - ratioLabel
+      properties:
+        ceiling:
+          type: string
+          enum:
+            - PSA_10
+            - PSA_9
+            - PSA_8
+            - PSA_7
+          description: PSA threshold row represented by this limit.
+        label:
+          type: string
+          description: Human-readable PSA threshold label.
+        maxMajorPercent:
+          type: number
+          enum:
+            - 55
+            - 60
+            - 65
+            - 70
+          description: Maximum allowed major-side percentage for this PSA centering threshold.
+        ratioLabel:
+          type: string
+          enum:
+            - 55/45
+            - 60/40
+            - 65/35
+            - 70/30
+          description: Human-readable ratio label for this threshold.
+    MeasurementOverlay:
+      type: object
+      additionalProperties: false
+      required:
+        - coordinateSpace
+        - outerCard
+        - innerFrame
+        - gaps
+      properties:
+        coordinateSpace:
+          type: string
+          enum:
+            - imagePixels
+          description: Rectangles and gaps are measured in the uploaded image pixel space.
+        outerCard:
+          $ref: "#/components/schemas/Rect"
+        innerFrame:
+          $ref: "#/components/schemas/Rect"
+        gaps:
+          $ref: "#/components/schemas/GapMeasurements"
+    Rect:
+      type: object
+      additionalProperties: false
+      required:
+        - x
+        - y
+        - width
+        - height
+      properties:
+        x:
+          type: integer
+          minimum: 0
+          description: Left coordinate in pixels.
+        y:
+          type: integer
+          minimum: 0
+          description: Top coordinate in pixels.
+        width:
+          type: integer
+          minimum: 1
+          description: Rectangle width in pixels.
+        height:
+          type: integer
+          minimum: 1
+          description: Rectangle height in pixels.
+    GapMeasurements:
+      type: object
+      additionalProperties: false
+      required:
+        - leftPx
+        - rightPx
+        - topPx
+        - bottomPx
+      properties:
+        leftPx:
+          type: integer
+          minimum: 0
+          description: Pixel gap between outer card and inner frame on the left side.
+        rightPx:
+          type: integer
+          minimum: 0
+          description: Pixel gap between outer card and inner frame on the right side.
+        topPx:
+          type: integer
+          minimum: 0
+          description: Pixel gap between outer card and inner frame on the top side.
+        bottomPx:
+          type: integer
+          minimum: 0
+          description: Pixel gap between outer card and inner frame on the bottom side.
+    PipelineInfo:
+      type: object
+      additionalProperties: false
+      required:
+        - mode
+        - version
+      properties:
+        mode:
+          type: string
+          enum:
+            - mock
+            - opencv
+          description: Measurement pipeline used for this response.
+        version:
+          type: string
+          description: Version of the measurement pipeline contract or implementation.
+    ProcessingMetadata:
+      type: object
+      additionalProperties: false
+      required:
+        - processingMs
+        - warnings
+      properties:
+        processingMs:
+          type: integer
+          minimum: 0
+          description: Server-side processing duration in milliseconds.
+        warnings:
+          type: array
+          description: Non-fatal processing warnings safe to show or log.
+          items:
+            type: string
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+      properties:
+        error:
+          $ref: "#/components/schemas/ApiError"
+    ApiError:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+        - details
+      properties:
+        code:
+          type: string
+          enum:
+            - INVALID_UPLOAD
+            - FILE_TOO_LARGE
+            - UNSUPPORTED_MEDIA_TYPE
+            - IMAGE_UNREADABLE
+            - CARD_NOT_DETECTED
+            - MEASUREMENT_FAILED
+          description: Machine-readable error code.
+        message:
+          type: string
+          description: Human-readable error message safe to return to clients.
+        details:
+          type: object
+          required:
+            - requestId
+          description: Error metadata safe for support and log correlation.
+          additionalProperties: true
+          properties:
+            requestId:
+              type: string
+              format: uuid
+              description: Request-scoped UUID metadata only; it is not derived from image bytes.
