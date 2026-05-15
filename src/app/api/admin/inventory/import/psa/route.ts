@@ -225,6 +225,11 @@ function formStringValue(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function formBooleanValue(formData: FormData, key: string) {
+  const value = formData.get(key);
+  return value === "true" || value === "on" || value === "1";
+}
+
 function defaultSubmissionName(fileName: string) {
   return fileName.replace(/\.[^.]+$/, "").trim() || "PSA Submission";
 }
@@ -336,6 +341,85 @@ async function recordPsaSubmission({
   return { warning: null, submissionId };
 }
 
+async function createInventoryBundleFromPsaRows({
+  supabase,
+  bundleName,
+  summaryRows,
+}: {
+  supabase: ReturnType<typeof createServiceClient>;
+  bundleName: string;
+  summaryRows: PsaImportSummaryRow[];
+}) {
+  const inventoryIds = Array.from(
+    new Set(summaryRows.map((row) => row.inventory_item_id).filter((id): id is string => Boolean(id)))
+  );
+
+  if (inventoryIds.length === 0) {
+    return { bundleId: null, warning: "No inventory items were available to bundle." };
+  }
+
+  const assignedRes = await supabase
+    .from("inventory_bundle_items")
+    .select("inventory_item_id")
+    .in("inventory_item_id", inventoryIds);
+
+  if (assignedRes.error) {
+    return { bundleId: null, warning: assignedRes.error.message };
+  }
+
+  if ((assignedRes.data?.length ?? 0) > 0) {
+    return {
+      bundleId: null,
+      warning: "Bundle was not created because one or more imported cards are already assigned to a bundle.",
+    };
+  }
+
+  const { data: bundle, error: bundleError } = await supabase
+    .from("inventory_bundles")
+    .insert({
+      name: bundleName,
+      status: "new",
+      sale_channel: "not_sold",
+      sold_date: null,
+      sold_price: null,
+      updated_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+
+  if (bundleError) {
+    return { bundleId: null, warning: bundleError.message };
+  }
+
+  const bundleId = (bundle as { id: string }).id;
+  const linkRows = inventoryIds.map((inventoryItemId, index) => ({
+    bundle_id: bundleId,
+    inventory_item_id: inventoryItemId,
+    position: index,
+  }));
+
+  const { error: linkError } = await supabase.from("inventory_bundle_items").insert(linkRows);
+  if (linkError) {
+    await supabase.from("inventory_bundles").delete().eq("id", bundleId);
+    return { bundleId: null, warning: linkError.message };
+  }
+
+  const { error: inventoryError } = await supabase
+    .from("inventory_items")
+    .update({
+      status: "new",
+      sale_channel: "not_sold",
+      sold_date: null,
+    })
+    .in("id", inventoryIds);
+
+  if (inventoryError) {
+    return { bundleId, warning: inventoryError.message };
+  }
+
+  return { bundleId, warning: null };
+}
+
 export async function POST(request: Request) {
   const formData = await request.formData().catch(() => null);
   if (!formData) {
@@ -349,6 +433,8 @@ export async function POST(request: Request) {
 
   const submissionName = formStringValue(formData, "submission_name") || defaultSubmissionName(psaFile.name);
   const submittedAt = submittedAtValue(formStringValue(formData, "submitted_at"));
+  const shouldCreateBundle = formBooleanValue(formData, "create_bundle");
+  const bundleName = formStringValue(formData, "bundle_name") || submissionName;
   const supabase = createServiceClient();
   const psaOrderNumber = psaOrderNumberFromFilename(psaFile.name);
 
@@ -545,6 +631,9 @@ export async function POST(request: Request) {
       submittedAt,
       summaryRows,
     });
+    const bundleResult = shouldCreateBundle
+      ? await createInventoryBundleFromPsaRows({ supabase, bundleName, summaryRows })
+      : { bundleId: null, warning: null };
 
     return NextResponse.json({
       count: 0,
@@ -553,6 +642,8 @@ export async function POST(request: Request) {
       skipped_duplicates: summaryRows.filter((row) => row.skipped_duplicate).length,
       submission_id: submissionResult.submissionId,
       submission_warning: submissionResult.warning,
+      bundle_id: bundleResult.bundleId,
+      bundle_warning: bundleResult.warning,
       rows: summaryRows,
     });
   }
@@ -580,6 +671,9 @@ export async function POST(request: Request) {
     submittedAt,
     summaryRows,
   });
+  const bundleResult = shouldCreateBundle
+    ? await createInventoryBundleFromPsaRows({ supabase, bundleName, summaryRows })
+    : { bundleId: null, warning: null };
 
   return NextResponse.json({
     count: data?.length ?? 0,
@@ -588,6 +682,8 @@ export async function POST(request: Request) {
     skipped_duplicates: summaryRows.filter((row) => row.skipped_duplicate).length,
     submission_id: submissionResult.submissionId,
     submission_warning: submissionResult.warning,
+    bundle_id: bundleResult.bundleId,
+    bundle_warning: bundleResult.warning,
     rows: summaryRows,
   });
 }

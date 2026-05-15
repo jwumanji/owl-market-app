@@ -3,6 +3,7 @@
 import { Fragment, type MouseEvent, type SelectHTMLAttributes, useCallback, useEffect, useMemo, useState } from "react";
 import { displayCustomerOrderNumber } from "@/lib/customer-orders";
 import { GRADED_RATINGS, type CatalogMatchStatus, type GradedRating, type InventoryStatus, type InventoryType } from "@/lib/inventory-options";
+import type { BundleInventoryItem, InventoryBundleSummary } from "../bundles/bundle-types";
 import type { CustomerOrderSummary } from "../orders/order-types";
 
 type StatusFilter = InventoryStatus | "all";
@@ -457,8 +458,11 @@ export default function InventoryTabs({
   items,
   orders = [],
   ordersError = null,
+  bundles = [],
+  bundlesError = null,
   onItemsChange,
   onOrdersChange,
+  onBundlesChange,
   statusFilter = "all",
   onStatusFilterChange,
   psa10CandidatesOnly = false,
@@ -466,8 +470,11 @@ export default function InventoryTabs({
   items: InventoryRow[];
   orders?: CustomerOrderSummary[];
   ordersError?: string | null;
+  bundles?: InventoryBundleSummary[];
+  bundlesError?: string | null;
   onItemsChange?: (items: InventoryRow[]) => void;
   onOrdersChange?: (orders: CustomerOrderSummary[]) => void;
+  onBundlesChange?: (bundles: InventoryBundleSummary[]) => void;
   statusFilter?: StatusFilter;
   onStatusFilterChange?: (status: StatusFilter) => void;
   psa10CandidatesOnly?: boolean;
@@ -509,6 +516,8 @@ export default function InventoryTabs({
   const [searchingMatchIds, setSearchingMatchIds] = useState<Record<string, boolean>>({});
   const [matchingItemIds, setMatchingItemIds] = useState<Record<string, boolean>>({});
   const [matchErrors, setMatchErrors] = useState<Record<string, string>>({});
+  const [bundleAttachDrafts, setBundleAttachDrafts] = useState<Record<string, string>>({});
+  const [attachingBundleItemIds, setAttachingBundleItemIds] = useState<Record<string, boolean>>({});
   const [actionError, setActionError] = useState<string | null>(null);
   const showTracking = statusFilter === "ship" || statusFilter === "sold";
   const showShippingActions = statusFilter === "ship";
@@ -686,6 +695,18 @@ export default function InventoryTabs({
     return map;
   }, [orders]);
 
+  const bundlesByInventoryItemId = useMemo(() => {
+    const map = new Map<string, InventoryBundleSummary>();
+
+    for (const bundle of bundles) {
+      for (const itemId of bundle.inventory_item_ids) {
+        map.set(itemId, bundle);
+      }
+    }
+
+    return map;
+  }, [bundles]);
+
   const groups = useMemo<InventoryGroup[]>(() => {
     const map = new Map<string, InventoryRow[]>();
     for (const item of tableRows) {
@@ -836,6 +857,80 @@ export default function InventoryTabs({
     if (!res.ok) {
       setRows(items);
     }
+  }
+
+  function bundleItemFromInventoryRow(item: InventoryRow): BundleInventoryItem {
+    return {
+      id: item.id,
+      created_at: item.created_at,
+      inventory_type: item.inventory_type,
+      status: item.status,
+      quantity: item.quantity,
+      item_nickname: item.item_nickname ?? null,
+      graded_rating: item.graded_rating,
+      certification_number: item.certification_number ?? null,
+      custom_image_front_url: item.custom_image_front_url ?? null,
+      custom_image_back_url: item.custom_image_back_url ?? null,
+      sale_channel: item.sale_channel ?? null,
+      sold_date: item.sold_date ?? null,
+      sold_price: item.sold_price ?? null,
+      card: item.card,
+    };
+  }
+
+  async function attachItemToBundle(item: InventoryRow) {
+    const bundleId = bundleAttachDrafts[item.id];
+    const bundle = bundles.find((candidate) => candidate.id === bundleId);
+    if (!bundle || attachingBundleItemIds[item.id]) return;
+
+    if (isLocalOnlyItem(item.id)) {
+      setActionError("Save this inventory item before adding it to a bundle.");
+      return;
+    }
+
+    setActionError(null);
+    setAttachingBundleItemIds((current) => ({ ...current, [item.id]: true }));
+    const res = await fetch(`/api/admin/bundles/${bundle.id}/items`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inventory_item_id: item.id }),
+    });
+    const payload = await res.json().catch(() => null);
+    setAttachingBundleItemIds((current) => ({ ...current, [item.id]: false }));
+
+    if (!res.ok) {
+      setActionError(payload?.error ?? "Could not add item to bundle.");
+      return;
+    }
+
+    const updates = {
+      status: (payload?.status ?? bundle.status) as InventoryStatus,
+      sale_channel: (payload?.sale_channel ?? bundle.sale_channel ?? "not_sold") as SaleChannel,
+      sold_date: (payload?.sold_date ?? bundle.sold_date ?? null) as string | null,
+    };
+    const nextItem = { ...item, ...updates };
+    setRows((current) => current.map((row) => (row.id === item.id ? nextItem : row)));
+    onBundlesChange?.(
+      bundles.map((candidate) =>
+        candidate.id === bundle.id
+          ? {
+              ...candidate,
+              inventory_item_ids: candidate.inventory_item_ids.includes(item.id)
+                ? candidate.inventory_item_ids
+                : [...candidate.inventory_item_ids, item.id],
+              items: candidate.items.some((bundleItem) => bundleItem.id === item.id)
+                ? candidate.items
+                : [...candidate.items, bundleItemFromInventoryRow(nextItem)],
+              updated_at: new Date().toISOString(),
+            }
+          : candidate
+      )
+    );
+    setBundleAttachDrafts((current) => {
+      const next = { ...current };
+      delete next[item.id];
+      return next;
+    });
   }
 
   function orderDraft(order: CustomerOrderSummary): OrderDraft {
@@ -2535,6 +2630,81 @@ export default function InventoryTabs({
     );
   }
 
+  function renderBundleAttachmentControl(item: InventoryRow) {
+    const currentBundle = bundlesByInventoryItemId.get(item.id);
+    const attachableBundles = bundles.filter((bundle) => !bundle.inventory_item_ids.includes(item.id));
+    const selectedBundleId = bundleAttachDrafts[item.id] ?? "";
+    const attaching = attachingBundleItemIds[item.id] ?? false;
+
+    if (currentBundle) {
+      return (
+        <section className="mb-3 rounded-md border border-blue/40 bg-blue/10 p-3">
+          <div className="font-mono text-xs font-extrabold uppercase tracking-wider text-blue">Part of Bundle</div>
+          <div className="mt-1 text-base font-extrabold leading-snug text-owl">{currentBundle.name}</div>
+          <div className="mt-1 flex flex-wrap gap-2 font-mono text-xs font-bold uppercase tracking-wider">
+            <span className="rounded border border-border bg-deep px-2 py-1 text-text-2">
+              {currentBundle.items.length} Cards
+            </span>
+            <span className="rounded border border-border bg-deep px-2 py-1 text-text-2">
+              {STATUS_LABELS[currentBundle.status]}
+            </span>
+          </div>
+          <a
+            href={`/admin/bundles/${currentBundle.id}`}
+            className="mt-3 inline-flex items-center justify-center rounded-md border border-owl bg-owl px-3 py-2 font-mono text-xs font-extrabold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
+          >
+            View Bundle
+          </a>
+        </section>
+      );
+    }
+
+    return (
+      <section className="mb-3 rounded-md border border-border bg-deep p-3">
+        <div className="font-mono text-xs font-extrabold uppercase tracking-wider text-owl">
+          Add to Existing Bundle
+        </div>
+        {bundlesError ? (
+          <div className="mt-2 rounded border border-owl/30 bg-owl/10 px-3 py-2 text-xs font-semibold text-text">
+            Bundles are not ready yet: {bundlesError}
+          </div>
+        ) : attachableBundles.length === 0 ? (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-text-2">
+            <span>No available bundles yet.</span>
+            <a href="/admin/bundles/new" className="font-mono text-xs font-bold uppercase tracking-wider text-owl">
+              Create Bundle
+            </a>
+          </div>
+        ) : (
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+            <select
+              value={selectedBundleId}
+              onChange={(event) =>
+                setBundleAttachDrafts((current) => ({ ...current, [item.id]: event.target.value }))
+              }
+              className="min-w-0 flex-1 rounded-md border border-border bg-surface px-3 py-2.5 font-mono text-xs font-semibold text-text outline-none focus:border-owl"
+            >
+              <option value="">Select bundle</option>
+              {attachableBundles.map((bundle) => (
+                <option key={bundle.id} value={bundle.id}>
+                  {bundle.name} ({bundle.items.length} cards)
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              disabled={!selectedBundleId || attaching}
+              onClick={() => attachItemToBundle(item)}
+              className="rounded-md border border-owl bg-owl/10 px-3 py-2.5 font-mono text-xs font-extrabold uppercase tracking-wider text-owl transition-colors hover:bg-owl/15 disabled:cursor-not-allowed disabled:border-border disabled:bg-surface disabled:text-text-3"
+            >
+              {attaching ? "Adding..." : "Add"}
+            </button>
+          </div>
+        )}
+      </section>
+    );
+  }
+
   function renderInventoryDetailModal() {
     if (!selectedGroup) return null;
 
@@ -2643,6 +2813,8 @@ export default function InventoryTabs({
                     </div>
                     {renderDeleteControls(row)}
                   </div>
+
+                  {renderBundleAttachmentControl(row)}
 
                   {needsCatalogMatch(row)
                     ? renderMatchControls(row)

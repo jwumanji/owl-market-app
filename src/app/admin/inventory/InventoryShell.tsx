@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import InventoryTabs, { InventoryRow } from "./InventoryTabs";
+import type { InventoryBundleSummary } from "../bundles/bundle-types";
 import type { CustomerOrderSummary } from "../orders/order-types";
 
 type InventoryStatus = "new" | "grading" | "sale" | "ship" | "sold";
@@ -20,12 +21,16 @@ export default function InventoryShell({
   items,
   orders = [],
   ordersError = null,
+  bundles = [],
+  bundlesError = null,
   initialStatusFilter = "all",
   initialPsa10CandidatesOnly = false,
 }: {
   items: InventoryRow[];
   orders?: CustomerOrderSummary[];
   ordersError?: string | null;
+  bundles?: InventoryBundleSummary[];
+  bundlesError?: string | null;
   initialStatusFilter?: StatusFilter;
   initialPsa10CandidatesOnly?: boolean;
 }) {
@@ -34,6 +39,7 @@ export default function InventoryShell({
   const [psa10CandidatesOnly, setPsa10CandidatesOnly] = useState(initialPsa10CandidatesOnly);
   const [liveItems, setLiveItems] = useState(items);
   const [liveOrders, setLiveOrders] = useState(orders);
+  const [liveBundles, setLiveBundles] = useState(bundles);
   const openOrders = liveOrders.filter((order) => !order.marked_shipped);
   const openOrderCount = openOrders.length;
   const shippedOrderCount = liveOrders.length - openOrderCount;
@@ -57,6 +63,10 @@ export default function InventoryShell({
   useEffect(() => {
     setLiveOrders(orders);
   }, [orders]);
+
+  useEffect(() => {
+    setLiveBundles(bundles);
+  }, [bundles]);
 
   const byStatus = useMemo(() => {
     return liveItems.reduce(
@@ -162,8 +172,11 @@ export default function InventoryShell({
         items={items}
         orders={liveOrders}
         ordersError={ordersError}
+        bundles={liveBundles}
+        bundlesError={bundlesError}
         onItemsChange={setLiveItems}
         onOrdersChange={setLiveOrders}
+        onBundlesChange={setLiveBundles}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
         psa10CandidatesOnly={psa10CandidatesOnly}

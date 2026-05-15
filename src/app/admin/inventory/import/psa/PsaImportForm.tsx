@@ -9,6 +9,8 @@ type PsaImportResult = {
   skipped_duplicates?: number;
   submission_id?: string | null;
   submission_warning?: string | null;
+  bundle_id?: string | null;
+  bundle_warning?: string | null;
   rows: {
     certification_number: string | null;
     matched: boolean;
@@ -34,6 +36,8 @@ export default function PsaImportForm() {
   const [psaFile, setPsaFile] = useState<File | null>(null);
   const [submissionName, setSubmissionName] = useState("");
   const [submittedAt, setSubmittedAt] = useState(todayDateString);
+  const [createBundle, setCreateBundle] = useState(false);
+  const [bundleName, setBundleName] = useState("");
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<PsaImportResult | null>(null);
@@ -45,6 +49,10 @@ export default function PsaImportForm() {
     formData.append("psa_file", psaFile);
     formData.append("submission_name", submissionName || defaultSubmissionName(psaFile) || "PSA Submission");
     formData.append("submitted_at", submittedAt);
+    if (createBundle) {
+      formData.append("create_bundle", "true");
+      formData.append("bundle_name", bundleName || submissionName || defaultSubmissionName(psaFile) || "PSA Bundle");
+    }
 
     setImporting(true);
     setError(null);
@@ -87,6 +95,7 @@ export default function PsaImportForm() {
               const nextFile = event.target.files?.[0] ?? null;
               setPsaFile(nextFile);
               if (!submissionName) setSubmissionName(defaultSubmissionName(nextFile));
+              if (!bundleName) setBundleName(defaultSubmissionName(nextFile));
             }}
             className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 text-sm text-text file:mr-3 file:rounded file:border-0 file:bg-owl file:px-3 file:py-2 file:font-mono file:text-xs file:font-bold file:uppercase file:text-void"
           />
@@ -110,6 +119,35 @@ export default function PsaImportForm() {
               className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-owl"
             />
           </label>
+        </div>
+        <div className="mt-4 rounded-md border border-border bg-deep p-3">
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={createBundle}
+              onChange={(event) => setCreateBundle(event.target.checked)}
+              className="mt-1 h-4 w-4 accent-owl"
+            />
+            <span>
+              <span className="block font-mono text-xs font-bold uppercase tracking-wider text-text">
+                Create Inventory Bundle From This Upload
+              </span>
+              <span className="mt-1 block text-sm text-text-2">
+                Use this for sequential PSA submissions or groups of graded cards that should stay together.
+              </span>
+            </span>
+          </label>
+          {createBundle && (
+            <label className="mt-3 block">
+              <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Bundle Name</span>
+              <input
+                value={bundleName}
+                onChange={(event) => setBundleName(event.target.value)}
+                placeholder="Sequential PSA bundle name"
+                className="mt-2 w-full rounded-md border border-border bg-surface px-3 py-2.5 text-sm text-text outline-none focus:border-owl"
+              />
+            </label>
+          )}
         </div>
         <div className="mt-4">
           <button
@@ -155,6 +193,19 @@ export default function PsaImportForm() {
             {result.submission_warning && (
               <span className="rounded border border-owl/40 bg-owl/10 px-3 py-2 text-xs font-semibold text-text">
                 Submission tracking skipped: {result.submission_warning}
+              </span>
+            )}
+            {result.bundle_id && (
+              <a
+                href={`/admin/bundles/${result.bundle_id}`}
+                className="rounded border border-owl/60 bg-owl/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/15"
+              >
+                View Bundle
+              </a>
+            )}
+            {result.bundle_warning && (
+              <span className="rounded border border-owl/40 bg-owl/10 px-3 py-2 text-xs font-semibold text-text">
+                Bundle skipped: {result.bundle_warning}
               </span>
             )}
           </div>

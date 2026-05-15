@@ -1,5 +1,6 @@
 import InventoryShell from "./InventoryShell";
 import type { CenteringCeiling, InventoryRow } from "./InventoryTabs";
+import { loadBundleSummaries } from "../bundles/bundle-data";
 import { loadOrderSummaries } from "../orders/order-data";
 import { createServiceClient } from "@/lib/supabase-server";
 import { CATALOG_MATCH_STATUSES, type CatalogMatchStatus, type GradedRating } from "@/lib/inventory-options";
@@ -279,6 +280,9 @@ export default async function AdminInventoryPage({
   const orderResult = supabase
     ? await loadOrderSummaries()
     : { data: [], error: null };
+  const bundleResult = supabase
+    ? await loadBundleSummaries()
+    : { data: [], error: null };
 
   return (
     <section className="mx-auto max-w-[1920px] px-5 py-8 sm:px-7 lg:px-10 xl:px-12">
@@ -313,6 +317,8 @@ export default async function AdminInventoryPage({
             items={items}
             orders={orderResult.data}
             ordersError={orderResult.error}
+            bundles={bundleResult.data}
+            bundlesError={bundleResult.error}
             initialStatusFilter={initialStatusFilter}
             initialPsa10CandidatesOnly={initialPsa10CandidatesOnly}
           />
