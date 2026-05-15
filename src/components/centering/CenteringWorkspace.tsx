@@ -38,7 +38,7 @@ export type CardIdentity = {
 };
 
 export type CenteringWorkspaceProps = {
-  inventoryItemId: string;
+  inventoryItemId?: string | null;
   preloadImageUrl?: string | null;
   cardIdentity: CardIdentity;
 };
@@ -228,12 +228,14 @@ export function buildMeasurementFormData({
   file,
   manualOverlay,
 }: {
-  inventoryItemId: string;
+  inventoryItemId?: string | null;
   file: File;
   manualOverlay?: MeasurementOverlay | null;
 }) {
   const formData = new FormData();
-  formData.set("inventoryItemId", inventoryItemId);
+  if (inventoryItemId) {
+    formData.set("inventoryItemId", inventoryItemId);
+  }
   formData.set("file", file);
 
   if (manualOverlay) {
@@ -349,7 +351,7 @@ export async function submitMeasurementRequest({
   manualOverlay,
   fetchImpl = fetch,
 }: {
-  inventoryItemId: string;
+  inventoryItemId?: string | null;
   file: File;
   manualOverlay?: MeasurementOverlay | null;
   fetchImpl?: typeof fetch;
@@ -390,7 +392,7 @@ export async function measurePreloadedImage({
   wait = delay,
 }: {
   imageUrl: string;
-  inventoryItemId: string;
+  inventoryItemId?: string | null;
   dispatchAction: (action: WorkspaceAction) => void;
   onFile: (file: File) => void;
   fetchImpl?: typeof fetch;
@@ -996,15 +998,16 @@ export default function CenteringWorkspace({
   cardIdentity,
 }: CenteringWorkspaceProps) {
   const [state, dispatch] = useReducer(centeringReducer, INITIAL_STATE);
+  const preloadImageSrc = inventoryItemId ? preloadImageUrl : null;
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [showUploadZone, setShowUploadZone] = useState(!preloadImageUrl);
+  const [showUploadZone, setShowUploadZone] = useState(!preloadImageSrc);
   const [preloadFetchError, setPreloadFetchError] = useState<string | null>(null);
   const [manualOverlay, setManualOverlay] = useState<MeasurementOverlay>(() => defaultManualOverlay(1024, 1428));
   const [imageSize, setImageSize] = useState({ width: 1024, height: 1428 });
   const reportRef = useRef<HTMLDivElement>(null);
-  const imageSrc = previewUrl ?? preloadImageUrl ?? null;
-  const showPreloadedPanel = Boolean(preloadImageUrl && !showUploadZone && !selectedFile);
+  const imageSrc = previewUrl ?? preloadImageSrc ?? null;
+  const showPreloadedPanel = Boolean(preloadImageSrc && !showUploadZone && !selectedFile);
 
   useEffect(() => {
     if (!selectedFile) return;
@@ -1030,9 +1033,9 @@ export default function CenteringWorkspace({
   }, [imageSrc]);
 
   useEffect(() => {
-    setShowUploadZone(!preloadImageUrl);
+    setShowUploadZone(!preloadImageSrc);
     setPreloadFetchError(null);
-  }, [preloadImageUrl]);
+  }, [preloadImageSrc]);
 
   const submitMeasurement = useCallback(
     async (file: File, overlay?: MeasurementOverlay | null) => {
@@ -1066,11 +1069,11 @@ export default function CenteringWorkspace({
   );
 
   const measurePreloadedFile = useCallback(() => {
-    if (!preloadImageUrl) return;
+    if (!preloadImageSrc) return;
 
     setPreloadFetchError(null);
     void measurePreloadedImage({
-      imageUrl: preloadImageUrl,
+      imageUrl: preloadImageSrc,
       inventoryItemId,
       dispatchAction: dispatch,
       onFile: setSelectedFile,
@@ -1080,7 +1083,7 @@ export default function CenteringWorkspace({
         setShowUploadZone(true);
       }
     });
-  }, [inventoryItemId, preloadImageUrl]);
+  }, [inventoryItemId, preloadImageSrc]);
 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
@@ -1142,9 +1145,9 @@ export default function CenteringWorkspace({
               {preloadFetchError}
             </div>
           )}
-          {showPreloadedPanel && preloadImageUrl ? (
+          {showPreloadedPanel && preloadImageSrc ? (
             <PreloadedImagePanel
-              imageSrc={preloadImageUrl}
+              imageSrc={preloadImageSrc}
               onMeasure={measurePreloadedFile}
               onUploadDifferent={() => {
                 setPreloadFetchError(null);

@@ -22,11 +22,11 @@ const componentJavaScript = ts.transpileModule(componentSource, {
 
 type Exports = {
   default: React.ComponentType<{
-    inventoryItemId: string;
+    inventoryItemId?: string | null;
     preloadImageUrl?: string | null;
     cardIdentity: { name: string; setCode?: string | null; cardNumber?: string | null; rarity?: string | null };
   }>;
-  buildMeasurementFormData: (input: { inventoryItemId: string; file: File; manualOverlay?: unknown }) => FormData;
+  buildMeasurementFormData: (input: { inventoryItemId?: string | null; file: File; manualOverlay?: unknown }) => FormData;
   buildResultViewModel: (result: Record<string, unknown>) => Record<string, unknown>;
   centeringReducer: (state: Record<string, unknown>, action: Record<string, unknown>) => Record<string, unknown>;
   defaultManualOverlay: (width: number, height: number) => Record<string, unknown>;
@@ -35,7 +35,7 @@ type Exports = {
   isManualCorrectionError: (error: { code?: string } | null) => boolean;
   measurePreloadedImage: (input: {
     imageUrl: string;
-    inventoryItemId: string;
+    inventoryItemId?: string | null;
     dispatchAction: (action: { type: string; result?: unknown; error?: unknown }) => void;
     onFile: (file: File) => void;
     fetchImpl: typeof fetch;
@@ -167,12 +167,18 @@ function measurementResponse() {
   };
 }
 
-function renderWorkspace(preloadImageUrl?: string | null) {
+function renderWorkspace({
+  preloadImageUrl = null,
+  inventoryItemId = "inventory-1",
+}: {
+  preloadImageUrl?: string | null;
+  inventoryItemId?: string | null;
+} = {}) {
   const { exports } = loadComponent();
 
   return renderToStaticMarkup(
     React.createElement(exports.default, {
-      inventoryItemId: "inventory-1",
+      inventoryItemId,
       preloadImageUrl,
       cardIdentity: {
         name: "Nami",
@@ -215,7 +221,7 @@ function responseLike({
 }
 
 test("workspace renders measure-this-card button when preload URL is passed", () => {
-  const html = renderWorkspace("https://cdn.example/cards/front.png");
+  const html = renderWorkspace({ preloadImageUrl: "https://cdn.example/cards/front.png" });
 
   assert.match(html, /Ready to measure/);
   assert.match(html, /Measure this card/);
@@ -224,10 +230,19 @@ test("workspace renders measure-this-card button when preload URL is passed", ()
 });
 
 test("workspace renders upload zone when no preload URL is passed", () => {
-  const html = renderWorkspace(null);
+  const html = renderWorkspace();
 
   assert.match(html, /Upload a front scan/);
   assert.match(html, /Browse scan/);
+  assert.doesNotMatch(html, /Measure this card/);
+});
+
+test("workspace renders standalone mode without inventory item context", () => {
+  const html = renderWorkspace({ inventoryItemId: null, preloadImageUrl: "https://cdn.example/cards/front.png" });
+
+  assert.match(html, /Upload a front scan/);
+  assert.match(html, /Browse scan/);
+  assert.doesNotMatch(html, /Ready to measure/);
   assert.doesNotMatch(html, /Measure this card/);
 });
 
@@ -303,6 +318,18 @@ test("manual correction retry payload includes manual_adjustment and corrected c
   assert.equal(exports.isManualCorrectionError({ code: "FILE_TOO_LARGE" }), false);
 });
 
+test("standalone measurement payload omits inventoryItemId", () => {
+  const { exports } = loadComponent();
+  const file = new File(["image"], "card.jpg", { type: "image/jpeg" });
+
+  const formData = exports.buildMeasurementFormData({
+    file,
+  });
+
+  assert.equal(formData.has("inventoryItemId"), false);
+  assert.equal(formData.get("file"), file);
+});
+
 test("measure-this-card action fetches the preloaded image and posts it for measurement", async () => {
   const { exports } = loadComponent();
   const actions: string[] = [];
@@ -368,7 +395,7 @@ test("preloaded image fetch failure returns inline error path and leaves upload 
     fetchImpl,
     wait: async () => undefined,
   });
-  const uploadZoneHtml = renderWorkspace(null);
+  const uploadZoneHtml = renderWorkspace();
 
   assert.equal(outcome.ok, false);
   assert.equal(outcome.preloadError, exports.PRELOAD_FETCH_ERROR_MESSAGE);

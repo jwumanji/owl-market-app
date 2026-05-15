@@ -84,7 +84,9 @@ function measurementResponse() {
 
 function measurementRequest(inventoryItemId = "inventory-1") {
   const formData = new FormData();
-  formData.set("inventoryItemId", inventoryItemId);
+  if (inventoryItemId) {
+    formData.set("inventoryItemId", inventoryItemId);
+  }
   formData.set("file", new File(["fake image"], "card.jpg", { type: "image/jpeg" }));
 
   return new Request("http://localhost/api/centering/measure", {
@@ -101,6 +103,7 @@ function loadRoute({
 }: LoadRouteOptions = {}) {
   const insertedRows: Record<string, unknown>[] = [];
   const cvCalls: { url: string; init: RequestInit }[] = [];
+  const inventoryLookups: string[] = [];
   let serviceClientCalls = 0;
 
   const supabase = {
@@ -116,6 +119,7 @@ function loadRoute({
             return query;
           },
           async single() {
+            inventoryLookups.push(selectedId);
             if (!inventoryFound) {
               return { data: null, error: { message: "not found" } };
             }
@@ -227,6 +231,7 @@ function loadRoute({
   return {
     POST: moduleStub.exports.POST as (request: Request) => Promise<Response>,
     cvCalls,
+    inventoryLookups,
     get serviceClientCalls() {
       return serviceClientCalls;
     },
@@ -280,6 +285,7 @@ test("happy path forwards CV response and inserts centering measurement", async 
   assert.equal(await response.text(), cvText);
   assert.equal(route.cvCalls.length, 1);
   assert.equal(route.cvCalls[0].url, "https://owl-lens.example/measure");
+  assert.deepEqual(route.inventoryLookups, ["inventory-1"]);
   assert.equal(route.insertedRows.length, 1);
   assert.deepEqual(JSON.parse(JSON.stringify(route.insertedRows[0])), {
     inventory_item_id: "inventory-1",
@@ -299,6 +305,28 @@ test("happy path forwards CV response and inserts centering measurement", async 
     image_height_px: 1428,
     overlay: cvBody.overlay,
   });
+});
+
+test("standalone request without inventoryItemId persists a null inventory link", async () => {
+  const cvBody = measurementResponse();
+  const cvText = JSON.stringify(cvBody);
+  const route = loadRoute({
+    inventoryFound: false,
+    cvResponse: new Response(cvText, {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }),
+  });
+
+  const response = await route.POST(measurementRequest(""));
+
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), cvText);
+  assert.deepEqual(route.inventoryLookups, []);
+  assert.equal(route.cvCalls.length, 1);
+  assert.equal(route.insertedRows.length, 1);
+  assert.equal(route.insertedRows[0].inventory_item_id, null);
+  assert.equal(route.insertedRows[0].psa_ceiling, "PSA_10");
 });
 
 test("CV 422 response is forwarded without inserting a row", async () => {

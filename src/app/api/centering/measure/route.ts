@@ -62,7 +62,7 @@ function passthroughHeaders(response: Response) {
   return headers;
 }
 
-function measurementRow(inventoryItemId: string, response: MeasurementResponse) {
+function measurementRow(inventoryItemId: string | null, response: MeasurementResponse) {
   return {
     inventory_item_id: inventoryItemId,
     request_id: crypto.randomUUID(),
@@ -102,10 +102,10 @@ export async function POST(request: Request) {
   }
 
   const inventoryItemIdEntry = formData.get("inventoryItemId");
-  const inventoryItemId = typeof inventoryItemIdEntry === "string" ? inventoryItemIdEntry.trim() : "";
-  if (!inventoryItemId) {
-    return NextResponse.json({ error: "Missing inventory item" }, { status: 400 });
-  }
+  const inventoryItemId =
+    typeof inventoryItemIdEntry === "string" && inventoryItemIdEntry.trim()
+      ? inventoryItemIdEntry.trim()
+      : null;
 
   const file = formData.get("file");
   if (!isUploadFile(file)) {
@@ -113,14 +113,16 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServiceClient();
-  const { data: inventoryItem, error: inventoryError } = await supabase
-    .from("inventory_items")
-    .select("id")
-    .eq("id", inventoryItemId)
-    .single();
+  if (inventoryItemId) {
+    const { data: inventoryItem, error: inventoryError } = await supabase
+      .from("inventory_items")
+      .select("id")
+      .eq("id", inventoryItemId)
+      .single();
 
-  if (inventoryError || !inventoryItem) {
-    return NextResponse.json({ error: "Inventory item not found" }, { status: 404 });
+    if (inventoryError || !inventoryItem) {
+      return NextResponse.json({ error: "Inventory item not found" }, { status: 404 });
+    }
   }
 
   const measureUrl = cvMeasureUrl();
