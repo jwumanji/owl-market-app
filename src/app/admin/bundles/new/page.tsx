@@ -8,8 +8,25 @@ export const metadata = {
   title: "Create Bundle - OWL Market",
 };
 
-export default async function NewInventoryBundlePage() {
+function selectedInventoryIds(searchParams?: { items?: string | string[] }) {
+  const raw = Array.isArray(searchParams?.items) ? searchParams?.items.join(",") : searchParams?.items ?? "";
+  return Array.from(
+    new Set(
+      raw
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+export default async function NewInventoryBundlePage({
+  searchParams,
+}: {
+  searchParams?: { items?: string | string[] };
+}) {
   const inventoryResult = await loadBundleInventory();
+  const initialSelectedIds = selectedInventoryIds(searchParams);
 
   return (
     <section className="mx-auto max-w-[1480px] px-4 py-8">
@@ -39,7 +56,7 @@ export default async function NewInventoryBundlePage() {
           <div className="mt-2 font-mono text-xs text-text-2">{inventoryResult.error}</div>
         </div>
       ) : (
-        <BundleForm inventoryItems={inventoryResult.data} />
+        <BundleForm inventoryItems={inventoryResult.data} initialSelectedIds={initialSelectedIds} />
       )}
     </section>
   );

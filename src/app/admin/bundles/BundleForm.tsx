@@ -24,6 +24,7 @@ const TYPE_LABELS: Record<string, string> = {
 type Props = {
   inventoryItems: BundleInventoryItem[];
   initialBundle?: InventoryBundleFormValue | null;
+  initialSelectedIds?: string[];
 };
 
 type HoverPreview = {
@@ -88,15 +89,20 @@ function todayDateString() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function BundleForm({ inventoryItems, initialBundle }: Props) {
+export default function BundleForm({ inventoryItems, initialBundle, initialSelectedIds = [] }: Props) {
   const router = useRouter();
+  const availableItemIds = useMemo(() => new Set(inventoryItems.map((item) => item.id)), [inventoryItems]);
+  const startingSelectedIds = useMemo(() => {
+    const sourceIds = initialBundle?.inventory_item_ids ?? initialSelectedIds;
+    return Array.from(new Set(sourceIds.filter((id) => availableItemIds.has(id))));
+  }, [availableItemIds, initialBundle?.inventory_item_ids, initialSelectedIds]);
   const [name, setName] = useState(initialBundle?.name ?? "");
   const [notes, setNotes] = useState(initialBundle?.notes ?? "");
   const [status, setStatus] = useState<InventoryStatus>(initialBundle?.status ?? "new");
   const [saleChannel, setSaleChannel] = useState<SaleChannel>(initialBundle?.sale_channel ?? "not_sold");
   const [soldDate, setSoldDate] = useState(initialBundle?.sold_date ?? "");
   const [soldPrice, setSoldPrice] = useState(initialBundle?.sold_price?.toString() ?? "");
-  const [selectedIds, setSelectedIds] = useState<string[]>(initialBundle?.inventory_item_ids ?? []);
+  const [selectedIds, setSelectedIds] = useState<string[]>(startingSelectedIds);
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);

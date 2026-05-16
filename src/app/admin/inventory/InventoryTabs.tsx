@@ -733,6 +733,10 @@ export default function InventoryTabs({
     [selectedItemIds]
   );
   const selectedCount = selectedIds.length;
+  const createBundleHref =
+    selectedIds.length > 0
+      ? `/admin/bundles/new?items=${selectedIds.map((id) => encodeURIComponent(id)).join(",")}`
+      : "/admin/bundles/new";
   const hasBulkEditDraft = Boolean(bulkStatusDraft || bulkConditionDraft);
   const visibleSelectedCount = visibleRows.reduce((sum, item) => sum + (selectedItemIds[item.id] ? 1 : 0), 0);
   const allVisibleSelected = visibleRows.length > 0 && visibleSelectedCount === visibleRows.length;
@@ -3403,10 +3407,10 @@ export default function InventoryTabs({
             Add Order
           </a>
           <a
-            href="/admin/bundles/new"
+            href={createBundleHref}
             className="h-10 rounded-md border border-owl/40 bg-owl/10 px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/15"
           >
-            Create Bundle
+            {selectedCount > 0 ? `Bundle Selected ${selectedCount}` : "Create Bundle"}
           </a>
           <a
             href="/admin/inventory/new"
