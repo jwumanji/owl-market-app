@@ -203,7 +203,11 @@ export default function BundleForm({ inventoryItems, initialBundle, initialSelec
       return;
     }
 
-    router.push(`/admin/bundles/${payload.id}`);
+    if (initialBundle) {
+      router.push(`/admin/bundles/${payload.id}`);
+    } else {
+      router.push(`/admin/bundles?created=${encodeURIComponent(name.trim())}`);
+    }
     router.refresh();
   }
 

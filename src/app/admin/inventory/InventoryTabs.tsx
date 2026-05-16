@@ -3435,22 +3435,32 @@ export default function InventoryTabs({
 
       <div className="flex flex-wrap gap-2">
         {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => {
-              setNeedsMatchReview(false);
-              setActiveTab(tab.id);
-            }}
-            className={`rounded-md border px-4 py-2.5 font-mono text-sm font-semibold transition-colors ${
-              activeTab === tab.id && !pendingMatchOnly
-                ? "border-owl bg-owl/10 text-owl"
-                : "border-border bg-surface text-text hover:border-border-2 hover:text-owl"
-            }`}
-          >
-            {tab.label}
-            <span className="ml-2 text-text-2">{counts[tab.id]}</span>
-          </button>
+          <Fragment key={tab.id}>
+            <button
+              type="button"
+              onClick={() => {
+                setNeedsMatchReview(false);
+                setActiveTab(tab.id);
+              }}
+              className={`rounded-md border px-4 py-2.5 font-mono text-sm font-semibold transition-colors ${
+                activeTab === tab.id && !pendingMatchOnly
+                  ? "border-owl bg-owl/10 text-owl"
+                  : "border-border bg-surface text-text hover:border-border-2 hover:text-owl"
+              }`}
+            >
+              {tab.label}
+              <span className="ml-2 text-text-2">{counts[tab.id]}</span>
+            </button>
+            {tab.id === "graded" && (
+              <a
+                href="/admin/bundles"
+                className="rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-sm font-semibold text-text transition-colors hover:border-border-2 hover:text-owl"
+              >
+                Bundles
+                <span className="ml-2 text-text-2">{bundles.length}</span>
+              </a>
+            )}
+          </Fragment>
         ))}
         {showNeedsMatchTab && (
           <button
