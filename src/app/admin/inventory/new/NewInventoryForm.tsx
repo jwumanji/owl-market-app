@@ -14,6 +14,7 @@ type CardSearchResult = {
   image_url: string | null;
   image_url_small: string | null;
   sets: { code: string | null; name: string | null } | { code: string | null; name: string | null }[] | null;
+  source?: "catalog" | "custom";
 };
 
 const CONDITIONS: { value: InventoryType; label: string }[] = [
@@ -112,14 +113,18 @@ export default function NewInventoryForm() {
     setSaving(true);
     setError(null);
 
+    const selectedCustomCard = selectedCard?.source === "custom";
     const catalogMatchStatus: CatalogMatchStatus = selectedCard
-      ? "matched"
+      ? selectedCustomCard
+        ? "custom_verified"
+        : "matched"
       : notInCatalog
         ? "custom_verified"
         : "needs_match";
 
     const payload = {
-      card_id: selectedCard?.id ?? "",
+      card_id: selectedCard && !selectedCustomCard ? selectedCard.id : "",
+      custom_card_id: selectedCustomCard ? selectedCard.id : "",
       manual_card_name: manualMode ? manualName : "",
       manual_card_number: manualMode ? manualNumber : "",
       manual_set_code: manualMode ? manualSet : "",
@@ -215,6 +220,11 @@ export default function NewInventoryForm() {
                   {setCode(card) && <span>{setCode(card)}</span>}
                   {card.card_number && <span>{card.card_number}</span>}
                   {card.rarity && <span>{card.rarity}</span>}
+                  {card.source === "custom" && (
+                    <span className="rounded border border-gain/40 bg-gain/10 px-1.5 py-0.5 text-gain">
+                      Private
+                    </span>
+                  )}
                 </div>
               </div>
             </button>
@@ -228,7 +238,7 @@ export default function NewInventoryForm() {
                 Can’t find the card?
               </div>
               <div className="mt-1 text-sm text-text-2">
-                Add it manually now and match it to the OWL card database later.
+                Add it to your private card list now, then match it to the OWL card database later if needed.
               </div>
             </div>
             <button
@@ -278,7 +288,7 @@ export default function NewInventoryForm() {
           {manualMode && (
             <div className="rounded-lg border border-owl/30 bg-owl/10 p-4">
               <div className="mb-3 font-mono text-xs font-bold uppercase tracking-wider text-owl">
-                {notInCatalog ? "Manual Item Entry" : "Manual Card Entry"}
+                {notInCatalog ? "Private Item Entry" : "Private Card Entry"}
               </div>
               <label className="block">
                 <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">

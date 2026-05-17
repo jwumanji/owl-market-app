@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
+import { getCurrentAdminUser } from "@/lib/admin-user";
 import { createServiceClient } from "@/lib/supabase-server";
 import { CATALOG_MATCH_STATUSES, GRADED_RATINGS, type CatalogMatchStatus } from "@/lib/inventory-options";
 import { isUploadFile, uploadInventoryScan } from "@/lib/inventory-scans";
+import {
+  findOrCreatePrivateCustomCard,
+  getPrivateCustomCard,
+  isMissingPrivateCustomCardsError,
+  updatePrivateCustomCardImages,
+  type PrivateCustomCardRow,
+} from "@/lib/private-custom-cards";
 
 type InventorySource = {
   card_id: string | null;
+  custom_card_id: string | null;
   manual_card_name: string | null;
   manual_card_number: string | null;
   manual_set_code: string | null;
@@ -43,7 +52,7 @@ function stringValue(body: RequestBody, key: string) {
   return typeof value === "string" ? value : null;
 }
 
-function resolveCatalogMatchStatus(body: RequestBody, cardId: string | null) {
+function resolveCatalogMatchStatus(body: RequestBody, cardId: string | null, customCardId: string | null) {
   const requestedStatus = stringValue(body, "catalog_match_status")?.trim() || null;
   if (requestedStatus && !CATALOG_MATCH_STATUS_VALUES.has(requestedStatus)) {
     return { error: "Invalid catalog match status" };
@@ -51,6 +60,10 @@ function resolveCatalogMatchStatus(body: RequestBody, cardId: string | null) {
 
   if (cardId) {
     return { value: "matched" as CatalogMatchStatus };
+  }
+
+  if (customCardId && !requestedStatus) {
+    return { value: "custom_verified" as CatalogMatchStatus };
   }
 
   return {
@@ -119,18 +132,21 @@ export async function POST(request: Request) {
 
   const supabase = createServiceClient();
 
-  if ("card_id" in body) {
+  if ("card_id" in body || "custom_card_id" in body || "manual_card_name" in body) {
     const cardId = stringValue(body, "card_id")?.trim() || null;
+    let customCardId = stringValue(body, "custom_card_id")?.trim() || null;
     const manualName = stringValue(body, "manual_card_name")?.trim() ?? "";
+    const manualNumber = stringValue(body, "manual_card_number")?.trim() || null;
+    const manualSet = stringValue(body, "manual_set_code")?.trim() || null;
     const inventoryType = stringValue(body, "inventory_type");
     const status = stringValue(body, "status");
-    const catalogMatchStatus = resolveCatalogMatchStatus(body, cardId);
+    let privateCustomCard: PrivateCustomCardRow | null = null;
 
-    if ("error" in catalogMatchStatus) {
-      return NextResponse.json({ error: catalogMatchStatus.error }, { status: 400 });
+    if (cardId && customCardId) {
+      return NextResponse.json({ error: "Choose a catalog card or a private card, not both" }, { status: 400 });
     }
 
-    if (!cardId && !manualName) {
+    if (!cardId && !customCardId && !manualName) {
       return NextResponse.json({ error: "Select a card or enter a manual card name" }, { status: 400 });
     }
 
@@ -182,6 +198,7 @@ export async function POST(request: Request) {
       inventoryType === "graded" ? stringValue(body, "certification_number")?.trim() || null : null;
     let customImageFrontUrl: string | null = null;
     let customImageBackUrl: string | null = null;
+    let currentUser: Awaited<ReturnType<typeof getCurrentAdminUser>> | null = null;
 
     try {
       customImageFrontUrl = await uploadInventoryScan(supabase, frontFile, {
@@ -198,11 +215,65 @@ export async function POST(request: Request) {
       const message = error instanceof Error ? error.message : "Could not upload inventory scans.";
       return NextResponse.json({ error: message }, { status: 400 });
     }
+
+    if (customCardId || (!cardId && manualName)) {
+      currentUser = await getCurrentAdminUser();
+      if (!currentUser) {
+        return NextResponse.json({ error: "Sign in before creating or using private cards." }, { status: 401 });
+      }
+    }
+
+    if (customCardId && currentUser) {
+      const privateCardResult = await getPrivateCustomCard(supabase, currentUser.id, customCardId);
+      if (privateCardResult.error || !privateCardResult.card) {
+        const message = isMissingPrivateCustomCardsError(privateCardResult.error)
+          ? "Private card table is not ready. Run schema-migration-v25-private-custom-cards.sql in Supabase."
+          : "Private card was not found.";
+        return NextResponse.json({ error: message }, { status: privateCardResult.error ? 500 : 404 });
+      }
+
+      privateCustomCard = privateCardResult.card;
+      if (customImageFrontUrl) {
+        await updatePrivateCustomCardImages(supabase, currentUser.id, customCardId, customImageFrontUrl);
+      }
+    }
+
+    if (!cardId && !customCardId && manualName && currentUser) {
+      const privateCardResult = await findOrCreatePrivateCustomCard(supabase, currentUser.id, {
+        name: manualName,
+        card_number: manualNumber,
+        set_code: manualSet,
+        image_url: customImageFrontUrl,
+        image_url_small: customImageFrontUrl,
+        notes: typeof body.notes === "string" ? body.notes.trim() || null : null,
+      });
+
+      if (privateCardResult.error || !privateCardResult.card) {
+        const message = isMissingPrivateCustomCardsError(privateCardResult.error)
+          ? "Private card table is not ready. Run schema-migration-v25-private-custom-cards.sql in Supabase."
+          : privateCardResult.error?.message ?? "Could not create private card.";
+        return NextResponse.json({ error: message }, { status: 500 });
+      }
+
+      privateCustomCard = privateCardResult.card;
+      customCardId = privateCustomCard.id;
+    }
+
+    if (privateCustomCard && !customImageFrontUrl) {
+      customImageFrontUrl = privateCustomCard.image_url;
+    }
+
+    const catalogMatchStatus = resolveCatalogMatchStatus(body, cardId, customCardId);
+    if ("error" in catalogMatchStatus) {
+      return NextResponse.json({ error: catalogMatchStatus.error }, { status: 400 });
+    }
+
     const rows = Array.from({ length: quantity }, () => ({
       card_id: cardId,
-      manual_card_name: cardId ? null : manualName,
-      manual_card_number: cardId ? null : stringValue(body, "manual_card_number")?.trim() || null,
-      manual_set_code: cardId ? null : stringValue(body, "manual_set_code")?.trim() || null,
+      custom_card_id: cardId ? null : customCardId,
+      manual_card_name: cardId ? null : privateCustomCard?.name ?? manualName,
+      manual_card_number: cardId ? null : privateCustomCard?.card_number ?? manualNumber,
+      manual_set_code: cardId ? null : privateCustomCard?.set_code ?? manualSet,
       catalog_match_status: catalogMatchStatus.value,
       item_nickname: stringValue(body, "item_nickname")?.trim() || null,
       pending_card_match: catalogMatchStatus.value === "needs_match",
@@ -245,7 +316,7 @@ export async function POST(request: Request) {
 
   const { data: source, error: sourceError } = await supabase
     .from("inventory_items")
-    .select("card_id, manual_card_name, manual_card_number, manual_set_code, catalog_match_status, item_nickname, pending_card_match, inventory_type, status, graded_rating, certification_number, custom_image_front_url, custom_image_back_url, customer_name, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from, notes")
+    .select("card_id, custom_card_id, manual_card_name, manual_card_number, manual_set_code, catalog_match_status, item_nickname, pending_card_match, inventory_type, status, graded_rating, certification_number, custom_image_front_url, custom_image_back_url, customer_name, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from, notes")
     .eq("id", sourceId)
     .single();
 
@@ -258,10 +329,13 @@ export async function POST(request: Request) {
     .from("inventory_items")
     .insert({
       card_id: item.card_id,
+      custom_card_id: item.custom_card_id,
       manual_card_name: item.manual_card_name,
       manual_card_number: item.manual_card_number,
       manual_set_code: item.manual_set_code,
-      catalog_match_status: item.catalog_match_status ?? (item.card_id ? "matched" : item.pending_card_match ? "needs_match" : "custom_verified"),
+      catalog_match_status:
+        item.catalog_match_status ??
+        (item.card_id ? "matched" : item.custom_card_id ? "custom_verified" : item.pending_card_match ? "needs_match" : "custom_verified"),
       item_nickname: item.item_nickname,
       pending_card_match: item.catalog_match_status
         ? item.catalog_match_status === "needs_match"
@@ -285,7 +359,7 @@ export async function POST(request: Request) {
       purchased_from: item.purchased_from,
       notes: item.notes,
     })
-    .select("id, created_at, inventory_type, status, quantity, catalog_match_status, item_nickname, graded_rating, certification_number, custom_image_front_url, custom_image_back_url, customer_name, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from")
+    .select("id, created_at, card_id, custom_card_id, inventory_type, status, quantity, catalog_match_status, item_nickname, graded_rating, certification_number, custom_image_front_url, custom_image_back_url, customer_name, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from")
     .single();
 
   if (error) {

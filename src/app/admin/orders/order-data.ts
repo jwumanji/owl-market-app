@@ -1,4 +1,10 @@
 import { createServiceClient } from "@/lib/supabase-server";
+import { getCurrentAdminUser } from "@/lib/admin-user";
+import {
+  isMissingPrivateCustomCardsError,
+  loadPrivateCustomCardsByIds,
+  type PrivateCustomCardRow,
+} from "@/lib/private-custom-cards";
 import type { GradedRating, InventoryStatus, InventoryType } from "@/lib/inventory-options";
 import type { SaleChannel } from "@/lib/sale-options";
 import type { CustomerOrderFormValue, CustomerOrderSummary, OrderInventoryItem } from "./order-types";
@@ -12,6 +18,7 @@ type InventoryQueryRow = {
   id: string;
   created_at: string | null;
   card_id: string | null;
+  custom_card_id: string | null;
   manual_card_name: string | null;
   manual_card_number: string | null;
   manual_set_code: string | null;
@@ -59,7 +66,7 @@ type OrderItemRow = {
 };
 
 const INVENTORY_SELECT = `
-  id, created_at, card_id, manual_card_name, manual_card_number, manual_set_code,
+  id, created_at, card_id, custom_card_id, manual_card_name, manual_card_number, manual_set_code,
   item_nickname, inventory_type, status, graded_rating, certification_number,
   custom_image_front_url, customer_name, shipping_tracking, shipping_label_url, shipped_at,
   sale_channel, sold_date, sold_price
@@ -87,8 +94,13 @@ function toOrderFormValue(order: OrderRow, inventoryItemIds: string[]): Customer
   };
 }
 
-function toInventoryItem(row: InventoryQueryRow, cardMap: Map<string, CardLookupRow>): OrderInventoryItem {
+function toInventoryItem(
+  row: InventoryQueryRow,
+  cardMap: Map<string, CardLookupRow>,
+  customCardMap: Map<string, PrivateCustomCardRow>
+): OrderInventoryItem {
   const card = row.card_id ? cardMap.get(row.card_id) ?? null : null;
+  const customCard = row.custom_card_id ? customCardMap.get(row.custom_card_id) ?? null : null;
   const set = Array.isArray(card?.sets) ? card?.sets[0] : card?.sets;
 
   return {
@@ -108,36 +120,48 @@ function toInventoryItem(row: InventoryQueryRow, cardMap: Map<string, CardLookup
     sold_date: row.sold_date,
     sold_price: row.sold_price,
     card: {
-      name: card?.name ?? row.manual_card_name ?? null,
-      image_url: card?.image_url ?? null,
-      image_url_small: card?.image_url_small ?? null,
-      card_number: card?.card_number ?? row.manual_card_number ?? null,
-      set_code: set?.code ?? row.manual_set_code ?? null,
+      name: card?.name ?? customCard?.name ?? row.manual_card_name ?? null,
+      image_url: card?.image_url ?? customCard?.image_url ?? null,
+      image_url_small: card?.image_url_small ?? customCard?.image_url_small ?? null,
+      card_number: card?.card_number ?? customCard?.card_number ?? row.manual_card_number ?? null,
+      set_code: set?.code ?? customCard?.set_code ?? row.manual_set_code ?? null,
     },
   };
 }
 
 async function hydrateInventoryRows(rows: InventoryQueryRow[]): Promise<OrderInventoryItem[]> {
   const cardIds = Array.from(new Set(rows.map((row) => row.card_id).filter(Boolean))) as string[];
-  if (cardIds.length === 0) {
-    return rows.map((row) => toInventoryItem(row, new Map()));
-  }
-
+  const customCardIds = Array.from(new Set(rows.map((row) => row.custom_card_id).filter(Boolean))) as string[];
   const supabase = createServiceClient();
-  const cardsRes = await supabase
-    .from("cards")
-    .select(`
-      id, name, image_url, image_url_small, card_number,
-      sets (code)
-    `)
-    .in("id", cardIds);
+  let cardMap = new Map<string, CardLookupRow>();
+  let customCardMap = new Map<string, PrivateCustomCardRow>();
 
-  if (cardsRes.error) {
-    throw new Error(cardsRes.error.message);
+  if (cardIds.length > 0) {
+    const cardsRes = await supabase
+      .from("cards")
+      .select(`
+        id, name, image_url, image_url_small, card_number,
+        sets (code)
+      `)
+      .in("id", cardIds);
+
+    if (cardsRes.error) {
+      throw new Error(cardsRes.error.message);
+    }
+
+    cardMap = new Map(((cardsRes.data ?? []) as unknown as CardLookupRow[]).map((card) => [card.id, card]));
   }
 
-  const cardMap = new Map(((cardsRes.data ?? []) as unknown as CardLookupRow[]).map((card) => [card.id, card]));
-  return rows.map((row) => toInventoryItem(row, cardMap));
+  if (customCardIds.length > 0) {
+    const currentUser = await getCurrentAdminUser();
+    const customCardsRes = await loadPrivateCustomCardsByIds(supabase, currentUser?.id ?? null, customCardIds);
+    if (customCardsRes.error && !isMissingPrivateCustomCardsError(customCardsRes.error)) {
+      throw new Error(customCardsRes.error.message);
+    }
+    customCardMap = customCardsRes.cards;
+  }
+
+  return rows.map((row) => toInventoryItem(row, cardMap, customCardMap));
 }
 
 export async function loadOrderInventory(currentOrderId?: string): Promise<LoadResult<OrderInventoryItem[]>> {

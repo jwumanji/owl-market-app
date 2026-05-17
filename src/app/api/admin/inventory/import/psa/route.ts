@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { inflateRawSync } from "zlib";
+import { getCurrentAdminUser } from "@/lib/admin-user";
 import { findBestCardAliasMatch, loadCardMatchAliases, type CardMatchAliasRow } from "@/lib/card-match-aliases";
+import {
+  isMissingPrivateCustomCardsError,
+  loadPrivateCustomCardsForUser,
+  type PrivateCustomCardRow,
+} from "@/lib/private-custom-cards";
 import { createServiceClient } from "@/lib/supabase-server";
 import { isUploadFile, uploadInventoryScan } from "@/lib/inventory-scans";
 import {
@@ -99,6 +105,7 @@ type ExistingCertificationItem = {
   id: string;
   certification_number: string | null;
   card_id: string | null;
+  custom_card_id: string | null;
   manual_card_name: string | null;
   manual_card_number: string | null;
   manual_set_code: string | null;
@@ -106,6 +113,11 @@ type ExistingCertificationItem = {
   custom_image_front_url: string | null;
   custom_image_back_url: string | null;
   catalog_match_status: string | null;
+};
+
+type ImportedCardMatch = {
+  source: "catalog" | "custom";
+  card: CardLookupForImport;
 };
 
 type ExistingPsaSubmission = {
@@ -216,7 +228,21 @@ function setCodeFor(card: CardLookupForImport | null) {
   return set?.code ?? null;
 }
 
-function matchImportedCard(row: PsaImportRow, cards: CardLookupForImport[], aliases: CardMatchAliasRow[]) {
+function customCardForImport(card: PrivateCustomCardRow): CardLookupForImport {
+  return {
+    id: card.id,
+    name: card.name,
+    card_number: card.card_number,
+    sets: { code: card.set_code },
+  };
+}
+
+function matchImportedCard(
+  row: PsaImportRow,
+  cards: CardLookupForImport[],
+  customCards: CardLookupForImport[],
+  aliases: CardMatchAliasRow[]
+): ImportedCardMatch | null {
   const alias = findBestCardAliasMatch(
     {
       rawName: row.cardName,
@@ -227,7 +253,15 @@ function matchImportedCard(row: PsaImportRow, cards: CardLookupForImport[], alia
     aliases
   );
   const aliasCard = alias ? cards.find((card) => card.id === alias.card_id) ?? null : null;
-  return aliasCard ?? matchInventoryCard(row, cards);
+  if (aliasCard) return { source: "catalog", card: aliasCard };
+
+  const catalogMatch = matchInventoryCard(row, cards);
+  if (catalogMatch) return { source: "catalog", card: catalogMatch };
+
+  const customMatch = matchInventoryCard(row, customCards);
+  if (customMatch) return { source: "custom", card: customMatch };
+
+  return null;
 }
 
 function certificationKey(value: string | number | null | undefined) {
@@ -451,6 +485,7 @@ export async function POST(request: Request) {
   const shouldCreateBundle = formBooleanValue(formData, "create_bundle");
   const bundleName = formStringValue(formData, "bundle_name") || submissionName;
   const supabase = createServiceClient();
+  const currentUser = await getCurrentAdminUser();
   const psaOrderNumber = psaOrderNumberFromFilename(psaFile.name);
 
   if (psaOrderNumber) {
@@ -499,7 +534,7 @@ export async function POST(request: Request) {
     const { data: existingCertData, error: existingCertError } = await supabase
       .from("inventory_items")
       .select(`
-        id, certification_number, card_id, manual_card_name, manual_card_number, manual_set_code, graded_rating,
+        id, certification_number, card_id, custom_card_id, manual_card_name, manual_card_number, manual_set_code, graded_rating,
         custom_image_front_url, custom_image_back_url, catalog_match_status
       `)
       .not("certification_number", "is", null)
@@ -528,6 +563,16 @@ export async function POST(request: Request) {
   }
 
   const cards = (cardData ?? []) as unknown as CardLookupForImport[];
+  let customCards: CardLookupForImport[] = [];
+  let customCardImageMap = new Map<string, PrivateCustomCardRow>();
+  if (currentUser) {
+    const customCardsResult = await loadPrivateCustomCardsForUser(supabase, currentUser.id);
+    if (customCardsResult.error && !isMissingPrivateCustomCardsError(customCardsResult.error)) {
+      return NextResponse.json({ error: customCardsResult.error.message }, { status: 500 });
+    }
+    customCardImageMap = new Map(customCardsResult.cards.map((card) => [card.id, card]));
+    customCards = customCardsResult.cards.map(customCardForImport);
+  }
   const aliasResult = await loadCardMatchAliases(supabase);
   const aliases = aliasResult.aliases;
   const importRows = [];
@@ -543,13 +588,14 @@ export async function POST(request: Request) {
     const isFileDuplicate = Boolean(certKey && importCertificationKeys.has(certKey));
 
     if (isExistingDuplicate || isFileDuplicate) {
-      const match = matchImportedCard(row, cards, aliases);
+      const matchResult = matchImportedCard(row, cards, customCards, aliases);
+      const match = matchResult?.card ?? null;
       summaryRows.push({
         source_index: row.sourceIndex,
         inventory_item_id: existingItem?.id ?? null,
         certification_number: certificationNumber,
         graded_rating: row.gradedRating ?? existingItem?.graded_rating ?? null,
-        matched: Boolean(match || existingItem?.card_id || existingItem?.catalog_match_status === "matched"),
+        matched: Boolean(match || existingItem?.card_id || existingItem?.custom_card_id || existingItem?.catalog_match_status === "matched"),
         card_name: match?.name ?? row.cardName ?? existingItem?.manual_card_name ?? null,
         card_number: match?.card_number ?? row.cardNumber ?? existingItem?.manual_card_number ?? null,
         set_code: setCodeFor(match) ?? row.setCode ?? existingItem?.manual_set_code ?? null,
@@ -562,7 +608,8 @@ export async function POST(request: Request) {
     }
 
     const pair = scanPairs.get(row.sourceIndex) ?? { front: null, back: null };
-    const match = matchImportedCard(row, cards, aliases);
+    const matchResult = matchImportedCard(row, cards, customCards, aliases);
+    const match = matchResult?.card ?? null;
     const psaCertDetails = await lookupPsaCertDetails(row.certificationNumber);
     const archivePair = await downloadPsaImageArchive(row.imageArchiveUrl);
     const frontScan = pair.front ?? archivePair.front;
@@ -591,14 +638,19 @@ export async function POST(request: Request) {
 
     customImageFrontUrl ??= psaCertDetails.frontImageUrl;
     customImageBackUrl ??= psaCertDetails.backImageUrl;
+    if (matchResult?.source === "custom") {
+      const privateCard = customCardImageMap.get(matchResult.card.id) ?? null;
+      customImageFrontUrl ??= privateCard?.image_url ?? privateCard?.image_url_small ?? null;
+    }
 
     importRows.push({
-      card_id: match?.id ?? null,
-      manual_card_name: match ? null : row.cardName,
-      manual_card_number: match ? null : row.cardNumber,
-      manual_set_code: match ? null : row.setCode,
-      catalog_match_status: match ? "matched" : "needs_match",
-      pending_card_match: !match,
+      card_id: matchResult?.source === "catalog" ? matchResult.card.id : null,
+      custom_card_id: matchResult?.source === "custom" ? matchResult.card.id : null,
+      manual_card_name: matchResult?.source === "catalog" ? null : match?.name ?? row.cardName,
+      manual_card_number: matchResult?.source === "catalog" ? null : match?.card_number ?? row.cardNumber,
+      manual_set_code: matchResult?.source === "catalog" ? null : setCodeFor(match) ?? row.setCode,
+      catalog_match_status: matchResult?.source === "catalog" ? "matched" : matchResult?.source === "custom" ? "custom_verified" : "needs_match",
+      pending_card_match: !matchResult,
       inventory_type: "graded",
       status: "new",
       quantity: 1,
@@ -619,7 +671,7 @@ export async function POST(request: Request) {
       inventory_item_id: null,
       certification_number: row.certificationNumber,
       graded_rating: gradedRating,
-      matched: Boolean(match),
+      matched: Boolean(matchResult),
       card_name: match?.name ?? row.cardName,
       card_number: match?.card_number ?? row.cardNumber,
       set_code: setCodeFor(match) ?? row.setCode,

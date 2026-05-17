@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
+import { getCurrentAdminUser } from "@/lib/admin-user";
 import { findCardAliasMatches, loadCardMatchAliases } from "@/lib/card-match-aliases";
+import {
+  PRIVATE_CUSTOM_CARD_SELECT,
+  isMissingPrivateCustomCardsError,
+  type PrivateCustomCardRow,
+} from "@/lib/private-custom-cards";
 import { createServiceClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +19,7 @@ type CardSearchRow = {
   image_url_small: string | null;
   set_id: string | null;
   sets: { code: string | null; name: string | null } | null;
+  source?: "catalog" | "custom";
 };
 
 const SEARCH_SELECT = `
@@ -72,6 +79,24 @@ function scoreCard(card: CardSearchRow, query: string, tokens: string[]) {
   return score;
 }
 
+function searchKey(card: CardSearchRow) {
+  return `${card.source ?? "catalog"}:${card.id}`;
+}
+
+function customCardToSearchRow(card: PrivateCustomCardRow): CardSearchRow {
+  return {
+    id: card.id,
+    name: card.name,
+    card_number: card.card_number,
+    rarity: "Private",
+    image_url: card.image_url,
+    image_url_small: card.image_url_small,
+    set_id: null,
+    sets: { code: card.set_code, name: "Private Custom" },
+    source: "custom",
+  };
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("q")?.trim();
@@ -81,6 +106,7 @@ export async function GET(request: Request) {
   }
 
   const supabase = createServiceClient();
+  const currentUser = await getCurrentAdminUser();
   const tokens = searchTokens(query);
   const candidates = new Map<string, CardSearchRow>();
   const aliasBoosts = new Map<string, number>();
@@ -99,7 +125,8 @@ export async function GET(request: Request) {
     }
 
     for (const card of (data ?? []) as unknown as CardSearchRow[]) {
-      candidates.set(card.id, card);
+      const catalogCard = { ...card, source: "catalog" as const };
+      candidates.set(searchKey(catalogCard), catalogCard);
     }
 
     for (const match of aliasMatches) {
@@ -119,7 +146,8 @@ export async function GET(request: Request) {
     }
 
     for (const card of (data ?? []) as unknown as CardSearchRow[]) {
-      candidates.set(card.id, card);
+      const catalogCard = { ...card, source: "catalog" as const };
+      candidates.set(searchKey(catalogCard), catalogCard);
     }
   }
 
@@ -148,12 +176,39 @@ export async function GET(request: Request) {
     }
 
     for (const card of (data ?? []) as unknown as CardSearchRow[]) {
-      candidates.set(card.id, card);
+      const catalogCard = { ...card, source: "catalog" as const };
+      candidates.set(searchKey(catalogCard), catalogCard);
+    }
+  }
+
+  if (currentUser) {
+    for (const token of tokens.length > 0 ? tokens : [query]) {
+      const { data, error } = await supabase
+        .from("custom_cards")
+        .select(PRIVATE_CUSTOM_CARD_SELECT)
+        .eq("user_id", currentUser.id)
+        .or(`name.ilike.%${token}%,card_number.ilike.%${token}%,set_code.ilike.%${token}%`)
+        .limit(60);
+
+      if (error) {
+        if (isMissingPrivateCustomCardsError(error)) break;
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      for (const card of (data ?? []) as unknown as PrivateCustomCardRow[]) {
+        const customCard = customCardToSearchRow(card);
+        candidates.set(searchKey(customCard), customCard);
+      }
     }
   }
 
   const scored = Array.from(candidates.values())
-    .map((card) => ({ card, score: scoreCard(card, query, tokens) + (aliasBoosts.get(card.id) ?? 0) }))
+    .map((card) => ({
+      card,
+      score:
+        scoreCard(card, query, tokens) +
+        (card.source === "catalog" ? aliasBoosts.get(card.id) ?? 0 : 35),
+    }))
     .filter(({ score }) => score > 0)
     .sort((a, b) => b.score - a.score || (a.card.name ?? "").localeCompare(b.card.name ?? ""))
     .slice(0, 30)

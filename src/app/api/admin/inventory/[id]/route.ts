@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { getCurrentAdminUser } from "@/lib/admin-user";
 import { createServiceClient } from "@/lib/supabase-server";
 import { saveCardMatchAlias, type CardMatchAliasSource } from "@/lib/card-match-aliases";
 import { CATALOG_MATCH_STATUSES, GRADED_RATINGS } from "@/lib/inventory-options";
+import { getPrivateCustomCard, isMissingPrivateCustomCardsError } from "@/lib/private-custom-cards";
 
 const STATUSES = new Set(["new", "grading", "sale", "ship", "sold"]);
 const CONDITIONS = new Set(["raw", "damaged", "graded", "sealed"]);
@@ -48,6 +50,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
+  const supabase = createServiceClient();
   const updates: Record<string, string | number | boolean | null> = {};
 
   if ("card_id" in body) {
@@ -59,10 +62,49 @@ export async function PATCH(
     updates.card_id = cardId;
 
     if (cardId) {
+      updates.custom_card_id = null;
       updates.manual_card_name = null;
       updates.manual_card_number = null;
       updates.manual_set_code = null;
       updates.catalog_match_status = "matched";
+      updates.pending_card_match = false;
+    }
+  }
+
+  if ("custom_card_id" in body) {
+    if (body.custom_card_id !== null && typeof body.custom_card_id !== "string") {
+      return NextResponse.json({ error: "Invalid private card match" }, { status: 400 });
+    }
+
+    const customCardId = body.custom_card_id?.trim() || null;
+    if (customCardId && typeof updates.card_id === "string" && updates.card_id) {
+      return NextResponse.json({ error: "Choose a catalog card or a private card, not both" }, { status: 400 });
+    }
+
+    updates.custom_card_id = customCardId;
+
+    if (customCardId) {
+      const currentUser = await getCurrentAdminUser();
+      if (!currentUser) {
+        return NextResponse.json({ error: "Sign in before using private cards." }, { status: 401 });
+      }
+
+      const privateCardResult = await getPrivateCustomCard(supabase, currentUser.id, customCardId);
+      if (privateCardResult.error || !privateCardResult.card) {
+        const message = isMissingPrivateCustomCardsError(privateCardResult.error)
+          ? "Private card table is not ready. Run schema-migration-v25-private-custom-cards.sql in Supabase."
+          : "Private card was not found.";
+        return NextResponse.json({ error: message }, { status: privateCardResult.error ? 500 : 404 });
+      }
+
+      updates.card_id = null;
+      updates.manual_card_name = privateCardResult.card.name;
+      updates.manual_card_number = privateCardResult.card.card_number;
+      updates.manual_set_code = privateCardResult.card.set_code;
+      if (privateCardResult.card.image_url) {
+        updates.custom_image_front_url = privateCardResult.card.image_url;
+      }
+      updates.catalog_match_status = "custom_verified";
       updates.pending_card_match = false;
     }
   }
@@ -254,7 +296,6 @@ export async function PATCH(
 
   updates.updated_at = new Date().toISOString();
 
-  const supabase = createServiceClient();
   const { data: existing } = await supabase
     .from("inventory_items")
     .select("status, inventory_type, manual_card_name, manual_card_number, manual_set_code, item_nickname, certification_number")
@@ -265,7 +306,7 @@ export async function PATCH(
     .from("inventory_items")
     .update(updates)
     .eq("id", params.id)
-    .select("id, card_id, manual_card_name, manual_card_number, manual_set_code, catalog_match_status, pending_card_match, status, graded_rating, certification_number, custom_image_front_url, custom_image_back_url")
+    .select("id, card_id, custom_card_id, manual_card_name, manual_card_number, manual_set_code, catalog_match_status, pending_card_match, status, graded_rating, certification_number, custom_image_front_url, custom_image_back_url")
     .single();
 
   if (error) {

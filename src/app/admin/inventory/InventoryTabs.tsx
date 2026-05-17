@@ -79,6 +79,7 @@ export interface InventoryRow {
   catalog_match_status?: CatalogMatchStatus | null;
   pending_card_match?: boolean | null;
   centering_ceiling?: CenteringCeiling | null;
+  custom_card_id?: string | null;
   card: {
     name: string | null;
     image_url: string | null;
@@ -96,6 +97,7 @@ type CardMatchResult = {
   image_url: string | null;
   image_url_small: string | null;
   sets: { code: string | null; name: string | null } | { code: string | null; name: string | null }[] | null;
+  source?: "catalog" | "custom";
 };
 
 const TABS = [
@@ -176,7 +178,7 @@ type CreatedInventoryItem = Pick<
   "id" | "created_at" | "inventory_type" | "status" | "quantity" | "item_nickname" | "graded_rating" | "certification_number"
   | "custom_image_front_url" | "custom_image_back_url" | "customer_name" | "shipping_tracking" | "shipped_at"
   | "shipping_label_url" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "purchased_from"
-  | "catalog_match_status"
+  | "catalog_match_status" | "custom_card_id"
 >;
 
 type SelectFieldProps = SelectHTMLAttributes<HTMLSelectElement> & {
@@ -542,6 +544,7 @@ export default function InventoryTabs({
   const [addingGroups, setAddingGroups] = useState<Record<string, boolean>>({});
   const [deletingItemIds, setDeletingItemIds] = useState<Record<string, boolean>>({});
   const [confirmingDeleteIds, setConfirmingDeleteIds] = useState<Record<string, boolean>>({});
+  const [savingBundleIds, setSavingBundleIds] = useState<Record<string, boolean>>({});
   const [bulkSelectMode, setBulkSelectMode] = useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<Record<string, boolean>>({});
   const [lastSelectedItemId, setLastSelectedItemId] = useState<string | null>(null);
@@ -553,6 +556,7 @@ export default function InventoryTabs({
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const [openActionMenuKey, setOpenActionMenuKey] = useState<string | null>(null);
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null);
+  const [expandedBundleIds, setExpandedBundleIds] = useState<Record<string, boolean>>({});
   const [hoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
   const [scanViewer, setScanViewer] = useState<ScanViewer | null>(null);
   const [searchDraft, setSearchDraft] = useState("");
@@ -888,7 +892,7 @@ export default function InventoryTabs({
     };
   }, [rows, selectedGroupKey]);
 
-  type InventoryItemUpdates = Partial<Pick<InventoryRow, "status" | "graded_rating" | "certification_number" | "custom_image_front_url" | "custom_image_back_url" | "inventory_type" | "item_nickname" | "customer_name" | "shipping_tracking" | "shipping_label_url" | "shipped_at" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "purchased_from" | "notes" | "catalog_match_status" | "pending_card_match">>;
+  type InventoryItemUpdates = Partial<Pick<InventoryRow, "status" | "graded_rating" | "certification_number" | "custom_image_front_url" | "custom_image_back_url" | "inventory_type" | "item_nickname" | "customer_name" | "shipping_tracking" | "shipping_label_url" | "shipped_at" | "sale_channel" | "sold_date" | "sold_price" | "acquired_at" | "cost_basis" | "purchased_from" | "notes" | "catalog_match_status" | "pending_card_match" | "custom_card_id">>;
 
   async function updateItem(
     id: string,
@@ -1184,11 +1188,13 @@ export default function InventoryTabs({
     setMatchingItemIds((current) => ({ ...current, [item.id]: true }));
 
     const matchedCard = cardFromMatch(card);
+    const matchStatus: CatalogMatchStatus = card.source === "custom" ? "custom_verified" : "matched";
     setRows((current) =>
       current.map((row) =>
         row.id === item.id
           ? {
-              ...withCatalogMatchStatus(row, "matched"),
+              ...withCatalogMatchStatus(row, matchStatus),
+              custom_card_id: card.source === "custom" ? card.id : null,
               card: matchedCard,
             }
           : row
@@ -1208,10 +1214,19 @@ export default function InventoryTabs({
       const res = await fetch(`/api/admin/inventory/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          card_id: card.id,
-          catalog_match_status: "matched",
-        }),
+        body: JSON.stringify(
+          card.source === "custom"
+            ? {
+                card_id: null,
+                custom_card_id: card.id,
+                catalog_match_status: "custom_verified",
+              }
+            : {
+                card_id: card.id,
+                custom_card_id: null,
+                catalog_match_status: "matched",
+              }
+        ),
       });
 
       if (!res.ok) {
@@ -1339,6 +1354,7 @@ export default function InventoryTabs({
                 cost_basis: created.cost_basis ?? null,
                 purchased_from: created.purchased_from ?? null,
                 catalog_match_status: created.catalog_match_status ?? newItem.catalog_match_status,
+                custom_card_id: created.custom_card_id ?? newItem.custom_card_id ?? null,
                 pending_card_match: (created.catalog_match_status ?? newItem.catalog_match_status) === "needs_match",
               }
             : item
@@ -1876,6 +1892,90 @@ export default function InventoryTabs({
       sale_channel: nextChannel,
       status: nextChannel === "not_sold" ? "sale" : item.status === "sold" ? "sold" : "ship",
       sold_date: nextChannel === "not_sold" ? null : item.sold_date ?? todayDateString(),
+    });
+  }
+
+  type BundleUpdates = Partial<Pick<InventoryBundleSummary, "status" | "sale_channel" | "sold_date" | "sold_price">>;
+
+  async function updateBundle(bundle: InventoryBundleSummary, updates: BundleUpdates) {
+    const nextBundle: InventoryBundleSummary = {
+      ...bundle,
+      ...updates,
+      updated_at: new Date().toISOString(),
+      items: bundle.items.map((item) => ({
+        ...item,
+        status: updates.status ?? item.status,
+        sale_channel: updates.sale_channel ?? item.sale_channel,
+        sold_date: updates.sold_date !== undefined ? updates.sold_date : item.sold_date,
+        sold_price: updates.sold_price !== undefined ? updates.sold_price : item.sold_price,
+      })),
+    };
+
+    setActionError(null);
+    setSavingBundleIds((current) => ({ ...current, [bundle.id]: true }));
+    onBundlesChange?.(bundles.map((candidate) => (candidate.id === bundle.id ? nextBundle : candidate)));
+    setRows((current) =>
+      current.map((item) =>
+        bundle.inventory_item_ids.includes(item.id)
+          ? {
+              ...item,
+              status: updates.status ?? item.status,
+              sale_channel: updates.sale_channel ?? item.sale_channel,
+              sold_date: updates.sold_date !== undefined ? updates.sold_date : item.sold_date,
+            }
+          : item
+      )
+    );
+
+    const res = await fetch(`/api/admin/bundles/${bundle.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: nextBundle.name,
+        notes: nextBundle.notes ?? "",
+        status: nextBundle.status,
+        sale_channel: nextBundle.sale_channel ?? "not_sold",
+        sold_date: nextBundle.sold_date ?? "",
+        sold_price: nextBundle.sold_price ?? "",
+        inventory_item_ids: nextBundle.inventory_item_ids,
+      }),
+    });
+    const payload = await res.json().catch(() => null);
+    setSavingBundleIds((current) => {
+      const next = { ...current };
+      delete next[bundle.id];
+      return next;
+    });
+
+    if (!res.ok) {
+      onBundlesChange?.(bundles);
+      setRows(items);
+      setActionError(payload?.error ?? "Could not update bundle.");
+    }
+  }
+
+  function updateBundleStatus(bundle: InventoryBundleSummary, nextStatus: InventoryStatus) {
+    if (nextStatus === "sold") {
+      updateBundle(bundle, {
+        status: nextStatus,
+        sold_date: bundle.sold_date ?? todayDateString(),
+      });
+      return;
+    }
+
+    updateBundle(bundle, {
+      status: nextStatus,
+      sale_channel: "not_sold",
+      sold_date: null,
+      sold_price: null,
+    });
+  }
+
+  function updateBundleSaleChannel(bundle: InventoryBundleSummary, nextChannel: SaleChannel) {
+    updateBundle(bundle, {
+      sale_channel: nextChannel,
+      status: nextChannel === "not_sold" ? "sale" : "sold",
+      sold_date: nextChannel === "not_sold" ? null : bundle.sold_date ?? todayDateString(),
     });
   }
 
@@ -2460,6 +2560,11 @@ export default function InventoryTabs({
                     {setCodeForMatch(card) && <span>{setCodeForMatch(card)}</span>}
                     {card.card_number && <span>{card.card_number}</span>}
                     {card.rarity && <span>{card.rarity}</span>}
+                    {card.source === "custom" && (
+                      <span className="rounded border border-gain/40 bg-gain/10 px-1.5 py-0.5 text-gain">
+                        Private
+                      </span>
+                    )}
                   </div>
                 </div>
                 <span className="shrink-0 rounded border border-owl/60 bg-owl/10 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-owl">
@@ -3138,13 +3243,19 @@ export default function InventoryTabs({
   }
 
   function renderBundleItems(bundle: InventoryBundleSummary) {
-    const visibleItems = bundle.items.slice(0, 8);
+    const expanded = expandedBundleIds[bundle.id] ?? false;
+    const visibleItems = expanded ? bundle.items : bundle.items.slice(0, 8);
     const hiddenCount = Math.max(0, bundle.items.length - visibleItems.length);
 
     return (
       <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
         {visibleItems.map((item) => (
-          <div key={item.id} className="grid min-w-0 grid-cols-[3.5rem_minmax(0,1fr)] gap-3 rounded-md border border-border bg-deep p-2">
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setSelectedGroupKey(`item:${item.id}`)}
+            className="grid min-w-0 grid-cols-[3.5rem_minmax(0,1fr)] gap-3 rounded-md border border-border bg-deep p-2 text-left transition-colors hover:border-owl/60 hover:bg-surf2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-owl"
+          >
             {renderBundleThumbnail(item)}
             <div className="min-w-0 self-center">
               <div className="truncate text-sm font-bold text-text">{bundleItemTitle(item)}</div>
@@ -3154,12 +3265,25 @@ export default function InventoryTabs({
                   .join(" / ")}
               </div>
             </div>
-          </div>
+          </button>
         ))}
         {hiddenCount > 0 && (
-          <div className="flex min-h-20 items-center justify-center rounded-md border border-dashed border-border bg-deep px-4 py-3 font-mono text-xs font-bold uppercase tracking-wider text-text-2">
+          <button
+            type="button"
+            onClick={() => setExpandedBundleIds((current) => ({ ...current, [bundle.id]: true }))}
+            className="flex min-h-20 items-center justify-center rounded-md border border-dashed border-border bg-deep px-4 py-3 font-mono text-xs font-bold uppercase tracking-wider text-text-2 transition-colors hover:border-owl/60 hover:bg-surf2 hover:text-owl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-owl"
+          >
             +{hiddenCount} More
-          </div>
+          </button>
+        )}
+        {expanded && bundle.items.length > 8 && (
+          <button
+            type="button"
+            onClick={() => setExpandedBundleIds((current) => ({ ...current, [bundle.id]: false }))}
+            className="flex min-h-20 items-center justify-center rounded-md border border-border bg-deep px-4 py-3 font-mono text-xs font-bold uppercase tracking-wider text-text-2 transition-colors hover:border-border-2 hover:bg-surf2 hover:text-owl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-owl"
+          >
+            Show Less
+          </button>
         )}
       </div>
     );
@@ -3196,12 +3320,17 @@ export default function InventoryTabs({
               </tr>
             ) : filteredBundles.length > 0 ? (
               filteredBundles.map((bundle) => {
-                const saleLabel = bundle.sale_channel ? SALE_CHANNEL_LABELS[bundle.sale_channel as SaleChannel] : "----";
+                const savingBundle = savingBundleIds[bundle.id] ?? false;
 
                 return (
                   <tr key={bundle.id} className="border-b border-border last:border-b-0">
                     <td className="px-4 py-4 align-top">
-                      <div className="text-lg font-black leading-tight text-owl">{bundle.name}</div>
+                      <a
+                        href={`/admin/bundles/${bundle.id}`}
+                        className="block text-lg font-black leading-tight text-owl underline-offset-2 transition-colors hover:text-owl-light hover:underline"
+                      >
+                        {bundle.name}
+                      </a>
                       <div className="mt-1 font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
                         Updated {formatOrderDate(bundle.updated_at ?? bundle.created_at)}
                       </div>
@@ -3216,25 +3345,42 @@ export default function InventoryTabs({
                       {renderBundleItems(bundle)}
                     </td>
                     <td className="px-4 py-4 align-top">
-                      <span className="inline-flex rounded-md border border-owl/40 bg-owl/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-owl">
-                        {STATUS_LABELS[bundle.status] ?? bundle.status}
-                      </span>
+                      <SelectField
+                        value={bundle.status}
+                        disabled={savingBundle}
+                        onChange={(event) => updateBundleStatus(bundle, event.target.value as InventoryStatus)}
+                        wrapperClassName="w-full"
+                        className="bg-deep"
+                      >
+                        {(Object.keys(STATUS_LABELS) as InventoryStatus[]).map((status) => (
+                          <option key={status} value={status}>
+                            {STATUS_LABELS[status]}
+                          </option>
+                        ))}
+                      </SelectField>
                     </td>
                     <td className="px-4 py-4 align-top font-mono text-xs font-semibold text-text-2">
-                      {bundle.status === "sold" ? (
-                        <div className="grid gap-2">
-                          <div>
-                            <span className="text-text-3">Sold At</span>
-                            <div className="mt-0.5 text-text">{saleLabel}</div>
-                          </div>
+                      <div className="grid gap-2">
+                        <SelectField
+                          value={bundle.sale_channel ?? "not_sold"}
+                          disabled={savingBundle}
+                          onChange={(event) => updateBundleSaleChannel(bundle, event.target.value as SaleChannel)}
+                          wrapperClassName="w-full"
+                          className="bg-deep"
+                        >
+                          {(Object.keys(SALE_CHANNEL_LABELS) as SaleChannel[]).map((channel) => (
+                            <option key={channel} value={channel}>
+                              {SALE_CHANNEL_LABELS[channel]}
+                            </option>
+                          ))}
+                        </SelectField>
+                        {(bundle.sale_channel ?? "not_sold") !== "not_sold" && (
                           <div>
                             <span className="text-text-3">Sold Date</span>
                             <div className="mt-0.5 text-text">{formatOrderDate(bundle.sold_date)}</div>
                           </div>
-                        </div>
-                      ) : (
-                        <span>----</span>
-                      )}
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-4 align-top">
                       <a
