@@ -103,6 +103,7 @@ const TABS = [
   { id: "raw", label: "Raw" },
   { id: "damaged", label: "Damaged Card" },
   { id: "graded", label: "Graded Card" },
+  { id: "bundles", label: "Bundles" },
   { id: "sealed", label: "Sealed" },
 ] as const;
 
@@ -382,6 +383,51 @@ function orderItemHasCustomScanImage(item: StageOrderItem) {
   return Boolean(item.custom_image_front_url);
 }
 
+function bundleItemTitle(item: BundleInventoryItem) {
+  return item.item_nickname || item.card.name || "Untitled inventory item";
+}
+
+function bundleItemImageUrl(item: BundleInventoryItem) {
+  return item.custom_image_front_url ?? item.card.image_url_small ?? item.card.image_url;
+}
+
+function bundleItemImageFallbackUrl(item: BundleInventoryItem) {
+  if (item.custom_image_front_url) return item.card.image_url_small ?? item.card.image_url ?? null;
+  return null;
+}
+
+function bundleItemHasCustomScanImage(item: BundleInventoryItem) {
+  return Boolean(item.custom_image_front_url);
+}
+
+function bundleMatchesSearch(bundle: InventoryBundleSummary, query: string) {
+  if (!query) return true;
+
+  return [
+    bundle.id,
+    bundle.name,
+    bundle.notes,
+    bundle.status,
+    bundle.sale_channel,
+    bundle.sold_date,
+    ...bundle.items.flatMap((item) => [
+      item.id,
+      item.item_nickname,
+      item.card.name,
+      item.card.set_code,
+      item.card.card_number,
+      item.inventory_type,
+      item.status,
+      item.graded_rating,
+      item.certification_number,
+    ]),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .includes(query);
+}
+
 function orderItemConditionLabel(item: StageOrderItem) {
   return CONDITION_LABELS[item.inventory_type] ?? item.inventory_type;
 }
@@ -418,6 +464,7 @@ function itemMatchesInventoryTab(
   tab: InventoryTabId,
   gradedFilter: GradedFilter
 ) {
+  if (tab === "bundles") return false;
   if (tab === "all") return true;
   if (item.inventory_type !== tab) return false;
   return tab !== "graded" || gradedFilter === "all" || item.graded_rating === gradedFilter;
@@ -758,6 +805,14 @@ export default function InventoryTabs({
       { all: 0, raw: 0, damaged: 0, graded: 0, sealed: 0 }
     );
   }, [countRows]);
+  const filteredBundles = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    return bundles.filter((bundle) => {
+      if (statusFilter !== "all" && bundle.status !== statusFilter) return false;
+      return bundleMatchesSearch(bundle, query);
+    });
+  }, [bundles, searchQuery, statusFilter]);
   const gradedCounts = useMemo(() => {
     return countRows.reduce(
       (acc, item) => {
@@ -1351,6 +1406,14 @@ export default function InventoryTabs({
     setBulkStatusDraft("");
     setBulkConditionDraft("");
     resetBulkActionConfirmations();
+  }
+
+  function switchInventoryTab(tab: InventoryTabId) {
+    setNeedsMatchReview(false);
+    setActiveTab(tab);
+    if (tab === "bundles") {
+      clearBulkSelection();
+    }
   }
 
   function applyRangeSelection(targetIds: string[], selected: boolean) {
@@ -2539,6 +2602,26 @@ export default function InventoryTabs({
     });
   }
 
+  function updateBundleItemHoverPreview(event: MouseEvent, item: BundleInventoryItem) {
+    const imageUrl = bundleItemImageUrl(item);
+    if (!imageUrl) return;
+
+    const isScanImage = bundleItemHasCustomScanImage(item);
+    const previewWidth = isScanImage ? 320 : 260;
+    const previewHeight = isScanImage ? 430 : 360;
+    const margin = 18;
+    const x = Math.min(event.clientX + margin, window.innerWidth - previewWidth - margin);
+    const y = Math.min(event.clientY + margin, window.innerHeight - previewHeight - margin);
+
+    setHoverPreview({
+      src: imageUrl,
+      name: bundleItemTitle(item),
+      x: Math.max(margin, x),
+      y: Math.max(margin, y),
+      isScanImage,
+    });
+  }
+
   function renderHoverPreview() {
     if (!hoverPreview) return null;
 
@@ -3016,6 +3099,167 @@ export default function InventoryTabs({
     );
   }
 
+  function renderBundleThumbnail(item: BundleInventoryItem) {
+    const imageUrl = bundleItemImageUrl(item);
+
+    if (!imageUrl) {
+      return (
+        <div className="flex h-20 w-14 shrink-0 items-center justify-center rounded-md border border-border bg-surf3 font-mono text-[10px] font-semibold uppercase text-text-3">
+          Box
+        </div>
+      );
+    }
+
+    return (
+      <div
+        className="flex h-20 w-14 shrink-0 cursor-zoom-in items-center justify-center overflow-hidden rounded-md border border-border bg-surf3 transition-transform hover:scale-[1.03]"
+        onMouseEnter={(event) => updateBundleItemHoverPreview(event, item)}
+        onMouseMove={(event) => updateBundleItemHoverPreview(event, item)}
+        onMouseLeave={() => setHoverPreview(null)}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imageUrl}
+          alt={bundleItemTitle(item)}
+          data-fallback-src={bundleItemImageFallbackUrl(item) ?? undefined}
+          className="h-full w-full object-contain"
+          onError={(event) => {
+            const fallbackSrc = event.currentTarget.dataset.fallbackSrc;
+            if (fallbackSrc && event.currentTarget.src !== fallbackSrc) {
+              event.currentTarget.src = fallbackSrc;
+              delete event.currentTarget.dataset.fallbackSrc;
+              return;
+            }
+            event.currentTarget.style.display = "none";
+          }}
+        />
+      </div>
+    );
+  }
+
+  function renderBundleItems(bundle: InventoryBundleSummary) {
+    const visibleItems = bundle.items.slice(0, 8);
+    const hiddenCount = Math.max(0, bundle.items.length - visibleItems.length);
+
+    return (
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        {visibleItems.map((item) => (
+          <div key={item.id} className="grid min-w-0 grid-cols-[3.5rem_minmax(0,1fr)] gap-3 rounded-md border border-border bg-deep p-2">
+            {renderBundleThumbnail(item)}
+            <div className="min-w-0 self-center">
+              <div className="truncate text-sm font-bold text-text">{bundleItemTitle(item)}</div>
+              <div className="mt-1 truncate font-mono text-xs font-semibold text-owl">
+                {[item.card.set_code, item.card.card_number, item.graded_rating, item.certification_number ? `Cert ${item.certification_number}` : null]
+                  .filter(Boolean)
+                  .join(" / ")}
+              </div>
+            </div>
+          </div>
+        ))}
+        {hiddenCount > 0 && (
+          <div className="flex min-h-20 items-center justify-center rounded-md border border-dashed border-border bg-deep px-4 py-3 font-mono text-xs font-bold uppercase tracking-wider text-text-2">
+            +{hiddenCount} More
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderBundlesTable() {
+    return (
+      <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+        <table className="w-full min-w-[1280px] table-fixed">
+          <colgroup>
+            <col className="w-[290px]" />
+            <col />
+            <col className="w-[145px]" />
+            <col className="w-[170px]" />
+            <col className="w-[130px]" />
+          </colgroup>
+          <thead>
+            <tr className="border-b border-border bg-surf2 text-left font-mono text-xs font-semibold uppercase tracking-wider text-text">
+              <th className="px-4 py-3.5">Bundle</th>
+              <th className="px-4 py-3.5">Cards</th>
+              <th className="px-4 py-3.5">Status</th>
+              <th className="px-4 py-3.5">Sale Details</th>
+              <th className="px-4 py-3.5">Edit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {bundlesError ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-8">
+                  <div className="rounded-md border border-loss/30 bg-loss/10 px-4 py-3 text-sm font-semibold text-text">
+                    Bundles are not ready yet: {bundlesError}
+                  </div>
+                </td>
+              </tr>
+            ) : filteredBundles.length > 0 ? (
+              filteredBundles.map((bundle) => {
+                const saleLabel = bundle.sale_channel ? SALE_CHANNEL_LABELS[bundle.sale_channel as SaleChannel] : "----";
+
+                return (
+                  <tr key={bundle.id} className="border-b border-border last:border-b-0">
+                    <td className="px-4 py-4 align-top">
+                      <div className="text-lg font-black leading-tight text-owl">{bundle.name}</div>
+                      <div className="mt-1 font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
+                        Updated {formatOrderDate(bundle.updated_at ?? bundle.created_at)}
+                      </div>
+                      {bundle.notes && <div className="mt-2 line-clamp-3 text-sm text-text-2">{bundle.notes}</div>}
+                    </td>
+                    <td className="px-4 py-4 align-top">
+                      <div className="mb-2 flex flex-wrap gap-2">
+                        <span className="rounded-md border border-blue/40 bg-blue/10 px-2.5 py-1.5 font-mono text-xs font-bold uppercase tracking-wider text-blue">
+                          {bundle.items.length} Cards
+                        </span>
+                      </div>
+                      {renderBundleItems(bundle)}
+                    </td>
+                    <td className="px-4 py-4 align-top">
+                      <span className="inline-flex rounded-md border border-owl/40 bg-owl/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-owl">
+                        {STATUS_LABELS[bundle.status] ?? bundle.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 align-top font-mono text-xs font-semibold text-text-2">
+                      {bundle.status === "sold" ? (
+                        <div className="grid gap-2">
+                          <div>
+                            <span className="text-text-3">Sold At</span>
+                            <div className="mt-0.5 text-text">{saleLabel}</div>
+                          </div>
+                          <div>
+                            <span className="text-text-3">Sold Date</span>
+                            <div className="mt-0.5 text-text">{formatOrderDate(bundle.sold_date)}</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <span>----</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 align-top">
+                      <a
+                        href={`/admin/bundles/${bundle.id}`}
+                        className="inline-flex rounded-md border border-border bg-deep px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl"
+                      >
+                        Edit Bundle
+                      </a>
+                    </td>
+                  </tr>
+                );
+              })
+            ) : (
+              <tr>
+                <td colSpan={5} className="px-4 py-12 text-center text-base text-text-2">
+                  No bundles in this view yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
   function renderStageOrdersSection() {
     if (statusFilter !== "ship" && statusFilter !== "sold") return null;
 
@@ -3388,12 +3632,17 @@ export default function InventoryTabs({
           >
             PSA Submissions
           </a>
-          <a
-            href="/admin/bundles"
-            className="h-10 rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl"
+          <button
+            type="button"
+            onClick={() => switchInventoryTab("bundles")}
+            className={`h-10 rounded-md border px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
+              activeTab === "bundles" && !pendingMatchOnly
+                ? "border-owl bg-owl/10 text-owl"
+                : "border-border bg-surface text-text hover:border-border-2 hover:text-owl"
+            }`}
           >
             Bundles
-          </a>
+          </button>
           <a
             href="/admin/inventory/import/psa"
             className="h-10 rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl"
@@ -3439,8 +3688,7 @@ export default function InventoryTabs({
             <button
               type="button"
               onClick={() => {
-                setNeedsMatchReview(false);
-                setActiveTab(tab.id);
+                switchInventoryTab(tab.id);
               }}
               className={`rounded-md border px-4 py-2.5 font-mono text-sm font-semibold transition-colors ${
                 activeTab === tab.id && !pendingMatchOnly
@@ -3449,17 +3697,10 @@ export default function InventoryTabs({
               }`}
             >
               {tab.label}
-              <span className="ml-2 text-text-2">{counts[tab.id]}</span>
+              <span className="ml-2 text-text-2">
+                {tab.id === "bundles" ? filteredBundles.length : counts[tab.id]}
+              </span>
             </button>
-            {tab.id === "graded" && (
-              <a
-                href="/admin/bundles"
-                className="rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-sm font-semibold text-text transition-colors hover:border-border-2 hover:text-owl"
-              >
-                Bundles
-                <span className="ml-2 text-text-2">{bundles.length}</span>
-              </a>
-            )}
           </Fragment>
         ))}
         {showNeedsMatchTab && (
@@ -3512,6 +3753,7 @@ export default function InventoryTabs({
         </div>
       )}
 
+      {activeTab !== "bundles" && (
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -3619,6 +3861,7 @@ export default function InventoryTabs({
           </>
         )}
       </div>
+      )}
 
       {actionError && (
         <div className="rounded-md border border-loss/30 bg-loss/10 px-4 py-3 text-sm font-semibold text-text">
@@ -3626,9 +3869,9 @@ export default function InventoryTabs({
         </div>
       )}
 
-      {renderStageOrdersSection()}
+      {activeTab !== "bundles" && renderStageOrdersSection()}
 
-      {(statusFilter === "ship" || statusFilter === "sold") && (
+      {activeTab !== "bundles" && (statusFilter === "ship" || statusFilter === "sold") && (
         <div className="flex items-center justify-between rounded-lg border border-border bg-surface px-4 py-3">
           <div>
             <h2 className="text-xl font-bold text-text">Single Card Order</h2>
@@ -3637,7 +3880,9 @@ export default function InventoryTabs({
         </div>
       )}
 
-      {statusFilter === "ship" ? (
+      {activeTab === "bundles" ? (
+        renderBundlesTable()
+      ) : statusFilter === "ship" ? (
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
         <table className="w-full min-w-[1390px] table-fixed">
           <colgroup>
