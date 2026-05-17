@@ -356,6 +356,18 @@ function formatOrderDate(value?: string | null) {
   }).format(new Date(value));
 }
 
+function formatSalePrice(value?: string | number | null) {
+  if (value === null || value === undefined || value === "") return null;
+
+  const numericValue = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numericValue)) return String(value);
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(numericValue);
+}
+
 function formatShortDate(value?: string | null) {
   if (!value) return null;
   const date = new Date(value);
@@ -729,11 +741,6 @@ export default function InventoryTabs({
     );
   }, [orders, statusFilter]);
 
-  const tableRows = useMemo(() => {
-    if (currentStageOrderItemIds.size === 0) return filtered;
-    return filtered.filter((item) => !currentStageOrderItemIds.has(item.id));
-  }, [currentStageOrderItemIds, filtered]);
-
   const ordersByInventoryItemId = useMemo(() => {
     const map = new Map<string, CustomerOrderSummary[]>();
 
@@ -757,6 +764,34 @@ export default function InventoryTabs({
 
     return map;
   }, [bundles]);
+
+  const stageStandaloneBundles = useMemo(() => {
+    if (statusFilter !== "ship" && statusFilter !== "sold") return [];
+
+    const query = searchQuery.trim().toLowerCase();
+
+    return bundles
+      .filter((bundle) => bundle.status === statusFilter)
+      .filter((bundle) => !bundle.inventory_item_ids.some((itemId) => currentStageOrderItemIds.has(itemId)))
+      .filter((bundle) => bundle.items.some((item) => itemMatchesInventoryTab(item, activeTab, gradedFilter)))
+      .filter((bundle) => bundleMatchesSearch(bundle, query));
+  }, [activeTab, bundles, currentStageOrderItemIds, gradedFilter, searchQuery, statusFilter]);
+
+  const stageStandaloneBundleItemIds = useMemo(() => {
+    if (statusFilter !== "ship" && statusFilter !== "sold") return new Set<string>();
+
+    return new Set(stageStandaloneBundles.flatMap((bundle) => bundle.inventory_item_ids));
+  }, [stageStandaloneBundles, statusFilter]);
+
+  const tableRows = useMemo(() => {
+    const rowsOutsideOrders =
+      currentStageOrderItemIds.size === 0
+        ? filtered
+        : filtered.filter((item) => !currentStageOrderItemIds.has(item.id));
+
+    if (stageStandaloneBundleItemIds.size === 0) return rowsOutsideOrders;
+    return rowsOutsideOrders.filter((item) => !stageStandaloneBundleItemIds.has(item.id));
+  }, [currentStageOrderItemIds, filtered, stageStandaloneBundleItemIds]);
 
   const groups = useMemo<InventoryGroup[]>(() => {
     const map = new Map<string, InventoryRow[]>();
@@ -852,13 +887,17 @@ export default function InventoryTabs({
     () => stageOrders.reduce((sum, order) => sum + order.items.length, 0),
     [stageOrders]
   );
-  const stageStandaloneOrderCount = statusFilter === "ship" || statusFilter === "sold" ? tableRows.length : 0;
-  const stageStandaloneCardCount = useMemo(() => {
+  const stageStandaloneBundleCardCount = useMemo(
+    () => stageStandaloneBundles.reduce((sum, bundle) => sum + bundle.items.length, 0),
+    [stageStandaloneBundles]
+  );
+  const stageSingleCardOrderCount = statusFilter === "ship" || statusFilter === "sold" ? tableRows.length : 0;
+  const stageSingleCardCount = useMemo(() => {
     if (statusFilter !== "ship" && statusFilter !== "sold") return 0;
     return tableRows.reduce((sum, item) => sum + item.quantity, 0);
   }, [statusFilter, tableRows]);
-  const stageTotalOrderCount = stageOrders.length + stageStandaloneOrderCount;
-  const stageTotalCardCount = stageOrderCardCount + stageStandaloneCardCount;
+  const stageTotalOrderCount = stageOrders.length + stageStandaloneBundles.length;
+  const stageTotalCardCount = stageOrderCardCount + stageStandaloneBundleCardCount;
 
   useEffect(() => {
     if (!pendingMatchOnly || pendingMatchCount > 0) return;
@@ -3411,7 +3450,8 @@ export default function InventoryTabs({
 
     const shippedStage = statusFilter === "sold";
     const title = shippedStage ? "Sold Orders" : "Bulk Orders";
-    const emptyText = shippedStage ? "No shipped orders in Sold yet." : "No open orders need shipping yet.";
+    const emptyText = shippedStage ? "No sold order groups yet." : "No open order groups need shipping yet.";
+    const hasStageOrderCards = stageOrders.length > 0 || stageStandaloneBundles.length > 0;
 
     return (
       <section className="rounded-lg border border-border bg-surface">
@@ -3420,8 +3460,8 @@ export default function InventoryTabs({
             <h2 className="text-xl font-bold text-text">{title}</h2>
             <p className="mt-1 text-sm text-text-2">
               {shippedStage
-                ? "Customer orders marked shipped and moved into Sold."
-                : "Customer order bundles waiting to ship."}
+                ? "Customer orders and standalone bundles sold together."
+                : "Customer orders and standalone bundles waiting to ship."}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -3435,12 +3475,19 @@ export default function InventoryTabs({
         </div>
 
         <div className="grid gap-3 p-3">
-          {ordersError ? (
+          {ordersError && (
             <div className="rounded-lg border border-loss/30 bg-loss/10 p-4 text-sm font-semibold text-text">
               Orders are not ready yet: {ordersError}
             </div>
-          ) : stageOrders.length > 0 ? (
-            stageOrders.map((order) => {
+          )}
+          {bundlesError && (
+            <div className="rounded-lg border border-loss/30 bg-loss/10 p-4 text-sm font-semibold text-text">
+              Bundles are not ready yet: {bundlesError}
+            </div>
+          )}
+          {hasStageOrderCards ? (
+            <>
+            {stageOrders.map((order) => {
               const draft = orderDraft(order);
               const shippingLabelHref = urlHref(draft.shipping_label);
               const trackingLinkHref = orderTrackingHref(draft.tracking_number);
@@ -3711,7 +3758,93 @@ export default function InventoryTabs({
                 </div>
               </div>
               );
-            })
+            })}
+            {stageStandaloneBundles.map((bundle) => {
+              const saleChannel = bundle.sale_channel ?? "not_sold";
+              const primaryDate = shippedStage
+                ? formatOrderDate(bundle.sold_date ?? bundle.updated_at ?? bundle.created_at)
+                : formatOrderDate(bundle.updated_at ?? bundle.created_at);
+              const stageDetailLabel = shippedStage ? "Sold At" : "Status";
+              const stageDetailValue = shippedStage ? SALE_CHANNEL_LABELS[saleChannel] : STATUS_LABELS[bundle.status];
+              const dateDetailLabel = shippedStage ? "Sold Date" : "Updated";
+              const dateDetailValue = shippedStage
+                ? formatOrderDate(bundle.sold_date)
+                : formatOrderDate(bundle.updated_at ?? bundle.created_at);
+              const priceDetailLabel = shippedStage ? "Sold Price" : "Price";
+              const salePrice = formatSalePrice(bundle.sold_price);
+
+              return (
+                <div
+                  key={`bundle:${bundle.id}`}
+                  className="group grid min-w-0 gap-3 rounded-lg border border-owl/45 bg-deep p-3 shadow-[inset_4px_0_0_rgba(255,176,0,0.5)]"
+                >
+                  <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
+                      <a
+                        href={`/admin/bundles/${bundle.id}`}
+                        className="block truncate text-2xl font-black leading-tight text-owl underline-offset-2 transition-colors hover:text-owl-light hover:underline"
+                      >
+                        {bundle.name}
+                      </a>
+                      <div className="mt-1 font-mono text-xs font-bold uppercase tracking-wider text-text-2">
+                        Standalone Bundle Order
+                      </div>
+                      {bundle.notes && <div className="mt-1 line-clamp-2 text-sm text-text-2">{bundle.notes}</div>}
+                    </div>
+
+                    <div className="flex shrink-0 flex-wrap gap-2.5">
+                      <span className="rounded-md border border-owl/40 bg-owl/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-owl sm:text-sm">
+                        Bundle
+                      </span>
+                      <span className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-text-2 sm:text-sm">
+                        {bundle.items.length} Cards
+                      </span>
+                      <span className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-text-2 sm:text-sm">
+                        {primaryDate}
+                      </span>
+                      <a
+                        href={`/admin/bundles/${bundle.id}`}
+                        className="rounded-md border border-border-2 bg-surface px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-text transition-colors hover:border-owl hover:text-owl sm:text-sm"
+                      >
+                        View Bundle
+                      </a>
+                    </div>
+                  </div>
+
+                  <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
+                    {renderBundleItems(bundle)}
+
+                    <div className="grid content-start gap-3 rounded-md border border-owl/50 bg-owl/10 p-4">
+                      <div>
+                        <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
+                          {stageDetailLabel}
+                        </span>
+                        <div className="mt-1.5 rounded-md border border-border bg-deep px-3 py-2.5 text-base font-extrabold text-text">
+                          {stageDetailValue}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
+                          {dateDetailLabel}
+                        </span>
+                        <div className="mt-1.5 rounded-md border border-border bg-deep px-3 py-2.5 text-base font-extrabold text-text">
+                          {dateDetailValue}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
+                          {priceDetailLabel}
+                        </span>
+                        <div className="mt-1.5 rounded-md border border-border bg-deep px-3 py-2.5 text-base font-extrabold text-text">
+                          {salePrice ?? "No price"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            </>
           ) : (
             <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-text-2">
               {emptyText}
@@ -4018,10 +4151,18 @@ export default function InventoryTabs({
       {activeTab !== "bundles" && renderStageOrdersSection()}
 
       {activeTab !== "bundles" && (statusFilter === "ship" || statusFilter === "sold") && (
-        <div className="flex items-center justify-between rounded-lg border border-border bg-surface px-4 py-3">
+        <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-xl font-bold text-text">Single Card Order</h2>
+            <h2 className="text-xl font-bold text-text">Single Card Orders</h2>
             <p className="mt-1 text-sm text-text-2">Individual cards waiting for shipping or sale completion.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className="rounded-md border border-owl/30 bg-owl/10 px-3 py-2 font-mono text-xs font-bold uppercase text-owl">
+              {stageSingleCardOrderCount} Orders
+            </span>
+            <span className="rounded-md border border-blue/30 bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase text-blue">
+              {stageSingleCardCount} Cards
+            </span>
           </div>
         </div>
       )}
