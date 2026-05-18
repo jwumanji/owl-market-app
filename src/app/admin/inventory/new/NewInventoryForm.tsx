@@ -372,7 +372,7 @@ export default function NewInventoryForm() {
           {manualMode && (
             <div className="rounded-lg border border-owl/30 bg-owl/10 p-4 lg:col-span-2">
               <div className="mb-3 font-mono text-xs font-bold uppercase tracking-wider text-owl">
-                {notInCatalog ? "Private Item Entry" : "Private Card Entry"}
+                {notInCatalog ? "Private Item Entry" : "Add Card to Catalog"}
               </div>
               <label className="block">
                 <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
