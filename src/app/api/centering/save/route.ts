@@ -1,0 +1,333 @@
+import { Buffer } from "node:buffer";
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
+import { isAllowedAdminEmail } from "@/lib/admin-auth";
+import {
+  ceilingFromWorstMax,
+  computeMeasurements,
+  legacyOverlayFromGeometry,
+  overlayGeometryFromUnknown,
+  overlayImageBounds,
+  overlaysEquivalent,
+  type OverlayGeometry,
+  type PsaCeiling,
+} from "@/lib/centering-math";
+import { isUploadFile } from "@/lib/inventory-scans";
+import { createServiceClient } from "@/lib/supabase-server";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+const CENTERING_IMAGES_BUCKET = "centering-images";
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+const IMAGE_EXTENSIONS = new Map([
+  ["image/jpeg", "jpg"],
+  ["image/png", "png"],
+  ["image/webp", "webp"],
+]);
+
+type CenteringFace = "front" | "back";
+type PipelineMode = "mock" | "opencv";
+
+function createAuthClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !anonKey) {
+    throw new Error("Missing Supabase auth environment variables.");
+  }
+
+  const cookieStore = cookies();
+  return createServerClient(url, anonKey, {
+    cookies: {
+      get(name: string) {
+        return cookieStore.get(name)?.value;
+      },
+      set(name: string, value: string, options) {
+        cookieStore.set({ name, value, ...options });
+      },
+      remove(name: string, options) {
+        cookieStore.set({ name, value: "", ...options });
+      },
+    },
+  });
+}
+
+async function requireAdminUser() {
+  const supabase = createAuthClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || !isAllowedAdminEmail(user.email)) {
+    return null;
+  }
+
+  return user;
+}
+
+function parseString(value: FormDataEntryValue | null) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function parseOptionalText(value: FormDataEntryValue | null) {
+  const trimmed = parseString(value);
+  return trimmed ? trimmed : null;
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
+function parseFace(value: FormDataEntryValue | null): CenteringFace | null {
+  const face = parseString(value) || "front";
+  if (face === "front" || face === "back") return face;
+  return null;
+}
+
+function parseOptionalUuid(value: FormDataEntryValue | null) {
+  const trimmed = parseString(value);
+  if (!trimmed) return null;
+  return isUuid(trimmed) ? trimmed : undefined;
+}
+
+function parsePositiveInteger(value: FormDataEntryValue | null) {
+  const parsed = Number(parseString(value));
+  if (!Number.isInteger(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
+function parsePipelineMode(value: FormDataEntryValue | null): PipelineMode | null {
+  const mode = parseString(value) || "mock";
+  if (mode === "mock" || mode === "opencv") return mode;
+  return null;
+}
+
+function parseJsonField(value: FormDataEntryValue | null) {
+  const raw = parseString(value);
+  if (!raw) return undefined;
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function parseOverlay(value: FormDataEntryValue | null): OverlayGeometry | null | undefined {
+  const parsed = parseJsonField(value);
+  if (parsed === undefined) return undefined;
+  if (parsed === null) return null;
+  return overlayGeometryFromUnknown(parsed);
+}
+
+function parseFirstOverlay(formData: FormData, names: string[]) {
+  for (const name of names) {
+    const parsed = parseOverlay(formData.get(name));
+    if (parsed !== undefined) return parsed;
+  }
+
+  return undefined;
+}
+
+function responseError(error: string, status: number) {
+  return NextResponse.json({ error }, { status });
+}
+
+function storagePath(userId: string, cardSessionId: string, face: CenteringFace, contentType: string) {
+  const extension = IMAGE_EXTENSIONS.get(contentType) ?? "jpg";
+  return `${userId}/${cardSessionId}/${face}.${extension}`;
+}
+
+function manualAdjustmentFromOverlay(overlay: OverlayGeometry, cvOverlay: OverlayGeometry | null | undefined) {
+  if (!cvOverlay) return true;
+  return !overlaysEquivalent(overlay, cvOverlay);
+}
+
+function measurementRow({
+  inventoryItemId,
+  overlay,
+  imageContentType,
+  imageWidthPx,
+  imageHeightPx,
+  pipelineMode,
+  pipelineVersion,
+  processingMs,
+  cardIdentity,
+  face,
+  cardSessionId,
+  imageUrl,
+  manualAdjustment,
+}: {
+  inventoryItemId: string | null;
+  overlay: OverlayGeometry;
+  imageContentType: string;
+  imageWidthPx: number;
+  imageHeightPx: number;
+  pipelineMode: PipelineMode;
+  pipelineVersion: string;
+  processingMs: number;
+  cardIdentity: string | null;
+  face: CenteringFace;
+  cardSessionId: string;
+  imageUrl: string;
+  manualAdjustment: boolean;
+}) {
+  const measurement = computeMeasurements(overlay);
+  const psaCeiling: PsaCeiling = ceilingFromWorstMax(measurement.worstAxisMaxPct);
+
+  return {
+    inventory_item_id: inventoryItemId,
+    request_id: crypto.randomUUID(),
+    left_pct: measurement.leftPct,
+    right_pct: measurement.rightPct,
+    top_pct: measurement.topPct,
+    bottom_pct: measurement.bottomPct,
+    worst_axis: measurement.worstAxis,
+    worst_axis_max_pct: measurement.worstAxisMaxPct,
+    psa_ceiling: psaCeiling,
+    pipeline_mode: pipelineMode,
+    pipeline_version: pipelineVersion,
+    processing_ms: processingMs,
+    image_content_type: imageContentType,
+    image_width_px: imageWidthPx,
+    image_height_px: imageHeightPx,
+    overlay: legacyOverlayFromGeometry(overlay),
+    manual_adjustment: manualAdjustment,
+    card_identity: cardIdentity,
+    face,
+    card_session_id: cardSessionId,
+    image_url: imageUrl,
+    overlay_geometry: overlay,
+  };
+}
+
+export async function POST(request: Request) {
+  let adminUser;
+  try {
+    adminUser = await requireAdminUser();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Authentication is not configured.";
+    return responseError(message, 500);
+  }
+
+  if (!adminUser) {
+    return responseError("Unauthorized", 401);
+  }
+
+  const formData = await request.formData().catch(() => null);
+  if (!formData) {
+    return responseError("Invalid save payload", 400);
+  }
+
+  const face = parseFace(formData.get("face"));
+  if (!face) {
+    return responseError("face must be front or back", 400);
+  }
+
+  const parsedCardSessionId = parseOptionalUuid(formData.get("cardSessionId"));
+  if (parsedCardSessionId === undefined) {
+    return responseError("cardSessionId must be a UUID", 400);
+  }
+  const cardSessionId = parsedCardSessionId ?? crypto.randomUUID();
+
+  const overlay = parseFirstOverlay(formData, ["overlayGeometry", "overlay"]);
+  if (!overlay) {
+    return responseError("overlayGeometry must be a valid quad overlay", 400);
+  }
+
+  const cvOverlay = parseFirstOverlay(formData, [
+    "cvOverlayGeometry",
+    "cvOverlay",
+    "originalOverlayGeometry",
+  ]);
+  if (cvOverlay === null) {
+    return responseError("cvOverlayGeometry must be a valid quad overlay", 400);
+  }
+
+  const file = formData.get("image") ?? formData.get("file");
+  if (!isUploadFile(file)) {
+    return responseError("Choose a card image to save", 400);
+  }
+
+  if (!IMAGE_EXTENSIONS.has(file.type)) {
+    return responseError("Image must be a JPEG, PNG, or WEBP file", 415);
+  }
+
+  if (file.size > MAX_IMAGE_BYTES) {
+    return responseError("Image is larger than 20 MB", 413);
+  }
+
+  const pipelineMode = parsePipelineMode(formData.get("pipelineMode"));
+  if (!pipelineMode) {
+    return responseError("pipelineMode must be mock or opencv", 400);
+  }
+
+  const pipelineVersion = parseOptionalText(formData.get("pipelineVersion")) ?? "manual-save";
+  const processingMs = parsePositiveInteger(formData.get("processingMs")) ?? 0;
+  const cardIdentity = parseOptionalText(formData.get("cardIdentity"));
+  const inventoryItemId = parseOptionalText(formData.get("inventoryItemId"));
+  const inferredBounds = overlayImageBounds(overlay);
+  const imageWidthPx = parsePositiveInteger(formData.get("imageWidthPx")) ?? inferredBounds.width;
+  const imageHeightPx = parsePositiveInteger(formData.get("imageHeightPx")) ?? inferredBounds.height;
+  const manualAdjustment = manualAdjustmentFromOverlay(overlay, cvOverlay);
+
+  const supabase = createServiceClient();
+  if (inventoryItemId) {
+    const { data: inventoryItem, error: inventoryError } = await supabase
+      .from("inventory_items")
+      .select("id")
+      .eq("id", inventoryItemId)
+      .single();
+
+    if (inventoryError || !inventoryItem) {
+      return responseError("Inventory item not found", 404);
+    }
+  }
+
+  const imagePath = storagePath(adminUser.id, cardSessionId, face, file.type);
+  const storage = supabase.storage.from(CENTERING_IMAGES_BUCKET);
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const { error: uploadError } = await storage.upload(imagePath, bytes, {
+    contentType: file.type,
+    upsert: true,
+  });
+
+  if (uploadError) {
+    return responseError(uploadError.message, 500);
+  }
+
+  const row = measurementRow({
+    inventoryItemId,
+    overlay,
+    imageContentType: file.type,
+    imageWidthPx,
+    imageHeightPx,
+    pipelineMode,
+    pipelineVersion,
+    processingMs,
+    cardIdentity,
+    face,
+    cardSessionId,
+    imageUrl: imagePath,
+    manualAdjustment,
+  });
+
+  const insertResult = await supabase
+    .from("centering_measurements")
+    .insert(row)
+    .select("*")
+    .single();
+
+  if (insertResult.error) {
+    await storage.remove([imagePath]).catch(() => null);
+    return responseError(insertResult.error.message, 500);
+  }
+
+  return NextResponse.json({
+    measurement: insertResult.data ?? row,
+    cardSessionId,
+    face,
+    imageUrl: imagePath,
+  });
+}

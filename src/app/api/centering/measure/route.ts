@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { isAllowedAdminEmail } from "@/lib/admin-auth";
+import { overlayGeometryFromUnknown } from "@/lib/centering-math";
 import { isUploadFile } from "@/lib/inventory-scans";
 import { createServiceClient } from "@/lib/supabase-server";
 import type { operations } from "@/lib/owl-lens/openapi.generated";
@@ -11,6 +12,7 @@ export const runtime = "nodejs";
 
 type MeasurementResponse =
   operations["measureCardCentering"]["responses"][200]["content"]["application/json"];
+type CenteringFace = "front" | "back";
 
 function createAuthClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -62,7 +64,45 @@ function passthroughHeaders(response: Response) {
   return headers;
 }
 
-function measurementRow(inventoryItemId: string | null, response: MeasurementResponse) {
+function parseFace(value: FormDataEntryValue | null): CenteringFace | null {
+  if (value === null || value === "") return "front";
+  if (value === "front" || value === "back") return value;
+  return null;
+}
+
+function parseOptionalUuid(value: FormDataEntryValue | null) {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const trimmed = value.trim();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)
+    ? trimmed
+    : undefined;
+}
+
+function parseOptionalText(value: FormDataEntryValue | null) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function parseManualAdjustment(value: FormDataEntryValue | null) {
+  return value === "true" || value === "1";
+}
+
+function measurementRow({
+  inventoryItemId,
+  response,
+  face,
+  cardSessionId,
+  cardIdentity,
+  manualAdjustment,
+}: {
+  inventoryItemId: string | null;
+  response: MeasurementResponse;
+  face: CenteringFace;
+  cardSessionId: string | null;
+  cardIdentity: string | null;
+  manualAdjustment: boolean;
+}) {
   return {
     inventory_item_id: inventoryItemId,
     request_id: crypto.randomUUID(),
@@ -80,6 +120,11 @@ function measurementRow(inventoryItemId: string | null, response: MeasurementRes
     image_width_px: response.image.widthPx,
     image_height_px: response.image.heightPx,
     overlay: response.overlay,
+    manual_adjustment: manualAdjustment,
+    card_identity: cardIdentity,
+    face,
+    card_session_id: cardSessionId,
+    overlay_geometry: overlayGeometryFromUnknown(response.overlay) ?? {},
   };
 }
 
@@ -106,6 +151,18 @@ export async function POST(request: Request) {
     typeof inventoryItemIdEntry === "string" && inventoryItemIdEntry.trim()
       ? inventoryItemIdEntry.trim()
       : null;
+  const face = parseFace(formData.get("face"));
+  if (!face) {
+    return NextResponse.json({ error: "face must be front or back" }, { status: 400 });
+  }
+
+  const cardSessionId = parseOptionalUuid(formData.get("cardSessionId"));
+  if (cardSessionId === undefined) {
+    return NextResponse.json({ error: "cardSessionId must be a UUID" }, { status: 400 });
+  }
+
+  const cardIdentity = parseOptionalText(formData.get("cardIdentity"));
+  const manualAdjustment = parseManualAdjustment(formData.get("manual_adjustment"));
 
   const file = formData.get("file");
   if (!isUploadFile(file)) {
@@ -166,7 +223,16 @@ export async function POST(request: Request) {
 
   const { error: insertError } = await supabase
     .from("centering_measurements")
-    .insert(measurementRow(inventoryItemId, measurement));
+    .insert(
+      measurementRow({
+        inventoryItemId,
+        response: measurement,
+        face,
+        cardSessionId,
+        cardIdentity,
+        manualAdjustment,
+      })
+    );
 
   if (insertError) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });

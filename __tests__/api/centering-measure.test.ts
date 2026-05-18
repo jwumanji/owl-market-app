@@ -25,6 +25,30 @@ const routeJavaScript = ts.transpileModule(routeSource, {
     target: ts.ScriptTarget.ES2022,
   },
 }).outputText;
+const mathPath = path.resolve("src/lib/centering-math.ts");
+const mathJavaScript = ts.transpileModule(fs.readFileSync(mathPath, "utf8"), {
+  compilerOptions: {
+    esModuleInterop: true,
+    module: ts.ModuleKind.CommonJS,
+    target: ts.ScriptTarget.ES2022,
+  },
+}).outputText;
+
+function loadMathModule() {
+  const moduleStub = {
+    exports: {} as Record<string, unknown>,
+  };
+  vm.runInContext(
+    mathJavaScript,
+    vm.createContext({
+      exports: moduleStub.exports,
+      module: moduleStub,
+      require: requireFromTest,
+    }),
+    { filename: mathPath }
+  );
+  return moduleStub.exports;
+}
 
 function measurementResponse() {
   return {
@@ -82,11 +106,17 @@ function measurementResponse() {
   };
 }
 
-function measurementRequest(inventoryItemId = "inventory-1") {
+function measurementRequest(
+  inventoryItemId = "inventory-1",
+  options: { face?: string; cardSessionId?: string; cardIdentity?: string } = {}
+) {
   const formData = new FormData();
   if (inventoryItemId) {
     formData.set("inventoryItemId", inventoryItemId);
   }
+  if (options.face !== undefined) formData.set("face", options.face);
+  if (options.cardSessionId !== undefined) formData.set("cardSessionId", options.cardSessionId);
+  if (options.cardIdentity !== undefined) formData.set("cardIdentity", options.cardIdentity);
   formData.set("file", new File(["fake image"], "card.jpg", { type: "image/jpeg" }));
 
   return new Request("http://localhost/api/centering/measure", {
@@ -180,6 +210,7 @@ function loadRoute({
         return email === "admin@example.com";
       },
     },
+    "@/lib/centering-math": loadMathModule(),
     "@/lib/inventory-scans": {
       isUploadFile(value: FormDataEntryValue | null) {
         return value instanceof File && value.size > 0;
@@ -304,7 +335,46 @@ test("happy path forwards CV response and inserts centering measurement", async 
     image_width_px: 1024,
     image_height_px: 1428,
     overlay: cvBody.overlay,
+    manual_adjustment: false,
+    card_identity: null,
+    face: "front",
+    card_session_id: null,
+    overlay_geometry: {
+      outer: {
+        tl: { x: 32, y: 28 },
+        tr: { x: 992, y: 28 },
+        br: { x: 992, y: 1400 },
+        bl: { x: 32, y: 1400 },
+      },
+      inner: {
+        tl: { x: 118, y: 134 },
+        tr: { x: 910, y: 134 },
+        br: { x: 910, y: 1298 },
+        bl: { x: 118, y: 1298 },
+      },
+    },
   });
+});
+
+test("optional face, cardSessionId, and cardIdentity metadata are persisted", async () => {
+  const cvBody = measurementResponse();
+  const route = loadRoute({
+    cvResponse: Response.json(cvBody),
+  });
+
+  const response = await route.POST(
+    measurementRequest("inventory-1", {
+      face: "back",
+      cardSessionId: "11111111-1111-4111-8111-111111111111",
+      cardIdentity: "Monkey D. Luffy OP01-001",
+    })
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(route.insertedRows.length, 1);
+  assert.equal(route.insertedRows[0].face, "back");
+  assert.equal(route.insertedRows[0].card_session_id, "11111111-1111-4111-8111-111111111111");
+  assert.equal(route.insertedRows[0].card_identity, "Monkey D. Luffy OP01-001");
 });
 
 test("standalone request without inventoryItemId persists a null inventory link", async () => {
