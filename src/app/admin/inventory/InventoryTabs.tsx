@@ -1961,6 +1961,7 @@ export default function InventoryTabs({
               status: updates.status ?? item.status,
               sale_channel: updates.sale_channel ?? item.sale_channel,
               sold_date: updates.sold_date !== undefined ? updates.sold_date : item.sold_date,
+              sold_price: updates.sold_price !== undefined ? updates.sold_price : item.sold_price,
             }
           : item
       )
@@ -3761,6 +3762,7 @@ export default function InventoryTabs({
             })}
             {stageStandaloneBundles.map((bundle) => {
               const saleChannel = bundle.sale_channel ?? "not_sold";
+              const savingBundle = savingBundleIds[bundle.id] ?? false;
               const primaryDate = shippedStage
                 ? formatOrderDate(bundle.sold_date ?? bundle.updated_at ?? bundle.created_at)
                 : formatOrderDate(bundle.updated_at ?? bundle.created_at);
@@ -3802,6 +3804,11 @@ export default function InventoryTabs({
                       <span className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-text-2 sm:text-sm">
                         {primaryDate}
                       </span>
+                      {savingBundle && (
+                        <span className="rounded-md border border-blue/30 bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-blue sm:text-sm">
+                          Saving
+                        </span>
+                      )}
                       <a
                         href={`/admin/bundles/${bundle.id}`}
                         className="rounded-md border border-border-2 bg-surface px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-text transition-colors hover:border-owl hover:text-owl sm:text-sm"
@@ -3819,25 +3826,63 @@ export default function InventoryTabs({
                         <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
                           {stageDetailLabel}
                         </span>
-                        <div className="mt-1.5 rounded-md border border-border bg-deep px-3 py-2.5 text-base font-extrabold text-text">
-                          {stageDetailValue}
-                        </div>
+                        {shippedStage ? (
+                          <SelectField
+                            value={saleChannel}
+                            disabled={savingBundle}
+                            onChange={(event) => updateBundleSaleChannel(bundle, event.target.value as SaleChannel)}
+                            wrapperClassName="mt-1.5 w-full"
+                            className="bg-deep text-base font-extrabold"
+                          >
+                            {(Object.keys(SALE_CHANNEL_LABELS) as SaleChannel[]).map((channel) => (
+                              <option key={channel} value={channel}>
+                                {SALE_CHANNEL_LABELS[channel]}
+                              </option>
+                            ))}
+                          </SelectField>
+                        ) : (
+                          <div className="mt-1.5 rounded-md border border-border bg-deep px-3 py-2.5 text-base font-extrabold text-text">
+                            {stageDetailValue}
+                          </div>
+                        )}
                       </div>
                       <div>
                         <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
                           {dateDetailLabel}
                         </span>
-                        <div className="mt-1.5 rounded-md border border-border bg-deep px-3 py-2.5 text-base font-extrabold text-text">
-                          {dateDetailValue}
-                        </div>
+                        {shippedStage ? (
+                          <input
+                            type="date"
+                            value={bundle.sold_date ?? ""}
+                            disabled={savingBundle}
+                            onChange={(event) => updateBundle(bundle, { sold_date: event.target.value || null })}
+                            className="mt-1.5 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-base font-extrabold text-text outline-none focus:border-owl disabled:cursor-wait disabled:opacity-60"
+                          />
+                        ) : (
+                          <div className="mt-1.5 rounded-md border border-border bg-deep px-3 py-2.5 text-base font-extrabold text-text">
+                            {dateDetailValue}
+                          </div>
+                        )}
                       </div>
                       <div>
                         <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
                           {priceDetailLabel}
                         </span>
-                        <div className="mt-1.5 rounded-md border border-border bg-deep px-3 py-2.5 text-base font-extrabold text-text">
-                          {salePrice ?? "No price"}
-                        </div>
+                        {shippedStage ? (
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={bundle.sold_price ?? ""}
+                            disabled={savingBundle}
+                            onChange={(event) => updateBundle(bundle, { sold_price: event.target.value })}
+                            placeholder="0.00"
+                            className="mt-1.5 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-base font-extrabold text-text outline-none focus:border-owl disabled:cursor-wait disabled:opacity-60"
+                          />
+                        ) : (
+                          <div className="mt-1.5 rounded-md border border-border bg-deep px-3 py-2.5 text-base font-extrabold text-text">
+                            {salePrice ?? "No price"}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
