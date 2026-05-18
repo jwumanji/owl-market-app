@@ -1,0 +1,31 @@
+import { graderResultsFromWorstMax, TINTED_TONE_CLASSES, TONE_TEXT_CLASSES } from "./grading";
+
+type GraderStripProps = {
+  worstMax: number;
+};
+
+export default function GraderStrip({ worstMax }: GraderStripProps) {
+  const results = graderResultsFromWorstMax(worstMax);
+
+  return (
+    <div className="mt-3">
+      <div className="mb-1.5 font-mono text-[9px] font-bold uppercase tracking-widest text-text-2">
+        Also reads as
+      </div>
+      <div className="grid grid-cols-3 gap-1.5">
+        {results.map((result) => (
+          <div
+            key={result.name}
+            className={`rounded-md border px-3 py-3 text-center ${TINTED_TONE_CLASSES[result.tone]}`}
+          >
+            <div className="font-mono text-[11px] font-bold uppercase tracking-widest text-text-2">
+              {result.name}
+            </div>
+            <div className={`mt-1.5 font-mono text-[22px] font-bold leading-none ${TONE_TEXT_CLASSES[result.tone]}`}>{result.value}</div>
+            {result.subLabel && <div className="mt-1.5 font-mono text-[11px] leading-tight text-text-2">{result.subLabel}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

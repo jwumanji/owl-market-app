@@ -40,6 +40,21 @@
   --top: 82px;
 }
 
+.tinted-gain {
+  background: rgba(0, 214, 143, 0.10);
+  border-color: rgba(0, 214, 143, 0.40);
+}
+
+.tinted-owl {
+  background: rgba(232, 160, 32, 0.10);
+  border-color: rgba(232, 160, 32, 0.40);
+}
+
+.tinted-loss {
+  background: rgba(255, 69, 96, 0.10);
+  border-color: rgba(255, 69, 96, 0.40);
+}
+
 body {
   color: var(--text);
   background: var(--void);

@@ -10,6 +10,8 @@ export type QuadCorners = {
   bl: QuadPoint;
 };
 
+export type QuadCornerKey = keyof QuadCorners;
+
 export type OverlayGeometry = {
   outer: QuadCorners;
   inner: QuadCorners;
@@ -272,4 +274,249 @@ export function comparableOverlayGeometry(overlay: OverlayGeometry) {
 
 export function overlaysEquivalent(a: OverlayGeometry, b: OverlayGeometry) {
   return JSON.stringify(comparableOverlayGeometry(a)) === JSON.stringify(comparableOverlayGeometry(b));
+}
+
+function addPoint(a: QuadPoint, b: QuadPoint): QuadPoint {
+  return { x: a.x + b.x, y: a.y + b.y };
+}
+
+function subtractPoint(a: QuadPoint, b: QuadPoint): QuadPoint {
+  return { x: a.x - b.x, y: a.y - b.y };
+}
+
+function scalePoint(point: QuadPoint, scale: number): QuadPoint {
+  return { x: point.x * scale, y: point.y * scale };
+}
+
+function dotPoint(a: QuadPoint, b: QuadPoint) {
+  return a.x * b.x + a.y * b.y;
+}
+
+function crossPoint(a: QuadPoint, b: QuadPoint) {
+  return a.x * b.y - a.y * b.x;
+}
+
+function normalizeVector(vector: QuadPoint): QuadPoint | null {
+  const length = Math.hypot(vector.x, vector.y);
+  if (length === 0) return null;
+  return { x: vector.x / length, y: vector.y / length };
+}
+
+function clampPoint(point: QuadPoint, bounds: { width: number; height: number }): QuadPoint {
+  return {
+    x: Math.min(bounds.width, Math.max(0, point.x)),
+    y: Math.min(bounds.height, Math.max(0, point.y)),
+  };
+}
+
+function cornersWithinBounds(corners: QuadCorners, bounds: { width: number; height: number }) {
+  return (Object.keys(corners) as QuadCornerKey[]).every((corner) => {
+    const point = corners[corner];
+    return point.x >= 0 && point.x <= bounds.width && point.y >= 0 && point.y <= bounds.height;
+  });
+}
+
+function rectangleAxes(corners: QuadCorners) {
+  const xAxis = normalizeVector(subtractPoint(corners.tr, corners.tl));
+  const yAxis = normalizeVector(subtractPoint(corners.bl, corners.tl));
+  if (!xAxis || !yAxis) return null;
+  return { xAxis, yAxis };
+}
+
+function rectangleFromAnchor({
+  anchor,
+  xAxis,
+  yAxis,
+  width,
+  height,
+  draggedCorner,
+}: {
+  anchor: QuadPoint;
+  xAxis: QuadPoint;
+  yAxis: QuadPoint;
+  width: number;
+  height: number;
+  draggedCorner: QuadCornerKey;
+}): QuadCorners {
+  const w = scalePoint(xAxis, width);
+  const h = scalePoint(yAxis, height);
+
+  if (draggedCorner === "tl") {
+    return {
+      tl: addPoint(addPoint(anchor, scalePoint(w, -1)), scalePoint(h, -1)),
+      tr: addPoint(anchor, scalePoint(h, -1)),
+      br: anchor,
+      bl: addPoint(anchor, scalePoint(w, -1)),
+    };
+  }
+
+  if (draggedCorner === "tr") {
+    return {
+      tl: addPoint(anchor, scalePoint(h, -1)),
+      tr: addPoint(addPoint(anchor, w), scalePoint(h, -1)),
+      br: addPoint(anchor, w),
+      bl: anchor,
+    };
+  }
+
+  if (draggedCorner === "bl") {
+    return {
+      tl: addPoint(anchor, scalePoint(w, -1)),
+      tr: anchor,
+      br: addPoint(anchor, h),
+      bl: addPoint(addPoint(anchor, scalePoint(w, -1)), h),
+    };
+  }
+
+  return {
+    tl: anchor,
+    tr: addPoint(anchor, w),
+    br: addPoint(addPoint(anchor, w), h),
+    bl: addPoint(anchor, h),
+  };
+}
+
+export function quadCentroid(corners: QuadCorners): QuadPoint {
+  return {
+    x: (corners.tl.x + corners.tr.x + corners.br.x + corners.bl.x) / 4,
+    y: (corners.tl.y + corners.tr.y + corners.br.y + corners.bl.y) / 4,
+  };
+}
+
+export function isConvexQuad(corners: QuadCorners) {
+  const points = [corners.tl, corners.tr, corners.br, corners.bl];
+  let sign = 0;
+
+  for (let index = 0; index < points.length; index += 1) {
+    const a = points[index];
+    const b = points[(index + 1) % points.length];
+    const c = points[(index + 2) % points.length];
+    const cross = crossPoint(subtractPoint(b, a), subtractPoint(c, b));
+
+    if (Math.abs(cross) < 0.000001) return false;
+
+    const nextSign = Math.sign(cross);
+    if (sign === 0) {
+      sign = nextSign;
+    } else if (nextSign !== sign) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function pointInConvexQuad(point: QuadPoint, corners: QuadCorners) {
+  const points = [corners.tl, corners.tr, corners.br, corners.bl];
+  let sign = 0;
+
+  for (let index = 0; index < points.length; index += 1) {
+    const a = points[index];
+    const b = points[(index + 1) % points.length];
+    const cross = crossPoint(subtractPoint(b, a), subtractPoint(point, a));
+
+    if (Math.abs(cross) < 0.000001) return false;
+
+    const nextSign = Math.sign(cross);
+    if (sign === 0) {
+      sign = nextSign;
+    } else if (nextSign !== sign) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function overlayHasInnerInsideOuter(overlay: OverlayGeometry) {
+  return (Object.keys(overlay.inner) as QuadCornerKey[]).every((corner) =>
+    pointInConvexQuad(overlay.inner[corner], overlay.outer)
+  );
+}
+
+export function freeCornerDrag(
+  corners: QuadCorners,
+  draggedCorner: QuadCornerKey,
+  newPos: QuadPoint,
+  bounds: { width: number; height: number }
+) {
+  const next = {
+    ...corners,
+    [draggedCorner]: clampPoint(newPos, bounds),
+  };
+
+  if (!isConvexQuad(next) || !cornersWithinBounds(next, bounds)) return corners;
+  return next;
+}
+
+export function constrainedCornerDrag(
+  corners: QuadCorners,
+  draggedCorner: QuadCornerKey,
+  newPos: QuadPoint,
+  bounds: { width: number; height: number }
+) {
+  const axes = rectangleAxes(corners);
+  if (!axes) return corners;
+
+  const minSize = 8;
+  const point = clampPoint(newPos, bounds);
+  let anchor = corners.tl;
+  let width = 0;
+  let height = 0;
+
+  if (draggedCorner === "tl") {
+    anchor = corners.br;
+    const delta = subtractPoint(anchor, point);
+    width = Math.max(minSize, dotPoint(delta, axes.xAxis));
+    height = Math.max(minSize, dotPoint(delta, axes.yAxis));
+  } else if (draggedCorner === "tr") {
+    anchor = corners.bl;
+    const delta = subtractPoint(point, anchor);
+    width = Math.max(minSize, dotPoint(delta, axes.xAxis));
+    height = Math.max(minSize, -dotPoint(delta, axes.yAxis));
+  } else if (draggedCorner === "bl") {
+    anchor = corners.tr;
+    const delta = subtractPoint(point, anchor);
+    width = Math.max(minSize, -dotPoint(delta, axes.xAxis));
+    height = Math.max(minSize, dotPoint(delta, axes.yAxis));
+  } else {
+    anchor = corners.tl;
+    const delta = subtractPoint(point, anchor);
+    width = Math.max(minSize, dotPoint(delta, axes.xAxis));
+    height = Math.max(minSize, dotPoint(delta, axes.yAxis));
+  }
+
+  const next = rectangleFromAnchor({
+    anchor,
+    xAxis: axes.xAxis,
+    yAxis: axes.yAxis,
+    width,
+    height,
+    draggedCorner,
+  });
+
+  if (!isConvexQuad(next) || !cornersWithinBounds(next, bounds)) return corners;
+  return next;
+}
+
+export function rotatePoint(point: QuadPoint, deltaDegrees: number, center: QuadPoint): QuadPoint {
+  const radians = (deltaDegrees * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const dx = point.x - center.x;
+  const dy = point.y - center.y;
+
+  return {
+    x: center.x + dx * cos - dy * sin,
+    y: center.y + dx * sin + dy * cos,
+  };
+}
+
+export function rotateCorners(corners: QuadCorners, deltaDegrees: number, center: QuadPoint): QuadCorners {
+  return {
+    tl: rotatePoint(corners.tl, deltaDegrees, center),
+    tr: rotatePoint(corners.tr, deltaDegrees, center),
+    br: rotatePoint(corners.br, deltaDegrees, center),
+    bl: rotatePoint(corners.bl, deltaDegrees, center),
+  };
 }
