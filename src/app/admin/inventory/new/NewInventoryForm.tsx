@@ -45,6 +45,50 @@ function setCode(card: CardSearchResult) {
   return set?.code ?? null;
 }
 
+function CardThumbnail({
+  card,
+  className,
+  placeholderClassName,
+}: {
+  card: CardSearchResult;
+  className: string;
+  placeholderClassName: string;
+}) {
+  const imageUrl = card.image_url_small ?? card.image_url;
+
+  if (!imageUrl) {
+    return (
+      <div className={placeholderClassName}>
+        BOX
+      </div>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={imageUrl}
+      alt={card.name ?? "Card thumbnail"}
+      className={className}
+    />
+  );
+}
+
+function CardMetadata({ card }: { card: CardSearchResult }) {
+  return (
+    <div className="mt-1 flex flex-wrap gap-2 font-mono text-xs text-text-2">
+      {setCode(card) && <span>{setCode(card)}</span>}
+      {card.card_number && <span>{card.card_number}</span>}
+      {card.rarity && <span>{card.rarity}</span>}
+      {card.source === "custom" && (
+        <span className="rounded border border-gain/40 bg-gain/10 px-1.5 py-0.5 text-gain">
+          Private
+        </span>
+      )}
+    </div>
+  );
+}
+
 function todayDateString() {
   const now = new Date();
   const offset = now.getTimezoneOffset();
@@ -170,8 +214,10 @@ export default function NewInventoryForm() {
     router.push("/admin/inventory");
   }
 
+  const selectedCardId = selectedCard?.id ?? null;
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
+    <div className="space-y-6">
       <div className="rounded-lg border border-border bg-surface p-5">
         <label className="font-mono text-sm font-semibold uppercase tracking-wider text-text">Search Card</label>
         <input
@@ -181,55 +227,73 @@ export default function NewInventoryForm() {
           className="mt-3 w-full rounded-md border border-border bg-deep px-4 py-3 text-base text-text outline-none focus:border-owl"
         />
 
-        <div className="mt-4 overflow-hidden rounded-lg border border-border">
-          {loading && <div className="p-4 text-sm text-text-2">Searching...</div>}
-          {!loading && results.length === 0 && (
-            <div className="p-4 text-sm text-text-2">Search for a card to add inventory.</div>
-          )}
-          {results.map((card) => (
-            <button
-              key={card.id}
-              type="button"
-              onClick={() => {
-                setSelectedCard(card);
-                setManualMode(false);
-                setNotInCatalog(false);
-                setFrontScan(null);
-                setBackScan(null);
-                setQuery(card.name ?? "");
-              }}
-              className={`flex w-full items-center gap-4 border-b border-border p-3 text-left transition-colors last:border-b-0 hover:bg-surf2 ${
-                selectedCard?.id === card.id ? "bg-owl/10" : "bg-surface"
-              }`}
-            >
-              {card.image_url || card.image_url_small ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={card.image_url_small ?? card.image_url ?? ""}
-                  alt=""
-                  className="h-20 w-14 rounded object-cover"
-                />
-              ) : (
-                <div className="flex h-20 w-14 items-center justify-center rounded bg-surf3 font-mono text-xs text-text-2">
-                  BOX
+        {selectedCard ? (
+          <div className="mt-4 rounded-lg border border-owl bg-owl/10 p-3">
+            <div className="mb-2 font-mono text-xs font-bold uppercase tracking-wider text-owl">
+              Selected Card
+            </div>
+            <div className="flex items-center gap-4 rounded-md bg-surface p-3">
+              <CardThumbnail
+                card={selectedCard}
+                className="h-20 w-14 shrink-0 rounded object-cover"
+                placeholderClassName="flex h-20 w-14 shrink-0 items-center justify-center rounded bg-surf3 font-mono text-xs text-text-2"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-base font-bold text-text">
+                  {selectedCard.name ?? "Unknown Card"}
                 </div>
-              )}
-              <div className="min-w-0">
-                <div className="truncate text-base font-bold text-text">{card.name ?? "Unknown Card"}</div>
-                <div className="mt-1 flex gap-2 font-mono text-xs text-text-2">
-                  {setCode(card) && <span>{setCode(card)}</span>}
-                  {card.card_number && <span>{card.card_number}</span>}
-                  {card.rarity && <span>{card.rarity}</span>}
-                  {card.source === "custom" && (
-                    <span className="rounded border border-gain/40 bg-gain/10 px-1.5 py-0.5 text-gain">
-                      Private
+                <CardMetadata card={selectedCard} />
+              </div>
+              <span className="hidden shrink-0 rounded border border-owl/50 bg-owl/10 px-2 py-1 font-mono text-xs font-bold uppercase tracking-wider text-owl sm:inline-flex">
+                Selected
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 max-h-[560px] overflow-y-auto rounded-lg border border-border">
+            {loading && <div className="p-4 text-sm text-text-2">Searching...</div>}
+            {!loading && results.length === 0 && (
+              <div className="p-4 text-sm text-text-2">Search for a card to add inventory.</div>
+            )}
+            {results.map((card) => {
+              const isSelected = selectedCardId === card.id;
+
+              return (
+                <button
+                  key={card.id}
+                  type="button"
+                  aria-pressed={isSelected}
+                  onClick={() => {
+                    setSelectedCard(card);
+                    setManualMode(false);
+                    setNotInCatalog(false);
+                    setFrontScan(null);
+                    setBackScan(null);
+                    setQuery(card.name ?? "");
+                  }}
+                  className={`flex w-full items-center gap-4 border-b border-l-4 border-b-border p-3 text-left transition-colors last:border-b-0 hover:bg-surf2 ${
+                    isSelected ? "border-l-owl bg-owl/10" : "border-l-transparent bg-surface"
+                  }`}
+                >
+                  <CardThumbnail
+                    card={card}
+                    className="h-20 w-14 shrink-0 rounded object-cover"
+                    placeholderClassName="flex h-20 w-14 shrink-0 items-center justify-center rounded bg-surf3 font-mono text-xs text-text-2"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-base font-bold text-text">{card.name ?? "Unknown Card"}</div>
+                    <CardMetadata card={card} />
+                  </div>
+                  {isSelected && (
+                    <span className="hidden shrink-0 rounded border border-owl/50 bg-owl/10 px-2 py-1 font-mono text-xs font-bold uppercase tracking-wider text-owl sm:inline-flex">
+                      Selected
                     </span>
                   )}
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <div className="mt-4 rounded-lg border border-owl/30 bg-owl/10 p-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -248,9 +312,9 @@ export default function NewInventoryForm() {
                 setSelectedCard(null);
                 setManualName(query);
               }}
-              className="rounded-md border border-owl bg-owl/10 px-4 py-2 font-mono text-sm font-bold uppercase tracking-wider text-owl hover:bg-owl/15"
+              className="whitespace-nowrap rounded-md border border-owl bg-owl/10 px-4 py-2 font-mono text-sm font-bold uppercase tracking-wider text-owl hover:bg-owl/15"
             >
-              Add Manually
+              Add Card to Catalog
             </button>
           </div>
         </div>
@@ -283,10 +347,30 @@ export default function NewInventoryForm() {
 
       <div className="rounded-lg border border-border bg-surface p-5">
         <h2 className="text-xl font-bold text-text">Inventory Details</h2>
+        {selectedCard && (
+          <div className="mt-4 rounded-lg border border-border bg-deep p-4">
+            <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_112px] sm:items-start">
+              <div className="min-w-0">
+                <div className="font-mono text-xs font-bold uppercase tracking-wider text-owl">
+                  Selected Card
+                </div>
+                <div className="mt-2 text-2xl font-bold leading-tight text-text">
+                  {selectedCard.name ?? "Unknown Card"}
+                </div>
+                <CardMetadata card={selectedCard} />
+              </div>
+              <CardThumbnail
+                card={selectedCard}
+                className="h-40 w-28 rounded object-cover shadow-lg shadow-void/30 sm:justify-self-end"
+                placeholderClassName="flex h-40 w-28 items-center justify-center rounded bg-surf3 font-mono text-xs text-text-2 sm:justify-self-end"
+              />
+            </div>
+          </div>
+        )}
 
-        <div className="mt-5 space-y-4">
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
           {manualMode && (
-            <div className="rounded-lg border border-owl/30 bg-owl/10 p-4">
+            <div className="rounded-lg border border-owl/30 bg-owl/10 p-4 lg:col-span-2">
               <div className="mb-3 font-mono text-xs font-bold uppercase tracking-wider text-owl">
                 {notInCatalog ? "Private Item Entry" : "Private Card Entry"}
               </div>
@@ -357,7 +441,7 @@ export default function NewInventoryForm() {
           </label>
 
           {condition === "graded" && (
-            <div className="space-y-4">
+            <div className="grid gap-4 lg:col-span-2 lg:grid-cols-2">
               <label className="block">
                 <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Graded Rating</span>
                 <select
@@ -450,7 +534,7 @@ export default function NewInventoryForm() {
             </select>
           </label>
 
-          <label className="block">
+          <label className="block lg:col-span-2">
             <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Notes</span>
             <textarea
               value={notes}
@@ -462,7 +546,7 @@ export default function NewInventoryForm() {
           </label>
 
           {showCustomPhotoUpload && (
-            <div className="rounded-lg border border-border bg-deep p-4">
+            <div className="rounded-lg border border-border bg-deep p-4 lg:col-span-2">
               <div className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
                 {condition === "graded" ? "Scan Images" : "Custom Photos"}
               </div>
@@ -508,13 +592,17 @@ export default function NewInventoryForm() {
             </div>
           )}
 
-          {error && <div className="rounded-md border border-loss/30 bg-loss/10 p-3 text-sm text-text">{error}</div>}
+          {error && (
+            <div className="rounded-md border border-loss/30 bg-loss/10 p-3 text-sm text-text lg:col-span-2">
+              {error}
+            </div>
+          )}
 
           <button
             type="button"
             disabled={!canSubmit}
             onClick={submit}
-            className="w-full rounded-md bg-owl px-4 py-3 font-mono text-sm font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light disabled:cursor-not-allowed disabled:bg-surf3 disabled:text-text-3"
+            className="w-full rounded-md bg-owl px-4 py-3 font-mono text-sm font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light disabled:cursor-not-allowed disabled:bg-surf3 disabled:text-text-3 lg:col-span-2"
           >
             {saving ? "Adding..." : "Add Inventory"}
           </button>
