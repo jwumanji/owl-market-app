@@ -102,6 +102,7 @@ export default function ImageOverlayDev() {
           overlay={overlay}
           imageUrl={SAMPLE_IMAGE}
           isWorst
+          isActive
         />
       </aside>
     </div>

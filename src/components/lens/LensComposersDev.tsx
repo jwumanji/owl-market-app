@@ -202,7 +202,9 @@ export default function LensComposersDev() {
       <Section title="Step 3 · ResultsPanel + FaceResultCard">
         <ResultsPanel
           faces={reviewFaces}
+          activeFace={activeFace}
           cardIdentity={cardIdentity}
+          onActiveFaceChange={setActiveFace}
           onDownloadReport={() => undefined}
           onMeasureAnother={() => undefined}
         />

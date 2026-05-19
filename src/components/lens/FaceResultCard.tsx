@@ -1,4 +1,5 @@
 import { ceilingFromWorstMax, type ComputedCenteringMeasurement, type OverlayGeometry } from "@/lib/centering-math";
+import type { KeyboardEvent } from "react";
 import AxisRatioCard from "./AxisRatioCard";
 import { axisTone, bareGradeLabel, measurementTone, TINTED_TONE_CLASSES } from "./grading";
 
@@ -9,6 +10,8 @@ type FaceResultCardProps = {
   imageSize?: { width: number; height: number } | null;
   imageUrl?: string | null;
   isWorst?: boolean;
+  isActive: boolean;
+  onSelect?: () => void;
 };
 
 function polygonPoints(corners: OverlayGeometry["outer"]) {
@@ -22,15 +25,42 @@ export default function FaceResultCard({
   imageSize,
   imageUrl,
   isWorst = false,
+  isActive,
+  onSelect,
 }: FaceResultCardProps) {
   const tone = measurementTone(measurement);
   const ceiling = bareGradeLabel(ceilingFromWorstMax(measurement.worstAxisMaxPct));
   const worstAxis = measurement.worstAxis === "leftRight" ? "L/R" : "T/B";
   const leftRightTone = axisTone(measurement.leftPct, measurement.rightPct);
   const topBottomTone = axisTone(measurement.topPct, measurement.bottomPct);
+  const interactive = Boolean(onSelect);
+  const cardClassName = [
+    "rounded-lg border bg-surface p-4",
+    isActive ? "border-owl" : "border-border",
+    interactive
+      ? "cursor-pointer outline-none transition-colors hover:border-border-2 focus-visible:border-owl focus-visible:ring-2 focus-visible:ring-owl/30"
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (!onSelect || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    onSelect();
+  }
 
   return (
-    <article className="rounded-lg border border-border bg-surface p-4">
+    <article
+      className={cardClassName}
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      aria-label={interactive ? `Switch to ${face} face` : undefined}
+      aria-pressed={interactive ? isActive : undefined}
+      data-active={isActive ? "true" : undefined}
+      onClick={onSelect}
+      onKeyDown={interactive ? handleKeyDown : undefined}
+    >
       <div className="flex items-center justify-between gap-3">
         <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">{face}</span>
         <span className={`rounded-md border px-2.5 py-1.5 font-mono text-xs font-bold ${TINTED_TONE_CLASSES[tone]}`}>

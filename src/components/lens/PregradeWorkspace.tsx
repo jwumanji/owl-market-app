@@ -992,7 +992,9 @@ export default function PregradeWorkspace() {
       {state.status === "results" && (
         <ResultsPanel
           faces={state.faces}
+          activeFace={state.activeReviewFace}
           cardIdentity={state.cardIdentity || null}
+          onActiveFaceChange={(face) => dispatch({ type: "setActiveReviewFace", face })}
           onDownloadReport={handleDownloadReport}
           onMeasureAnother={handleMeasureAnother}
         />

@@ -9,7 +9,9 @@ import type { LensFace, LensFaceState, LensMeasuredFace } from "./lens-types";
 
 type ResultsPanelProps = {
   faces: Partial<Record<LensFace, LensFaceState>>;
+  activeFace?: LensFace;
   cardIdentity?: string | null;
+  onActiveFaceChange?: (face: LensFace) => void;
   onDownloadReport: () => void;
   onMeasureAnother: () => void;
 };
@@ -107,7 +109,9 @@ function ThresholdTable() {
 
 export default function ResultsPanel({
   faces,
+  activeFace,
   cardIdentity,
+  onActiveFaceChange,
   onDownloadReport,
   onMeasureAnother,
 }: ResultsPanelProps) {
@@ -125,6 +129,7 @@ export default function ResultsPanel({
   const ceiling = ceilingFromWorstMax(worst.measurement.worstAxisMaxPct);
   const adjusted = measured.some((face) => face.adjusted);
   const single = measured.length === 1;
+  const currentActiveFace = activeFace ?? measured[0]?.face;
 
   if (!single) {
     return (
@@ -151,6 +156,8 @@ export default function ResultsPanel({
               imageSize={face.imageSize}
               imageUrl={face.imageUrl}
               isWorst={face.face === worst.face}
+              isActive={currentActiveFace === face.face}
+              onSelect={onActiveFaceChange ? () => onActiveFaceChange(face.face) : undefined}
             />
           ))}
         </div>
@@ -191,6 +198,8 @@ export default function ResultsPanel({
             imageSize={face.imageSize}
             imageUrl={face.imageUrl}
             isWorst
+            isActive={currentActiveFace === face.face}
+            onSelect={onActiveFaceChange ? () => onActiveFaceChange(face.face) : undefined}
           />
           <ThresholdTable />
           <ActionButtons onDownloadReport={onDownloadReport} onMeasureAnother={onMeasureAnother} />
