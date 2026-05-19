@@ -1,30 +1,18 @@
 import type { UploadFaceState } from "./lens-types";
 
-type CardInfoColumnProps = {
-  cardIdentity: string;
+type CardPreviewColumnProps = {
   frontUpload?: UploadFaceState;
-  onCardIdentityChange: (value: string) => void;
 };
 
-export default function CardInfoColumn({
-  cardIdentity,
+export default function CardPreviewColumn({
   frontUpload,
-  onCardIdentityChange,
-}: CardInfoColumnProps) {
+}: CardPreviewColumnProps) {
   const previewUrl = frontUpload?.previewUrl;
 
   return (
-    <aside className="space-y-4 rounded-lg border border-border bg-surface p-4" data-card-info-column="true">
-      <div>
-        <label className="mb-2 block font-mono text-[10px] font-bold uppercase tracking-wider text-text-2">
-          Card name
-        </label>
-        <input
-          value={cardIdentity}
-          onChange={(event) => onCardIdentityChange(event.target.value)}
-          placeholder="Add card name..."
-          className="w-full rounded-lg border border-border bg-deep px-3.5 py-3 text-sm text-text outline-none transition-colors placeholder:text-text-3 focus:border-owl/50"
-        />
+    <aside className="space-y-2 rounded-lg border border-border bg-surface p-4" data-card-preview-column="true">
+      <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-text-2">
+        PREVIEW
       </div>
       <div
         className={`flex aspect-[2.5/3.5] items-center justify-center overflow-hidden rounded-lg bg-deep/70 text-center ${

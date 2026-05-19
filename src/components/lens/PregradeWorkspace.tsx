@@ -8,7 +8,7 @@ import {
   type OverlayGeometry,
 } from "@/lib/centering-math";
 import type { operations } from "@/lib/owl-lens/openapi.generated";
-import CardInfoColumn from "./CardInfoColumn";
+import CardPreviewColumn from "./CardPreviewColumn";
 import FailureNotice from "./FailureNotice";
 import ResultsPanel from "./ResultsPanel";
 import ReviewWorkspace from "./ReviewWorkspace";
@@ -670,11 +670,21 @@ export function PregradeUploadState({
         </div>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)]">
-        <CardInfoColumn
-          cardIdentity={cardIdentity}
+      <div data-card-name-row="true">
+        <label className="mb-2 block font-mono text-[10px] font-bold uppercase tracking-wider text-text-2">
+          CARD NAME
+        </label>
+        <input
+          value={cardIdentity}
+          onChange={(event) => onCardIdentityChange(event.target.value)}
+          placeholder="Add card name..."
+          className="w-full rounded-lg border border-border bg-deep px-3.5 py-3 text-sm text-text outline-none transition-colors placeholder:text-text-3 focus:border-owl/50"
+        />
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-[200px_minmax(0,1fr)]" data-upload-columns="true">
+        <CardPreviewColumn
           frontUpload={uploads.front}
-          onCardIdentityChange={onCardIdentityChange}
         />
         <div className="grid min-w-0 gap-4 lg:grid-cols-2">
           <UploadPane

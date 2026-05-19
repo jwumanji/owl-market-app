@@ -150,14 +150,21 @@ function uploadPane(root: React.ReactElement, face: LensFace) {
   return pane;
 }
 
-test("PregradeWorkspace upload state renders card info and both upload boxes", () => {
+test("PregradeWorkspace upload state renders card name row above preview and upload boxes", () => {
   const { html } = renderUploadState();
   const uploadPaneCount = html.match(/data-upload-pane="/g)?.length ?? 0;
+  const cardNameRowIndex = html.indexOf('data-card-name-row="true"');
+  const uploadColumnsIndex = html.indexOf('data-upload-columns="true"');
+  const uploadColumnsHtml = html.slice(uploadColumnsIndex);
 
   assert.match(html, /data-pregrade-upload-state="true"/);
-  assert.match(html, /data-card-info-column="true"/);
+  assert.ok(cardNameRowIndex >= 0);
+  assert.ok(uploadColumnsIndex >= 0);
+  assert.ok(cardNameRowIndex < uploadColumnsIndex);
+  assert.doesNotMatch(uploadColumnsHtml, /Add card name/);
+  assert.match(uploadColumnsHtml, /data-card-preview-column="true"/);
   assert.equal(uploadPaneCount, 2);
-  assert.match(html, /Card name/);
+  assert.match(html, /CARD NAME/);
   assert.match(html, /Card preview/);
   assert.match(html, /Front[\s\S]*required/);
   assert.match(html, /Back[\s\S]*optional/);
