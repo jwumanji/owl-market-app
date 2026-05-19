@@ -63,6 +63,9 @@ export const OVERLAY_SCREEN_TARGETS = {
   cornerHandle: 12,
   rotationHandle: 16,
   degreeDialFont: 14,
+  axisLabelFont: 14,
+  axisLabelPaddingX: 8,
+  axisLabelPaddingY: 4,
   strokeWidth: 2,
   focusRing: 3,
 } as const;
@@ -79,6 +82,11 @@ const DEGREE_DIAL_HEIGHT_PX = 32;
 const DEGREE_DIAL_OFFSET_X_PX = 14;
 const DEGREE_DIAL_OFFSET_Y_PX = -16;
 const DEGREE_DIAL_MARGIN_PX = 6;
+const AXIS_LABEL_FONT_PX = OVERLAY_SCREEN_TARGETS.axisLabelFont;
+const AXIS_LABEL_PADDING_X_PX = OVERLAY_SCREEN_TARGETS.axisLabelPaddingX;
+const AXIS_LABEL_PADDING_Y_PX = OVERLAY_SCREEN_TARGETS.axisLabelPaddingY;
+const AXIS_LABEL_CHAR_WIDTH_PX = 8.4;
+const AXIS_LABEL_RADIUS_PX = 4;
 
 export function screenPxToSvgUnits(screenPx: number, svgScale: number) {
   if (!Number.isFinite(svgScale) || svgScale <= 0) return screenPx;
@@ -177,6 +185,12 @@ function cornerLabel(handle: OverlayHandle) {
   return `${TARGET_LABELS[handle.target]} ${handle.corner}`;
 }
 
+function axisLabelColor(percentage: number) {
+  if (percentage <= 55) return "var(--gain, var(--green))";
+  if (percentage <= 60) return "var(--owl)";
+  return "var(--loss, var(--red))";
+}
+
 export default function ImageOverlayPanel({
   overlay,
   imageSize,
@@ -255,6 +269,12 @@ export default function ImageOverlayPanel({
   const degreeDialWidth = screenPxToSvgUnits(DEGREE_DIAL_WIDTH_PX, svgScale);
   const degreeDialHeight = screenPxToSvgUnits(DEGREE_DIAL_HEIGHT_PX, svgScale);
   const degreeDialMargin = screenPxToSvgUnits(DEGREE_DIAL_MARGIN_PX, svgScale);
+  const axisLabelFontSize = screenPxToSvgUnits(AXIS_LABEL_FONT_PX, svgScale);
+  const axisLabelPaddingX = screenPxToSvgUnits(AXIS_LABEL_PADDING_X_PX, svgScale);
+  const axisLabelPaddingY = screenPxToSvgUnits(AXIS_LABEL_PADDING_Y_PX, svgScale);
+  const axisLabelRadius = screenPxToSvgUnits(AXIS_LABEL_RADIUS_PX, svgScale);
+  const axisLabelCharWidth = screenPxToSvgUnits(AXIS_LABEL_CHAR_WIDTH_PX, svgScale);
+  const axisLabelHeight = axisLabelFontSize + axisLabelPaddingY * 2;
   const degreeDial = {
     x: Math.min(
       imageSize.width - degreeDialWidth - degreeDialMargin,
@@ -434,21 +454,25 @@ export default function ImageOverlayPanel({
       key: "left" as const,
       text: `${Math.round(measurement.gaps.leftPx)}px · ${measurement.leftPct}%`,
       position: labelPosition("left", overlay),
+      percentage: measurement.leftPct,
     },
     {
       key: "right" as const,
       text: `${Math.round(measurement.gaps.rightPx)}px · ${measurement.rightPct}%`,
       position: labelPosition("right", overlay),
+      percentage: measurement.rightPct,
     },
     {
       key: "top" as const,
       text: `${Math.round(measurement.gaps.topPx)}px · ${measurement.topPct}%`,
       position: labelPosition("top", overlay),
+      percentage: measurement.topPct,
     },
     {
       key: "bottom" as const,
       text: `${Math.round(measurement.gaps.bottomPx)}px · ${measurement.bottomPct}%`,
       position: labelPosition("bottom", overlay),
+      percentage: measurement.bottomPct,
     },
   ];
 
@@ -546,23 +570,28 @@ export default function ImageOverlayPanel({
 
         {labels.map((label) => {
           const active = affectedSides.includes(label.key);
+          const axisLabelWidth = label.text.length * axisLabelCharWidth + axisLabelPaddingX * 2;
           return (
-            <g key={label.key} pointerEvents="none">
+            <g key={label.key} pointerEvents="none" data-axis-label={label.key}>
               <rect
-                x={label.position.x - 43}
-                y={label.position.y - 12}
-                width="86"
-                height="24"
-                rx="4"
-                fill={active ? "rgba(232,160,32,0.18)" : "rgba(3,5,13,0.74)"}
-                stroke={active ? "rgba(232,160,32,0.6)" : "rgba(255,255,255,0.10)"}
+                x={label.position.x - axisLabelWidth / 2}
+                y={label.position.y - axisLabelHeight / 2}
+                width={axisLabelWidth}
+                height={axisLabelHeight}
+                rx={axisLabelRadius}
+                fill={active ? "rgba(232,160,32,0.18)" : "rgba(3,5,13,0.82)"}
+                stroke="var(--border)"
+                strokeWidth="1"
+                vectorEffect="non-scaling-stroke"
               />
               <text
                 x={label.position.x}
-                y={label.position.y + 3.5}
+                y={label.position.y + axisLabelFontSize * 0.36}
                 textAnchor="middle"
-                fill={active ? "var(--owl)" : "var(--text2)"}
-                className="font-mono text-[10px] font-bold"
+                fill={axisLabelColor(label.percentage)}
+                className="font-mono font-bold"
+                fontSize={axisLabelFontSize}
+                data-screen-px={AXIS_LABEL_FONT_PX}
               >
                 {label.text}
               </text>

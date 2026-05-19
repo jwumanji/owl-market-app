@@ -81,6 +81,9 @@ type OverlayPanelModule = {
     cornerHandle: number;
     rotationHandle: number;
     degreeDialFont: number;
+    axisLabelFont: number;
+    axisLabelPaddingX: number;
+    axisLabelPaddingY: number;
     strokeWidth: number;
     focusRing: number;
     workspaceMinHeight: number;
@@ -116,12 +119,30 @@ const overlay: OverlayGeometry = {
   },
 };
 
+const toneThresholdOverlay: OverlayGeometry = {
+  outer: {
+    tl: { x: 0, y: 0 },
+    tr: { x: 100, y: 0 },
+    br: { x: 100, y: 100 },
+    bl: { x: 0, y: 100 },
+  },
+  inner: {
+    tl: { x: 20, y: 30 },
+    tr: { x: 60, y: 30 },
+    br: { x: 60, y: 80 },
+    bl: { x: 20, y: 80 },
+  },
+};
+
 test("overlay sizing helper preserves fixed screen pixels across SVG scales", () => {
   const panel = loadModule<OverlayPanelModule>("src/components/lens/ImageOverlayPanel.tsx");
 
   assert.equal(panel.screenPxToSvgUnits(panel.OVERLAY_SCREEN_TARGETS.cornerHandle, 0.5) * 0.5, 12);
   assert.equal(panel.screenPxToSvgUnits(panel.OVERLAY_SCREEN_TARGETS.cornerHandle, 2) * 2, 12);
   assert.equal(panel.screenPxToSvgUnits(panel.OVERLAY_SCREEN_TARGETS.degreeDialFont, 0), 14);
+  assert.equal(panel.screenPxToSvgUnits(panel.OVERLAY_SCREEN_TARGETS.axisLabelFont, 2) * 2, 14);
+  assert.equal(panel.OVERLAY_SCREEN_TARGETS.axisLabelPaddingX, 8);
+  assert.equal(panel.OVERLAY_SCREEN_TARGETS.axisLabelPaddingY, 4);
   assert.equal(panel.OVERLAY_SCREEN_TARGETS.rotationHandle, 16);
   assert.equal(panel.OVERLAY_SCREEN_TARGETS.strokeWidth, 2);
   assert.equal(panel.OVERLAY_SCREEN_TARGETS.focusRing, 3);
@@ -161,4 +182,25 @@ test("ImageOverlayPanel workspace enforces min height and 24px padding", () => {
   assert.match(html, /data-workspace-padding="24"/);
   assert.match(html, /min-h-\[600px\]/);
   assert.match(html, /p-6/);
+});
+
+test("ImageOverlayPanel renders 14px tone-colored axis labels", () => {
+  const panel = loadModule<OverlayPanelModule>("src/components/lens/ImageOverlayPanel.tsx");
+  const html = renderToStaticMarkup(
+    React.createElement(panel.default, {
+      overlay: toneThresholdOverlay,
+      imageSize: { width: 100, height: 100 },
+      freeCorners: false,
+      mode: "readonly",
+      onOverlayChange: () => undefined,
+    })
+  );
+
+  assert.equal((html.match(/data-axis-label="/g) ?? []).length, 4);
+  assert.equal((html.match(/data-screen-px="14"/g) ?? []).length, 4);
+  assert.match(html, /font-size="14"/);
+  assert.match(html, /stroke="var\(--border\)"/);
+  assert.match(html, /fill="var\(--gain, var\(--green\)\)"/);
+  assert.match(html, /fill="var\(--owl\)"/);
+  assert.match(html, /fill="var\(--loss, var\(--red\)\)"/);
 });
