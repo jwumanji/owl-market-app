@@ -38,6 +38,46 @@
   --nav-h: 54px;
   --bar-h: 28px;
   --top: calc(var(--nav-h) + var(--bar-h));
+
+  /* ───────── C1.5 Playful Modern tokens (migration in progress) ───────── */
+  /* These coexist with the legacy --void/--text/--owl tokens above. */
+  /* Components migrate to these stage-by-stage. */
+
+  /* Neutrals */
+  --bg:    #FFF5E4;
+  --bg-2:  #FFFFFF;
+  --bg-3:  #FCE6BE;
+  --ink:   #1A0F08;
+  --ink-2: #5C4534;
+  --ink-3: #9A8475;
+
+  /* Sunset gradient stops */
+  --pink:  #FF6BB8;
+  --coral: #FF4936;
+  --gold:  #E89512;
+
+  /* Semantic (new aliases — values aligned with brand bible) */
+  --gain-2: #2D9961;
+  --loss-2: #E04E4E;
+
+  /* Primary gradient — A3 Sunset Multi-stop */
+  --grad-brand: linear-gradient(
+    135deg,
+    var(--pink)  0%,
+    var(--coral) 50%,
+    var(--gold)  100%
+  );
+
+  /* New font CSS-var aliases (the next/font vars come from layout.tsx) */
+  --font-space-grotesk-stack: var(--font-space-grotesk), system-ui, sans-serif;
+  --font-caveat-stack:        var(--font-caveat), cursive;
+  --font-jetbrains-mono-stack: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  /* C1.5 radii */
+  --r-sm:   8px;
+  --r-md:  14px;
+  --r-lg:  22px;
+  --r-pill: 999px;
 }
 
 body {
