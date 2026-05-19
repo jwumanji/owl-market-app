@@ -3949,30 +3949,26 @@ export default function InventoryTabs({
         </div>
       </form>
 
-        <div className="flex shrink-0 justify-start gap-2 xl:justify-end">
-          <a
-            href="/admin/psa-submissions"
-            className="h-10 rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl"
-          >
-            PSA Submissions
-          </a>
-          <button
-            type="button"
-            onClick={() => switchInventoryTab("bundles")}
-            className={`h-10 rounded-md border px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
-              activeTab === "bundles" && !pendingMatchOnly
-                ? "border-owl bg-owl/10 text-owl"
-                : "border-border bg-surface text-text hover:border-border-2 hover:text-owl"
-            }`}
-          >
-            Bundles
-          </button>
-          <a
-            href="/admin/inventory/import/psa"
-            className="h-10 rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl"
-          >
-            PSA Import
-          </a>
+        <div className="flex shrink-0 flex-wrap justify-start gap-2 xl:justify-end">
+          <details className="inventory-tools relative">
+            <summary className="flex h-10 cursor-pointer list-none items-center rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl">
+              Tools
+            </summary>
+            <div className="absolute right-0 top-11 z-40 grid min-w-[190px] gap-1 rounded-lg border border-border bg-deep p-2 shadow-2xl">
+              <a
+                href="/admin/psa-submissions"
+                className="rounded-md px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:bg-surface hover:text-owl"
+              >
+                PSA Submissions
+              </a>
+              <a
+                href="/admin/inventory/import/psa"
+                className="rounded-md px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:bg-surface hover:text-owl"
+              >
+                PSA Import
+              </a>
+            </div>
+          </details>
           <a
             href="/admin/orders/new"
             className="h-10 rounded-md border border-owl/40 bg-owl/10 px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/15"

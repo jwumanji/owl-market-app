@@ -15,11 +15,29 @@ const NAV_LINKS = [
   { label: "OWL LENS", href: "/admin/lens" },
 ];
 
+const ADMIN_NAV_LINKS = [
+  { label: "INVENTORY", href: "/admin/inventory" },
+  { label: "ORDERS", href: "/admin/orders" },
+  { label: "BUNDLES", href: "/admin/bundles" },
+  { label: "PSA", href: "/admin/psa-submissions" },
+  { label: "OWL LENS", href: "/admin/lens" },
+];
+
+function isActivePath(pathname: string, href: string) {
+  if (href === "/") {
+    return pathname === href;
+  }
+
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export default function Nav() {
   const pathname = usePathname();
+  const isAdmin = pathname.startsWith("/admin");
+  const links = isAdmin ? ADMIN_NAV_LINKS : NAV_LINKS;
 
   return (
-    <nav>
+    <nav className={isAdmin ? "admin-nav" : undefined}>
       <div className="nav-row">
         <Link href="/" className="logo">
           <div className="logo-owl">🦉</div>
@@ -29,11 +47,11 @@ export default function Nav() {
         </Link>
 
         <div className="nav-mid">
-          {NAV_LINKS.map((link) => (
+          {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className={`nav-link${pathname === link.href ? " active" : ""}`}
+              className={`nav-link${isActivePath(pathname, link.href) ? " active" : ""}`}
             >
               {link.label}
             </Link>
@@ -41,20 +59,26 @@ export default function Nav() {
         </div>
 
         <div className="nav-right">
-          <div className="live-badge">
-            <span className="live-dot" />
-            LIVE
-          </div>
-          <Link href="/login" className="btn-login">
-            Login
-          </Link>
+          {isAdmin ? (
+            <div className="live-badge admin-badge">INTERNAL</div>
+          ) : (
+            <>
+              <div className="live-badge">
+                <span className="live-dot" />
+                LIVE
+              </div>
+              <Link href="/login" className="btn-login">
+                Login
+              </Link>
+            </>
+          )}
           <Link href="/logout" className="btn-login">
             Logout
           </Link>
         </div>
       </div>
 
-      <Ticker />
+      {!isAdmin && <Ticker />}
     </nav>
   );
 }
