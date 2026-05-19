@@ -347,16 +347,113 @@ Decision note:
 
 > **Decision 23 — Face result cards are clickable; click switches active face. Axis labels in workspace use tone-matched color and 14px IBM Plex Mono.**
 
+> **Decision 24 — Grade ceiling logic uses face-aware threshold tables aligned to published PSA, BGS, and TAG standards. Back-face tolerances are looser than front. TAG defaults to TCG category for Owl Lens; Sports support is reserved but unused. Combined ceiling = worse of front and back; back-missing returns front-only with a flag.**
+
 ---
 
-## 11. Scope and platform
+## 11. Grading thresholds
+
+Owl Lens defaults to the TCG category. Sports support exists in code for future use, but the One Piece TCG UI does not expose it.
+
+PSA source: https://www.psacard.com/gradingstandards
+
+### PSA — front face
+
+| Worst axis % | Grade ceiling |
+|---|---|
+| ≤55 | PSA 10 (Gem Mint) |
+| ≤60 | PSA 10 (with eye-appeal allowance) |
+| ≤65 | PSA 9 |
+| ≤70 | PSA 8 |
+| ≤75 | PSA 7 |
+| ≤80 | PSA 6 |
+| ≤85 | PSA 5 |
+| ≤90 | PSA 4 |
+| >90 | PSA 3 or worse |
+
+### PSA — back face
+
+| Worst axis % | Grade ceiling |
+|---|---|
+| ≤75 | PSA 10 |
+| ≤90 | PSA 9 |
+| >90 | PSA 2 or worse |
+
+BGS source: https://www.beckett.com/grading/scale
+
+### BGS — front face
+
+| Worst axis % | Grade ceiling |
+|---|---|
+| ≤51 | BGS 10 Pristine |
+| ≤55 | BGS 9.5 Gem Mint |
+| ≤60 | BGS 9 Mint |
+| ≤65 | BGS 8.5 |
+| ≤70 | BGS 8 |
+| ≤75 | BGS 7.5 |
+| ≤80 | BGS 7 |
+| ≤85 | BGS 6.5 |
+| >85 | BGS 6 or worse |
+
+### BGS — back face
+
+| Worst axis % | Grade ceiling |
+|---|---|
+| ≤55 | BGS 10 Pristine |
+| ≤60 | BGS 9.5 |
+| ≤80 | BGS 9 |
+| ≤90 | BGS 8.5 |
+| ≤95 | BGS 8 |
+| >95 | BGS 7.5 or worse |
+
+TAG sources: https://taggrading.com/pages/rubric and https://taggrading.com/pages/conversion
+
+### TAG — front face (TCG and Sports)
+
+| Worst axis % | Grade ceiling |
+|---|---|
+| ≤51 | TAG 10 Pristine (≥990) |
+| ≤55 | TAG 10 Gem Mint (950–989) |
+| ≤60 | TAG 9 Mint (900–949) |
+| ≤62.5 | TAG 8 NM-MT (800–899) |
+| ≤65 | TAG 7 NM (700–799) |
+| ≤67.5 | TAG 6 EX-MT (600–699) |
+| ≤70 | TAG 5 EX (500–599) |
+| >70 | TAG 4 or worse |
+
+### TAG TCG — back face
+
+| Worst axis % | Grade ceiling |
+|---|---|
+| ≤52 | TAG 10 Pristine |
+| ≤65 | TAG 10 Gem Mint |
+| ≤75 | TAG 9 Mint |
+| ≤85 | TAG 8 NM-MT |
+| ≤95 | TAG 7 NM |
+| >95 | TAG 6 or worse |
+
+### TAG Sports — back face
+
+| Worst axis % | Grade ceiling |
+|---|---|
+| ≤54.5 | TAG 10 Pristine |
+| ≤70 | TAG 10 Gem Mint |
+| ≤90 | TAG 9 Mint |
+| ≤95 | TAG 8 NM-MT |
+| >95 | TAG 7 or worse |
+
+Combined ceiling is the worse numerical grade between the front and back. If the back is missing, the result returns the front ceiling with a front-only flag.
+
+---
+
+## 12. Scope and platform
 
 - **Desktop only for v1.** Mobile is deferred. The two-column review layout, keyboard nudge, and rotation handle all assume mouse + keyboard input. Mobile gets a separate design pass later; likely full-bleed image with a bottom sheet for numbers.
 - **Admin-only.** Routes are at `/admin/lens/*`. Auth boundary opens up in a later ADR.
 
 ---
 
-## 12. Open questions
+## 13. Open questions
 
 - Should the degree dial double as a click-to-reset-rotation control? (Deferred — easy to add.)
 - Inventory autocomplete on the card-name field — out of scope here, but the field is positioned to accept it as a non-breaking upgrade later.

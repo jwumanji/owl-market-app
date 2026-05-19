@@ -385,7 +385,8 @@ export function bgsCeilingBack(worstMax: number): BgsGrade {
  * Sources: TAG grading rubric, https://taggrading.com/pages/rubric and
  * TAG conversion table, https://taggrading.com/pages/conversion
  */
-export function tagCeilingFront(worstMax: number, _category: TagCategory = "tcg"): TagGrade {
+export function tagCeilingFront(worstMax: number, category: TagCategory = "tcg"): TagGrade {
+  void category;
   return ceilingFromTable(
     worstMax,
     [
