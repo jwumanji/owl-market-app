@@ -2,7 +2,7 @@
 
 **Status:** Approved — implementation-ready
 **Version:** v1 (refined, supersedes v0)
-**Last updated:** 2026-05-17
+**Last updated:** 2026-05-19
 **Venue:** Owl Lens lives inside `jwumanji/owl-market-app` per ADR 003. Routes admin-only at `/admin/lens/*`. CV service lives separately at `jwumanji/owl-lens`.
 
 ---
@@ -37,11 +37,22 @@ Below the tools, a **Recent pre-grades** section shows the last 5 saved measurem
 
 ### `idle` (the Upload step)
 
-A unified upload pane with Front/Back tabs in its header. Empty tab body shows a dropzone; uploaded tab body shows the image preview with filename + Replace button.
+The upload state uses a two-column layout. The left column is fixed-width on desktop and contains the free-text **Card name** input plus a card-ratio thumbnail preview area. Before upload, the thumbnail area shows a dashed **Card preview** placeholder. Once the front image is uploaded, it shows the front thumbnail.
 
-Above the pane: optional **Card name** input (free-text). Below: **Measure** button (centered, disabled until front is uploaded) and a privacy notice ("Images are saved with your measurement so you can re-open and adjust later").
+The right column contains both face upload boxes at once:
 
-**Special case — adding a back to an existing front measurement:** If `state.frontOverlay` already exists when the user returns to idle (via the "+ Add back image" link from review), a notice strip appears above the pane: *"Front measurement is saved. Add a back image, then click Measure to complete the pair. The front won't be re-measured."* The Measure handler is idempotent — it only runs CV on faces that don't yet have an overlay.
+```text
+┌────────────────────────────┬──────────────────────────────────────────────┐
+│ Card name                  │ Front · required      Back · optional        │
+│ Card preview thumbnail     │ Upload/preview box    Upload/preview box     │
+└────────────────────────────┴──────────────────────────────────────────────┘
+```
+
+Desktop (`>=1024px`) shows the card info column next to the right upload column, with Front and Back side-by-side inside the right column. Below that breakpoint, the layout stacks cleanly: card info first, then Front, then Back. Each upload box has its own empty/uploaded/failure state. Uploaded image previews are clickable shortcuts for Replace, while the explicit Replace and Clear buttons remain in the metadata strip.
+
+Below the columns: **Measure** button (centered, disabled until front is uploaded) and a privacy notice ("Images are saved with your measurement so you can re-open and adjust later"). Back remains optional.
+
+**Special case — adding a back to an existing front measurement:** If `state.frontOverlay` already exists when the user returns to idle (via the "+ Add back image" link from review), a notice strip appears above the upload layout: *"Front measurement is saved. Add a back image, then click Measure to complete the pair. The front won't be re-measured."* The Measure handler is idempotent — it only runs CV on faces that don't yet have an overlay.
 
 ### `uploading` / `processing`
 
@@ -241,7 +252,8 @@ Updates `card_identity` only. Used by the inline-rename-in-history affordance.
 | `ToolCard` | A single tool tile (active or coming-soon). |
 | `PreGradeHistorySection` | Compact history table for the hub (max 5 rows + "View all"). |
 | `CenteringWorkspace` | State machine + orchestration for the full pre-grade flow. |
-| `UploadPane` | The unified Front/Back-tabbed upload+preview surface. |
+| `CardInfoColumn` | Card name input plus front thumbnail preview/placeholder for the upload state. |
+| `UploadPane` | A single face upload+preview surface with drop, paste, browse, replace, clear, and per-face failure notice support. |
 | `ProcessingPanel` | Step list with spinner. |
 | `ReviewWorkspace` | The two-column review layout (image panel + numbers panel). |
 | `ImageOverlayPanel` | SVG with quads, handles, rotation, gap labels. |
@@ -348,6 +360,8 @@ Decision note:
 > **Decision 23 — Face result cards are clickable; click switches active face. Axis labels in workspace use tone-matched color and 14px IBM Plex Mono.**
 
 > **Decision 24 — Grade ceiling logic uses face-aware threshold tables aligned to published PSA, BGS, and TAG standards. Back-face tolerances are looser than front. TAG defaults to TCG category for Owl Lens; Sports support is reserved but unused. Combined ceiling = worse of front and back; back-missing returns front-only with a flag.**
+
+> **Decision 25 — Pregrade upload state uses a two-column layout: left column has card name input + thumbnail preview, right column has both Front and Back upload boxes visible simultaneously (no tab switching). Side-by-side on desktop >=1024px, stacked vertically below. MEASURE button enables once front is uploaded; back remains optional. Replaces the prior FaceTabs-based upload state. FaceTabs component is retained for the measurement/review state.**
 
 ---
 
