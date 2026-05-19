@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { isAllowedAdminEmail } from "@/lib/admin-auth";
+import { gradeRank, type PsaCeiling } from "@/lib/centering-math";
 import { createServiceClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +12,6 @@ const CENTERING_IMAGES_BUCKET = "centering-images";
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
 type CenteringFace = "front" | "back";
-type PsaCeiling = "PSA_10" | "PSA_9" | "PSA_8" | "PSA_7" | "BELOW_PSA_7";
 type CeilingFilter = "all" | "10" | "9" | "8" | "7-";
 
 type MeasurementRow = {
@@ -108,23 +108,8 @@ function numeric(value: string | number | null) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function ceilingRank(ceiling: PsaCeiling) {
-  switch (ceiling) {
-    case "PSA_10":
-      return 10;
-    case "PSA_9":
-      return 9;
-    case "PSA_8":
-      return 8;
-    case "PSA_7":
-      return 7;
-    default:
-      return 6;
-  }
-}
-
 function worseCeiling(a: PsaCeiling, b: PsaCeiling) {
-  return ceilingRank(a) <= ceilingRank(b) ? a : b;
+  return gradeRank(a) <= gradeRank(b) ? a : b;
 }
 
 function ceilingMatchesFilter(ceiling: PsaCeiling, filter: CeilingFilter) {
@@ -132,7 +117,7 @@ function ceilingMatchesFilter(ceiling: PsaCeiling, filter: CeilingFilter) {
   if (filter === "10") return ceiling === "PSA_10";
   if (filter === "9") return ceiling === "PSA_9";
   if (filter === "8") return ceiling === "PSA_8";
-  return ceiling === "PSA_7" || ceiling === "BELOW_PSA_7";
+  return !["PSA_10", "PSA_9", "PSA_8"].includes(ceiling);
 }
 
 function parseCeilingFilter(value: string | null): CeilingFilter {

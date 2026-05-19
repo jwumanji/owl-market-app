@@ -1,4 +1,5 @@
-import type { ComputedCenteringMeasurement, OverlayGeometry } from "@/lib/centering-math";
+import type { ComputedCenteringMeasurement, OverlayGeometry, PsaCeiling } from "@/lib/centering-math";
+export type { PsaCeiling };
 
 export type LensFace = "front" | "back";
 
@@ -24,8 +25,6 @@ export type UploadFaceState = {
   contentType?: string | null;
   previewUrl: string | null;
 };
-
-export type PsaCeiling = "PSA_10" | "PSA_9" | "PSA_8" | "PSA_7" | "BELOW_PSA_7";
 
 export type PreGradeFace = {
   id: string;

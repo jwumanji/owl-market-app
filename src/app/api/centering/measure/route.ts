@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { isAllowedAdminEmail } from "@/lib/admin-auth";
-import { overlayGeometryFromUnknown } from "@/lib/centering-math";
+import { overlayGeometryFromUnknown, psaCeilingBack, psaCeilingFront } from "@/lib/centering-math";
 import { isUploadFile } from "@/lib/inventory-scans";
 import { createServiceClient } from "@/lib/supabase-server";
 import type { operations } from "@/lib/owl-lens/openapi.generated";
@@ -117,7 +117,9 @@ function measurementRow({
     bottom_pct: response.centering.topBottom.bottomPercent,
     worst_axis: response.centering.worstAxis,
     worst_axis_max_pct: response.centering.worstAxisMaxPercent,
-    psa_ceiling: response.psa.ceiling,
+    psa_ceiling: face === "back"
+      ? psaCeilingBack(response.centering.worstAxisMaxPercent)
+      : psaCeilingFront(response.centering.worstAxisMaxPercent),
     pipeline_mode: response.pipeline.mode,
     pipeline_version: response.pipeline.version,
     processing_ms: response.metadata.processingMs,

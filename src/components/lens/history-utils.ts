@@ -117,6 +117,10 @@ export function ceilingDisplayLabel(ceiling: PsaCeiling) {
   if (ceiling === "PSA_9") return "9";
   if (ceiling === "PSA_8") return "8";
   if (ceiling === "PSA_7") return "7";
+  if (ceiling === "PSA_6") return "6";
+  if (ceiling === "PSA_5") return "5";
+  if (ceiling === "PSA_4") return "4";
+  if (ceiling === "PSA_3_OR_LESS") return "<=3";
   return "<=6";
 }
 

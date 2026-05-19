@@ -1,4 +1,9 @@
-import { ceilingFromWorstMax, type ComputedCenteringMeasurement, type OverlayGeometry } from "@/lib/centering-math";
+import {
+  psaCeilingBack,
+  psaCeilingFront,
+  type ComputedCenteringMeasurement,
+  type OverlayGeometry,
+} from "@/lib/centering-math";
 import type { KeyboardEvent } from "react";
 import AxisRatioCard from "./AxisRatioCard";
 import { axisTone, bareGradeLabel, measurementTone, TINTED_TONE_CLASSES } from "./grading";
@@ -28,8 +33,12 @@ export default function FaceResultCard({
   isActive,
   onSelect,
 }: FaceResultCardProps) {
-  const tone = measurementTone(measurement);
-  const ceiling = bareGradeLabel(ceilingFromWorstMax(measurement.worstAxisMaxPct));
+  const tone = measurementTone(measurement, face);
+  const ceiling = bareGradeLabel(
+    face === "back"
+      ? psaCeilingBack(measurement.worstAxisMaxPct)
+      : psaCeilingFront(measurement.worstAxisMaxPct)
+  );
   const worstAxis = measurement.worstAxis === "leftRight" ? "L/R" : "T/B";
   const leftRightTone = axisTone(measurement.leftPct, measurement.rightPct);
   const topBottomTone = axisTone(measurement.topPct, measurement.bottomPct);

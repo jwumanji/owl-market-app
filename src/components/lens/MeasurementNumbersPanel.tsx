@@ -1,10 +1,18 @@
 "use client";
 
-import { ceilingFromWorstMax, type ComputedCenteringMeasurement, type OverlayGeometry } from "@/lib/centering-math";
+import { type ComputedCenteringMeasurement, type OverlayGeometry, type PsaGrade } from "@/lib/centering-math";
 import { AxisRatioValue } from "./AxisRatioCard";
 import FreeCornersToggle from "./FreeCornersToggle";
 import GraderStrip from "./GraderStrip";
-import { axisTone, bareGradeLabel, measurementTone, TINTED_TONE_CLASSES, TONE_TEXT_CLASSES } from "./grading";
+import {
+  axisTone,
+  bareGradeLabel,
+  graderResultsFromFaces,
+  measurementTone,
+  TINTED_TONE_CLASSES,
+  TONE_TEXT_CLASSES,
+  type GraderResult,
+} from "./grading";
 import type { LensFace, LensFaceState } from "./lens-types";
 
 type MeasurementNumbersPanelProps = {
@@ -28,30 +36,6 @@ type MeasurementNumbersPanelProps = {
 
 function polygonPoints(corners: OverlayGeometry["outer"]) {
   return `${corners.tl.x},${corners.tl.y} ${corners.tr.x},${corners.tr.y} ${corners.br.x},${corners.br.y} ${corners.bl.x},${corners.bl.y}`;
-}
-
-function ceilingRank(measurement: ComputedCenteringMeasurement) {
-  const ceiling = ceilingFromWorstMax(measurement.worstAxisMaxPct);
-  if (ceiling === "PSA_10") return 10;
-  if (ceiling === "PSA_9") return 9;
-  if (ceiling === "PSA_8") return 8;
-  if (ceiling === "PSA_7") return 7;
-  return 6;
-}
-
-function combinedMeasurement(measurements: Partial<Record<LensFace, ComputedCenteringMeasurement>>) {
-  const available = (["front", "back"] as LensFace[])
-    .map((face) => ({ face, measurement: measurements[face] }))
-    .filter((entry): entry is { face: LensFace; measurement: ComputedCenteringMeasurement } => Boolean(entry.measurement));
-
-  if (available.length === 0) return null;
-  return available.reduce((worst, next) => {
-    const nextRank = ceilingRank(next.measurement);
-    const worstRank = ceilingRank(worst.measurement);
-    if (nextRank < worstRank) return next;
-    if (nextRank === worstRank && next.measurement.worstAxisMaxPct > worst.measurement.worstAxisMaxPct) return next;
-    return worst;
-  });
 }
 
 function OverlayPreview({ faceState }: { faceState: LensFaceState }) {
@@ -87,7 +71,7 @@ function FaceMeasurementCard({
   showWorst: boolean;
   isWorst: boolean;
 }) {
-  const tone = measurementTone(measurement);
+  const tone = measurementTone(measurement, face);
   const leftRightTone = axisTone(measurement.leftPct, measurement.rightPct);
   const topBottomTone = axisTone(measurement.topPct, measurement.bottomPct);
   const worstAxis = measurement.worstAxis === "leftRight" ? "L/R" : "T/B";
@@ -174,10 +158,11 @@ export default function MeasurementNumbersPanel({
   onDelete,
 }: MeasurementNumbersPanelProps) {
   const activeMeasurement = measurements[activeFace];
-  const combined = combinedMeasurement(measurements);
+  const frontMeasurement = measurements.front ?? activeMeasurement;
+  const backMeasurement = measurements.front ? measurements.back ?? null : null;
   const hasBack = Boolean(measurements.back);
 
-  if (!activeMeasurement || !combined) {
+  if (!activeMeasurement || !frontMeasurement) {
     return (
       <aside className="rounded-lg border border-border bg-surface p-4 text-sm text-text-2">
         Measurement unavailable.
@@ -185,8 +170,19 @@ export default function MeasurementNumbersPanel({
     );
   }
 
-  const combinedTone = measurementTone(combined.measurement);
-  const combinedCeiling = ceilingFromWorstMax(combined.measurement.worstAxisMaxPct);
+  const graderResults = graderResultsFromFaces({
+    front: { worstMax: frontMeasurement.worstAxisMaxPct },
+    back: backMeasurement ? { worstMax: backMeasurement.worstAxisMaxPct } : null,
+  });
+  const psaResult = graderResults[0] as GraderResult<PsaGrade>;
+  const combinedTone = psaResult.tone;
+  const combinedCeiling = psaResult.ceiling;
+  const combinedFace: LensFace = psaResult.breakdown.back &&
+    psaResult.ceiling === psaResult.breakdown.back.ceiling &&
+    (psaResult.breakdown.front.ceiling !== psaResult.breakdown.back.ceiling ||
+      psaResult.breakdown.back.worstMax > psaResult.breakdown.front.worstMax)
+    ? "back"
+    : "front";
   const primaryLabel = saveLabel ?? (hasBack ? "Save both faces" : "Save measurement");
   const secondaryLabel = resetLabel ?? `Reset ${activeFace}`;
   const showWorst = Boolean(measurements.front && measurements.back);
@@ -203,7 +199,10 @@ export default function MeasurementNumbersPanel({
         <div className="mt-1 font-mono text-[10px] text-text-2">
           {hasBack ? "worse of front · back" : "front only (back not measured)"}
         </div>
-        <GraderStrip worstMax={combined.measurement.worstAxisMaxPct} />
+        <GraderStrip
+          frontWorstMax={frontMeasurement.worstAxisMaxPct}
+          backWorstMax={backMeasurement?.worstAxisMaxPct ?? null}
+        />
       </div>
 
       <div className="space-y-2">
@@ -224,7 +223,7 @@ export default function MeasurementNumbersPanel({
               measurement={measurement}
               active={face === activeFace}
               showWorst={showWorst}
-              isWorst={combined.face === face}
+              isWorst={combinedFace === face}
             />
           );
         })}

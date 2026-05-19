@@ -4,14 +4,15 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { isAllowedAdminEmail } from "@/lib/admin-auth";
 import {
-  ceilingFromWorstMax,
   computeMeasurements,
   legacyOverlayFromGeometry,
   overlayGeometryFromUnknown,
   overlayImageBounds,
   overlaysEquivalent,
   type OverlayGeometry,
-  type PsaCeiling,
+  psaCeilingBack,
+  psaCeilingFront,
+  type PsaGrade,
 } from "@/lib/centering-math";
 import { isUploadFile } from "@/lib/inventory-scans";
 import { createServiceClient } from "@/lib/supabase-server";
@@ -174,7 +175,9 @@ function measurementRow({
   manualAdjustment: boolean;
 }) {
   const measurement = computeMeasurements(overlay);
-  const psaCeiling: PsaCeiling = ceilingFromWorstMax(measurement.worstAxisMaxPct);
+  const psaCeiling: PsaGrade = face === "back"
+    ? psaCeilingBack(measurement.worstAxisMaxPct)
+    : psaCeilingFront(measurement.worstAxisMaxPct);
 
   return {
     inventory_item_id: inventoryItemId,

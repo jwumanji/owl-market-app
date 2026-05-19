@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ceilingFromWorstMax, computeMeasurements, type OverlayGeometry } from "@/lib/centering-math";
+import { computeMeasurements, psaCeilingFront, type OverlayGeometry } from "@/lib/centering-math";
 import AxisRatioCard from "./AxisRatioCard";
 import FaceTabs, { type LensFace } from "./FaceTabs";
 import FaceResultCard from "./FaceResultCard";
@@ -64,7 +64,7 @@ export default function ImageOverlayDev() {
             Combined ceiling
           </div>
           <div className="mt-2 font-mono text-4xl font-bold text-owl">
-            {bareGradeLabel(ceilingFromWorstMax(measurement.worstAxisMaxPct))}
+            {bareGradeLabel(psaCeilingFront(measurement.worstAxisMaxPct))}
           </div>
           <div className="mt-1 font-mono text-[10px] text-text-2">front only (back not measured)</div>
           <GraderStrip worstMax={measurement.worstAxisMaxPct} />

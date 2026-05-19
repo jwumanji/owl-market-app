@@ -1,11 +1,27 @@
-import { graderResultsFromWorstMax, TINTED_TONE_CLASSES, TONE_TEXT_CLASSES } from "./grading";
+import type { TagCategory } from "@/lib/centering-math";
+import { graderResultsFromFaces, TINTED_TONE_CLASSES, TONE_TEXT_CLASSES } from "./grading";
 
 type GraderStripProps = {
-  worstMax: number;
+  worstMax?: number;
+  frontWorstMax?: number;
+  backWorstMax?: number | null;
+  category?: TagCategory;
 };
 
-export default function GraderStrip({ worstMax }: GraderStripProps) {
-  const results = graderResultsFromWorstMax(worstMax);
+export default function GraderStrip({
+  worstMax,
+  frontWorstMax,
+  backWorstMax = null,
+  category = "tcg",
+}: GraderStripProps) {
+  const front = frontWorstMax ?? worstMax;
+  if (typeof front !== "number") return null;
+
+  const results = graderResultsFromFaces({
+    front: { worstMax: front },
+    back: typeof backWorstMax === "number" ? { worstMax: backWorstMax } : null,
+    category,
+  });
 
   return (
     <div className="mt-3">

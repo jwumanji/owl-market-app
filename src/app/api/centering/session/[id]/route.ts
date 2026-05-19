@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { isAllowedAdminEmail } from "@/lib/admin-auth";
+import { gradeRank, type PsaCeiling } from "@/lib/centering-math";
 import { createServiceClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +14,6 @@ const SESSION_SELECT =
   "id, created_at, inventory_item_id, card_identity, face, card_session_id, image_url, overlay, overlay_geometry, left_pct, right_pct, top_pct, bottom_pct, worst_axis, worst_axis_max_pct, psa_ceiling, manual_adjustment";
 
 type CenteringFace = "front" | "back";
-type PsaCeiling = "PSA_10" | "PSA_9" | "PSA_8" | "PSA_7" | "BELOW_PSA_7";
 
 type MeasurementRow = {
   id: string;
@@ -104,23 +104,8 @@ function numeric(value: string | number | null) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function ceilingRank(ceiling: PsaCeiling) {
-  switch (ceiling) {
-    case "PSA_10":
-      return 10;
-    case "PSA_9":
-      return 9;
-    case "PSA_8":
-      return 8;
-    case "PSA_7":
-      return 7;
-    default:
-      return 6;
-  }
-}
-
 function worseCeiling(a: PsaCeiling, b: PsaCeiling) {
-  return ceilingRank(a) <= ceilingRank(b) ? a : b;
+  return gradeRank(a) <= gradeRank(b) ? a : b;
 }
 
 function isStoragePath(value: string) {

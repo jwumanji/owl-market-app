@@ -1,10 +1,10 @@
 "use client";
 
-import { ceilingFromWorstMax, computeMeasurements } from "@/lib/centering-math";
+import { computeMeasurements, type PsaGrade } from "@/lib/centering-math";
 import FaceResultCard from "./FaceResultCard";
 import GraderStrip from "./GraderStrip";
 import ImageOverlayPanel from "./ImageOverlayPanel";
-import { bareGradeLabel, measurementTone, TINTED_TONE_CLASSES } from "./grading";
+import { bareGradeLabel, graderResultsFromFaces, measurementTone, TINTED_TONE_CLASSES, type GraderResult } from "./grading";
 import type { LensFace, LensFaceState, LensMeasuredFace } from "./lens-types";
 
 type ResultsPanelProps = {
@@ -26,17 +26,27 @@ function measuredFaces(faces: Partial<Record<LensFace, LensFaceState>>) {
     }));
 }
 
-function rank(measuredFace: LensMeasuredFace) {
-  const ceiling = ceilingFromWorstMax(measuredFace.measurement.worstAxisMaxPct);
-  if (ceiling === "PSA_10") return 10;
-  if (ceiling === "PSA_9") return 9;
-  if (ceiling === "PSA_8") return 8;
-  if (ceiling === "PSA_7") return 7;
-  return 6;
-}
+function combinedPsaResult(faces: LensMeasuredFace[]) {
+  const front = faces.find((face) => face.face === "front") ?? faces[0];
+  const back = front.face === "front" ? faces.find((face) => face.face === "back") ?? null : null;
+  const graderResults = graderResultsFromFaces({
+    front: { worstMax: front.measurement.worstAxisMaxPct },
+    back: back ? { worstMax: back.measurement.worstAxisMaxPct } : null,
+  });
+  const psa = graderResults[0] as GraderResult<PsaGrade>;
+  const worstFace = psa.breakdown.back &&
+    psa.ceiling === psa.breakdown.back.ceiling &&
+    (psa.breakdown.front.ceiling !== psa.breakdown.back.ceiling ||
+      psa.breakdown.back.worstMax > psa.breakdown.front.worstMax)
+    ? back ?? front
+    : front;
 
-function worstFace(faces: LensMeasuredFace[]) {
-  return faces.reduce((worst, face) => (rank(face) < rank(worst) ? face : worst));
+  return {
+    psa,
+    front,
+    back,
+    worstFace,
+  };
 }
 
 function ActionButtons({
@@ -124,9 +134,10 @@ export default function ResultsPanel({
     );
   }
 
-  const worst = worstFace(measured);
-  const worstTone = measurementTone(worst.measurement);
-  const ceiling = ceilingFromWorstMax(worst.measurement.worstAxisMaxPct);
+  const combined = combinedPsaResult(measured);
+  const worst = combined.worstFace;
+  const worstTone = combined.psa.tone;
+  const ceiling = combined.psa.ceiling;
   const adjusted = measured.some((face) => face.adjusted);
   const single = measured.length === 1;
   const currentActiveFace = activeFace ?? measured[0]?.face;
@@ -141,7 +152,10 @@ export default function ResultsPanel({
             </div>
             <div className="mt-1 font-mono text-5xl font-bold leading-none">{bareGradeLabel(ceiling)}</div>
             <div className="mt-1 font-mono text-[10px] text-text-2">worse of front · back</div>
-            <GraderStrip worstMax={worst.measurement.worstAxisMaxPct} />
+            <GraderStrip
+              frontWorstMax={combined.front.measurement.worstAxisMaxPct}
+              backWorstMax={combined.back?.measurement.worstAxisMaxPct ?? null}
+            />
           </div>
           <ActionButtons onDownloadReport={onDownloadReport} onMeasureAnother={onMeasureAnother} />
         </div>
@@ -167,7 +181,7 @@ export default function ResultsPanel({
   }
 
   const [face] = measured;
-  const tone = measurementTone(face.measurement);
+  const tone = measurementTone(face.measurement, face.face);
 
   return (
     <section className="space-y-4">
@@ -186,10 +200,10 @@ export default function ResultsPanel({
           <div className={`rounded-lg border p-4 text-center ${TINTED_TONE_CLASSES[tone]}`}>
             <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-text-2">Ceiling</div>
             <div className="mt-1 font-mono text-4xl font-bold leading-none">
-              {bareGradeLabel(ceilingFromWorstMax(face.measurement.worstAxisMaxPct))}
+              {bareGradeLabel(ceiling)}
             </div>
             <div className="mt-1 font-mono text-[10px] text-text-2">front only (back not measured)</div>
-            <GraderStrip worstMax={face.measurement.worstAxisMaxPct} />
+            <GraderStrip frontWorstMax={face.measurement.worstAxisMaxPct} backWorstMax={null} />
           </div>
           <FaceResultCard
             face={face.face}
