@@ -33,8 +33,17 @@ export type ComputedCenteringMeasurement = {
 };
 
 export type CenteringFace = "front" | "back";
-export type PsaGrade = "PSA_10" | "PSA_9" | "PSA_8" | "PSA_7" | "BELOW_PSA_7";
-export type PsaCeiling = PsaGrade;
+export type PsaGrade =
+  | "PSA_10"
+  | "PSA_9"
+  | "PSA_8"
+  | "PSA_7"
+  | "PSA_6"
+  | "PSA_5"
+  | "PSA_4"
+  | "PSA_3_OR_LESS";
+export type LegacyPsaCeiling = "BELOW_PSA_7";
+export type PsaCeiling = PsaGrade | LegacyPsaCeiling;
 export type BgsGrade =
   | "BGS_10"
   | "BGS_9_5"
@@ -51,8 +60,12 @@ export type TagGrade =
   | "TAG_9"
   | "TAG_8"
   | "TAG_7"
+  | "TAG_6"
+  | "TAG_5"
+  | "TAG_4_OR_LESS"
+  | "TAG_7_OR_LESS"
   | "TAG_6_OR_LESS";
-export type GraderGrade = PsaGrade | BgsGrade | TagGrade;
+export type GraderGrade = PsaCeiling | BgsGrade | TagGrade;
 export type CombinedCeilingResult<TGrade extends GraderGrade> = {
   ceiling: TGrade;
   front: TGrade;
@@ -65,6 +78,10 @@ const GRADE_RANK: Record<GraderGrade, number> = {
   PSA_9: 9,
   PSA_8: 8,
   PSA_7: 7,
+  PSA_6: 6,
+  PSA_5: 5,
+  PSA_4: 4,
+  PSA_3_OR_LESS: 3,
   BELOW_PSA_7: 6,
   BGS_10: 10,
   BGS_9_5: 9.5,
@@ -80,6 +97,10 @@ const GRADE_RANK: Record<GraderGrade, number> = {
   TAG_9: 9,
   TAG_8: 8,
   TAG_7: 7,
+  TAG_6: 6,
+  TAG_5: 5,
+  TAG_4_OR_LESS: 4,
+  TAG_7_OR_LESS: 7,
   TAG_6_OR_LESS: 6,
 };
 
@@ -282,18 +303,45 @@ export function combinedCeiling<TGrade extends GraderGrade>(
   };
 }
 
+/**
+ * PSA front centering thresholds.
+ * Source: PSA grading standards, https://www.psacard.com/gradingstandards
+ */
 export function psaCeilingFront(worstMax: number): PsaGrade {
-  if (worstMax <= 55) return "PSA_10";
-  if (worstMax <= 60) return "PSA_9";
-  if (worstMax <= 65) return "PSA_8";
-  if (worstMax <= 70) return "PSA_7";
-  return "BELOW_PSA_7";
+  return ceilingFromTable(
+    worstMax,
+    [
+      { max: 60, ceiling: "PSA_10" },
+      { max: 65, ceiling: "PSA_9" },
+      { max: 70, ceiling: "PSA_8" },
+      { max: 75, ceiling: "PSA_7" },
+      { max: 80, ceiling: "PSA_6" },
+      { max: 85, ceiling: "PSA_5" },
+      { max: 90, ceiling: "PSA_4" },
+    ],
+    "PSA_3_OR_LESS"
+  );
 }
 
+/**
+ * PSA back centering thresholds.
+ * Source: PSA grading standards, https://www.psacard.com/gradingstandards
+ */
 export function psaCeilingBack(worstMax: number): PsaGrade {
-  return psaCeilingFront(worstMax);
+  return ceilingFromTable(
+    worstMax,
+    [
+      { max: 75, ceiling: "PSA_10" },
+      { max: 90, ceiling: "PSA_9" },
+    ],
+    "PSA_3_OR_LESS"
+  );
 }
 
+/**
+ * BGS front centering sub-grade thresholds.
+ * Source: Beckett grading scale, https://www.beckett.com/grading/scale
+ */
 export function bgsCeilingFront(worstMax: number): BgsGrade {
   return ceilingFromTable(
     worstMax,
@@ -311,10 +359,29 @@ export function bgsCeilingFront(worstMax: number): BgsGrade {
   );
 }
 
+/**
+ * BGS back centering sub-grade thresholds.
+ * Source: Beckett grading scale, https://www.beckett.com/grading/scale
+ */
 export function bgsCeilingBack(worstMax: number): BgsGrade {
-  return bgsCeilingFront(worstMax);
+  return ceilingFromTable(
+    worstMax,
+    [
+      { max: 55, ceiling: "BGS_10" },
+      { max: 60, ceiling: "BGS_9_5" },
+      { max: 80, ceiling: "BGS_9" },
+      { max: 90, ceiling: "BGS_8_5" },
+      { max: 95, ceiling: "BGS_8" },
+    ],
+    "BGS_7_5"
+  );
 }
 
+/**
+ * TAG front centering thresholds.
+ * Sources: TAG grading rubric, https://taggrading.com/pages/rubric and
+ * TAG conversion table, https://taggrading.com/pages/conversion
+ */
 export function tagCeilingFront(worstMax: number): TagGrade {
   return ceilingFromTable(
     worstMax,
@@ -322,15 +389,32 @@ export function tagCeilingFront(worstMax: number): TagGrade {
       { max: 51, ceiling: "TAG_10_PRISTINE" },
       { max: 55, ceiling: "TAG_10_GEM_MINT" },
       { max: 60, ceiling: "TAG_9" },
-      { max: 65, ceiling: "TAG_8" },
-      { max: 70, ceiling: "TAG_7" },
+      { max: 62.5, ceiling: "TAG_8" },
+      { max: 65, ceiling: "TAG_7" },
+      { max: 67.5, ceiling: "TAG_6" },
+      { max: 70, ceiling: "TAG_5" },
     ],
-    "TAG_6_OR_LESS"
+    "TAG_4_OR_LESS"
   );
 }
 
+/**
+ * TAG TCG back centering thresholds.
+ * Sources: TAG grading rubric, https://taggrading.com/pages/rubric and
+ * TAG conversion table, https://taggrading.com/pages/conversion
+ */
 export function tagCeilingBack(worstMax: number): TagGrade {
-  return tagCeilingFront(worstMax);
+  return ceilingFromTable(
+    worstMax,
+    [
+      { max: 52, ceiling: "TAG_10_PRISTINE" },
+      { max: 65, ceiling: "TAG_10_GEM_MINT" },
+      { max: 75, ceiling: "TAG_9" },
+      { max: 85, ceiling: "TAG_8" },
+      { max: 95, ceiling: "TAG_7" },
+    ],
+    "TAG_6_OR_LESS"
+  );
 }
 
 export function ceilingFromWorstMax(worstMax: number): PsaCeiling {
