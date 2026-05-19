@@ -57,6 +57,33 @@ const AFFECTED_SIDES: Record<QuadCornerKey, Array<"left" | "right" | "top" | "bo
   br: ["right", "bottom"],
   bl: ["left", "bottom"],
 };
+export const OVERLAY_SCREEN_TARGETS = {
+  workspaceMinHeight: 600,
+  workspacePadding: 24,
+  cornerHandle: 12,
+  rotationHandle: 16,
+  degreeDialFont: 14,
+  strokeWidth: 2,
+  focusRing: 3,
+} as const;
+
+const WORKSPACE_PADDING_PX = OVERLAY_SCREEN_TARGETS.workspacePadding;
+const CORNER_HANDLE_PX = OVERLAY_SCREEN_TARGETS.cornerHandle;
+const CORNER_HIT_RADIUS_PX = 18;
+const CORNER_RADIUS_PX = 2;
+const ROTATION_HANDLE_PX = OVERLAY_SCREEN_TARGETS.rotationHandle;
+const FOCUS_RING_OFFSET_PX = 5;
+const DEGREE_DIAL_FONT_PX = OVERLAY_SCREEN_TARGETS.degreeDialFont;
+const DEGREE_DIAL_WIDTH_PX = 92;
+const DEGREE_DIAL_HEIGHT_PX = 32;
+const DEGREE_DIAL_OFFSET_X_PX = 14;
+const DEGREE_DIAL_OFFSET_Y_PX = -16;
+const DEGREE_DIAL_MARGIN_PX = 6;
+
+export function screenPxToSvgUnits(screenPx: number, svgScale: number) {
+  if (!Number.isFinite(svgScale) || svgScale <= 0) return screenPx;
+  return screenPx / svgScale;
+}
 
 function points(corners: QuadCorners) {
   return `${corners.tl.x},${corners.tl.y} ${corners.tr.x},${corners.tr.y} ${corners.br.x},${corners.br.y} ${corners.bl.x},${corners.bl.y}`;
@@ -170,6 +197,7 @@ export default function ImageOverlayPanel({
   const [activeHandle, setActiveHandle] = useState<OverlayHandle | null>(null);
   const [selectedHandle, setSelectedHandle] = useState<OverlayHandle | null>(null);
   const [isRotating, setIsRotating] = useState(false);
+  const [svgScale, setSvgScale] = useState(1);
   const editable = isEditable(mode);
   const measurement = useMemo(() => computeMeasurements(overlay), [overlay]);
 
@@ -188,14 +216,54 @@ export default function ImageOverlayPanel({
     freeCornersRef.current = freeCorners;
   }, [freeCorners]);
 
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    const updateScale = () => {
+      const renderedWidth = svg.getBoundingClientRect().width;
+      if (!renderedWidth || !imageSize.width) return;
+      const nextScale = renderedWidth / imageSize.width;
+      setSvgScale((current) => (Math.abs(current - nextScale) < 0.001 ? current : nextScale));
+    };
+
+    updateScale();
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateScale);
+      return () => window.removeEventListener("resize", updateScale);
+    }
+
+    const observer = new ResizeObserver(updateScale);
+    observer.observe(svg);
+    return () => observer.disconnect();
+  }, [imageSize.width]);
+
   const rotationDegrees = normalizeDegrees(topEdgeAngle(overlay.outer) - (initialRotationRef.current ?? topEdgeAngle(overlay.outer)));
   const affectedSides = activeHandle ? AFFECTED_SIDES[activeHandle.corner] : [];
   const rotation = rotationHandlePosition(overlay.outer);
   const viewBoxTop = -64;
   const viewBoxHeight = imageSize.height - viewBoxTop;
+  const cornerHandleSize = screenPxToSvgUnits(CORNER_HANDLE_PX, svgScale);
+  const cornerHandleHalf = cornerHandleSize / 2;
+  const cornerHandleRadius = screenPxToSvgUnits(CORNER_RADIUS_PX, svgScale);
+  const cornerHitRadius = screenPxToSvgUnits(CORNER_HIT_RADIUS_PX, svgScale);
+  const focusRingSize = cornerHandleSize + screenPxToSvgUnits(FOCUS_RING_OFFSET_PX * 2, svgScale);
+  const focusRingHalf = focusRingSize / 2;
+  const rotationHandleRadius = screenPxToSvgUnits(ROTATION_HANDLE_PX / 2, svgScale);
+  const degreeDialFontSize = screenPxToSvgUnits(DEGREE_DIAL_FONT_PX, svgScale);
+  const degreeDialWidth = screenPxToSvgUnits(DEGREE_DIAL_WIDTH_PX, svgScale);
+  const degreeDialHeight = screenPxToSvgUnits(DEGREE_DIAL_HEIGHT_PX, svgScale);
+  const degreeDialMargin = screenPxToSvgUnits(DEGREE_DIAL_MARGIN_PX, svgScale);
   const degreeDial = {
-    x: Math.min(imageSize.width - 84, Math.max(6, rotation.handle.x + 14)),
-    y: Math.min(imageSize.height - 34, Math.max(viewBoxTop + 6, rotation.handle.y - 16)),
+    x: Math.min(
+      imageSize.width - degreeDialWidth - degreeDialMargin,
+      Math.max(degreeDialMargin, rotation.handle.x + screenPxToSvgUnits(DEGREE_DIAL_OFFSET_X_PX, svgScale))
+    ),
+    y: Math.min(
+      imageSize.height - degreeDialHeight - degreeDialMargin,
+      Math.max(viewBoxTop + degreeDialMargin, rotation.handle.y + screenPxToSvgUnits(DEGREE_DIAL_OFFSET_Y_PX, svgScale))
+    ),
   };
 
   const updateCorner = useCallback(
@@ -385,11 +453,16 @@ export default function ImageOverlayPanel({
   ];
 
   return (
-    <div className="rounded-lg border border-border bg-surface p-3">
+    <div
+      className="flex min-h-[600px] flex-grow flex-col rounded-lg border border-border bg-deep p-6"
+      data-lens-workspace-panel="true"
+      data-workspace-min-height="600"
+      data-workspace-padding={WORKSPACE_PADDING_PX}
+    >
       <svg
         ref={svgRef}
         viewBox={`0 ${viewBoxTop} ${imageSize.width} ${viewBoxHeight}`}
-        className="block max-h-[640px] w-full touch-none select-none rounded-md bg-void outline-none"
+        className="block h-full min-h-[552px] w-full flex-1 touch-none select-none rounded-md bg-void object-contain outline-none"
         role="img"
         aria-label="Owl Lens centering overlay"
         tabIndex={0}
@@ -436,23 +509,40 @@ export default function ImageOverlayPanel({
               strokeDasharray="8 8"
               strokeOpacity="0.75"
               strokeWidth="2"
+              vectorEffect="non-scaling-stroke"
             />
             <circle
               cx={rotation.handle.x}
               cy={rotation.handle.y}
-              r="8"
+              r={rotationHandleRadius}
               fill="var(--owl)"
               stroke="var(--void)"
-              strokeWidth="4"
+              strokeWidth="2"
+              vectorEffect="non-scaling-stroke"
               className="cursor-grab"
               data-overlay-interactive="true"
+              data-screen-px={ROTATION_HANDLE_PX}
               onPointerDown={beginRotationDrag}
             />
           </g>
         )}
 
-        <polygon points={points(overlay.outer)} fill="rgba(232,160,32,0.05)" stroke="var(--owl)" strokeWidth="4" strokeDasharray="6 8" />
-        <polygon points={points(overlay.inner)} fill="rgba(0,214,143,0.04)" stroke="var(--green)" strokeWidth="4" strokeDasharray="6 8" />
+        <polygon
+          points={points(overlay.outer)}
+          fill="rgba(232,160,32,0.05)"
+          stroke="var(--owl)"
+          strokeWidth="2"
+          vectorEffect="non-scaling-stroke"
+          strokeDasharray="6 8"
+        />
+        <polygon
+          points={points(overlay.inner)}
+          fill="rgba(0,214,143,0.04)"
+          stroke="var(--green)"
+          strokeWidth="2"
+          vectorEffect="non-scaling-stroke"
+          strokeDasharray="6 8"
+        />
 
         {labels.map((label) => {
           const active = affectedSides.includes(label.key);
@@ -482,8 +572,26 @@ export default function ImageOverlayPanel({
 
         {rotationDegrees !== 0 && Math.abs(rotationDegrees) >= 0.05 && (
           <g pointerEvents="none">
-            <rect x={degreeDial.x} y={degreeDial.y} width="78" height="30" rx="5" fill="rgba(3,5,13,0.80)" stroke="rgba(232,160,32,0.5)" />
-            <text x={degreeDial.x + 39} y={degreeDial.y + 20} textAnchor="middle" fill="var(--owl)" className="font-mono text-[12px] font-bold">
+            <rect
+              x={degreeDial.x}
+              y={degreeDial.y}
+              width={degreeDialWidth}
+              height={degreeDialHeight}
+              rx={screenPxToSvgUnits(5, svgScale)}
+              fill="rgba(3,5,13,0.80)"
+              stroke="rgba(232,160,32,0.5)"
+              strokeWidth="2"
+              vectorEffect="non-scaling-stroke"
+            />
+            <text
+              x={degreeDial.x + degreeDialWidth / 2}
+              y={degreeDial.y + degreeDialHeight / 2 + degreeDialFontSize * 0.36}
+              textAnchor="middle"
+              fill="var(--owl)"
+              className="font-mono font-bold"
+              fontSize={degreeDialFontSize}
+              data-screen-px={DEGREE_DIAL_FONT_PX}
+            >
               {rotationDegrees > 0 ? "+" : ""}
               {rotationDegrees.toFixed(1)}°
             </text>
@@ -495,36 +603,40 @@ export default function ImageOverlayPanel({
             const point = overlay[target][corner];
             const handle = { target, corner };
             const selected = selectedHandle?.target === target && selectedHandle.corner === corner;
-            const active = activeHandle?.target === target && activeHandle.corner === corner;
             const color = target === "outer" ? "var(--owl)" : "var(--green)";
             return (
               <g key={`${target}-${corner}`}>
                 {selected && (
-                  <circle
-                    cx={point.x}
-                    cy={point.y}
-                    r={active ? 24 : 22}
+                  <rect
+                    x={point.x - focusRingHalf}
+                    y={point.y - focusRingHalf}
+                    width={focusRingSize}
+                    height={focusRingSize}
+                    rx={cornerHandleRadius}
                     fill="none"
-                    stroke="var(--owl)"
+                    stroke={color}
                     strokeOpacity="0.95"
-                    strokeWidth="2"
+                    strokeWidth="3"
+                    vectorEffect="non-scaling-stroke"
                   />
                 )}
-                <circle
-                  cx={point.x}
-                  cy={point.y}
-                  r={active ? 20 : selected ? 18 : 11}
-                  fill="none"
-                  stroke={color}
-                  strokeOpacity={active || selected ? "1" : "0.35"}
-                  strokeWidth={active || selected ? "3" : "2"}
+                <rect
+                  x={point.x - cornerHandleHalf}
+                  y={point.y - cornerHandleHalf}
+                  width={cornerHandleSize}
+                  height={cornerHandleSize}
+                  rx={cornerHandleRadius}
+                  fill={color}
+                  stroke="var(--void)"
+                  strokeWidth="2"
+                  vectorEffect="non-scaling-stroke"
+                  data-screen-px={CORNER_HANDLE_PX}
                 />
-                <circle cx={point.x} cy={point.y} r="7" fill={color} stroke="var(--void)" strokeWidth="3" />
                 {editable && (
                   <circle
                     cx={point.x}
                     cy={point.y}
-                    r="20"
+                    r={cornerHitRadius}
                     fill="transparent"
                     className="cursor-move"
                     aria-label={`${target} ${corner} handle`}
