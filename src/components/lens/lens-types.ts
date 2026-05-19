@@ -24,3 +24,33 @@ export type UploadFaceState = {
   contentType?: string | null;
   previewUrl: string | null;
 };
+
+export type PsaCeiling = "PSA_10" | "PSA_9" | "PSA_8" | "PSA_7" | "BELOW_PSA_7";
+
+export type PreGradeFace = {
+  id: string;
+  face: LensFace;
+  createdAt: string | null;
+  imagePath: string | null;
+  signedImageUrl: string | null;
+  overlayGeometry: unknown;
+  leftPct: number | null;
+  rightPct: number | null;
+  topPct: number | null;
+  bottomPct: number | null;
+  worstAxis: "leftRight" | "topBottom";
+  worstAxisMaxPct: number | null;
+  psaCeiling: PsaCeiling;
+  manualAdjustment: boolean;
+};
+
+export type PreGradeSession = {
+  id: string;
+  cardSessionId: string | null;
+  cardIdentity: string | null;
+  createdAt: string | null;
+  ceiling: PsaCeiling;
+  manualAdjustment: boolean;
+  front: PreGradeFace | null;
+  back: PreGradeFace | null;
+};
