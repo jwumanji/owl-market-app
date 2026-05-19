@@ -141,32 +141,21 @@ export default function InventoryShell({
         ))}
       </div>
 
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface px-4 py-3">
-        <div>
-          <div className="font-mono text-sm font-semibold uppercase tracking-wider text-text">
-            Centering Filter
-          </div>
-          <div className="mt-1 text-sm text-text-2">
-            {psa10CandidateCount} item{psa10CandidateCount === 1 ? "" : "s"} currently measure as PSA 10 candidates.
-          </div>
+      {psa10CandidatesOnly && (
+        <div className="mb-4 inline-flex flex-wrap items-center gap-2 rounded-md border border-gain/30 bg-gain/10 px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-gain">
+          <span>
+            {psa10CandidateCount} PSA 10 centering candidate{psa10CandidateCount === 1 ? "" : "s"} shown
+          </span>
+          <button
+            type="button"
+            aria-pressed={psa10CandidatesOnly}
+            onClick={() => setPsa10CandidateFilter(false)}
+            className="rounded border border-gain/40 px-2 py-1 text-[11px] transition-colors hover:bg-gain/10"
+          >
+            Clear
+          </button>
         </div>
-        <button
-          type="button"
-          aria-pressed={psa10CandidatesOnly}
-          onClick={() => setPsa10CandidateFilter(!psa10CandidatesOnly)}
-          className={`inline-flex items-center gap-2 rounded-md border px-4 py-2.5 font-mono text-sm font-bold uppercase tracking-wider transition-colors ${
-            psa10CandidatesOnly
-              ? "border-gain bg-gain/10 text-gain"
-              : "border-border-2 bg-deep text-text hover:border-owl hover:text-owl"
-          }`}
-        >
-          <span
-            aria-hidden="true"
-            className={`h-2.5 w-2.5 rounded-full ${psa10CandidatesOnly ? "bg-gain" : "bg-text-3"}`}
-          />
-          Show only PSA 10 candidates
-        </button>
-      </div>
+      )}
 
       <InventoryTabs
         items={items}

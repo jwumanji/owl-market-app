@@ -37,7 +37,7 @@
   /* Layout */
   --nav-h: 54px;
   --bar-h: 28px;
-  --top: 82px;
+  --top: calc(var(--nav-h) + var(--bar-h));
 }
 
 body {
@@ -46,6 +46,10 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+body:has(.admin-nav) {
+  --top: var(--nav-h);
 }
 
 input[type="date"] {
@@ -156,6 +160,11 @@ nav {
   gap: 2px;
 }
 
+.admin-nav .nav-mid {
+  flex: 1;
+  justify-content: center;
+}
+
 .nav-link {
   font-family: var(--font-ibm-plex-mono), monospace;
   font-size: 10px;
@@ -206,6 +215,12 @@ nav {
   animation: blink 1.5s infinite;
 }
 
+.admin-badge {
+  color: var(--owl);
+  background: var(--owl-d);
+  border-color: rgba(232, 160, 32, 0.22);
+}
+
 .btn-login {
   font-family: var(--font-ibm-plex-mono), monospace;
   font-size: 10px;
@@ -224,6 +239,10 @@ nav {
 .btn-login:hover {
   color: var(--text);
   background: var(--surf2);
+}
+
+.inventory-tools > summary::-webkit-details-marker {
+  display: none;
 }
 
 .btn-signup {
