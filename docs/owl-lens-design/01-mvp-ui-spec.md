@@ -312,6 +312,12 @@ Overlay handles (rendered at screen px, not SVG units):
 Overlay text:
 - Degree dial: 14px IBM Plex Mono
 
+Overlay axis labels (rendered at screen px, not SVG units):
+- Text size: 14px IBM Plex Mono
+- Padding: 4px 8px
+- Color: tone-matched per axis (`≤55` `--gain`, `≤60` `--owl`, `>60` `--loss`)
+- Background: dark with 1px `--border` outline
+
 ---
 
 ## 10. Copy strings (canonical)
@@ -338,6 +344,8 @@ Overlay text:
 Decision note:
 
 > **Decision 22 — Handle sizing is fixed screen pixels, not relative to image dimensions.** Mouse cursor size doesn't scale with the card, so handles shouldn't either. Workspace has a 600px min-height so the card is always large enough to evaluate centering by eye.
+
+> **Decision 23 — Face result cards are clickable; click switches active face. Axis labels in workspace use tone-matched color and 14px IBM Plex Mono.**
 
 ---
 
