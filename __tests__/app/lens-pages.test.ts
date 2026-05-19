@@ -35,6 +35,12 @@ test("lens hub renders all tool cards with only Pre-grade active", () => {
       __esModule: true,
       default: linkMock,
     },
+    "@/components/lens/PreGradeHistorySection": {
+      __esModule: true,
+      default() {
+        return React.createElement("section", { "data-testid": "pregrade-history-section" }, "Recent pre-grades");
+      },
+    },
   };
 
   function localRequire(specifier: string) {
@@ -65,6 +71,7 @@ test("lens hub renders all tool cards with only Pre-grade active", () => {
   assert.equal((html.match(/aria-disabled="true"/g) ?? []).length, 3);
   assert.match(html, /Coming next/);
   assert.match(html, /Coming later/);
+  assert.match(html, /data-testid="pregrade-history-section"/);
 });
 
 test("pregrade page renders the standalone pregrade workspace", () => {
@@ -104,4 +111,41 @@ test("pregrade page renders the standalone pregrade workspace", () => {
 
   assert.match(html, /data-testid="pregrade-workspace"/);
   assert.doesNotMatch(html, /Pre-grade History/);
+});
+
+test("pregrade history page renders the history client", () => {
+  const pagePath = path.resolve("src/app/admin/lens/pregrade/history/page.tsx");
+  const moduleStub = {
+    exports: {} as {
+      default: () => React.ReactElement;
+    },
+  };
+  const mocks: Record<string, unknown> = {
+    "@/components/lens/PreGradeHistoryClient": {
+      __esModule: true,
+      default() {
+        return React.createElement("div", { "data-testid": "pregrade-history-client" }, "Pre-grade history");
+      },
+    },
+  };
+
+  function localRequire(specifier: string) {
+    return Object.prototype.hasOwnProperty.call(mocks, specifier) ? mocks[specifier] : requireFromTest(specifier);
+  }
+
+  vm.runInContext(
+    transpile(pagePath),
+    vm.createContext({
+      console,
+      exports: moduleStub.exports,
+      module: moduleStub,
+      process,
+      require: localRequire,
+    }),
+    { filename: pagePath }
+  );
+
+  const html = renderToStaticMarkup(React.createElement(moduleStub.exports.default));
+
+  assert.match(html, /data-testid="pregrade-history-client"/);
 });

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PreGradeHistorySection from "@/components/lens/PreGradeHistorySection";
 
 export const metadata = {
   title: "Owl Lens - OWL Market",
@@ -81,6 +82,8 @@ export default function AdminLensPage() {
           );
         })}
       </div>
+
+      <PreGradeHistorySection />
     </section>
   );
 }
