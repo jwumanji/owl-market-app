@@ -33,6 +33,7 @@ export type ComputedCenteringMeasurement = {
 };
 
 export type CenteringFace = "front" | "back";
+export type TagCategory = "tcg" | "sports";
 export type PsaGrade =
   | "PSA_10"
   | "PSA_9"
@@ -382,7 +383,7 @@ export function bgsCeilingBack(worstMax: number): BgsGrade {
  * Sources: TAG grading rubric, https://taggrading.com/pages/rubric and
  * TAG conversion table, https://taggrading.com/pages/conversion
  */
-export function tagCeilingFront(worstMax: number): TagGrade {
+export function tagCeilingFront(worstMax: number, _category: TagCategory = "tcg"): TagGrade {
   return ceilingFromTable(
     worstMax,
     [
@@ -399,11 +400,24 @@ export function tagCeilingFront(worstMax: number): TagGrade {
 }
 
 /**
- * TAG TCG back centering thresholds.
+ * TAG back centering thresholds.
  * Sources: TAG grading rubric, https://taggrading.com/pages/rubric and
  * TAG conversion table, https://taggrading.com/pages/conversion
  */
-export function tagCeilingBack(worstMax: number): TagGrade {
+export function tagCeilingBack(worstMax: number, category: TagCategory = "tcg"): TagGrade {
+  if (category === "sports") {
+    return ceilingFromTable(
+      worstMax,
+      [
+        { max: 54.5, ceiling: "TAG_10_PRISTINE" },
+        { max: 70, ceiling: "TAG_10_GEM_MINT" },
+        { max: 90, ceiling: "TAG_9" },
+        { max: 95, ceiling: "TAG_8" },
+      ],
+      "TAG_7_OR_LESS"
+    );
+  }
+
   return ceilingFromTable(
     worstMax,
     [
