@@ -32,7 +32,56 @@ export type ComputedCenteringMeasurement = {
   };
 };
 
-export type PsaCeiling = "PSA_10" | "PSA_9" | "PSA_8" | "PSA_7" | "BELOW_PSA_7";
+export type CenteringFace = "front" | "back";
+export type PsaGrade = "PSA_10" | "PSA_9" | "PSA_8" | "PSA_7" | "BELOW_PSA_7";
+export type PsaCeiling = PsaGrade;
+export type BgsGrade =
+  | "BGS_10"
+  | "BGS_9_5"
+  | "BGS_9"
+  | "BGS_8_5"
+  | "BGS_8"
+  | "BGS_7_5"
+  | "BGS_7"
+  | "BGS_6_5"
+  | "BGS_6_OR_LESS";
+export type TagGrade =
+  | "TAG_10_PRISTINE"
+  | "TAG_10_GEM_MINT"
+  | "TAG_9"
+  | "TAG_8"
+  | "TAG_7"
+  | "TAG_6_OR_LESS";
+export type GraderGrade = PsaGrade | BgsGrade | TagGrade;
+export type CombinedCeilingResult<TGrade extends GraderGrade> = {
+  ceiling: TGrade;
+  front: TGrade;
+  back: TGrade | null;
+  frontOnly: boolean;
+};
+
+const GRADE_RANK: Record<GraderGrade, number> = {
+  PSA_10: 10,
+  PSA_9: 9,
+  PSA_8: 8,
+  PSA_7: 7,
+  BELOW_PSA_7: 6,
+  BGS_10: 10,
+  BGS_9_5: 9.5,
+  BGS_9: 9,
+  BGS_8_5: 8.5,
+  BGS_8: 8,
+  BGS_7_5: 7.5,
+  BGS_7: 7,
+  BGS_6_5: 6.5,
+  BGS_6_OR_LESS: 6,
+  TAG_10_PRISTINE: 10.1,
+  TAG_10_GEM_MINT: 10,
+  TAG_9: 9,
+  TAG_8: 8,
+  TAG_7: 7,
+  TAG_6_OR_LESS: 6,
+};
 
 type LegacyRect = {
   x: number;
@@ -197,12 +246,95 @@ export function computeMeasurements(overlay: OverlayGeometry): ComputedCentering
   };
 }
 
-export function ceilingFromWorstMax(worstMax: number): PsaCeiling {
+function ceilingFromTable<TGrade extends GraderGrade>(
+  worstMax: number,
+  thresholds: Array<{ max: number; ceiling: TGrade }>,
+  fallback: TGrade
+) {
+  for (const threshold of thresholds) {
+    if (worstMax <= threshold.max) return threshold.ceiling;
+  }
+  return fallback;
+}
+
+export function gradeRank(grade: GraderGrade) {
+  return GRADE_RANK[grade];
+}
+
+export function combinedCeiling<TGrade extends GraderGrade>(
+  front: TGrade,
+  back: TGrade | null
+): CombinedCeilingResult<TGrade> {
+  if (!back) {
+    return {
+      ceiling: front,
+      front,
+      back: null,
+      frontOnly: true,
+    };
+  }
+
+  return {
+    ceiling: gradeRank(front) <= gradeRank(back) ? front : back,
+    front,
+    back,
+    frontOnly: false,
+  };
+}
+
+export function psaCeilingFront(worstMax: number): PsaGrade {
   if (worstMax <= 55) return "PSA_10";
   if (worstMax <= 60) return "PSA_9";
   if (worstMax <= 65) return "PSA_8";
   if (worstMax <= 70) return "PSA_7";
   return "BELOW_PSA_7";
+}
+
+export function psaCeilingBack(worstMax: number): PsaGrade {
+  return psaCeilingFront(worstMax);
+}
+
+export function bgsCeilingFront(worstMax: number): BgsGrade {
+  return ceilingFromTable(
+    worstMax,
+    [
+      { max: 51, ceiling: "BGS_10" },
+      { max: 55, ceiling: "BGS_9_5" },
+      { max: 60, ceiling: "BGS_9" },
+      { max: 65, ceiling: "BGS_8_5" },
+      { max: 70, ceiling: "BGS_8" },
+      { max: 75, ceiling: "BGS_7_5" },
+      { max: 80, ceiling: "BGS_7" },
+      { max: 85, ceiling: "BGS_6_5" },
+    ],
+    "BGS_6_OR_LESS"
+  );
+}
+
+export function bgsCeilingBack(worstMax: number): BgsGrade {
+  return bgsCeilingFront(worstMax);
+}
+
+export function tagCeilingFront(worstMax: number): TagGrade {
+  return ceilingFromTable(
+    worstMax,
+    [
+      { max: 51, ceiling: "TAG_10_PRISTINE" },
+      { max: 55, ceiling: "TAG_10_GEM_MINT" },
+      { max: 60, ceiling: "TAG_9" },
+      { max: 65, ceiling: "TAG_8" },
+      { max: 70, ceiling: "TAG_7" },
+    ],
+    "TAG_6_OR_LESS"
+  );
+}
+
+export function tagCeilingBack(worstMax: number): TagGrade {
+  return tagCeilingFront(worstMax);
+}
+
+export function ceilingFromWorstMax(worstMax: number): PsaCeiling {
+  return psaCeilingFront(worstMax);
 }
 
 function boundingRect(corners: QuadCorners): LegacyRect {
