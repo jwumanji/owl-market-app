@@ -7,7 +7,10 @@ type FaceTabsProps = {
   activeFace: LensFace;
   faces?: LensFace[];
   adjustedFaces?: Partial<Record<LensFace, boolean>>;
+  uploadedFaces?: Partial<Record<LensFace, boolean>>;
+  emptyFaceHints?: Partial<Record<LensFace, string>>;
   unviewedFaces?: Partial<Record<LensFace, boolean>>;
+  className?: string;
   onChange: (face: LensFace) => void;
 };
 
@@ -15,11 +18,14 @@ export default function FaceTabs({
   activeFace,
   faces = ["front", "back"],
   adjustedFaces = {},
+  uploadedFaces = {},
+  emptyFaceHints = {},
   unviewedFaces = {},
+  className = "mb-3",
   onChange,
 }: FaceTabsProps) {
   return (
-    <div className="mb-3 flex gap-7 border-b border-border">
+    <div className={`${className} flex gap-7 border-b border-border`}>
       {faces.map((face) => (
         <button
           key={face}
@@ -32,6 +38,12 @@ export default function FaceTabs({
           }`}
         >
           {face}
+          {uploadedFaces[face] && <span aria-label={`${face} uploaded`} className="h-1.5 w-1.5 rounded-full bg-gain" />}
+          {!uploadedFaces[face] && emptyFaceHints[face] && (
+            <span className="text-[9px] font-medium tracking-normal text-text-3">
+              ·{emptyFaceHints[face]}
+            </span>
+          )}
           {unviewedFaces[face] && <span aria-label={`${face} unviewed`} className="h-1.5 w-1.5 rounded-full bg-owl" />}
           {adjustedFaces[face] && <span className="text-[9px] font-medium tracking-normal text-owl">· adj</span>}
         </button>

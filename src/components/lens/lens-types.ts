@@ -19,5 +19,8 @@ export type LensMeasuredFace = LensFaceState & {
 export type UploadFaceState = {
   fileName: string;
   fileSize?: number | null;
+  file?: File | null;
+  imageSize?: { width: number; height: number } | null;
+  contentType?: string | null;
   previewUrl: string | null;
 };

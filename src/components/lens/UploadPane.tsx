@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type DragEvent } from "react";
+import { useRef, useState, type ClipboardEvent, type DragEvent, type ReactNode } from "react";
 import FaceTabs, { type LensFace } from "./FaceTabs";
 import type { UploadFaceState } from "./lens-types";
 
@@ -8,6 +8,7 @@ type UploadPaneProps = {
   activeFace: LensFace;
   uploads: Partial<Record<LensFace, UploadFaceState>>;
   cardIdentity: string;
+  notice?: ReactNode;
   addBackNotice?: boolean;
   onActiveFaceChange: (face: LensFace) => void;
   onCardIdentityChange: (value: string) => void;
@@ -22,10 +23,15 @@ function formatFileSize(value?: number | null) {
   return `${mb.toFixed(mb >= 10 ? 0 : 1)} MB`;
 }
 
+function firstClipboardImage(event: ClipboardEvent<HTMLElement>) {
+  return Array.from(event.clipboardData.files).find((file) => file.type.startsWith("image/"));
+}
+
 export default function UploadPane({
   activeFace,
   uploads,
   cardIdentity,
+  notice = null,
   addBackNotice = false,
   onActiveFaceChange,
   onCardIdentityChange,
@@ -49,8 +55,24 @@ export default function UploadPane({
     selectFile(event.dataTransfer.files[0]);
   }
 
+  function onPaste(event: ClipboardEvent<HTMLElement>) {
+    const image = firstClipboardImage(event);
+    if (!image) return;
+    event.preventDefault();
+    selectFile(image);
+  }
+
+  const uploadedFaces = {
+    front: Boolean(uploads.front),
+    back: Boolean(uploads.back),
+  };
+  const emptyFaceHints = {
+    front: "required",
+    back: "optional",
+  };
+
   return (
-    <section className="space-y-4">
+    <section className="space-y-4" onPaste={onPaste}>
       <div>
         <label className="mb-2 block font-mono text-[10px] font-bold uppercase tracking-wider text-text-2">
           Card name
@@ -63,6 +85,8 @@ export default function UploadPane({
         />
       </div>
 
+      {notice}
+
       {addBackNotice && (
         <div className="rounded-md border border-owl/40 bg-owl/10 px-4 py-3 text-sm text-text">
           Front measurement is saved. Add a back image, then click Measure to complete the pair. The front won&apos;t be re-measured.
@@ -72,9 +96,16 @@ export default function UploadPane({
       <div className="overflow-hidden rounded-lg border border-border bg-surface">
         <div className="flex items-center justify-between gap-3 border-b border-border bg-deep px-4 py-3">
           <div className="font-mono text-[11px] font-bold uppercase tracking-widest text-text-2">
-            Upload image
+            Card images
           </div>
-          <FaceTabs activeFace={activeFace} adjustedFaces={{}} onChange={onActiveFaceChange} />
+          <FaceTabs
+            activeFace={activeFace}
+            adjustedFaces={{}}
+            uploadedFaces={uploadedFaces}
+            emptyFaceHints={emptyFaceHints}
+            className="mb-0"
+            onChange={onActiveFaceChange}
+          />
         </div>
 
         <div className="bg-void p-4">
@@ -127,6 +158,14 @@ export default function UploadPane({
               onDragLeave={() => setDragActive(false)}
               onDrop={onDrop}
               onClick={() => inputRef.current?.click()}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  inputRef.current?.click();
+                }
+              }}
+              role="button"
+              tabIndex={0}
               className={`relative flex min-h-[360px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-10 text-center transition-colors ${
                 dragActive
                   ? "border-owl bg-owl/10"
@@ -141,9 +180,11 @@ export default function UploadPane({
               <div className="text-base font-medium text-text">
                 Upload {activeFace === "front" ? "front" : "back"} image
               </div>
-              <div className="mt-2 text-sm text-text-2">Drop, paste, or browse for a card scan</div>
+              <div className="mt-2 text-sm text-text-2">
+                Drop, paste, or browse for a card scan
+              </div>
               <div className="mt-4 font-mono text-[10px] font-medium uppercase tracking-wider text-text-3">
-                JPG · PNG · WebP · max 20 MB
+                {activeFace === "front" ? "Required" : "Optional"} · JPG · PNG · WebP · max 20 MB
               </div>
             </div>
           )}

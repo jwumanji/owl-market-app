@@ -67,92 +67,19 @@ test("lens hub renders all tool cards with only Pre-grade active", () => {
   assert.match(html, /Coming later/);
 });
 
-test("pregrade page renders standalone workspace and NULL inventory history", async () => {
+test("pregrade page renders the standalone pregrade workspace", () => {
   const pagePath = path.resolve("src/app/admin/lens/pregrade/page.tsx");
-  const ranges: { from: number; to: number }[] = [];
-  const nullFilters: { column: string; value: unknown }[] = [];
-  const workspaceProps: Array<{ inventoryItemId?: string | null; cardIdentity: { name: string } }> = [];
-  const rows = [
-    {
-      id: "measurement-1",
-      inventory_item_id: null,
-      created_at: "2026-05-16T03:00:00.000Z",
-      left_pct: 52,
-      right_pct: 48,
-      top_pct: 49,
-      bottom_pct: 51,
-      worst_axis: "leftRight",
-      worst_axis_max_pct: 52,
-      psa_ceiling: "PSA_10",
-    },
-    {
-      id: "measurement-2",
-      inventory_item_id: null,
-      created_at: "2026-05-15T03:00:00.000Z",
-      left_pct: 58,
-      right_pct: 42,
-      top_pct: 55,
-      bottom_pct: 45,
-      worst_axis: "leftRight",
-      worst_axis_max_pct: 58,
-      psa_ceiling: "PSA_9",
-    },
-  ];
-  const supabase = {
-    from(table: string) {
-      assert.equal(table, "centering_measurements");
-      const query = {
-        select(_columns: string, _options?: { count?: string }) {
-          return query;
-        },
-        is(column: string, value: unknown) {
-          nullFilters.push({ column, value });
-          return query;
-        },
-        order() {
-          return query;
-        },
-        async range(from: number, to: number) {
-          ranges.push({ from, to });
-          return {
-            data: rows.slice(from, to + 1),
-            error: null,
-            count: 21,
-          };
-        },
-      };
-      return query;
-    },
-  };
   const moduleStub = {
     exports: {} as {
-      default: (props: { searchParams?: { page?: string } }) => Promise<React.ReactElement>;
+      default: () => React.ReactElement;
     },
   };
   const mocks: Record<string, unknown> = {
-    "@/components/centering/CenteringWorkspace": {
+    "@/components/lens/PregradeWorkspace": {
       __esModule: true,
-      default(props: { inventoryItemId?: string | null; cardIdentity: { name: string } }) {
-        workspaceProps.push(props);
-        return React.createElement(
-          "div",
-          {
-            "data-testid": "centering-workspace",
-            "data-inventory": props.inventoryItemId ?? "",
-            "data-card": props.cardIdentity.name,
-          },
-          "Standalone workspace"
-        );
+      default() {
+        return React.createElement("div", { "data-testid": "pregrade-workspace" }, "Pregrade workspace");
       },
-    },
-    "@/lib/supabase-server": {
-      createServiceClient() {
-        return supabase;
-      },
-    },
-    "next/link": {
-      __esModule: true,
-      default: linkMock,
     },
   };
 
@@ -172,18 +99,9 @@ test("pregrade page renders standalone workspace and NULL inventory history", as
     { filename: pagePath }
   );
 
-  const element = await moduleStub.exports.default({ searchParams: { page: "1" } });
+  const element = moduleStub.exports.default();
   const html = renderToStaticMarkup(element);
 
-  assert.deepEqual(nullFilters, [{ column: "inventory_item_id", value: null }]);
-  assert.deepEqual(ranges, [{ from: 0, to: 19 }]);
-  assert.deepEqual(JSON.parse(JSON.stringify(workspaceProps)), [{ cardIdentity: { name: "Standalone pre-grade" } }]);
-  assert.match(html, /data-testid="centering-workspace"/);
-  assert.match(html, /Pre-grade History/);
-  assert.match(html, /PSA_10/);
-  assert.match(html, /52\.00% \/ 48\.00%/);
-  assert.match(html, /49\.00% \/ 51\.00%/);
-  assert.match(html, /Left\/right at 52\.00%/);
-  assert.match(html, /Next pre-grades/);
-  assert.match(html, /page=2/);
+  assert.match(html, /data-testid="pregrade-workspace"/);
+  assert.doesNotMatch(html, /Pre-grade History/);
 });

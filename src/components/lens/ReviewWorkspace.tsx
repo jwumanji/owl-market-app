@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { computeMeasurements, type OverlayGeometry } from "@/lib/centering-math";
 import FaceTabs from "./FaceTabs";
 import ImageOverlayPanel from "./ImageOverlayPanel";
@@ -11,7 +12,9 @@ type ReviewWorkspaceProps = {
   activeFace: LensFace;
   mode?: "review" | "edit";
   cardIdentity?: string | null;
-  notice?: string | null;
+  notice?: ReactNode;
+  saving?: boolean;
+  allowAddBack?: boolean;
   onActiveFaceChange: (face: LensFace) => void;
   onOverlayChange: (face: LensFace, overlay: OverlayGeometry) => void;
   onFreeCornersChange: (face: LensFace, enabled: boolean) => void;
@@ -32,6 +35,8 @@ export default function ReviewWorkspace({
   mode = "review",
   cardIdentity,
   notice,
+  saving = false,
+  allowAddBack = true,
   onActiveFaceChange,
   onOverlayChange,
   onFreeCornersChange,
@@ -66,11 +71,11 @@ export default function ReviewWorkspace({
           {cardIdentity}
         </div>
       )}
-      {notice && (
+      {typeof notice === "string" ? (
         <div className="rounded-md border border-owl/40 bg-owl/10 px-4 py-3 text-sm text-text">
           {notice}
         </div>
-      )}
+      ) : notice}
       {faceList.length > 1 && (
         <FaceTabs
           activeFace={activeFace}
@@ -98,9 +103,10 @@ export default function ReviewWorkspace({
           freeCorners={Boolean(active.freeCorners)}
           adjusted={Boolean(active.adjusted)}
           mode={mode}
-          showAddBack={!hasBack && active.face === "front" && mode === "review"}
+          showAddBack={allowAddBack && !hasBack && active.face === "front" && mode === "review"}
           saveLabel={mode === "edit" ? "Update measurement" : undefined}
           resetLabel={mode === "edit" ? `Revert ${active.face} to saved` : undefined}
+          saving={saving}
           onFreeCornersChange={(enabled) => onFreeCornersChange(active.face, enabled)}
           onAddBack={onAddBack}
           onSave={onSave}

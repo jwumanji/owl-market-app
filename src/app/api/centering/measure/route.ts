@@ -88,6 +88,11 @@ function parseManualAdjustment(value: FormDataEntryValue | null) {
   return value === "true" || value === "1";
 }
 
+function parsePersist(value: FormDataEntryValue | null) {
+  if (value === "false" || value === "0" || value === "no") return false;
+  return true;
+}
+
 function measurementRow({
   inventoryItemId,
   response,
@@ -163,15 +168,16 @@ export async function POST(request: Request) {
 
   const cardIdentity = parseOptionalText(formData.get("cardIdentity"));
   const manualAdjustment = parseManualAdjustment(formData.get("manual_adjustment"));
+  const persistResult = parsePersist(formData.get("persist"));
 
   const file = formData.get("file");
   if (!isUploadFile(file)) {
     return NextResponse.json({ error: "Choose a card image to measure" }, { status: 400 });
   }
 
-  const supabase = createServiceClient();
+  const supabase = inventoryItemId || persistResult ? createServiceClient() : null;
   if (inventoryItemId) {
-    const { data: inventoryItem, error: inventoryError } = await supabase
+    const { data: inventoryItem, error: inventoryError } = await supabase!
       .from("inventory_items")
       .select("id")
       .eq("id", inventoryItemId)
@@ -221,21 +227,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Owl Lens CV service returned invalid JSON" }, { status: 502 });
   }
 
-  const { error: insertError } = await supabase
-    .from("centering_measurements")
-    .insert(
-      measurementRow({
-        inventoryItemId,
-        response: measurement,
-        face,
-        cardSessionId,
-        cardIdentity,
-        manualAdjustment,
-      })
-    );
+  if (persistResult) {
+    const { error: insertError } = await supabase!
+      .from("centering_measurements")
+      .insert(
+        measurementRow({
+          inventoryItemId,
+          response: measurement,
+          face,
+          cardSessionId,
+          cardIdentity,
+          manualAdjustment,
+        })
+      );
 
-  if (insertError) {
-    return NextResponse.json({ error: insertError.message }, { status: 500 });
+    if (insertError) {
+      return NextResponse.json({ error: insertError.message }, { status: 500 });
+    }
   }
 
   return new Response(responseBody, {

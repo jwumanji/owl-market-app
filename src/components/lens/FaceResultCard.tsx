@@ -6,6 +6,7 @@ type FaceResultCardProps = {
   face: "front" | "back";
   measurement: ComputedCenteringMeasurement;
   overlay?: OverlayGeometry | null;
+  imageSize?: { width: number; height: number } | null;
   imageUrl?: string | null;
   isWorst?: boolean;
 };
@@ -18,6 +19,7 @@ export default function FaceResultCard({
   face,
   measurement,
   overlay,
+  imageSize,
   imageUrl,
   isWorst = false,
 }: FaceResultCardProps) {
@@ -58,8 +60,18 @@ export default function FaceResultCard({
       </div>
       {overlay && (
         <div className="mt-4 overflow-hidden rounded-md border border-border bg-void">
-          <svg viewBox="0 0 420 580" className="h-36 w-full">
-            {imageUrl && <image href={imageUrl} width="420" height="580" preserveAspectRatio="xMidYMid meet" />}
+          <svg
+            viewBox={`0 0 ${imageSize?.width ?? 420} ${imageSize?.height ?? 580}`}
+            className="h-36 w-full"
+          >
+            {imageUrl && (
+              <image
+                href={imageUrl}
+                width={imageSize?.width ?? 420}
+                height={imageSize?.height ?? 580}
+                preserveAspectRatio="xMidYMid meet"
+              />
+            )}
             <polygon points={polygonPoints(overlay.outer)} fill="none" stroke="var(--owl)" strokeWidth="4" />
             <polygon points={polygonPoints(overlay.inner)} fill="none" stroke="var(--green)" strokeWidth="4" />
           </svg>

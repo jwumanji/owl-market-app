@@ -17,6 +17,7 @@ type MeasurementNumbersPanelProps = {
   showAddBack?: boolean;
   saveLabel?: string;
   resetLabel?: string;
+  saving?: boolean;
   onFreeCornersChange: (enabled: boolean) => void;
   onAddBack?: () => void;
   onSave: () => void;
@@ -164,6 +165,7 @@ export default function MeasurementNumbersPanel({
   showAddBack = false,
   saveLabel,
   resetLabel,
+  saving = false,
   onFreeCornersChange,
   onAddBack,
   onSave,
@@ -234,14 +236,16 @@ export default function MeasurementNumbersPanel({
         <button
           type="button"
           onClick={onSave}
-          className="rounded-md border border-owl/40 bg-owl px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
+          disabled={saving}
+          aria-busy={saving}
+          className="rounded-md border border-owl/40 bg-owl px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light disabled:cursor-wait disabled:opacity-60"
         >
-          {primaryLabel}
+          {saving ? "Saving..." : primaryLabel}
         </button>
         <button
           type="button"
           onClick={onReset}
-          disabled={!adjusted}
+          disabled={!adjusted || saving}
           className="rounded-md border border-border bg-deep px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:bg-surf2 disabled:cursor-not-allowed disabled:opacity-45"
         >
           {secondaryLabel}
@@ -249,6 +253,7 @@ export default function MeasurementNumbersPanel({
         <button
           type="button"
           onClick={onCancel}
+          disabled={saving}
           className="rounded-md border border-transparent px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text-2 transition-colors hover:text-text"
         >
           Cancel

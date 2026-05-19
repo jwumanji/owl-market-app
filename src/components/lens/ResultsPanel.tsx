@@ -64,6 +64,47 @@ function ActionButtons({
   );
 }
 
+function ThresholdTable() {
+  const rows = [
+    ["<= 51%", "10", "10 Pristine", "10 Pristine"],
+    ["<= 55%", "10", "9.5 Gem Mint", "10 Gem Mint"],
+    ["<= 60%", "9", "9 Mint", "9 Mint"],
+    ["<= 65%", "8", "8.5 NM-MT+", "8 NM-MT"],
+    ["<= 70%", "7", "8 NM-MT", "7 NM"],
+    ["> 70%", "<=6", "<=7.5", "<=6"],
+  ];
+
+  return (
+    <div className="rounded-lg border border-border bg-surface p-3">
+      <div className="mb-2 font-mono text-[10px] font-bold uppercase tracking-widest text-text-2">
+        Centering thresholds
+      </div>
+      <div className="overflow-hidden rounded-md border border-border">
+        <table className="w-full text-left font-mono text-[10px]">
+          <thead className="bg-deep uppercase tracking-wider text-text-2">
+            <tr>
+              <th className="px-2 py-2">Worst</th>
+              <th className="px-2 py-2">PSA</th>
+              <th className="px-2 py-2">BGS</th>
+              <th className="px-2 py-2">TAG</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(([worst, psa, bgs, tag]) => (
+              <tr key={worst} className="border-t border-border text-text">
+                <td className="px-2 py-2 text-text-2">{worst}</td>
+                <td className="px-2 py-2">{psa}</td>
+                <td className="px-2 py-2">{bgs}</td>
+                <td className="px-2 py-2">{tag}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function ResultsPanel({
   faces,
   cardIdentity,
@@ -107,6 +148,7 @@ export default function ResultsPanel({
               face={face.face}
               measurement={face.measurement}
               overlay={face.overlay}
+              imageSize={face.imageSize}
               imageUrl={face.imageUrl}
               isWorst={face.face === worst.face}
             />
@@ -146,9 +188,11 @@ export default function ResultsPanel({
             face={face.face}
             measurement={face.measurement}
             overlay={face.overlay}
+            imageSize={face.imageSize}
             imageUrl={face.imageUrl}
             isWorst
           />
+          <ThresholdTable />
           <ActionButtons onDownloadReport={onDownloadReport} onMeasureAnother={onMeasureAnother} />
         </aside>
       </div>
