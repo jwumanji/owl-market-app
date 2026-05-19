@@ -42,7 +42,8 @@ export type PsaGrade =
   | "PSA_6"
   | "PSA_5"
   | "PSA_4"
-  | "PSA_3_OR_LESS";
+  | "PSA_3_OR_LESS"
+  | "PSA_2_OR_LESS";
 export type LegacyPsaCeiling = "BELOW_PSA_7";
 export type PsaCeiling = PsaGrade | LegacyPsaCeiling;
 export type BgsGrade =
@@ -83,6 +84,7 @@ const GRADE_RANK: Record<GraderGrade, number> = {
   PSA_5: 5,
   PSA_4: 4,
   PSA_3_OR_LESS: 3,
+  PSA_2_OR_LESS: 2,
   BELOW_PSA_7: 6,
   BGS_10: 10,
   BGS_9_5: 9.5,
@@ -335,7 +337,7 @@ export function psaCeilingBack(worstMax: number): PsaGrade {
       { max: 75, ceiling: "PSA_10" },
       { max: 90, ceiling: "PSA_9" },
     ],
-    "PSA_3_OR_LESS"
+    "PSA_2_OR_LESS"
   );
 }
 

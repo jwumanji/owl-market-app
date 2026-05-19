@@ -68,13 +68,15 @@ function overlay(leftInnerX = 20) {
 function saveRequest({
   finalOverlay = overlay(),
   cvOverlay = finalOverlay,
+  face = "front",
 }: {
   finalOverlay?: ReturnType<typeof overlay>;
   cvOverlay?: ReturnType<typeof overlay> | null;
+  face?: "front" | "back";
 } = {}) {
   const formData = new FormData();
   formData.set("cardSessionId", "11111111-1111-4111-8111-111111111111");
-  formData.set("face", "front");
+  formData.set("face", face);
   formData.set("cardIdentity", "Monkey D. Luffy OP01-001");
   formData.set("imageWidthPx", "100");
   formData.set("imageHeightPx", "200");
@@ -314,7 +316,18 @@ test("save marks manual_adjustment when final overlay differs from CV overlay", 
   assert.equal(route.insertedRows[0].manual_adjustment, true);
   assert.equal(route.insertedRows[0].left_pct, 55.56);
   assert.equal(route.insertedRows[0].right_pct, 44.44);
-  assert.equal(route.insertedRows[0].psa_ceiling, "PSA_9");
+  assert.equal(route.insertedRows[0].psa_ceiling, "PSA_10");
+});
+
+test("save applies back-face PSA tolerance for back measurements", async () => {
+  const route = loadRoute();
+
+  const response = await route.POST(saveRequest({ finalOverlay: overlay(47.26), face: "back" }));
+
+  assert.equal(response.status, 200);
+  assert.equal(route.insertedRows.length, 1);
+  assert.equal(route.insertedRows[0].worst_axis_max_pct, 70.26);
+  assert.equal(route.insertedRows[0].psa_ceiling, "PSA_10");
 });
 
 test("storage upload errors stop before database insert", async () => {

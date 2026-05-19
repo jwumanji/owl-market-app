@@ -87,6 +87,7 @@ export function bareGradeLabel(psaCeiling: PsaCeiling) {
   if (psaCeiling === "PSA_5") return "5";
   if (psaCeiling === "PSA_4") return "4";
   if (psaCeiling === "PSA_3_OR_LESS") return "≤3";
+  if (psaCeiling === "PSA_2_OR_LESS") return "≤2";
   return "≤6";
 }
 

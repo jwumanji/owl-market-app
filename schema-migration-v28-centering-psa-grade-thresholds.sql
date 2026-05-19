@@ -13,6 +13,7 @@ ALTER TABLE public.centering_measurements
       'PSA_5',
       'PSA_4',
       'PSA_3_OR_LESS',
+      'PSA_2_OR_LESS',
       'BELOW_PSA_7'
     )
   );

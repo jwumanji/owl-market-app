@@ -50,7 +50,15 @@ function loadMathModule() {
   return moduleStub.exports;
 }
 
-function measurementResponse() {
+function measurementResponse({
+  leftPercent = 52,
+  rightPercent = 48,
+  worstAxisMaxPercent = 52,
+}: {
+  leftPercent?: number;
+  rightPercent?: number;
+  worstAxisMaxPercent?: number;
+} = {}) {
   return {
     image: {
       contentType: "image/jpeg",
@@ -59,15 +67,15 @@ function measurementResponse() {
     },
     centering: {
       leftRight: {
-        leftPercent: 52,
-        rightPercent: 48,
+        leftPercent,
+        rightPercent,
       },
       topBottom: {
         topPercent: 49,
         bottomPercent: 51,
       },
       worstAxis: "leftRight",
-      worstAxisMaxPercent: 52,
+      worstAxisMaxPercent,
     },
     psa: {
       ceiling: "PSA_10",
@@ -375,6 +383,24 @@ test("optional face, cardSessionId, and cardIdentity metadata are persisted", as
   assert.equal(route.insertedRows[0].face, "back");
   assert.equal(route.insertedRows[0].card_session_id, "11111111-1111-4111-8111-111111111111");
   assert.equal(route.insertedRows[0].card_identity, "Monkey D. Luffy OP01-001");
+});
+
+test("persisted measure uses face-aware PSA ceiling instead of CV-provided ceiling", async () => {
+  const cvBody = measurementResponse({
+    leftPercent: 70.26,
+    rightPercent: 29.74,
+    worstAxisMaxPercent: 70.26,
+  });
+  cvBody.psa.ceiling = "PSA_8";
+  const route = loadRoute({
+    cvResponse: Response.json(cvBody),
+  });
+
+  const response = await route.POST(measurementRequest("inventory-1", { face: "back" }));
+
+  assert.equal(response.status, 200);
+  assert.equal(route.insertedRows.length, 1);
+  assert.equal(route.insertedRows[0].psa_ceiling, "PSA_10");
 });
 
 test("standalone request without inventoryItemId persists a null inventory link", async () => {

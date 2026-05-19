@@ -100,6 +100,23 @@ function authMocks(user: MockUser = { email: "admin@example.com" }) {
         return email === "admin@example.com";
       },
     },
+    "@/lib/centering-math": {
+      gradeRank(ceiling: string) {
+        const ranks: Record<string, number> = {
+          PSA_10: 10,
+          PSA_9: 9,
+          PSA_8: 8,
+          PSA_7: 7,
+          PSA_6: 6,
+          PSA_5: 5,
+          PSA_4: 4,
+          PSA_3_OR_LESS: 3,
+          PSA_2_OR_LESS: 2,
+          BELOW_PSA_7: 6,
+        };
+        return ranks[ceiling] ?? 0;
+      },
+    },
   };
 }
 
