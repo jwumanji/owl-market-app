@@ -81,14 +81,11 @@ type LensFace = "front" | "back";
 
 type UploadPaneModule = {
   default: (props: {
-    activeFace: LensFace;
-    uploads: Partial<Record<LensFace, { fileName: string; fileSize?: number | null; previewUrl: string | null }>>;
-    cardIdentity: string;
-    onActiveFaceChange: (face: LensFace) => void;
-    onCardIdentityChange: (value: string) => void;
+    face: LensFace;
+    upload?: { fileName: string; fileSize?: number | null; previewUrl: string | null };
+    notice?: React.ReactNode;
     onFileSelect: (face: LensFace, file: File) => void;
     onClearFace: (face: LensFace) => void;
-    onMeasure: () => void;
   }) => React.ReactElement;
 };
 
@@ -111,20 +108,23 @@ function walkElements(node: React.ReactNode, elements: React.ReactElement[] = []
 function renderUploadedPane(inputClick: () => void, activeFace: LensFace = "front") {
   const uploadPane = loadModule<UploadPaneModule>("src/components/lens/UploadPane.tsx", inputClick);
   return uploadPane.default({
-    activeFace,
-    uploads: {
-      [activeFace]: {
-        fileName: `${activeFace}.jpg`,
-        fileSize: 1024 * 1024,
-        previewUrl: `blob:${activeFace}`,
-      },
+    face: activeFace,
+    upload: {
+      fileName: `${activeFace}.jpg`,
+      fileSize: 1024 * 1024,
+      previewUrl: `blob:${activeFace}`,
     },
-    cardIdentity: "OP01-001",
-    onActiveFaceChange: () => undefined,
-    onCardIdentityChange: () => undefined,
     onFileSelect: () => undefined,
     onClearFace: () => undefined,
-    onMeasure: () => undefined,
+  });
+}
+
+function renderEmptyPane(inputClick: () => void, face: LensFace) {
+  const uploadPane = loadModule<UploadPaneModule>("src/components/lens/UploadPane.tsx", inputClick);
+  return uploadPane.default({
+    face,
+    onFileSelect: () => undefined,
+    onClearFace: () => undefined,
   });
 }
 
@@ -191,4 +191,12 @@ test("UploadPane uploaded image target exposes hover affordance styling", () => 
   assert.match(target.props.className, /hover:border-owl/);
   assert.ok(hint);
   assert.match(hint.props.className, /group-hover:opacity-100/);
+});
+
+test("UploadPane renders per-face labels", () => {
+  const front = renderEmptyPane(() => undefined, "front");
+  const back = renderEmptyPane(() => undefined, "back");
+
+  assert.match(textContent(front), /Front · required/);
+  assert.match(textContent(back), /Back · optional/);
 });

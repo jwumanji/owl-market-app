@@ -56,9 +56,8 @@ function initialFaces(): Record<LensFace, LensFaceState> {
 }
 
 export default function LensComposersDev() {
-  const [uploadFace, setUploadFace] = useState<LensFace>("front");
   const [uploads, setUploads] = useState<Partial<Record<LensFace, UploadFaceState>>>(SAMPLE_UPLOADS);
-  const [cardIdentity, setCardIdentity] = useState("Monkey D. Luffy OP01-001");
+  const [cardIdentity] = useState("Monkey D. Luffy OP01-001");
   const [activeFace, setActiveFace] = useState<LensFace>("front");
   const [reviewFaces, setReviewFaces] = useState<Partial<Record<LensFace, LensFaceState>>>(() => initialFaces());
   const [editActiveFace, setEditActiveFace] = useState<LensFace>("front");
@@ -141,32 +140,32 @@ export default function LensComposersDev() {
       </Section>
 
       <Section title="Step 3 · UploadPane">
-        <UploadPane
-          activeFace={uploadFace}
-          uploads={uploads}
-          cardIdentity={cardIdentity}
-          addBackNotice={Boolean(uploads.front && !uploads.back)}
-          onActiveFaceChange={setUploadFace}
-          onCardIdentityChange={setCardIdentity}
-          onFileSelect={(face, file) => {
-            setUploads((current) => ({
-              ...current,
-              [face]: {
-                fileName: file.name,
-                fileSize: file.size,
-                previewUrl: URL.createObjectURL(file),
-              },
-            }));
-          }}
-          onClearFace={(face) =>
-            setUploads((current) => {
-              const next = { ...current };
-              delete next[face];
-              return next;
-            })
-          }
-          onMeasure={() => undefined}
-        />
+        <div className="grid gap-4 lg:grid-cols-2">
+          {(["front", "back"] as LensFace[]).map((face) => (
+            <UploadPane
+              key={face}
+              face={face}
+              upload={uploads[face]}
+              onFileSelect={(selectedFace, file) => {
+                setUploads((current) => ({
+                  ...current,
+                  [selectedFace]: {
+                    fileName: file.name,
+                    fileSize: file.size,
+                    previewUrl: URL.createObjectURL(file),
+                  },
+                }));
+              }}
+              onClearFace={(selectedFace) =>
+                setUploads((current) => {
+                  const next = { ...current };
+                  delete next[selectedFace];
+                  return next;
+                })
+              }
+            />
+          ))}
+        </div>
       </Section>
 
       <Section title="Step 3 · ReviewWorkspace">
@@ -192,7 +191,7 @@ export default function LensComposersDev() {
           }}
           onOverlayChange={setReviewOverlay}
           onFreeCornersChange={setReviewFreeCorners}
-          onAddBack={() => setUploadFace("back")}
+          onAddBack={() => undefined}
           onSave={() => undefined}
           onResetFace={resetFace}
           onCancel={() => undefined}

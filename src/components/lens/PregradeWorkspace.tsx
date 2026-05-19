@@ -59,7 +59,7 @@ type PregradeState = {
   uploads: Partial<Record<LensFace, UploadedFace>>;
   faces: Partial<Record<LensFace, LensFaceState>>;
   faceMeta: Partial<Record<LensFace, FaceMeta>>;
-  idleNotice: string | null;
+  idleNotices: Partial<Record<LensFace, string>>;
   reviewNotice: ReviewNotice | null;
   addBackMode: boolean;
   isSaving: boolean;
@@ -131,7 +131,7 @@ function initialState(): PregradeState {
     uploads: {},
     faces: {},
     faceMeta: {},
-    idleNotice: null,
+    idleNotices: {},
     reviewNotice: null,
     addBackMode: false,
     isSaving: false,
@@ -195,13 +195,15 @@ function reducer(state: PregradeState, action: Action): PregradeState {
       const faceMeta = { ...state.faceMeta };
       delete faces[action.face];
       delete faceMeta[action.face];
+      const idleNotices = { ...state.idleNotices };
+      delete idleNotices[action.face];
       return {
         ...state,
         activeUploadFace: action.face,
         uploads: { ...state.uploads, [action.face]: action.upload },
         faces,
         faceMeta,
-        idleNotice: null,
+        idleNotices,
         reviewNotice: null,
         addBackMode: false,
       };
@@ -213,13 +215,15 @@ function reducer(state: PregradeState, action: Action): PregradeState {
       delete uploads[action.face];
       delete faces[action.face];
       delete faceMeta[action.face];
+      const idleNotices = { ...state.idleNotices };
+      delete idleNotices[action.face];
       return {
         ...state,
         uploads,
         faces,
         faceMeta,
         activeUploadFace: action.face,
-        idleNotice: null,
+        idleNotices,
         addBackMode: action.face === "back" ? state.addBackMode : false,
       };
     }
@@ -228,11 +232,11 @@ function reducer(state: PregradeState, action: Action): PregradeState {
         ...state,
         status: "idle",
         activeUploadFace: action.face,
-        idleNotice: action.message,
+        idleNotices: { ...state.idleNotices, [action.face]: action.message },
         isSaving: false,
       };
     case "startMeasure":
-      return { ...state, status: "uploading", idleNotice: null, reviewNotice: null, isSaving: false };
+      return { ...state, status: "uploading", idleNotices: {}, reviewNotice: null, isSaving: false };
     case "startProcessing":
       return { ...state, status: "processing" };
     case "receiveCvResult": {
@@ -341,7 +345,7 @@ function reducer(state: PregradeState, action: Action): PregradeState {
         ...state,
         status: "idle",
         activeUploadFace: "back",
-        idleNotice: COPY.idleAddBack,
+        idleNotices: {},
         reviewNotice: null,
         addBackMode: true,
       };
@@ -632,6 +636,93 @@ function ProcessingPanel({
 function renderUploadNotice(message: string | null) {
   if (!message) return null;
   return <FailureNotice tone="error">{message}</FailureNotice>;
+}
+
+type PregradeUploadStateProps = {
+  cardIdentity: string;
+  uploads: Partial<Record<LensFace, UploadFaceState>>;
+  idleNotices: Partial<Record<LensFace, string>>;
+  addBackMode: boolean;
+  onCardIdentityChange: (value: string) => void;
+  onFileSelect: (face: LensFace, file: File) => void;
+  onClearFace: (face: LensFace) => void;
+  onMeasure: () => void;
+};
+
+export function PregradeUploadState({
+  cardIdentity,
+  uploads,
+  idleNotices,
+  addBackMode,
+  onCardIdentityChange,
+  onFileSelect,
+  onClearFace,
+  onMeasure,
+}: PregradeUploadStateProps) {
+  const canMeasure = Boolean(uploads.front);
+
+  return (
+    <section className="space-y-5" data-pregrade-upload-state="true">
+      {addBackMode && !uploads.back && (
+        <div className="rounded-md border border-owl/40 bg-owl/10 px-4 py-3 text-sm text-text">
+          {COPY.idleAddBack}
+        </div>
+      )}
+
+      <div className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)]">
+        <aside className="space-y-4 rounded-lg border border-border bg-surface p-4" data-card-info-column="true">
+          <div>
+            <label className="mb-2 block font-mono text-[10px] font-bold uppercase tracking-wider text-text-2">
+              Card name
+            </label>
+            <input
+              value={cardIdentity}
+              onChange={(event) => onCardIdentityChange(event.target.value)}
+              placeholder="Add card name..."
+              className="w-full rounded-lg border border-border bg-deep px-3.5 py-3 text-sm text-text outline-none transition-colors placeholder:text-text-3 focus:border-owl/50"
+            />
+          </div>
+          <div
+            className="flex aspect-[2.5/3.5] items-center justify-center rounded-lg border border-dashed border-border-2 bg-deep/70 p-4 text-center font-mono text-[10px] font-semibold uppercase tracking-wider text-text-3"
+            data-card-preview="empty"
+          >
+            Card preview
+          </div>
+        </aside>
+
+        <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+          <UploadPane
+            face="front"
+            upload={uploads.front}
+            notice={renderUploadNotice(idleNotices.front ?? null)}
+            onFileSelect={onFileSelect}
+            onClearFace={onClearFace}
+          />
+          <UploadPane
+            face="back"
+            upload={uploads.back}
+            notice={renderUploadNotice(idleNotices.back ?? null)}
+            onFileSelect={onFileSelect}
+            onClearFace={onClearFace}
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-col items-center gap-2">
+        <button
+          type="button"
+          disabled={!canMeasure}
+          onClick={onMeasure}
+          className="rounded-lg bg-owl px-8 py-3 font-mono text-xs font-bold uppercase tracking-widest text-void transition-colors hover:bg-owl-light disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Measure
+        </button>
+        <div className="text-center text-xs text-text-2">
+          Images are saved with your measurement so you can re-open and adjust later.
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function reviewNoticeNode({
@@ -950,13 +1041,11 @@ export default function PregradeWorkspace() {
       </div>
 
       {state.status === "idle" && (
-        <UploadPane
-          activeFace={state.activeUploadFace}
+        <PregradeUploadState
           uploads={state.uploads}
           cardIdentity={state.cardIdentity}
-          notice={state.addBackMode ? null : renderUploadNotice(state.idleNotice)}
-          addBackNotice={state.addBackMode && !state.uploads.back}
-          onActiveFaceChange={(face) => dispatch({ type: "setActiveUploadFace", face })}
+          idleNotices={state.idleNotices}
+          addBackMode={state.addBackMode}
           onCardIdentityChange={(value) => dispatch({ type: "setCardIdentity", value })}
           onFileSelect={(face, file) => void handleFileSelected(face, file)}
           onClearFace={handleClearFace}
