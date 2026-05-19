@@ -34,7 +34,7 @@ export default function EditWorkspace({
   onDelete,
 }: EditWorkspaceProps) {
   return (
-    <section className="space-y-4">
+    <section className="flex min-h-0 flex-1 flex-col space-y-4">
       <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <button

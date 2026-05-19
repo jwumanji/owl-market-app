@@ -930,7 +930,7 @@ export default function PregradeWorkspace() {
   });
 
   return (
-    <section className="mx-auto max-w-[1280px] px-4 py-8">
+    <section className="mx-auto flex min-h-[calc(100vh-96px)] max-w-[1280px] flex-col px-4 py-8">
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="mb-2 font-mono text-sm font-semibold uppercase tracking-wider text-owl">

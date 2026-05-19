@@ -65,7 +65,7 @@ export default function ReviewWorkspace({
   const hasBack = Boolean(faces.back);
 
   return (
-    <section className="space-y-3">
+    <section className="flex min-h-0 flex-1 flex-col space-y-3">
       {cardIdentity && (
         <div className="font-mono text-[11px] font-bold uppercase tracking-wider text-owl">
           {cardIdentity}
@@ -86,7 +86,7 @@ export default function ReviewWorkspace({
         />
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="grid flex-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
         <ImageOverlayPanel
           overlay={active.overlay}
           imageSize={active.imageSize}
