@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ClipboardEvent, type DragEvent, type ReactNode } from "react";
+import { useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
 import FaceTabs, { type LensFace } from "./FaceTabs";
 import type { UploadFaceState } from "./lens-types";
 
@@ -47,6 +47,16 @@ export default function UploadPane({
   function selectFile(file: File | undefined) {
     if (!file) return;
     onFileSelect(activeFace, file);
+  }
+
+  function openFilePicker() {
+    inputRef.current?.click();
+  }
+
+  function onReplacePreviewKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    openFilePicker();
   }
 
   function onDrop(event: DragEvent<HTMLDivElement>) {
@@ -111,7 +121,14 @@ export default function UploadPane({
         <div className="bg-void p-4">
           {activeUpload ? (
             <div className="flex min-h-[360px] flex-col">
-              <div className="flex min-h-[300px] flex-1 items-center justify-center rounded-md border border-border bg-surface p-3">
+              <div
+                onClick={openFilePicker}
+                onKeyDown={onReplacePreviewKeyDown}
+                role="button"
+                tabIndex={0}
+                aria-label={`Replace ${activeFace} card image`}
+                className="group relative flex min-h-[300px] flex-1 cursor-pointer items-center justify-center rounded-md border border-border bg-surface p-3 outline-none transition-colors hover:border-owl focus-visible:border-owl focus-visible:ring-2 focus-visible:ring-owl/30"
+              >
                 {activeUpload.previewUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -122,6 +139,12 @@ export default function UploadPane({
                 ) : (
                   <div className="font-mono text-xs uppercase tracking-widest text-text-3">Preview unavailable</div>
                 )}
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded bg-void/85 px-2 py-1 font-mono text-[9px] font-semibold uppercase tracking-wider text-text opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                >
+                  Click to replace
+                </span>
               </div>
               <div className="mt-3 flex items-center gap-3 rounded-md bg-surface px-3 py-2.5">
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-gain/15 text-gain">
@@ -135,7 +158,7 @@ export default function UploadPane({
                 </div>
                 <button
                   type="button"
-                  onClick={() => inputRef.current?.click()}
+                  onClick={openFilePicker}
                   className="rounded border border-border-2 px-3 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-text-2 hover:text-text"
                 >
                   Replace
@@ -157,11 +180,11 @@ export default function UploadPane({
               }}
               onDragLeave={() => setDragActive(false)}
               onDrop={onDrop}
-              onClick={() => inputRef.current?.click()}
+              onClick={openFilePicker}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
-                  inputRef.current?.click();
+                  openFilePicker();
                 }
               }}
               role="button"
