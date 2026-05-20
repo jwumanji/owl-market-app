@@ -3,7 +3,6 @@
 import { useEffect, useReducer, useRef } from "react";
 import Link from "next/link";
 import {
-  computeMeasurements,
   overlayGeometryFromUnknown,
   type OverlayGeometry,
 } from "@/lib/centering-math";
@@ -686,6 +685,39 @@ function renderUploadNotice(message: string | null) {
   return <FailureNotice tone="error">{message}</FailureNotice>;
 }
 
+export function PregradeHeader({ isResults }: { isResults: boolean }) {
+  const backHref = isResults ? "/admin/lens/pregrade" : "/admin/lens";
+  const backLabel = isResults ? "Back to Pre-grade" : "Back to Owl Lens";
+
+  return (
+    <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <p className="mb-2 font-mono text-sm font-semibold uppercase tracking-wider text-owl">
+          Owl Lens
+        </p>
+        <h1 className="text-4xl font-bold text-text">
+          {isResults ? "Pre-grade report" : "Pre-grade"}
+        </h1>
+        <p className="mt-2 max-w-3xl text-base leading-7 text-text-2">
+          {isResults
+            ? "Saved centering report with combined ceiling, grader readouts, and per-face ratios."
+            : "Upload a front scan, add the back when you have it, then verify the overlay before saving the centering result."}
+        </p>
+      </div>
+      <Link
+        href={backHref}
+        aria-label={backLabel}
+        className={`inline-flex h-10 items-center justify-center rounded-md border border-border bg-surface text-text-2 transition-colors hover:border-border-2 hover:text-owl focus-visible:border-owl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-owl/30 ${
+          isResults ? "gap-2 px-3 font-mono text-[11px] font-bold uppercase tracking-wider" : "w-10"
+        }`}
+      >
+        <ArrowLeftIcon className="h-5 w-5" />
+        {isResults && <span>Back to Pre-grade</span>}
+      </Link>
+    </div>
+  );
+}
+
 type PregradeUploadStateProps = {
   cardIdentity: string;
   uploads: Partial<Record<LensFace, UploadFaceState>>;
@@ -812,10 +844,6 @@ function reviewNoticeNode({
       {notice.body}
     </FailureNotice>
   );
-}
-
-function safeFileName(value: string) {
-  return (value.trim() || "owl-lens-pregrade").replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase();
 }
 
 export default function PregradeWorkspace() {
@@ -1029,38 +1057,6 @@ export default function PregradeWorkspace() {
     dispatch({ type: "reopenSavedSession" });
   }
 
-  function handleDownloadReport() {
-    const faces = FACE_ORDER
-      .filter((face) => state.faces[face])
-      .map((face) => {
-        const faceState = state.faces[face]!;
-        return {
-          face,
-          measurement: computeMeasurements(faceState.overlay),
-          overlayGeometry: faceState.overlay,
-          adjusted: Boolean(faceState.adjusted),
-        };
-      });
-
-    const blob = new Blob([
-      JSON.stringify(
-        {
-          cardIdentity: state.cardIdentity || null,
-          cardSessionId: state.cardSessionId,
-          faces,
-        },
-        null,
-        2
-      ),
-    ], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${safeFileName(state.cardIdentity)}-centering-report.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-  }
-
   const processingFaces = FACE_ORDER.filter((face) => state.uploads[face] && !state.faces[face]);
   const isResults = state.status === "results";
   const reviewNotice = reviewNoticeNode({
@@ -1071,28 +1067,7 @@ export default function PregradeWorkspace() {
 
   return (
     <section className="mx-auto flex min-h-[calc(100vh-96px)] max-w-[1280px] flex-col px-4 py-8">
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="mb-2 font-mono text-sm font-semibold uppercase tracking-wider text-owl">
-            Owl Lens
-          </p>
-          <h1 className="text-4xl font-bold text-text">
-            {isResults ? "Pre-grade report" : "Pre-grade"}
-          </h1>
-          <p className="mt-2 max-w-3xl text-base leading-7 text-text-2">
-            {isResults
-              ? "Saved centering report with combined ceiling, grader readouts, and per-face ratios."
-              : "Upload a front scan, add the back when you have it, then verify the overlay before saving the centering result."}
-          </p>
-        </div>
-        <Link
-          href="/admin/lens"
-          aria-label="Back to Owl Lens"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-border bg-surface text-text-2 transition-colors hover:border-border-2 hover:text-owl focus-visible:border-owl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-owl/30"
-        >
-          <ArrowLeftIcon className="h-5 w-5" />
-        </Link>
-      </div>
+      <PregradeHeader isResults={isResults} />
 
       {state.status === "idle" && (
         <PregradeUploadState
@@ -1142,7 +1117,6 @@ export default function PregradeWorkspace() {
           onActiveFaceChange={(face) => dispatch({ type: "setActiveReviewFace", face })}
           onCardIdentityChange={(value) => dispatch({ type: "setCardIdentity", value })}
           onReMeasure={handleReMeasure}
-          onDownloadReport={handleDownloadReport}
           onMeasureAnother={handleMeasureAnother}
         />
       )}

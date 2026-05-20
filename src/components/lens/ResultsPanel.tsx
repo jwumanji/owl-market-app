@@ -29,7 +29,6 @@ type ResultsPanelProps = {
   onActiveFaceChange?: (face: LensFace) => void;
   onCardIdentityChange?: (value: string) => void;
   onReMeasure: () => void;
-  onDownloadReport: () => void;
   onMeasureAnother: () => void;
 };
 
@@ -87,36 +86,36 @@ function combinedPsaResult(faces: LensMeasuredFace[]) {
 
 function ActionButtons({
   onReMeasure,
-  onDownloadReport,
   onMeasureAnother,
 }: {
   onReMeasure: () => void;
-  onDownloadReport: () => void;
   onMeasureAnother: () => void;
 }) {
   return (
-    <div className="flex flex-wrap justify-center gap-2">
-      <button
-        type="button"
-        onClick={onReMeasure}
-        className="rounded-md border border-border bg-deep px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:bg-surf2"
+    <div className="flex flex-col items-center gap-3">
+      <div className="flex flex-wrap justify-center gap-2" data-report-actions="true">
+        <button
+          type="button"
+          onClick={onReMeasure}
+          className="rounded-md border border-border bg-deep px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:bg-surf2"
+        >
+          Re-measure
+        </button>
+        <button
+          type="button"
+          onClick={onMeasureAnother}
+          className="rounded-md border border-owl/40 bg-owl px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
+        >
+          Measure another
+        </button>
+      </div>
+      <a
+        href="/admin/lens/pregrade/history"
+        aria-label="Back to pre-grade summary"
+        className="font-mono text-[11px] font-bold uppercase tracking-wider text-text-2 transition-colors hover:text-owl"
       >
-        Re-measure
-      </button>
-      <button
-        type="button"
-        onClick={onDownloadReport}
-        className="rounded-md border border-owl/40 bg-owl px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
-      >
-        Download report
-      </button>
-      <button
-        type="button"
-        onClick={onMeasureAnother}
-        className="rounded-md border border-border bg-deep px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:bg-surf2"
-      >
-        Measure another
-      </button>
+        Back to pre-grade summary
+      </a>
     </div>
   );
 }
@@ -462,7 +461,6 @@ export default function ResultsPanel({
   onActiveFaceChange,
   onCardIdentityChange,
   onReMeasure,
-  onDownloadReport,
   onMeasureAnother,
 }: ResultsPanelProps) {
   const measured = measuredFaces(faces);
@@ -507,7 +505,6 @@ export default function ResultsPanel({
 
       <ActionButtons
         onReMeasure={onReMeasure}
-        onDownloadReport={onDownloadReport}
         onMeasureAnother={onMeasureAnother}
       />
     </section>

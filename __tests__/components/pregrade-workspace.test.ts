@@ -103,6 +103,7 @@ type OverlayGeometry = {
 
 type PregradeWorkspaceModule = {
   default: React.ComponentType;
+  PregradeHeader: React.ComponentType<{ isResults: boolean }>;
   createInitialPregradeState: () => Record<string, unknown>;
   pregradeReducer: (state: Record<string, unknown>, action: Record<string, unknown>) => Record<string, unknown>;
   saveFace: (input: {
@@ -278,6 +279,16 @@ test("PregradeWorkspace header uses a back arrow icon link to Owl Lens", () => {
   assert.match(html, /aria-label="Back to Owl Lens"/);
   assert.match(html, /viewBox="0 0 24 24"/);
   assert.doesNotMatch(html, /Back to Owl Lens<\/a>/);
+});
+
+test("PregradeWorkspace report header links back to Pre-grade with a visible label", () => {
+  const workspace = loadModule<PregradeWorkspaceModule>("src/components/lens/PregradeWorkspace.tsx");
+  const html = renderToStaticMarkup(React.createElement(workspace.PregradeHeader, { isResults: true }));
+
+  assert.match(html, /href="\/admin\/lens\/pregrade"/);
+  assert.match(html, /aria-label="Back to Pre-grade"/);
+  assert.match(html, /Back to Pre-grade/);
+  assert.match(html, /viewBox="0 0 24 24"/);
 });
 
 test("PregradeWorkspace re-measure returns to review mode with the same session id", () => {

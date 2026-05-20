@@ -139,7 +139,6 @@ type ResultsPanelModule = {
     onActiveFaceChange?: (face: LensFace) => void;
     onCardIdentityChange?: (value: string) => void;
     onReMeasure: () => void;
-    onDownloadReport: () => void;
     onMeasureAnother: () => void;
   }) => React.ReactElement;
   reportCardNameDisplay: (cardIdentity?: string | null) => string;
@@ -342,7 +341,6 @@ test("ResultsPanel wires face card selection to the active face source of truth"
       selected = face;
     },
     onReMeasure: () => undefined,
-    onDownloadReport: () => undefined,
     onMeasureAnother: () => undefined,
   }) as React.ReactElement;
   const cards = walkElements(element).filter(
@@ -372,7 +370,6 @@ test("ResultsPanel renders saved report hero and large face cards", () => {
       cardIdentity: "OP01-001",
       onActiveFaceChange: () => undefined,
       onReMeasure: () => undefined,
-      onDownloadReport: () => undefined,
       onMeasureAnother: () => undefined,
     })
   );
@@ -386,7 +383,18 @@ test("ResultsPanel renders saved report hero and large face cards", () => {
   assert.match(html, /data-report-face-card="back"/);
   assert.match(html, /aspect-\[2\.5\/3\.5\]/);
   assert.match(html, /Re-measure/);
-  assert.match(html, /Download report/);
+  assert.match(html, /Measure another/);
+  assert.doesNotMatch(html, /Download report/);
+  assert.match(html, /href="\/admin\/lens\/pregrade\/history"/);
+  assert.match(html, /aria-label="Back to pre-grade summary"/);
+  assert.match(html, /Back to pre-grade summary/);
+
+  const actionBlock = html.match(/<div(?=[^>]*data-report-actions="true")[^>]*>([\s\S]*?)<\/div>/)?.[1] ?? "";
+  assert.notEqual(actionBlock, "");
+  assert.equal(actionBlock.match(/<button/g)?.length ?? 0, 2);
+  assert.match(actionBlock, /Re-measure/);
+  assert.match(actionBlock, /Measure another/);
+  assert.doesNotMatch(actionBlock, /Download report/);
 });
 
 test("ResultsPanel front-only report uses untitled fallback and omits back card", () => {
@@ -398,7 +406,6 @@ test("ResultsPanel front-only report uses untitled fallback and omits back card"
       cardIdentity: "",
       onActiveFaceChange: () => undefined,
       onReMeasure: () => undefined,
-      onDownloadReport: () => undefined,
       onMeasureAnother: () => undefined,
     })
   );
@@ -419,7 +426,6 @@ test("ResultsPanel card name renders editable affordance and display fallback", 
       cardSessionId: "11111111-1111-4111-8111-111111111111",
       onCardIdentityChange: () => undefined,
       onReMeasure: () => undefined,
-      onDownloadReport: () => undefined,
       onMeasureAnother: () => undefined,
     })
   );
