@@ -17,21 +17,20 @@ const TICKER_DATA = [
 
 function TickerItem({ n, p, c, up }: (typeof TICKER_DATA)[number]) {
   return (
-    <div className="ti">
-      <span className="ti-name">{n}</span>
-      <span className="ti-price">{p}</span>
-      <span className={up ? "ti-up" : "ti-dn"}>{c}</span>
+    <div className="c-ti">
+      <span className="c-ti-name">{n}</span>
+      <span className="c-ti-price">{p}</span>
+      <span className={up ? "c-ti-up" : "c-ti-dn"}>{c}</span>
     </div>
   );
 }
 
 export default function Ticker() {
-  // Duplicate data for seamless infinite scroll
   const items = [...TICKER_DATA, ...TICKER_DATA];
 
   return (
-    <div className="ticker-bar">
-      <div className="ticker-track">
+    <div className="c-ticker-bar">
+      <div className="c-ticker-track">
         {items.map((t, i) => (
           <TickerItem key={i} {...t} />
         ))}

@@ -62,7 +62,7 @@ export default function RootLayout({
         className={`${inter.variable} ${ibmPlexMono.variable} ${spaceGrotesk.variable} ${caveat.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
         <Nav />
-        <main style={{ paddingTop: "var(--top)" }}>{children}</main>
+        <main>{children}</main>
       </body>
     </html>
   );
