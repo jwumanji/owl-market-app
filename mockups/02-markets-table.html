@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OwlMarket — Markets (full, C1.5 mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Caveat:wght@700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #FFF5E4; --bg-2: #FFFFFF; --bg-3: #FCE6BE;
+      --ink: #1A0F08; --ink-2: #5C4534; --ink-3: #9A8475;
+      --pink: #FF6BB8; --coral: #FF4936; --gold: #E89512;
+      --gain: #2D9961; --loss: #E04E4E;
+      --grad-brand: linear-gradient(135deg, #FF6BB8 0%, #FF4936 50%, #E89512 100%);
+      --r-sm: 8px; --r-md: 14px; --r-lg: 22px; --r-pill: 999px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      background: var(--bg); color: var(--ink);
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-weight: 500; -webkit-font-smoothing: antialiased; min-height: 100vh;
+    }
+    .container { max-width: 1280px; margin: 0 auto; padding-left: 28px; padding-right: 28px; }
+
+    /* ===== NAV ===== */
+    .topnav {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(255, 245, 228, 0.85);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      border-bottom: 1.5px solid rgba(26, 15, 8, 0.08);
+    }
+    .topnav-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 28px; max-width: 1280px; margin: 0 auto;
+    }
+    .lockup { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+    .lockup-wm {
+      font-family: 'Space Grotesk', sans-serif; font-weight: 700;
+      letter-spacing: -0.02em; line-height: 1; color: var(--ink);
+      font-size: 22px; display: inline-flex; align-items: baseline;
+    }
+    .lockup-wm em {
+      font-family: 'Caveat', cursive; font-style: normal; font-weight: 700;
+      font-size: 28px; margin-left: -2px; padding-right: 8px; padding-bottom: 2px;
+      display: inline-block; background: var(--grad-brand);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: transparent;
+    }
+    .nav-links { display: inline-flex; gap: 28px; list-style: none; }
+    .nav-links a {
+      font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px;
+      color: var(--ink-2); text-decoration: none; padding: 4px 0; position: relative;
+    }
+    .nav-links a.active { color: var(--ink); }
+    .nav-links a.active::after {
+      content: ""; position: absolute; left: 0; right: 0; bottom: -6px;
+      height: 2px; background: var(--grad-brand); border-radius: 2px;
+    }
+    .signin-btn {
+      font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px;
+      color: var(--ink); background: transparent; border: 1.5px solid var(--ink);
+      border-radius: var(--r-pill); padding: 8px 18px; cursor: pointer;
+      text-decoration: none; transition: all 0.15s ease;
+    }
+    .signin-btn:hover { background: var(--ink); color: var(--bg); }
+
+    main { padding: 32px 0 96px; }
+
+    /* ===== PAGE HEAD ===== */
+    .page-head { margin-bottom: 24px; display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+    .eyebrow {
+      font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600;
+      font-size: 12px; color: var(--ink-2); letter-spacing: 0.14em;
+      text-transform: uppercase; margin-bottom: 12px;
+    }
+    h1.title {
+      font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 48px;
+      letter-spacing: -0.025em; line-height: 1; color: var(--ink);
+    }
+    h1.title em {
+      font-family: 'Caveat', cursive; font-style: normal; font-weight: 700;
+      font-size: 60px; margin-left: 4px; padding-right: 16px; padding-bottom: 6px;
+      display: inline-block; line-height: 1; vertical-align: -4px;
+      background: var(--grad-brand); -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: transparent;
+    }
+    .subline {
+      margin-top: 12px; font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-weight: 600; font-size: 13px; color: var(--ink-2);
+    }
+    .subline .dot { color: var(--coral); margin: 0 6px; }
+    .view-toggle {
+      display: inline-flex; align-items: center; gap: 0;
+      background: var(--bg-2); border: 1.5px solid var(--ink);
+      border-radius: var(--r-pill); padding: 3px;
+    }
+    .view-btn {
+      font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12px;
+      color: var(--ink-2); background: transparent; border: none;
+      padding: 7px 16px; border-radius: var(--r-pill); cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .view-btn.active { background: var(--ink); color: var(--bg); }
+
+    /* ════════ DASHBOARD ════════ */
+    .dashboard { margin-bottom: 36px; }
+    .dash-top { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+    .dash-bottom { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+    .widget {
+      background: var(--bg-2); border: 1.5px solid var(--ink);
+      border-radius: var(--r-md); overflow: hidden; display: flex; flex-direction: column;
+    }
+    .widget-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 13px 16px; border-bottom: 1.5px solid var(--ink);
+      background: var(--bg-3);
+    }
+    .widget-title {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: 'Space Grotesk', sans-serif; font-weight: 700;
+      font-size: 14px; color: var(--ink); letter-spacing: -0.01em;
+    }
+    .widget-icon { font-size: 15px; }
+    .widget-all {
+      font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600;
+      font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--coral); text-decoration: none;
+    }
+    .widget-body { display: flex; flex-direction: column; }
+
+    .drow {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 16px; border-top: 1px solid var(--bg-3);
+      text-decoration: none; color: inherit; cursor: pointer;
+      transition: background 0.12s;
+    }
+    .drow:first-child { border-top: none; }
+    .drow:hover { background: var(--bg-3); }
+    .drank {
+      font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600;
+      font-size: 11px; color: var(--ink-3); width: 14px; flex-shrink: 0;
+    }
+    .dthumb {
+      width: 26px; height: 36px; border-radius: 3px; border: 1.2px solid var(--ink);
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 11px; color: var(--bg);
+    }
+    .dinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .dname {
+      font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12.5px;
+      color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .dmeta {
+      display: flex; align-items: center; gap: 6px;
+      font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600;
+      font-size: 10px; color: var(--ink-3);
+    }
+    .dvalues { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+    .dprice {
+      font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600;
+      font-size: 12.5px; color: var(--ink);
+    }
+    .dchg {
+      font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 11px;
+    }
+    .dchg.up, .dchg-solo.up { color: var(--gain); }
+    .dchg.down, .dchg-solo.down { color: var(--loss); }
+    .dchg-solo {
+      font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600;
+      font-size: 12px; flex-shrink: 0;
+    }
+
+    /* set code chip + inline rarity in dashboard */
+    .setcode {
+      font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600;
+      font-size: 9px; color: var(--ink-2); background: var(--bg-3);
+      padding: 1px 5px; border-radius: 4px; letter-spacing: 0.04em;
+    }
+    .dash-rarbadge {
+      font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 700;
+      font-size: 9px; letter-spacing: 0.06em; padding: 2px 7px;
+      border-radius: var(--r-pill); border: 1.2px solid; flex-shrink: 0;
+    }
+    .dbadges { display: inline-flex; gap: 3px; flex-wrap: wrap; }
+
+    /* ════════ FILTER BAR ════════ */
+    .filterbar {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px;
+    }
+    .search-input {
+      font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 500; font-size: 13px;
+      color: var(--ink); background: var(--bg-2); border: 1.5px solid var(--ink);
+      border-radius: var(--r-pill); padding: 9px 16px; width: 220px; outline: none;
+    }
+    .search-input::placeholder { color: var(--ink-3); }
+    .dropdown {
+      font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px;
+      color: var(--ink); background: var(--bg-2); border: 1.5px solid var(--ink);
+      border-radius: var(--r-pill); padding: 9px 16px; cursor: pointer; outline: none;
+    }
+    .rarity-toggles { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .rar-toggle {
+      font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 11px;
+      letter-spacing: 0.04em; color: var(--ink-2); background: var(--bg-2);
+      border: 1.5px solid var(--ink-3); border-radius: var(--r-pill);
+      padding: 5px 11px; cursor: pointer; transition: all 0.12s;
+    }
+    .rar-toggle:hover { border-color: var(--ink); color: var(--ink); }
+    .rar-toggle.active {
+      background: var(--grad-brand); color: var(--bg); border-color: transparent;
+    }
+
+    /* ════════ TABLE ════════ */
+    .table {
+      background: var(--bg-2); border: 1.5px solid var(--ink);
+      border-radius: var(--r-md); overflow: hidden;
+    }
+    .thead, .row {
+      display: grid;
+      grid-template-columns: 44px 52px 1fr 96px 76px 76px 76px 92px 92px;
+      align-items: center; gap: 12px; padding: 12px 18px;
+    }
+    .thead {
+      background: var(--bg-3); border-bottom: 1.5px solid var(--ink);
+      font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600;
+      font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2);
+    }
+    .thead .c { text-align: center; }
+    .thead .r { text-align: right; }
+    .row {
+      border-top: 1px solid var(--bg-3); transition: background 0.12s; cursor: pointer;
+    }
+    .row:hover { background: var(--bg-3); }
+    .rank {
+      font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600;
+      font-size: 12px; color: var(--ink-2); text-align: center;
+    }
+    .thumb {
+      width: 40px; height: 56px; border-radius: 4px; border: 1.5px solid var(--ink);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 14px;
+      color: var(--bg); flex-shrink: 0;
+    }
+    .card-cell { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+    .card-name {
+      font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px;
+      color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .card-sub { display: flex; align-items: center; gap: 6px; }
+
+    .rar {
+      display: inline-flex; align-items: center; justify-content: center;
+      font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 700;
+      font-size: 10px; letter-spacing: 0.06em; padding: 2px 8px;
+      border-radius: var(--r-pill); border: 1.2px solid; flex-shrink: 0;
+    }
+    /* 10-rarity color system */
+    .rar-c   { color: var(--ink-2); border-color: var(--ink-2); background: var(--bg-2); }
+    .rar-uc  { color: var(--ink);   border-color: var(--ink);   background: var(--bg-3); }
+    .rar-r   { color: var(--coral); border-color: var(--coral); background: #FFE2DD; }
+    .rar-l   { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+    .rar-sr  { color: var(--pink);  border-color: var(--pink);  background: #FFE0F0; }
+    .rar-aa  { color: #7A3FB0; border-color: #7A3FB0; background: #F0E4FA; }
+    .rar-tr  { color: var(--gold); border-color: var(--gold); background: #FBF0DA; }
+    .rar-mr, .rar-sp, .rar-sec {
+      border-color: var(--ink); background: var(--bg-3);
+    }
+    .rar-mr span, .rar-sp span, .rar-sec span {
+      background: var(--grad-brand); -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: transparent;
+    }
+
+    .price {
+      font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600;
+      font-size: 14px; color: var(--ink); text-align: right;
+    }
+    .chg {
+      font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600;
+      font-size: 12.5px; text-align: right;
+    }
+    .chg.up { color: var(--gain); }
+    .chg.down { color: var(--loss); }
+    .chg.flat { color: var(--ink-3); }
+    .alt-price {
+      font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 500;
+      font-size: 12.5px; color: var(--ink-2); text-align: right;
+    }
+
+    .mock-note {
+      margin-top: 32px; padding: 14px 20px; background: var(--bg-2);
+      border: 1.5px dashed var(--ink-3); border-radius: var(--r-md);
+      font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px;
+      letter-spacing: 0.08em; color: var(--ink-2); text-align: center;
+      text-transform: uppercase; font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <header class="topnav">
+    <div class="topnav-inner">
+      <a href="#" class="lockup">
+        <svg width="36" height="36" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="og-nav" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#FF6BB8"/><stop offset="50%" stop-color="#FF4936"/><stop offset="100%" stop-color="#E89512"/>
+            </linearGradient>
+            <mask id="om-nav"><rect width="120" height="120" fill="white"/><circle cx="70" cy="56" r="20" fill="black"/></mask>
+          </defs>
+          <circle cx="60" cy="60" r="52" fill="url(#og-nav)" stroke="#1A0F08" stroke-width="5"/>
+          <circle cx="60" cy="60" r="38" fill="#1A0F08"/>
+          <circle cx="58" cy="60" r="26" fill="#FFF5E4" mask="url(#om-nav)"/>
+          <g transform="translate(80 60)"><path d="M 0,-11 Q 1.65,-1.65 11,0 Q 1.65,1.65 0,11 Q -1.65,1.65 -11,0 Q -1.65,-1.65 0,-11 Z" fill="#FFF5E4"/></g>
+        </svg>
+        <span class="lockup-wm">Owl<em>Market</em></span>
+      </a>
+      <nav>
+        <ul class="nav-links">
+          <li><a href="#">Home</a></li>
+          <li><a href="#" class="active">Markets</a></li>
+          <li><a href="#">Rarities</a></li>
+          <li><a href="#">Sets</a></li>
+          <li><a href="#">Characters</a></li>
+          <li><a href="#">Portfolio</a></li>
+        </ul>
+      </nav>
+      <a href="#" class="signin-btn">Sign in</a>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">TCG · Live prices · Verified data</div>
+        <h1 class="title">Markets — <em>live</em></h1>
+        <p class="subline">Top 20 by market value<span class="dot">·</span>Updated every 60s<span class="dot">·</span>One Piece TCG</p>
+      </div>
+      <div class="view-toggle">
+        <button class="view-btn active">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          Table
+        </button>
+        <button class="view-btn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Grid
+        </button>
+      </div>
+    </div>
+
+    <!-- ════════ DASHBOARD ════════ -->
+    <div class="dashboard">
+
+      <!-- TOP ROW: 3 -->
+      <div class="dash-top">
+
+        <!-- Trending -->
+        <div class="widget">
+          <div class="widget-head">
+            <span class="widget-title"><span class="widget-icon">🔥</span> Trending</span>
+            <a href="#" class="widget-all">View all →</a>
+          </div>
+          <div class="widget-body">
+            <a class="drow"><span class="drank">1</span><span class="dthumb" style="background:#C53A2A;">L</span><span class="dinfo"><span class="dname">Luffy — Gear Fifth</span><span class="dmeta"><span class="setcode">OP05</span><span class="dash-rarbadge rar-sec"><span>SEC</span></span></span></span><span class="dvalues"><span class="dprice">$640</span><span class="dchg up">+34.5%</span></span></a>
+            <a class="drow"><span class="drank">2</span><span class="dthumb" style="background:#1A4F2D;">Y</span><span class="dinfo"><span class="dname">Yamato — Thunder Bagua</span><span class="dmeta"><span class="setcode">OP05</span><span class="dash-rarbadge rar-sr">SR</span></span></span><span class="dvalues"><span class="dprice">$96</span><span class="dchg up">+8.4%</span></span></a>
+            <a class="drow"><span class="drank">3</span><span class="dthumb" style="background:#7C2A1E;">S</span><span class="dinfo"><span class="dname">Shanks — Red Hair</span><span class="dmeta"><span class="setcode">OP01</span><span class="dash-rarbadge rar-mr"><span>MR</span></span></span></span><span class="dvalues"><span class="dprice">$680</span><span class="dchg up">+6.7%</span></span></a>
+            <a class="drow"><span class="drank">4</span><span class="dthumb" style="background:#4A2A52;">R</span><span class="dinfo"><span class="dname">Robin — Veinte Fleurs</span><span class="dmeta"><span class="setcode">OP04</span><span class="dash-rarbadge rar-sr">SR</span></span></span><span class="dvalues"><span class="dprice">$208</span><span class="dchg up">+5.6%</span></span></a>
+            <a class="drow"><span class="drank">5</span><span class="dthumb" style="background:#7A4B1C;">G</span><span class="dinfo"><span class="dname">Garp — Galaxy Impact</span><span class="dmeta"><span class="setcode">OP06</span><span class="dash-rarbadge rar-sec"><span>SEC</span></span></span></span><span class="dvalues"><span class="dprice">$268</span><span class="dchg up">+5.3%</span></span></a>
+          </div>
+        </div>
+
+        <!-- Top Gainers -->
+        <div class="widget">
+          <div class="widget-head">
+            <span class="widget-title"><span class="widget-icon">🚀</span> Top Gainers</span>
+            <a href="#" class="widget-all">View all →</a>
+          </div>
+          <div class="widget-body">
+            <a class="drow"><span class="drank">1</span><span class="dthumb" style="background:#C53A2A;">L</span><span class="dinfo"><span class="dname">Luffy — Gear Fifth</span><span class="dmeta"><span class="setcode">OP05</span><span class="dash-rarbadge rar-sec"><span>SEC</span></span></span></span><span class="dvalues"><span class="dprice">$640</span><span class="dchg up">+34.5%</span></span></a>
+            <a class="drow"><span class="drank">2</span><span class="dthumb" style="background:#2D6E4E;">Z</span><span class="dinfo"><span class="dname">Zoro — King of Hell</span><span class="dmeta"><span class="setcode">OP06</span><span class="dash-rarbadge rar-sp"><span>SP</span></span></span></span><span class="dvalues"><span class="dprice">$385</span><span class="dchg up">+12.1%</span></span></a>
+            <a class="drow"><span class="drank">3</span><span class="dthumb" style="background:#1A4F2D;">Y</span><span class="dinfo"><span class="dname">Yamato — Thunder Bagua</span><span class="dmeta"><span class="setcode">OP05</span><span class="dash-rarbadge rar-sr">SR</span></span></span><span class="dvalues"><span class="dprice">$96</span><span class="dchg up">+8.4%</span></span></a>
+            <a class="drow"><span class="drank">4</span><span class="dthumb" style="background:#7C2A1E;">S</span><span class="dinfo"><span class="dname">Shanks — Red Hair</span><span class="dmeta"><span class="setcode">OP01</span><span class="dash-rarbadge rar-mr"><span>MR</span></span></span></span><span class="dvalues"><span class="dprice">$680</span><span class="dchg up">+6.7%</span></span></a>
+            <a class="drow"><span class="drank">5</span><span class="dthumb" style="background:#594229;">D</span><span class="dinfo"><span class="dname">Dragon — Revolutionary</span><span class="dmeta"><span class="setcode">OP06</span><span class="dash-rarbadge rar-sec"><span>SEC</span></span></span></span><span class="dvalues"><span class="dprice">$412</span><span class="dchg up">+2.4%</span></span></a>
+          </div>
+        </div>
+
+        <!-- Top Losers -->
+        <div class="widget">
+          <div class="widget-head">
+            <span class="widget-title"><span class="widget-icon">📉</span> Top Losers</span>
+            <a href="#" class="widget-all">View all →</a>
+          </div>
+          <div class="widget-body">
+            <a class="drow"><span class="drank">1</span><span class="dthumb" style="background:#8B2A2A;">M</span><span class="dinfo"><span class="dname">Mihawk — Black Blade</span><span class="dmeta"><span class="setcode">OP02</span><span class="dash-rarbadge rar-aa">AA</span></span></span><span class="dvalues"><span class="dprice">$28</span><span class="dchg down">−6.7%</span></span></a>
+            <a class="drow"><span class="drank">2</span><span class="dthumb" style="background:#3D2D5C;">B</span><span class="dinfo"><span class="dname">Big Mom — Soul Pocus</span><span class="dmeta"><span class="setcode">OP03</span><span class="dash-rarbadge rar-sec"><span>SEC</span></span></span></span><span class="dvalues"><span class="dprice">$245</span><span class="dchg down">−4.1%</span></span></a>
+            <a class="drow"><span class="drank">3</span><span class="dthumb" style="background:#2D6E4E;">Z</span><span class="dinfo"><span class="dname">Zoro AA — Three Swords</span><span class="dmeta"><span class="setcode">OP01</span><span class="dash-rarbadge rar-aa">AA</span></span></span><span class="dvalues"><span class="dprice">$62</span><span class="dchg down">−3.4%</span></span></a>
+            <a class="drow"><span class="drank">4</span><span class="dthumb" style="background:#6B3F8A;">L</span><span class="dinfo"><span class="dname">Law — Room</span><span class="dmeta"><span class="setcode">OP05</span><span class="dash-rarbadge rar-sr">SR</span></span></span><span class="dvalues"><span class="dprice">$172</span><span class="dchg down">−3.1%</span></span></a>
+            <a class="drow"><span class="drank">5</span><span class="dthumb" style="background:#7C2A1E;">S</span><span class="dinfo"><span class="dname">Shanks — Divine Departure</span><span class="dmeta"><span class="setcode">OP01</span><span class="dash-rarbadge rar-sec"><span>SEC</span></span></span></span><span class="dvalues"><span class="dprice">$1,420</span><span class="dchg down">−1.8%</span></span></a>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- BOTTOM ROW: 4 -->
+      <div class="dash-bottom">
+
+        <!-- Rarity Ranking -->
+        <div class="widget">
+          <div class="widget-head">
+            <span class="widget-title"><span class="widget-icon">🏆</span> Rarity Ranking</span>
+            <a href="#" class="widget-all">All →</a>
+          </div>
+          <div class="widget-body">
+            <a class="drow"><span class="drank">1</span><span class="dash-rarbadge rar-mr"><span>MR</span></span><span class="dinfo"><span class="dname">Manga Rare</span><span class="dmeta">Avg $720 · 38 cards</span></span><span class="dchg-solo up">+2.1%</span></a>
+            <a class="drow"><span class="drank">2</span><span class="dash-rarbadge rar-sec"><span>SEC</span></span><span class="dinfo"><span class="dname">Secret Rare</span><span class="dmeta">Avg $480 · 52 cards</span></span><span class="dchg-solo up">+1.4%</span></a>
+            <a class="drow"><span class="drank">3</span><span class="dash-rarbadge rar-sp"><span>SP</span></span><span class="dinfo"><span class="dname">Special</span><span class="dmeta">Avg $310 · 44 cards</span></span><span class="dchg-solo up">+0.8%</span></a>
+            <a class="drow"><span class="drank">4</span><span class="dash-rarbadge rar-tr">TR</span><span class="dinfo"><span class="dname">Treasure Rare</span><span class="dmeta">Avg $145 · 18 cards</span></span><span class="dchg-solo down">−0.6%</span></a>
+            <a class="drow"><span class="drank">5</span><span class="dash-rarbadge rar-aa">AA</span><span class="dinfo"><span class="dname">Alternate Art</span><span class="dmeta">Avg $88 · 96 cards</span></span><span class="dchg-solo up">+1.1%</span></a>
+          </div>
+        </div>
+
+        <!-- Top Characters -->
+        <div class="widget">
+          <div class="widget-head">
+            <span class="widget-title"><span class="widget-icon">⭐</span> Top Characters</span>
+            <a href="#" class="widget-all">All →</a>
+          </div>
+          <div class="widget-body">
+            <a class="drow"><span class="drank">1</span><span class="dinfo"><span class="dname">Monkey D. Luffy</span><span class="dmeta dbadges"><span class="dash-rarbadge rar-sec"><span>SEC</span></span><span class="dash-rarbadge rar-sr">SR</span><span class="dash-rarbadge rar-mr"><span>MR</span></span></span></span><span class="dchg-solo up">+4.2%</span></a>
+            <a class="drow"><span class="drank">2</span><span class="dinfo"><span class="dname">Shanks</span><span class="dmeta dbadges"><span class="dash-rarbadge rar-sec"><span>SEC</span></span><span class="dash-rarbadge rar-mr"><span>MR</span></span></span></span><span class="dchg-solo up">+2.8%</span></a>
+            <a class="drow"><span class="drank">3</span><span class="dinfo"><span class="dname">Roronoa Zoro</span><span class="dmeta dbadges"><span class="dash-rarbadge rar-sp"><span>SP</span></span><span class="dash-rarbadge rar-sr">SR</span><span class="dash-rarbadge rar-aa">AA</span></span></span><span class="dchg-solo up">+1.9%</span></a>
+            <a class="drow"><span class="drank">4</span><span class="dinfo"><span class="dname">Trafalgar Law</span><span class="dmeta dbadges"><span class="dash-rarbadge rar-sr">SR</span><span class="dash-rarbadge rar-r">R</span></span></span><span class="dchg-solo down">−1.2%</span></a>
+            <a class="drow"><span class="drank">5</span><span class="dinfo"><span class="dname">Portgas D. Ace</span><span class="dmeta dbadges"><span class="dash-rarbadge rar-sec"><span>SEC</span></span><span class="dash-rarbadge rar-r">R</span></span></span><span class="dchg-solo up">+0.6%</span></a>
+          </div>
+        </div>
+
+        <!-- Sealed Boxes -->
+        <div class="widget">
+          <div class="widget-head">
+            <span class="widget-title"><span class="widget-icon">📦</span> Sealed Boxes</span>
+            <a href="#" class="widget-all">All →</a>
+          </div>
+          <div class="widget-body">
+            <a class="drow"><span class="drank">1</span><span class="dinfo"><span class="dname">OP01 Booster Box</span><span class="dmeta">OP01 · Booster</span></span><span class="dvalues"><span class="dprice">$1,850</span><span class="dchg up">+3.2%</span></span></a>
+            <a class="drow"><span class="drank">2</span><span class="dinfo"><span class="dname">OP05 Booster Box</span><span class="dmeta">OP05 · Booster</span></span><span class="dvalues"><span class="dprice">$420</span><span class="dchg up">+1.1%</span></span></a>
+            <a class="drow"><span class="drank">3</span><span class="dinfo"><span class="dname">Romance Dawn Starter</span><span class="dmeta">OP01 · Starter</span></span><span class="dvalues"><span class="dprice">$180</span><span class="dchg down">−0.8%</span></span></a>
+            <a class="drow"><span class="drank">4</span><span class="dinfo"><span class="dname">OP06 Booster Box</span><span class="dmeta">OP06 · Booster</span></span><span class="dvalues"><span class="dprice">$148</span><span class="dchg up">+2.4%</span></span></a>
+            <a class="drow"><span class="drank">5</span><span class="dinfo"><span class="dname">Ultra Deck Three Captains</span><span class="dmeta">ST10 · Deck</span></span><span class="dvalues"><span class="dprice">$62</span><span class="dchg up">+0.5%</span></span></a>
+          </div>
+        </div>
+
+        <!-- Top eBay Sales -->
+        <div class="widget">
+          <div class="widget-head">
+            <span class="widget-title"><span class="widget-icon">🛒</span> Top eBay Sales</span>
+          </div>
+          <div class="widget-body">
+            <a class="drow"><span class="dinfo"><span class="dname">Shanks SEC OP01-120 PSA 10</span></span><span class="dprice">$1,465</span></a>
+            <a class="drow"><span class="dinfo"><span class="dname">Luffy Gear 5 Manga Rare PSA 10</span></span><span class="dprice">$1,240</span></a>
+            <a class="drow"><span class="dinfo"><span class="dname">Buggy SEC OP06-088 Raw NM</span></span><span class="dprice">$845</span></a>
+            <a class="drow"><span class="dinfo"><span class="dname">Roger GMR OP09 PSA 9</span></span><span class="dprice">$680</span></a>
+            <a class="drow"><span class="dinfo"><span class="dname">Dragon SEC OP06 PSA 10</span></span><span class="dprice">$455</span></a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ════════ FILTER BAR ════════ -->
+    <div class="filterbar">
+      <input class="search-input" type="text" placeholder="Search cards..." />
+      <select class="dropdown">
+        <option>All Sets</option>
+        <option>[OP01] Romance Dawn</option>
+        <option>[OP02] Paramount War</option>
+      </select>
+      <select class="dropdown">
+        <option>Sort: Value</option>
+        <option>Sort: 24h</option>
+        <option>Sort: 7d</option>
+        <option>Sort: 30d</option>
+      </select>
+      <div class="rarity-toggles">
+        <button class="rar-toggle">MR</button>
+        <button class="rar-toggle active">SP</button>
+        <button class="rar-toggle">SEC</button>
+        <button class="rar-toggle">TR</button>
+        <button class="rar-toggle">AA</button>
+        <button class="rar-toggle active">SR</button>
+        <button class="rar-toggle">R</button>
+        <button class="rar-toggle">L</button>
+        <button class="rar-toggle">UC</button>
+        <button class="rar-toggle">C</button>
+      </div>
+    </div>
+
+    <!-- ════════ TABLE ════════ -->
+    <div class="table">
+      <div class="thead">
+        <span class="c">#</span>
+        <span></span>
+        <span>Card</span>
+        <span class="r">Price</span>
+        <span class="r">24h</span>
+        <span class="r">7d</span>
+        <span class="r">30d</span>
+        <span class="r">TCG</span>
+        <span class="r">eBay</span>
+      </div>
+
+      <div class="row">
+        <span class="rank">1</span>
+        <span class="thumb" style="background:#7C2A1E;">S</span>
+        <span class="card-cell"><span class="card-name">Shanks — Divine Departure</span><span class="card-sub"><span class="setcode">OP01</span><span class="rar rar-sec"><span>SEC</span></span></span></span>
+        <span class="price">$1,420</span>
+        <span class="chg down">−1.8%</span>
+        <span class="chg up">+2.1%</span>
+        <span class="chg up">+18.4%</span>
+        <span class="alt-price">$1,398</span>
+        <span class="alt-price">$1,465</span>
+      </div>
+
+      <div class="row">
+        <span class="rank">2</span>
+        <span class="thumb" style="background:#D85A8E;">B</span>
+        <span class="card-cell"><span class="card-name">Buggy — The Genius Jester</span><span class="card-sub"><span class="setcode">OP06</span><span class="rar rar-sec"><span>SEC</span></span></span></span>
+        <span class="price">$890</span>
+        <span class="chg down">−0.9%</span>
+        <span class="chg up">+3.4%</span>
+        <span class="chg up">+22.1%</span>
+        <span class="alt-price">$875</span>
+        <span class="alt-price">$845</span>
+      </div>
+
+      <div class="row">
+        <span class="rank">3</span>
+        <span class="thumb" style="background:#7C2A1E;">S</span>
+        <span class="card-cell"><span class="card-name">Shanks — Red Hair Pirates</span><span class="card-sub"><span class="setcode">OP01</span><span class="rar rar-mr"><span>MR</span></span></span></span>
+        <span class="price">$680</span>
+        <span class="chg up">+6.7%</span>
+        <span class="chg up">+9.2%</span>
+        <span class="chg up">+14.0%</span>
+        <span class="alt-price">$695</span>
+        <span class="alt-price">$680</span>
+      </div>
+
+      <div class="row">
+        <span class="rank">4</span>
+        <span class="thumb" style="background:#C53A2A;">L</span>
+        <span class="card-cell"><span class="card-name">Luffy — Gear Fifth</span><span class="card-sub"><span class="setcode">OP05</span><span class="rar rar-sec"><span>SEC</span></span></span></span>
+        <span class="price">$640</span>
+        <span class="chg up">+34.5%</span>
+        <span class="chg up">+41.0%</span>
+        <span class="chg up">+88.6%</span>
+        <span class="alt-price">$620</span>
+        <span class="alt-price">$640</span>
+      </div>
+
+      <div class="row">
+        <span class="rank">5</span>
+        <span class="thumb" style="background:#594229;">D</span>
+        <span class="card-cell"><span class="card-name">Dragon — Revolutionary</span><span class="card-sub"><span class="setcode">OP06</span><span class="rar rar-sec"><span>SEC</span></span></span></span>
+        <span class="price">$412</span>
+        <span class="chg up">+2.4%</span>
+        <span class="chg up">+8.1%</span>
+        <span class="chg flat">+0.2%</span>
+        <span class="alt-price">$405</span>
+        <span class="alt-price">$455</span>
+      </div>
+
+      <div class="row">
+        <span class="rank">6</span>
+        <span class="thumb" style="background:#2D6E4E;">Z</span>
+        <span class="card-cell"><span class="card-name">Roronoa Zoro — King of Hell</span><span class="card-sub"><span class="setcode">OP06</span><span class="rar rar-sp"><span>SP</span></span></span></span>
+        <span class="price">$385</span>
+        <span class="chg up">+12.1%</span>
+        <span class="chg up">+15.4%</span>
+        <span class="chg up">+28.0%</span>
+        <span class="alt-price">$370</span>
+        <span class="alt-price">$390</span>
+      </div>
+
+      <div class="row">
+        <span class="rank">7</span>
+        <span class="thumb" style="background:#7C2A1E;">K</span>
+        <span class="card-cell"><span class="card-name">Kaido — Boro Breath</span><span class="card-sub"><span class="setcode">OP03</span><span class="rar rar-sec"><span>SEC</span></span></span></span>
+        <span class="price">$320</span>
+        <span class="chg up">+1.1%</span>
+        <span class="chg down">−1.8%</span>
+        <span class="chg up">+5.4%</span>
+        <span class="alt-price">$315</span>
+        <span class="alt-price">$328</span>
+      </div>
+
+      <div class="row">
+        <span class="rank">8</span>
+        <span class="thumb" style="background:#3D2D5C;">B</span>
+        <span class="card-cell"><span class="card-name">Big Mom — Soul Pocus</span><span class="card-sub"><span class="setcode">OP03</span><span class="rar rar-sec"><span>SEC</span></span></span></span>
+        <span class="price">$245</span>
+        <span class="chg down">−2.3%</span>
+        <span class="chg down">−4.1%</span>
+        <span class="chg down">−6.8%</span>
+        <span class="alt-price">$252</span>
+        <span class="alt-price">$240</span>
+      </div>
+
+      <div class="row">
+        <span class="rank">9</span>
+        <span class="thumb" style="background:#4A2A52;">R</span>
+        <span class="card-cell"><span class="card-name">Nico Robin — Veinte Fleurs</span><span class="card-sub"><span class="setcode">OP04</span><span class="rar rar-sr">SR</span></span></span>
+        <span class="price">$208</span>
+        <span class="chg up">+5.6%</span>
+        <span class="chg up">+8.9%</span>
+        <span class="chg up">+24.1%</span>
+        <span class="alt-price">$200</span>
+        <span class="alt-price">$215</span>
+      </div>
+
+      <div class="row">
+        <span class="rank">10</span>
+        <span class="thumb" style="background:#6B3F8A;">L</span>
+        <span class="card-cell"><span class="card-name">Trafalgar Law — Room</span><span class="card-sub"><span class="setcode">OP05</span><span class="rar rar-sr">SR</span></span></span>
+        <span class="price">$172</span>
+        <span class="chg down">−3.1%</span>
+        <span class="chg down">−1.4%</span>
+        <span class="chg up">+6.2%</span>
+        <span class="alt-price">$178</span>
+        <span class="alt-price">$168</span>
+      </div>
+
+    </div>
+
+    <div class="mock-note">
+      MOCKUP · /markets (FULL) · C1.5 · v2.0 · 2026-05-19 · MATCHES REAL PAGE: 7-WIDGET DASHBOARD + FILTERBAR (SEARCH/SET/SORT/10 RARITY TOGGLES) + 9-COL TABLE (#/THUMB/CARD/PRICE/24H/7D/30D/TCG/EBAY) · REAL RARITIES: MR SP SEC TR AA SR R L UC C
+    </div>
+
+  </main>
+
+</body>
+</html>

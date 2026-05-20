@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OwlMarket — Admin · Inventory Bundles (C1.5 mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Caveat:wght@700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #FFF5E4; --bg-2: #FFFFFF; --bg-3: #FCE6BE;
+      --ink: #1A0F08; --ink-2: #5C4534; --ink-3: #9A8475;
+      --pink: #FF6BB8; --coral: #FF4936; --gold: #E89512;
+      --gain: #2D9961; --loss: #E04E4E;
+      --select: #1F47A1;
+      --grad-brand: linear-gradient(135deg, #FF6BB8 0%, #FF4936 50%, #E89512 100%);
+      --r-sm: 8px; --r-md: 14px; --r-lg: 22px; --r-pill: 999px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: var(--bg); color: var(--ink); font-family: 'Space Grotesk', system-ui, sans-serif; font-weight: 500; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+    .container { max-width: 1480px; margin: 0 auto; padding-left: 28px; padding-right: 28px; }
+    a { color: inherit; }
+
+    /* ===== NAV (ADMIN) ===== */
+    .topnav { position: sticky; top: 0; z-index: 50; background: rgba(255, 245, 228, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1.5px solid rgba(26, 15, 8, 0.08); }
+    .topnav-inner { display: flex; align-items: center; gap: 22px; padding: 14px 28px; max-width: 1680px; margin: 0 auto; }
+    .lockup { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; flex-shrink: 0; }
+    .lockup-wm { font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: var(--ink); font-size: 22px; display: inline-flex; align-items: baseline; }
+    .lockup-wm em { font-family: 'Caveat', cursive; font-style: normal; font-weight: 700; font-size: 28px; margin-left: -2px; padding-right: 8px; padding-bottom: 2px; display: inline-block; background: var(--grad-brand); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+    .internal-chip { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--coral); background: #FFE2DD; border: 1.5px solid var(--coral); border-radius: var(--r-pill); padding: 3px 9px; flex-shrink: 0; }
+    .nav-links { display: inline-flex; gap: 22px; list-style: none; margin-left: 6px; }
+    .nav-links a { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: var(--ink-2); text-decoration: none; padding: 4px 0; position: relative; white-space: nowrap; }
+    .nav-links a.active { color: var(--ink); }
+    .nav-links a.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 2px; background: var(--grad-brand); border-radius: 2px; }
+    .nav-right { margin-left: auto; display: inline-flex; align-items: center; gap: 16px; }
+    .nav-view { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 12px; color: var(--ink-2); text-decoration: none; letter-spacing: 0.04em; }
+    .nav-view:hover { color: var(--ink); }
+    .nav-signout { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; color: var(--ink); background: transparent; border: 1.5px solid var(--ink); border-radius: var(--r-pill); padding: 7px 16px; cursor: pointer; text-decoration: none; transition: all 0.15s ease; }
+    .nav-signout:hover { background: var(--ink); color: var(--bg); }
+
+    main { padding: 32px 0 96px; }
+
+    /* head */
+    .page-head { margin-bottom: 22px; display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+    .eyebrow { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 12px; color: var(--coral); letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 10px; }
+    h1.title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; letter-spacing: -0.025em; line-height: 1; color: var(--ink); }
+    .subline { margin-top: 10px; font-size: 14px; color: var(--ink-2); max-width: 620px; }
+    .head-actions { display: inline-flex; gap: 12px; flex-wrap: wrap; }
+
+    .btn { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; padding: 0 16px; height: 42px; border-radius: var(--r-sm); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 7px; text-decoration: none; transition: all 0.13s ease; border: 1.5px solid transparent; white-space: nowrap; }
+    .btn-primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+    .btn-primary:hover { background: #2E1C10; }
+    .btn-ghost { background: var(--bg-2); color: var(--ink); border-color: var(--ink); }
+    .btn-ghost:hover { background: var(--bg-3); }
+    .btn-view { height: 40px; }
+
+    /* success banner */
+    .banner-ok { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; border: 1.5px solid var(--gain); background: #DCF1E6; border-radius: var(--r-md); padding: 13px 18px; font-family: 'Space Grotesk'; font-weight: 600; font-size: 14px; color: var(--ink); }
+    .banner-ok b { color: var(--gain); }
+
+    /* ===== BUNDLE CARD ===== */
+    .bundle-list { display: grid; gap: 18px; }
+    .bundle {
+      background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-md);
+      padding: 22px 24px; display: flex; flex-direction: column; gap: 20px;
+    }
+    /* top row: header (left) + thumbnail rail (right) */
+    .b-top { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 24px; align-items: start; }
+    .b-head { min-width: 0; }
+    .b-updated { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+    .b-name { font-family: 'Space Grotesk'; font-weight: 700; font-size: 24px; letter-spacing: -0.02em; color: var(--ink); margin-top: 3px; }
+    .b-notes { margin-top: 8px; font-size: 13.5px; color: var(--ink-2); max-width: 720px; line-height: 1.5; }
+
+    /* chips */
+    .b-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .chip { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; padding: 7px 12px; border-radius: var(--r-sm); border: 1.5px solid; display: inline-flex; align-items: center; gap: 6px; }
+    .chip .v { color: var(--ink); }
+    .chip-cards { color: var(--ink-2); border-color: var(--ink); background: var(--bg-3); }
+    .chip-status { color: var(--ink-2); border-color: var(--ink-2); background: var(--bg-2); }
+    .chip-status.st-sale { color: var(--gain); border-color: var(--gain); background: #DCF1E6; }
+    .chip-status.st-grading { color: var(--gold); border-color: var(--gold); background: #FBF0DA; }
+    .chip-status.st-ship { color: var(--coral); border-color: var(--coral); background: #FFE2DD; }
+    .chip-status.st-sold { color: var(--ink-3); border-color: var(--ink-3); background: var(--bg-2); }
+    .chip-soldat { color: var(--gain); border-color: var(--gain); background: #DCF1E6; }
+    .chip-solddate { color: var(--ink-2); border-color: var(--ink-3); background: var(--bg-2); }
+
+    /* item preview grid — FULL WIDTH, auto-fill */
+    .b-items { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+    .b-item { display: grid; grid-template-columns: 48px minmax(0,1fr); gap: 12px; align-items: center; border: 1.5px solid var(--ink); border-radius: var(--r-sm); background: var(--bg); padding: 9px; }
+    .b-item > span:last-child { display: block; min-width: 0; overflow: hidden; }
+    .b-item-thumb { width: 48px; height: 66px; border-radius: 5px; border: 1.5px solid var(--ink); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk'; font-weight: 700; font-size: 15px; color: var(--bg); }
+    .b-item-thumb.box { background: var(--ink-2); font-size: 10px; }
+    .b-item-name { display: block; font-family: 'Space Grotesk'; font-weight: 700; font-size: 13px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .b-item-meta { display: block; margin-top: 3px; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* right rail: fanned thumbnails + view */
+    .b-rail { display: flex; flex-direction: column; align-items: flex-end; gap: 14px; min-width: 200px; }
+    .fan { display: flex; }
+    .fan .fan-card { width: 52px; height: 74px; border-radius: 6px; border: 1.5px solid var(--ink); box-shadow: 0 0 0 2.5px var(--bg-2); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk'; font-weight: 700; font-size: 15px; color: var(--bg); margin-left: -12px; }
+    .fan .fan-card:first-child { margin-left: 0; }
+    .fan-none { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); border: 1.5px dashed var(--ink-3); border-radius: var(--r-sm); padding: 14px 18px; }
+
+    .mock-note { margin-top: 28px; padding: 14px 20px; background: var(--bg-2); border: 1.5px dashed var(--ink-3); border-radius: var(--r-md); font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em; color: var(--ink-2); text-align: center; text-transform: uppercase; font-weight: 600; line-height: 1.7; }
+  </style>
+</head>
+<body>
+
+  <!-- NAV (ADMIN) -->
+  <header class="topnav">
+    <div class="topnav-inner">
+      <a href="#" class="lockup">
+        <svg width="34" height="34" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="og-adm" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FF6BB8"/><stop offset="50%" stop-color="#FF4936"/><stop offset="100%" stop-color="#E89512"/></linearGradient>
+            <mask id="om-adm"><rect width="120" height="120" fill="white"/><circle cx="70" cy="56" r="20" fill="black"/></mask>
+          </defs>
+          <circle cx="60" cy="60" r="52" fill="url(#og-adm)" stroke="#1A0F08" stroke-width="5"/>
+          <circle cx="60" cy="60" r="38" fill="#1A0F08"/>
+          <circle cx="58" cy="60" r="26" fill="#FFF5E4" mask="url(#om-adm)"/>
+          <g transform="translate(80 60)"><path d="M 0,-11 Q 1.65,-1.65 11,0 Q 1.65,1.65 0,11 Q -1.65,1.65 -11,0 Q -1.65,-1.65 0,-11 Z" fill="#FFF5E4"/></g>
+        </svg>
+        <span class="lockup-wm">Owl<em>Market</em></span>
+      </a>
+      <span class="internal-chip">Internal</span>
+      <nav>
+        <ul class="nav-links">
+          <li><a href="#">Inventory</a></li>
+          <li><a href="#" class="active">Bundles</a></li>
+          <li><a href="#">Orders</a></li>
+          <li><a href="#">Lens</a></li>
+          <li><a href="#">PSA</a></li>
+        </ul>
+      </nav>
+      <div class="nav-right">
+        <a href="#" class="nav-view">View site ↗</a>
+        <a href="#" class="nav-signout">Sign out</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Internal Tool</div>
+        <h1 class="title">Inventory Bundles</h1>
+        <p class="subline">Manage permanent card groups that should stay together and move through inventory as one bundle.</p>
+      </div>
+      <div class="head-actions">
+        <a href="#" class="btn btn-ghost">Back to Inventory</a>
+        <a href="#" class="btn btn-primary">Create Bundle</a>
+      </div>
+    </div>
+
+    <div class="banner-ok">Bundle created: <b>Red-Hair Pirates Trio</b></div>
+
+    <div class="bundle-list">
+
+      <!-- BUNDLE 1 — For Sale -->
+      <article class="bundle">
+        <div class="b-top">
+          <div class="b-head">
+            <div class="b-updated">Updated May 18, 2026</div>
+            <div class="b-name">Red-Hair Pirates Trio</div>
+            <p class="b-notes">Matched OP01 leader set — keeping these three together for a premium listing. Sells as one lot only.</p>
+            <div class="b-chips">
+              <span class="chip chip-cards">Cards <span class="v">3</span></span>
+              <span class="chip chip-status st-sale">For Sale</span>
+            </div>
+          </div>
+          <div class="b-rail">
+            <div class="fan">
+              <span class="fan-card" style="background:#7C2A1E;">S</span>
+              <span class="fan-card" style="background:#594229;">B</span>
+              <span class="fan-card" style="background:#7A4B1C;">Y</span>
+            </div>
+            <a href="#" class="btn btn-ghost btn-view">View Bundle</a>
+          </div>
+        </div>
+        <div class="b-items">
+          <div class="b-item">
+            <span class="b-item-thumb" style="background:#7C2A1E;">S</span>
+            <span><span class="b-item-name">Shanks — Red Hair</span><span class="b-item-meta">OP01 / OP01-120 / MR / Cert 78451123</span></span>
+          </div>
+          <div class="b-item">
+            <span class="b-item-thumb" style="background:#594229;">B</span>
+            <span><span class="b-item-name">Benn Beckman</span><span class="b-item-meta">OP01 / OP01-019 / SR</span></span>
+          </div>
+          <div class="b-item">
+            <span class="b-item-thumb" style="background:#7A4B1C;">Y</span>
+            <span><span class="b-item-name">Yasopp</span><span class="b-item-meta">OP01 / OP01-018 / R</span></span>
+          </div>
+        </div>
+      </article>
+
+      <!-- BUNDLE 2 — Grading -->
+      <article class="bundle">
+        <div class="b-top">
+          <div class="b-head">
+            <div class="b-updated">Updated May 16, 2026</div>
+            <div class="b-name">Gear 5 Graded Lot</div>
+            <p class="b-notes">Four Luffy Gear Fifth copies submitted together — moving through grading as one bundle.</p>
+            <div class="b-chips">
+              <span class="chip chip-cards">Cards <span class="v">4</span></span>
+              <span class="chip chip-status st-grading">Grading</span>
+            </div>
+          </div>
+          <div class="b-rail">
+            <div class="fan">
+              <span class="fan-card" style="background:#C53A2A;">L</span>
+              <span class="fan-card" style="background:#C53A2A;">L</span>
+              <span class="fan-card" style="background:#C53A2A;">L</span>
+              <span class="fan-card" style="background:#C53A2A;">L</span>
+            </div>
+            <a href="#" class="btn btn-ghost btn-view">View Bundle</a>
+          </div>
+        </div>
+        <div class="b-items">
+          <div class="b-item">
+            <span class="b-item-thumb" style="background:#C53A2A;">L</span>
+            <span><span class="b-item-name">Luffy — Gear Fifth</span><span class="b-item-meta">OP05 / OP05-119 / PSA 10 / Cert 89102447</span></span>
+          </div>
+          <div class="b-item">
+            <span class="b-item-thumb" style="background:#C53A2A;">L</span>
+            <span><span class="b-item-name">Luffy — Gear Fifth</span><span class="b-item-meta">OP05 / OP05-119 / PSA 9 / Cert 89102450</span></span>
+          </div>
+          <div class="b-item">
+            <span class="b-item-thumb" style="background:#C53A2A;">L</span>
+            <span><span class="b-item-name">Luffy — Gear Fifth</span><span class="b-item-meta">OP05 / OP05-119 / PSA 9 / Cert 89102461</span></span>
+          </div>
+          <div class="b-item">
+            <span class="b-item-thumb" style="background:#C53A2A;">L</span>
+            <span><span class="b-item-name">Luffy — Gear Fifth</span><span class="b-item-meta">OP05 / OP05-119 / PSA 8 / Cert 89102479</span></span>
+          </div>
+        </div>
+      </article>
+
+      <!-- BUNDLE 3 — Sold (shows sold chips) -->
+      <article class="bundle">
+        <div class="b-top">
+          <div class="b-head">
+            <div class="b-updated">Updated May 09, 2026</div>
+            <div class="b-name">OP01 Starter Showcase</div>
+            <p class="b-notes">Full starter-deck showcase set sold as one lot to a repeat buyer.</p>
+            <div class="b-chips">
+              <span class="chip chip-cards">Cards <span class="v">6</span></span>
+              <span class="chip chip-status st-sold">Sold</span>
+              <span class="chip chip-soldat">Sold At <span class="v">Ebay</span></span>
+              <span class="chip chip-solddate">Sold Date <span class="v">May 9, 2026</span></span>
+            </div>
+          </div>
+          <div class="b-rail">
+            <div class="fan">
+              <span class="fan-card" style="background:#7C2A1E;">L</span>
+              <span class="fan-card" style="background:#2D6E4E;">Z</span>
+              <span class="fan-card" style="background:#4A2A52;">N</span>
+              <span class="fan-card" style="background:#594229;">U</span>
+              <span class="fan-card" style="background:#6B3F8A;">S</span>
+              <span class="fan-card box" style="background:var(--ink-2);font-size:9px;">BOX</span>
+            </div>
+            <a href="#" class="btn btn-ghost btn-view">View Bundle</a>
+          </div>
+        </div>
+        <div class="b-items">
+          <div class="b-item">
+            <span class="b-item-thumb" style="background:#7C2A1E;">L</span>
+            <span><span class="b-item-name">Luffy — Romance Dawn</span><span class="b-item-meta">OP01 / OP01-024 / L</span></span>
+          </div>
+          <div class="b-item">
+            <span class="b-item-thumb" style="background:#2D6E4E;">Z</span>
+            <span><span class="b-item-name">Zoro — Three Sword Style</span><span class="b-item-meta">OP01 / OP01-025 / SR</span></span>
+          </div>
+          <div class="b-item">
+            <span class="b-item-thumb" style="background:#4A2A52;">N</span>
+            <span><span class="b-item-name">Nami — Cat Burglar</span><span class="b-item-meta">OP01 / OP01-016 / R</span></span>
+          </div>
+          <div class="b-item">
+            <span class="b-item-thumb" style="background:#594229;">U</span>
+            <span><span class="b-item-name">Usopp — Sniper King</span><span class="b-item-meta">OP01 / OP01-013 / UC</span></span>
+          </div>
+          <div class="b-item">
+            <span class="b-item-thumb" style="background:#6B3F8A;">S</span>
+            <span><span class="b-item-name">Sanji — Black Leg</span><span class="b-item-meta">OP01 / OP01-014 / R</span></span>
+          </div>
+          <div class="b-item">
+            <span class="b-item-thumb box">BOX</span>
+            <span><span class="b-item-name">OP01 Starter — ST01</span><span class="b-item-meta">ST01 / Sealed product</span></span>
+          </div>
+        </div>
+      </article>
+
+    </div>
+
+    <div class="mock-note">
+      MOCKUP · /admin/bundles · C1.5 · v3.0 · 2026-05-20 · LOCKS THE CARD-LIST PATTERN (vs inventory data-table)<br>
+      MATCHES REAL: STACKED BUNDLE CARDS · UPDATED-DATE · NAME · NOTES · CHIPS (CARDS COUNT / STATUS / [SOLD: SOLD-AT + SOLD-DATE]) · ITEM PREVIEW (THUMB + NAME + SET/NUMBER/GRADE/CERT, UP TO 6) · FANNED THUMBNAIL STACK + VIEW BUNDLE · HOVER-ZOOM ON THUMBS (interaction)<br>
+      v3: ITEM GRID NOW FULL-WIDTH AUTO-FILL (header + rail = top row, items break out below) — MORE META VISIBLE, MORE CARDS PER ROW, NO DEAD SPACE
+    </div>
+
+  </main>
+
+</body>
+</html>

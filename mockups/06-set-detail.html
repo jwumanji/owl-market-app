@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OwlMarket — Set Detail (C1.5 mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Caveat:wght@700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #FFF5E4; --bg-2: #FFFFFF; --bg-3: #FCE6BE;
+      --ink: #1A0F08; --ink-2: #5C4534; --ink-3: #9A8475;
+      --pink: #FF6BB8; --coral: #FF4936; --gold: #E89512;
+      --gain: #2D9961; --loss: #E04E4E;
+      --grad-brand: linear-gradient(135deg, #FF6BB8 0%, #FF4936 50%, #E89512 100%);
+      --set-color: #C53A2A; /* OP01 red — per-set accent */
+      --r-sm: 8px; --r-md: 14px; --r-lg: 22px; --r-pill: 999px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      background: var(--bg); color: var(--ink);
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-weight: 500; -webkit-font-smoothing: antialiased; min-height: 100vh;
+    }
+    .container { max-width: 1280px; margin: 0 auto; padding-left: 28px; padding-right: 28px; }
+
+    /* NAV */
+    .topnav { position: sticky; top: 0; z-index: 50; background: rgba(255,245,228,0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1.5px solid rgba(26,15,8,0.08); }
+    .topnav-inner { display: flex; align-items: center; justify-content: space-between; padding: 16px 28px; max-width: 1280px; margin: 0 auto; }
+    .lockup { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+    .lockup-wm { font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: var(--ink); font-size: 22px; display: inline-flex; align-items: baseline; }
+    .lockup-wm em { font-family: 'Caveat', cursive; font-style: normal; font-weight: 700; font-size: 28px; margin-left: -2px; padding-right: 8px; padding-bottom: 2px; display: inline-block; background: var(--grad-brand); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+    .nav-links { display: inline-flex; gap: 28px; list-style: none; }
+    .nav-links a { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px; color: var(--ink-2); text-decoration: none; padding: 4px 0; position: relative; }
+    .nav-links a.active { color: var(--ink); }
+    .nav-links a.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 2px; background: var(--grad-brand); border-radius: 2px; }
+    .signin-btn { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: var(--ink); background: transparent; border: 1.5px solid var(--ink); border-radius: var(--r-pill); padding: 8px 18px; cursor: pointer; text-decoration: none; transition: all 0.15s; }
+    .signin-btn:hover { background: var(--ink); color: var(--bg); }
+
+    main { padding: 28px 0 96px; }
+
+    /* BREADCRUMB */
+    .crumbs { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 12px; color: var(--ink-2); letter-spacing: 0.03em; margin-bottom: 20px; }
+    .crumbs a { color: var(--ink-2); text-decoration: none; }
+    .crumbs a:hover { color: var(--ink); }
+    .crumbs .sep { margin: 0 8px; color: var(--ink-3); }
+    .crumbs .here { color: var(--ink); }
+
+    /* SET SWITCHER */
+    .switcher { background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-md); padding: 14px 18px; margin-bottom: 24px; display: flex; flex-direction: column; gap: 10px; }
+    .switcher-row { display: flex; align-items: center; gap: 14px; }
+    .switcher-label { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); width: 64px; flex-shrink: 0; }
+    .switcher-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+    .chip { display: inline-flex; align-items: center; gap: 5px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 12px; color: var(--ink); background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-pill); padding: 5px 11px; text-decoration: none; transition: all 0.12s; }
+    .chip:hover { background: var(--bg-3); }
+    .chip.active { background: var(--grad-brand); color: var(--bg); border-color: transparent; }
+    .chip-arrow { font-size: 8px; }
+    .chip-arrow.up { color: var(--gain); }
+    .chip-arrow.dn { color: var(--loss); }
+    .chip.active .chip-arrow.up, .chip.active .chip-arrow.dn { color: var(--bg); }
+
+    /* HERO */
+    .hero { display: grid; grid-template-columns: 380px 1fr; gap: 24px; margin-bottom: 32px; align-items: start; }
+
+    /* ID CARD (left) */
+    .id-card { background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-md); overflow: hidden; }
+    .id-art { position: relative; aspect-ratio: 4 / 3; background: var(--set-color); display: flex; align-items: center; justify-content: center; border-bottom: 1.5px solid var(--ink); }
+    .id-art-emoji { font-size: 84px; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.25)); }
+    .id-art-label { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,245,228,0.85); }
+    .id-head { padding: 18px 20px 14px; border-bottom: 1px dashed rgba(26,15,8,0.15); }
+    .id-code { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 12px; letter-spacing: 0.06em; color: var(--ink-2); }
+    .id-name { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 24px; letter-spacing: -0.02em; color: var(--ink); margin-top: 4px; line-height: 1.1; }
+    .id-desc { font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 13px; color: var(--ink-2); margin-top: 8px; line-height: 1.4; }
+    .id-rows { padding: 8px 20px 16px; }
+    .id-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-top: 1px solid var(--bg-3); }
+    .id-row:first-child { border-top: none; }
+    .id-key { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+    .id-val { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 14px; color: var(--ink); }
+    .id-val.accent { color: var(--set-color); font-size: 16px; }
+    .id-val.muted { color: var(--ink-2); }
+
+    /* CHART CARD (right) */
+    .chart-card { background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-md); padding: 20px 22px 18px; }
+    .cc-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .cc-eyebrow { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); }
+    .cc-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 20px; letter-spacing: -0.015em; color: var(--ink); margin-top: 6px; }
+    .cc-price-row { display: flex; align-items: baseline; gap: 12px; margin-top: 10px; }
+    .cc-price { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 32px; color: var(--ink); letter-spacing: -0.01em; }
+    .cc-delta { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 13px; padding: 4px 11px; border-radius: var(--r-pill); }
+    .cc-delta.up { background: var(--gain); color: var(--bg); }
+    .cc-delta.dn { background: var(--loss); color: var(--bg); }
+    .cc-sub { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 12px; color: var(--ink-3); margin-top: 8px; }
+    .cc-times { display: flex; gap: 4px; }
+    .cc-time { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 11px; color: var(--ink-2); background: transparent; border: none; padding: 6px 11px; border-radius: var(--r-pill); cursor: pointer; letter-spacing: 0.04em; }
+    .cc-time:hover { background: var(--bg-3); }
+    .cc-time.on { background: var(--ink); color: var(--bg); }
+
+    .cc-chart { margin-top: 18px; }
+    .cc-chart svg { width: 100%; height: 200px; display: block; }
+    .cc-grid { stroke: var(--ink-3); stroke-width: 0.5; stroke-dasharray: 3 4; opacity: 0.3; }
+    .cc-line { fill: none; stroke: var(--gain); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .cc-area { fill: url(#cc-grad); }
+    .cc-axis { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 10px; fill: var(--ink-3); }
+
+    .perf-strip { margin-top: 16px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; border-top: 1px dashed rgba(26,15,8,0.15); padding-top: 16px; }
+    .perf-cell { text-align: center; }
+    .perf-period { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 10px; letter-spacing: 0.1em; color: var(--ink-3); text-transform: uppercase; }
+    .perf-val { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 13px; margin-top: 4px; }
+    .perf-val.up { color: var(--gain); }
+    .perf-val.dn { color: var(--loss); }
+    .perf-val.flat { color: var(--ink-3); }
+
+    /* TOP CARDS */
+    .tc-section { margin-top: 8px; }
+    .tc-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+    .tc-eyebrow { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); }
+    .tc-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 28px; letter-spacing: -0.02em; color: var(--ink); margin-top: 6px; }
+    .tc-title span { color: var(--set-color); }
+    .tc-sub { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+    .tc-link { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: var(--ink); text-decoration: none; border-bottom: 2px solid; border-image: var(--grad-brand) 1; padding-bottom: 2px; }
+
+    .table { background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-md); overflow: hidden; }
+    .thead, .row { display: grid; grid-template-columns: 40px 56px 1fr 88px 96px 92px 70px 70px 70px 100px; align-items: center; gap: 12px; padding: 12px 18px; }
+    .thead { background: var(--bg-3); border-bottom: 1.5px solid var(--ink); font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+    .thead .r { text-align: right; }
+    .row { border-top: 1px solid var(--bg-3); transition: background 0.12s; cursor: pointer; }
+    .row:hover { background: var(--bg-3); }
+    .rank { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 12px; color: var(--ink-2); text-align: center; }
+    .thumb { width: 40px; height: 56px; border-radius: 4px; border: 1.5px solid var(--ink); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 14px; color: var(--bg); flex-shrink: 0; }
+    .card-cell { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+    .card-name { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .setcode { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 9px; color: var(--ink-2); background: var(--bg-3); padding: 1px 5px; border-radius: 4px; width: fit-content; letter-spacing: 0.04em; }
+    .rar { display: inline-flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 700; font-size: 10px; letter-spacing: 0.06em; padding: 2px 8px; border-radius: var(--r-pill); border: 1.2px solid; width: fit-content; }
+    .rar-r { color: var(--coral); border-color: var(--coral); background: #FFE2DD; }
+    .rar-sr { color: var(--pink); border-color: var(--pink); background: #FFE0F0; }
+    .rar-aa { color: #7A3FB0; border-color: #7A3FB0; background: #F0E4FA; }
+    .rar-sec, .rar-mr, .rar-sp { border-color: var(--ink); background: var(--bg-3); }
+    .rar-sec span, .rar-mr span, .rar-sp span { background: var(--grad-brand); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+    .price { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 14px; color: var(--ink); text-align: right; }
+    .price.alt { color: var(--ink-2); font-weight: 500; }
+    .chg { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 12.5px; text-align: right; }
+    .chg.up { color: var(--gain); }
+    .chg.dn { color: var(--loss); }
+    .chg.flat { color: var(--ink-3); }
+    .spark { width: 90px; height: 24px; display: block; margin-left: auto; }
+    .spark path { fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    .spark .area { stroke: none; }
+    .spark.up path.line { stroke: var(--gain); }
+    .spark.up path.area { fill: rgba(45,153,97,0.13); }
+    .spark.dn path.line { stroke: var(--loss); }
+    .spark.dn path.area { fill: rgba(224,78,78,0.11); }
+
+    .mock-note { margin-top: 32px; padding: 14px 20px; background: var(--bg-2); border: 1.5px dashed var(--ink-3); border-radius: var(--r-md); font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: 0.08em; color: var(--ink-2); text-align: center; text-transform: uppercase; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <header class="topnav">
+    <div class="topnav-inner">
+      <a href="#" class="lockup">
+        <svg width="36" height="36" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="og-nav" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FF6BB8"/><stop offset="50%" stop-color="#FF4936"/><stop offset="100%" stop-color="#E89512"/></linearGradient>
+            <mask id="om-nav"><rect width="120" height="120" fill="white"/><circle cx="70" cy="56" r="20" fill="black"/></mask>
+          </defs>
+          <circle cx="60" cy="60" r="52" fill="url(#og-nav)" stroke="#1A0F08" stroke-width="5"/>
+          <circle cx="60" cy="60" r="38" fill="#1A0F08"/>
+          <circle cx="58" cy="60" r="26" fill="#FFF5E4" mask="url(#om-nav)"/>
+          <g transform="translate(80 60)"><path d="M 0,-11 Q 1.65,-1.65 11,0 Q 1.65,1.65 0,11 Q -1.65,1.65 -11,0 Q -1.65,-1.65 0,-11 Z" fill="#FFF5E4"/></g>
+        </svg>
+        <span class="lockup-wm">Owl<em>Market</em></span>
+      </a>
+      <nav>
+        <ul class="nav-links">
+          <li><a href="#">Home</a></li>
+          <li><a href="#">Markets</a></li>
+          <li><a href="#">Rarities</a></li>
+          <li><a href="#" class="active">Sets</a></li>
+          <li><a href="#">Characters</a></li>
+          <li><a href="#">Portfolio</a></li>
+        </ul>
+      </nav>
+      <a href="#" class="signin-btn">Sign in</a>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <div class="crumbs">
+      <a href="#">OWL Market</a><span class="sep">›</span><a href="#">Sets</a><span class="sep">›</span><span class="here">OP01</span>
+    </div>
+
+    <!-- SET SWITCHER -->
+    <div class="switcher">
+      <div class="switcher-row">
+        <span class="switcher-label">Booster</span>
+        <div class="switcher-chips">
+          <a href="#" class="chip active"><span>OP01</span><span class="chip-arrow up">▲</span></a>
+          <a href="#" class="chip"><span>OP02</span><span class="chip-arrow up">▲</span></a>
+          <a href="#" class="chip"><span>OP03</span><span class="chip-arrow dn">▼</span></a>
+          <a href="#" class="chip"><span>OP04</span><span class="chip-arrow up">▲</span></a>
+          <a href="#" class="chip"><span>OP05</span><span class="chip-arrow up">▲</span></a>
+          <a href="#" class="chip"><span>OP06</span><span class="chip-arrow up">▲</span></a>
+        </div>
+      </div>
+      <div class="switcher-row">
+        <span class="switcher-label">Extras</span>
+        <div class="switcher-chips">
+          <a href="#" class="chip"><span>EB01</span><span class="chip-arrow up">▲</span></a>
+          <a href="#" class="chip"><span>PRB01</span><span class="chip-arrow dn">▼</span></a>
+        </div>
+      </div>
+      <div class="switcher-row">
+        <span class="switcher-label">Starter</span>
+        <div class="switcher-chips">
+          <a href="#" class="chip"><span>ST01</span><span class="chip-arrow up">▲</span></a>
+          <a href="#" class="chip"><span>ST10</span><span class="chip-arrow up">▲</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- HERO -->
+    <div class="hero">
+
+      <!-- ID CARD -->
+      <div class="id-card">
+        <div class="id-art">
+          <span class="id-art-emoji">🏴‍☠️</span>
+          <span class="id-art-label">OP01 Booster Box</span>
+        </div>
+        <div class="id-head">
+          <span class="id-code">OP01 · 2022</span>
+          <div class="id-name">Romance Dawn</div>
+          <div class="id-desc">One Piece TCG OP01 — 121 priced cards in this print run.</div>
+        </div>
+        <div class="id-rows">
+          <div class="id-row"><span class="id-key">Index Value</span><span class="id-val accent">$2,840.00</span></div>
+          <div class="id-row"><span class="id-key">All-Time High</span><span class="id-val">$3,120</span></div>
+          <div class="id-row"><span class="id-key">All-Time Low</span><span class="id-val">$1,240</span></div>
+          <div class="id-row"><span class="id-key">Cards Priced</span><span class="id-val">121/121</span></div>
+          <div class="id-row"><span class="id-key">Release</span><span class="id-val">2022</span></div>
+          <div class="id-row"><span class="id-key">24H Volume</span><span class="id-val muted">$184K</span></div>
+        </div>
+      </div>
+
+      <!-- CHART CARD -->
+      <div class="chart-card">
+        <div class="cc-head">
+          <div>
+            <div class="cc-eyebrow">Index Performance</div>
+            <div class="cc-title">OP01 Romance Dawn Index</div>
+            <div class="cc-price-row">
+              <span class="cc-price">$2,840.00</span>
+              <span class="cc-delta up">+8.4% · 30D</span>
+            </div>
+            <div class="cc-sub">Total card value · 121 cards tracked · USD</div>
+          </div>
+          <div class="cc-times">
+            <button class="cc-time">7D</button>
+            <button class="cc-time on">1M</button>
+            <button class="cc-time">3M</button>
+            <button class="cc-time">1Y</button>
+            <button class="cc-time">MAX</button>
+          </div>
+        </div>
+
+        <div class="cc-chart">
+          <svg viewBox="0 0 720 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="cc-grad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#2D9961" stop-opacity="0.20"/>
+                <stop offset="100%" stop-color="#2D9961" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <line class="cc-grid" x1="0" y1="40" x2="660" y2="40"/>
+            <line class="cc-grid" x1="0" y1="90" x2="660" y2="90"/>
+            <line class="cc-grid" x1="0" y1="140" x2="660" y2="140"/>
+            <text class="cc-axis" x="666" y="44">$3,000</text>
+            <text class="cc-axis" x="666" y="94">$2,700</text>
+            <text class="cc-axis" x="666" y="144">$2,400</text>
+            <path class="cc-area" d="M 10 130 L 50 124 L 90 132 L 130 118 L 170 110 L 210 96 L 250 104 L 290 82 L 330 70 L 370 84 L 410 60 L 450 72 L 490 54 L 530 48 L 570 40 L 610 58 L 648 50 L 648 175 L 10 175 Z"/>
+            <path class="cc-line" d="M 10 130 L 50 124 L 90 132 L 130 118 L 170 110 L 210 96 L 250 104 L 290 82 L 330 70 L 370 84 L 410 60 L 450 72 L 490 54 L 530 48 L 570 40 L 610 58 L 648 50"/>
+            <circle cx="648" cy="50" r="4" fill="#2D9961" stroke="#FFFFFF" stroke-width="2"/>
+            <text class="cc-axis" x="10" y="192">Apr 19</text>
+            <text class="cc-axis" x="320" y="192">May 4</text>
+            <text class="cc-axis" x="600" y="192">May 19</text>
+          </svg>
+        </div>
+
+        <div class="perf-strip">
+          <div class="perf-cell"><div class="perf-period">1H</div><div class="perf-val flat">0.0%</div></div>
+          <div class="perf-cell"><div class="perf-period">24H</div><div class="perf-val up">+1.2%</div></div>
+          <div class="perf-cell"><div class="perf-period">7D</div><div class="perf-val up">+3.6%</div></div>
+          <div class="perf-cell"><div class="perf-period">30D</div><div class="perf-val up">+8.4%</div></div>
+          <div class="perf-cell"><div class="perf-period">1Y</div><div class="perf-val up">+42.1%</div></div>
+          <div class="perf-cell"><div class="perf-period">MAX</div><div class="perf-val up">+128.0%</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOP CARDS -->
+    <div class="tc-section">
+      <div class="tc-head">
+        <div>
+          <div class="tc-eyebrow">Holdings</div>
+          <div class="tc-title">Top cards in <span>OP01</span></div>
+          <div class="tc-sub">10 of 121 cards · sorted by average market price</div>
+        </div>
+        <a href="#" class="tc-link">View all 121 in markets →</a>
+      </div>
+
+      <div class="table">
+        <div class="thead">
+          <span class="r">#</span>
+          <span></span>
+          <span>Card</span>
+          <span>Rarity</span>
+          <span class="r">Avg Price</span>
+          <span class="r">TCGPlayer</span>
+          <span class="r">24H</span>
+          <span class="r">7D</span>
+          <span class="r">30D</span>
+          <span class="r">7D Trend</span>
+        </div>
+
+        <div class="row">
+          <span class="rank">1</span>
+          <span class="thumb" style="background:#7C2A1E;">S</span>
+          <span class="card-cell"><span class="card-name">Shanks — Divine Departure</span><span class="setcode">OP01</span></span>
+          <span><span class="rar rar-sec"><span>SEC</span></span></span>
+          <span class="price">$1,420.00</span>
+          <span class="price alt">$1,398.00</span>
+          <span class="chg dn">−1.8%</span>
+          <span class="chg up">+2.1%</span>
+          <span class="chg up">+18.4%</span>
+          <span><svg class="spark up" viewBox="0 0 90 24"><path class="area" d="M2,18 L13,16 L24,17 L35,12 L46,13 L57,8 L68,9 L79,5 L88,4 L88,24 L2,24 Z"/><path class="line" d="M2,18 L13,16 L24,17 L35,12 L46,13 L57,8 L68,9 L79,5 L88,4"/></svg></span>
+        </div>
+
+        <div class="row">
+          <span class="rank">2</span>
+          <span class="thumb" style="background:#7C2A1E;">S</span>
+          <span class="card-cell"><span class="card-name">Shanks — Red Hair Pirates</span><span class="setcode">OP01</span></span>
+          <span><span class="rar rar-mr"><span>MR</span></span></span>
+          <span class="price">$680.00</span>
+          <span class="price alt">$695.00</span>
+          <span class="chg up">+6.7%</span>
+          <span class="chg up">+9.2%</span>
+          <span class="chg up">+14.0%</span>
+          <span><svg class="spark up" viewBox="0 0 90 24"><path class="area" d="M2,20 L13,18 L24,16 L35,14 L46,12 L57,10 L68,8 L79,6 L88,5 L88,24 L2,24 Z"/><path class="line" d="M2,20 L13,18 L24,16 L35,14 L46,12 L57,10 L68,8 L79,6 L88,5"/></svg></span>
+        </div>
+
+        <div class="row">
+          <span class="rank">3</span>
+          <span class="thumb" style="background:#C53A2A;">L</span>
+          <span class="card-cell"><span class="card-name">Monkey D. Luffy — Gum-Gum Pistol</span><span class="setcode">OP01</span></span>
+          <span><span class="rar rar-sr">SR</span></span>
+          <span class="price">$284.00</span>
+          <span class="price alt">$276.00</span>
+          <span class="chg up">+4.2%</span>
+          <span class="chg up">+11.0%</span>
+          <span class="chg up">+38.6%</span>
+          <span><svg class="spark up" viewBox="0 0 90 24"><path class="area" d="M2,20 L13,19 L24,17 L35,15 L46,13 L57,10 L68,8 L79,5 L88,3 L88,24 L2,24 Z"/><path class="line" d="M2,20 L13,19 L24,17 L35,15 L46,13 L57,10 L68,8 L79,5 L88,3"/></svg></span>
+        </div>
+
+        <div class="row">
+          <span class="rank">4</span>
+          <span class="thumb" style="background:#D9A028;">N</span>
+          <span class="card-cell"><span class="card-name">Nami — Mirage Tempo</span><span class="setcode">OP01</span></span>
+          <span><span class="rar rar-r">R</span></span>
+          <span class="price">$48.00</span>
+          <span class="price alt">$46.50</span>
+          <span class="chg up">+0.8%</span>
+          <span class="chg up">+2.4%</span>
+          <span class="chg up">+9.2%</span>
+          <span><svg class="spark up" viewBox="0 0 90 24"><path class="area" d="M2,16 L13,15 L24,16 L35,14 L46,15 L57,13 L68,14 L79,12 L88,11 L88,24 L2,24 Z"/><path class="line" d="M2,16 L13,15 L24,16 L35,14 L46,15 L57,13 L68,14 L79,12 L88,11"/></svg></span>
+        </div>
+
+        <div class="row">
+          <span class="rank">5</span>
+          <span class="thumb" style="background:#2D6E4E;">Z</span>
+          <span class="card-cell"><span class="card-name">Roronoa Zoro — Three Sword Style</span><span class="setcode">OP01</span></span>
+          <span><span class="rar rar-aa">AA</span></span>
+          <span class="price">$62.00</span>
+          <span class="price alt">$64.00</span>
+          <span class="chg dn">−3.4%</span>
+          <span class="chg dn">−1.2%</span>
+          <span class="chg up">+4.8%</span>
+          <span><svg class="spark dn" viewBox="0 0 90 24"><path class="area" d="M2,8 L13,9 L24,8 L35,11 L46,10 L57,13 L68,12 L79,15 L88,16 L88,24 L2,24 Z"/><path class="line" d="M2,8 L13,9 L24,8 L35,11 L46,10 L57,13 L68,12 L79,15 L88,16"/></svg></span>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="mock-note">
+      MOCKUP · /sets/[slug] · C1.5 · v1.0 · 2026-05-19 · MATCHES REAL STRUCTURE: SET SWITCHER (BY TYPE) + ID CARD (BOX ART + 6 STATS) + INDEX CHART + 6-CELL PERF STRIP + TOP-CARDS TABLE W/ 7D SPARKLINE · PER-SET ACCENT COLOR (OP01 = RED)
+    </div>
+
+  </main>
+
+</body>
+</html>
