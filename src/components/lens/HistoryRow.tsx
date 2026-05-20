@@ -25,6 +25,33 @@ const TONE_TEXT_CLASSES = {
   loss: "text-loss",
 } as const;
 
+const ROW_SIZE = {
+  compact: {
+    row: "rounded-md px-4 py-4",
+    grid: "grid-cols-[64px_minmax(0,0.95fr)_minmax(0,1.15fr)_52px_76px]",
+    thumbnail: "w-16",
+    name: "text-[17px]",
+    input: "px-3 py-2.5 text-[17px]",
+    adjusted: "text-[10px]",
+    ratioBlock: "space-y-2",
+    ratioRow: "gap-x-4 gap-y-1 text-[14px] leading-6",
+    ceiling: "h-[52px] w-[52px] text-[26px]",
+    time: "w-[76px] text-[12px]",
+  },
+  full: {
+    row: "rounded-lg px-5 py-[18px]",
+    grid: "grid-cols-[72px_minmax(0,1fr)_minmax(0,1.2fr)_56px_84px_auto]",
+    thumbnail: "w-[72px]",
+    name: "text-[18px]",
+    input: "px-3 py-2.5 text-[18px]",
+    adjusted: "text-[10px]",
+    ratioBlock: "space-y-2.5",
+    ratioRow: "gap-x-4 gap-y-1 text-[14px] leading-6",
+    ceiling: "h-14 w-14 text-[28px]",
+    time: "w-[84px] text-[12px]",
+  },
+} as const;
+
 export async function saveHistoryRowRename({
   id,
   initialName,
@@ -58,13 +85,14 @@ export async function confirmAndDeleteHistoryRow({
   return true;
 }
 
-function faceRatioRows(face: PreGradeFace | null, label: "F" | "B") {
+function faceRatioRows(face: PreGradeFace | null, label: "F" | "B", variant: "full" | "compact") {
   if (!face) return null;
   const lrTone = axisToneFromPcts(face.leftPct, face.rightPct);
   const tbTone = axisToneFromPcts(face.topPct, face.bottomPct);
+  const size = ROW_SIZE[variant];
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] leading-5">
+    <div className={`flex min-w-0 flex-wrap items-center font-mono ${size.ratioRow}`}>
       <span className="font-bold text-text-2">{label}:</span>
       <span className={TONE_TEXT_CLASSES[lrTone]}>
         L {formatPct(face.leftPct)} / R {formatPct(face.rightPct)}
@@ -92,6 +120,7 @@ export default function HistoryRow({ session, variant, onRename, onDelete }: His
   const displayName = localName.trim() || "Add card name...";
   const ceilingLabel = ceilingDisplayLabel(session.ceiling);
   const href = `/admin/lens/pregrade?session=${encodeURIComponent(session.id)}`;
+  const size = ROW_SIZE[variant];
 
   async function commitRename() {
     setIsBusy(true);
@@ -133,21 +162,18 @@ export default function HistoryRow({ session, variant, onRename, onDelete }: His
     <article
       data-history-row-variant={variant}
       className={`relative overflow-hidden border border-border bg-surface transition-colors hover:border-border-2 hover:bg-surf2 ${
-        variant === "compact" ? "rounded-md px-3 py-2.5" : "rounded-lg px-4 py-3"
+        size.row
       }`}
     >
       <a className="absolute inset-0 z-0" href={href} aria-label={`Open ${displayName}`} />
       <div
         className={`relative z-10 grid items-center gap-3 ${
-          variant === "compact"
-            ? "grid-cols-[38px_minmax(150px,1fr)_minmax(210px,auto)_auto_auto]"
-            : "grid-cols-[48px_minmax(190px,1fr)_minmax(260px,1.1fr)_auto_auto_auto]"
+          size.grid
         }`}
       >
         <div
-          className={`overflow-hidden rounded border border-border bg-deep ${
-            variant === "compact" ? "h-[52px] w-[38px]" : "h-[58px] w-[42px]"
-          }`}
+          className={`aspect-[2.5/3.5] overflow-hidden rounded-md border border-border bg-deep ${size.thumbnail}`}
+          data-history-thumbnail="true"
         >
           {session.front?.signedImageUrl ? (
             <img
@@ -189,7 +215,7 @@ export default function HistoryRow({ session, variant, onRename, onDelete }: His
                 }
               }}
               placeholder="Add card name..."
-              className="w-full rounded-md border border-owl/50 bg-deep px-2.5 py-2 text-sm text-text outline-none"
+              className={`w-full rounded-md border border-owl/50 bg-deep text-text outline-none ${size.input}`}
             />
           ) : (
             <button
@@ -202,7 +228,7 @@ export default function HistoryRow({ session, variant, onRename, onDelete }: His
                 setDraftName(localName);
                 setIsEditing(true);
               }}
-              className={`block max-w-full truncate bg-transparent p-0 text-left text-sm font-semibold ${
+              className={`block max-w-full truncate bg-transparent p-0 text-left font-semibold ${size.name} ${
                 localName.trim()
                   ? "text-text hover:text-owl"
                   : "italic text-text-2 hover:text-text"
@@ -212,26 +238,27 @@ export default function HistoryRow({ session, variant, onRename, onDelete }: His
             </button>
           )}
           {session.manualAdjustment && (
-            <div className="mt-1 font-mono text-[9px] font-bold uppercase tracking-wider text-owl">
+            <div className={`mt-1.5 font-mono font-bold uppercase tracking-wider text-owl ${size.adjusted}`}>
               Adjusted manually
             </div>
           )}
           {error && <div className="mt-1 text-xs text-loss">{error}</div>}
         </div>
 
-        <div className={variant === "compact" ? "hidden min-w-0 md:block" : "min-w-0"}>
-          {faceRatioRows(session.front, "F")}
-          {faceRatioRows(session.back, "B")}
+        <div className={`min-w-0 ${size.ratioBlock}`} data-history-ratios="true">
+          {faceRatioRows(session.front, "F", variant)}
+          {faceRatioRows(session.back, "B", variant)}
         </div>
 
         <div
-          className="rounded-md border px-2.5 py-1.5 text-center font-mono text-xs font-bold"
+          className={`flex shrink-0 items-center justify-center rounded-md border text-center font-mono font-bold leading-none ${size.ceiling}`}
           style={gradeTierAccentStyleFromLabel(ceilingLabel)}
+          data-history-ceiling="true"
         >
           {ceilingLabel}
         </div>
 
-        <div className="whitespace-nowrap text-right font-mono text-[11px] text-text-2">
+        <div className={`shrink-0 whitespace-nowrap text-right font-mono text-text-2 ${size.time}`}>
           {formatRelativeTime(session.createdAt)}
         </div>
 

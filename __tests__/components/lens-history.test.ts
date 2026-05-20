@@ -235,6 +235,31 @@ test("HistoryRow compact variant omits delete and uses compact marker", () => {
   assert.doesNotMatch(html, /Delete/);
 });
 
+test("HistoryRow renders enlarged ceiling and thumbnail sizing for both variants", () => {
+  const historyRow = loadModule<HistoryRowModule>("src/components/lens/HistoryRow.tsx");
+  const compact = renderToStaticMarkup(
+    React.createElement(historyRow.default, {
+      session: session(),
+      variant: "compact",
+      onRename: async () => {},
+    })
+  );
+  const full = renderToStaticMarkup(
+    React.createElement(historyRow.default, {
+      session: session(),
+      variant: "full",
+      onRename: async () => {},
+    })
+  );
+
+  assert.match(compact, /data-history-ceiling="true"/);
+  assert.match(compact, /h-\[52px\] w-\[52px\] text-\[26px\]/);
+  assert.match(compact, /data-history-thumbnail="true"/);
+  assert.match(compact, /aspect-\[2\.5\/3\.5\][^"]*w-16/);
+  assert.match(full, /h-14 w-14 text-\[28px\]/);
+  assert.match(full, /aspect-\[2\.5\/3\.5\][^"]*w-\[72px\]/);
+});
+
 test("HistoryRow ceiling pill uses grade tier color while ratios keep axis tone", () => {
   const historyRow = loadModule<HistoryRowModule>("src/components/lens/HistoryRow.tsx");
   const html = renderToStaticMarkup(
@@ -251,6 +276,8 @@ test("HistoryRow ceiling pill uses grade tier color while ratios keep axis tone"
 
   assert.match(html, /color:var\(--coral\)/);
   assert.match(html, /border-color:var\(--coral\)/);
+  assert.match(html, /data-history-ratios="true"/);
+  assert.match(html, /text-\[14px\] leading-6/);
   assert.match(html, /text-owl/);
 });
 
