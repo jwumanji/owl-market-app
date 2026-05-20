@@ -1084,7 +1084,9 @@ export default function PregradeWorkspace() {
           faces={state.faces}
           activeFace={state.activeReviewFace}
           cardIdentity={state.cardIdentity || null}
+          cardSessionId={state.cardSessionId}
           onActiveFaceChange={(face) => dispatch({ type: "setActiveReviewFace", face })}
+          onCardIdentityChange={(value) => dispatch({ type: "setCardIdentity", value })}
           onDownloadReport={handleDownloadReport}
           onMeasureAnother={handleMeasureAnother}
         />

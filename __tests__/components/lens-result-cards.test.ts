@@ -135,10 +135,19 @@ type ResultsPanelModule = {
     faces: Partial<Record<LensFace, FaceState>>;
     activeFace?: LensFace;
     cardIdentity?: string | null;
+    cardSessionId?: string | null;
     onActiveFaceChange?: (face: LensFace) => void;
+    onCardIdentityChange?: (value: string) => void;
     onDownloadReport: () => void;
     onMeasureAnother: () => void;
   }) => React.ReactElement;
+  reportCardNameDisplay: (cardIdentity?: string | null) => string;
+  reportCardNameKeyAction: (key: string) => "commit" | "cancel" | null;
+  saveReportCardIdentity: (input: {
+    sessionId?: string | null;
+    cardIdentity: string;
+    fetchImpl: typeof fetch;
+  }) => Promise<unknown>;
 };
 
 type MeasurementNumbersPanelModule = {
@@ -393,6 +402,62 @@ test("ResultsPanel front-only report uses untitled fallback and omits back card"
   assert.match(html, /front only \(back not measured\)/);
   assert.match(html, /data-report-face-card="front"/);
   assert.doesNotMatch(html, /data-report-face-card="back"/);
+});
+
+test("ResultsPanel card name renders editable affordance and display fallback", () => {
+  const panel = loadModule<ResultsPanelModule>("src/components/lens/ResultsPanel.tsx");
+  const html = renderToStaticMarkup(
+    React.createElement(panel.default, {
+      faces: { front: faces.front },
+      activeFace: "front",
+      cardIdentity: null,
+      cardSessionId: "11111111-1111-4111-8111-111111111111",
+      onCardIdentityChange: () => undefined,
+      onDownloadReport: () => undefined,
+      onMeasureAnother: () => undefined,
+    })
+  );
+
+  assert.equal(panel.reportCardNameDisplay("  Nami  "), "Nami");
+  assert.equal(panel.reportCardNameDisplay("  "), "Untitled card");
+  assert.match(html, /aria-label="Edit card name"/);
+  assert.match(html, /Untitled card/);
+});
+
+test("ResultsPanel card name keyboard helper commits Enter and cancels Escape", () => {
+  const panel = loadModule<ResultsPanelModule>("src/components/lens/ResultsPanel.tsx");
+
+  assert.equal(panel.reportCardNameKeyAction("Enter"), "commit");
+  assert.equal(panel.reportCardNameKeyAction("Escape"), "cancel");
+  assert.equal(panel.reportCardNameKeyAction("Tab"), null);
+});
+
+test("saveReportCardIdentity PATCHes card_identity on the saved session", async () => {
+  const panel = loadModule<ResultsPanelModule>("src/components/lens/ResultsPanel.tsx");
+  const calls: Array<{ url: string; init: RequestInit | undefined }> = [];
+  const fetchImpl = (async (url: string, init?: RequestInit) => {
+    calls.push({ url, init });
+    return new Response(JSON.stringify({ session: {} }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  await panel.saveReportCardIdentity({
+    sessionId: "session-id",
+    cardIdentity: "  Nami  ",
+    fetchImpl,
+  });
+  await panel.saveReportCardIdentity({
+    sessionId: "session-id",
+    cardIdentity: "",
+    fetchImpl,
+  });
+
+  assert.equal(calls[0].url, "/api/centering/session/session-id");
+  assert.equal(calls[0].init?.method, "PATCH");
+  assert.deepEqual(JSON.parse(String(calls[0].init?.body)), { card_identity: "Nami" });
+  assert.deepEqual(JSON.parse(String(calls[1].init?.body)), { card_identity: null });
 });
 
 test("ReviewWorkspace shares active face handler between FaceTabs and result cards", () => {

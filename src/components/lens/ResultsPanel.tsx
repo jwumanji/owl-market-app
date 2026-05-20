@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import type { KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import {
   computeMeasurements,
   psaCeilingBack,
@@ -25,7 +25,9 @@ type ResultsPanelProps = {
   faces: Partial<Record<LensFace, LensFaceState>>;
   activeFace?: LensFace;
   cardIdentity?: string | null;
+  cardSessionId?: string | null;
   onActiveFaceChange?: (face: LensFace) => void;
+  onCardIdentityChange?: (value: string) => void;
   onDownloadReport: () => void;
   onMeasureAnother: () => void;
 };
@@ -91,15 +93,148 @@ function ActionButtons({
   );
 }
 
-function ReportCardName({ cardIdentity }: { cardIdentity?: string | null }) {
+export function reportCardNameDisplay(cardIdentity?: string | null) {
+  return cardIdentity?.trim() || "Untitled card";
+}
+
+export function reportCardNameKeyAction(key: string) {
+  if (key === "Enter") return "commit";
+  if (key === "Escape") return "cancel";
+  return null;
+}
+
+export async function saveReportCardIdentity({
+  sessionId,
+  cardIdentity,
+  fetchImpl = fetch,
+}: {
+  sessionId?: string | null;
+  cardIdentity: string;
+  fetchImpl?: typeof fetch;
+}) {
+  if (!sessionId) {
+    throw new Error("A saved pre-grade session id is required.");
+  }
+
+  const response = await fetchImpl(`/api/centering/session/${sessionId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ card_identity: cardIdentity.trim() || null }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Could not rename pre-grade (${response.status}).`);
+  }
+
+  return response.json() as Promise<unknown>;
+}
+
+function ReportCardName({
+  cardIdentity,
+  cardSessionId,
+  onCardIdentityChange,
+}: {
+  cardIdentity?: string | null;
+  cardSessionId?: string | null;
+  onCardIdentityChange?: (value: string) => void;
+}) {
+  const [localName, setLocalName] = useState(cardIdentity ?? "");
+  const [draftName, setDraftName] = useState(cardIdentity ?? "");
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const skipBlurCommit = useRef(false);
+
+  useEffect(() => {
+    setLocalName(cardIdentity ?? "");
+    setDraftName(cardIdentity ?? "");
+  }, [cardIdentity]);
+
+  async function commitRename() {
+    const nextName = draftName.trim();
+    const currentName = localName.trim();
+    if (nextName === currentName) {
+      setDraftName(nextName);
+      setIsEditing(false);
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+    try {
+      await saveReportCardIdentity({
+        sessionId: cardSessionId,
+        cardIdentity: nextName,
+      });
+      setLocalName(nextName);
+      setDraftName(nextName);
+      onCardIdentityChange?.(nextName);
+      setIsEditing(false);
+    } catch (renameError) {
+      setError(renameError instanceof Error ? renameError.message : "Could not rename pre-grade.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function cancelRename() {
+    skipBlurCommit.current = true;
+    setDraftName(localName);
+    setError(null);
+    setIsEditing(false);
+  }
+
   return (
     <div className="mx-auto max-w-3xl text-center" data-report-card-name="true">
       <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-text-2">
         Card name
       </div>
-      <h2 className="mt-2 text-3xl font-semibold leading-tight text-text">
-        {cardIdentity?.trim() || "Untitled card"}
-      </h2>
+      {isEditing ? (
+        <input
+          autoFocus
+          value={draftName}
+          disabled={isSaving}
+          onChange={(event) => setDraftName(event.target.value)}
+          onBlur={() => {
+            if (skipBlurCommit.current) {
+              skipBlurCommit.current = false;
+              return;
+            }
+            void commitRename();
+          }}
+          onKeyDown={(event) => {
+            const action = reportCardNameKeyAction(event.key);
+            if (!action) return;
+            event.preventDefault();
+            if (action === "commit") {
+              void commitRename();
+              return;
+            }
+            cancelRename();
+          }}
+          aria-label="Card name"
+          placeholder="Untitled card"
+          className="mt-2 w-full max-w-xl rounded-lg border border-owl/50 bg-deep px-4 py-3 text-center text-3xl font-semibold leading-tight text-text outline-none placeholder:text-text-3 disabled:cursor-wait disabled:opacity-60"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            setDraftName(localName);
+            setIsEditing(true);
+          }}
+          aria-label="Edit card name"
+          className="group mt-2 inline-flex max-w-full flex-wrap items-center justify-center gap-2 rounded-md border border-transparent px-2 py-1 text-center transition-colors hover:border-border hover:bg-surface focus-visible:border-owl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-owl/30"
+        >
+          <span className="truncate text-3xl font-semibold leading-tight text-text group-hover:text-owl">
+            {reportCardNameDisplay(localName)}
+          </span>
+          <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-text-3 transition-colors group-hover:text-owl">
+            Edit
+          </span>
+        </button>
+      )}
+      {error && <div className="mt-2 text-sm text-loss">{error}</div>}
     </div>
   );
 }
@@ -294,7 +429,9 @@ export default function ResultsPanel({
   faces,
   activeFace,
   cardIdentity,
+  cardSessionId,
   onActiveFaceChange,
+  onCardIdentityChange,
   onDownloadReport,
   onMeasureAnother,
 }: ResultsPanelProps) {
@@ -313,7 +450,11 @@ export default function ResultsPanel({
 
   return (
     <section className="space-y-8" data-results-report="true">
-      <ReportCardName cardIdentity={cardIdentity} />
+      <ReportCardName
+        cardIdentity={cardIdentity}
+        cardSessionId={cardSessionId}
+        onCardIdentityChange={onCardIdentityChange}
+      />
       <CombinedHero combined={combined} />
 
       <div className="mx-auto grid w-full max-w-[720px] gap-4 md:grid-cols-2">
