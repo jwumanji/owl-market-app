@@ -349,6 +349,52 @@ test("ResultsPanel wires face card selection to the active face source of truth"
   assert.equal(selected, "front");
 });
 
+test("ResultsPanel renders saved report hero and large face cards", () => {
+  const panel = loadModule<ResultsPanelModule>("src/components/lens/ResultsPanel.tsx");
+  const html = renderToStaticMarkup(
+    React.createElement(panel.default, {
+      faces: {
+        front: { ...faces.front, imageUrl: "https://example.test/front.jpg" },
+        back: { ...faces.back, imageUrl: "https://example.test/back.jpg" },
+      },
+      activeFace: "front",
+      cardIdentity: "OP01-001",
+      onActiveFaceChange: () => undefined,
+      onDownloadReport: () => undefined,
+      onMeasureAnother: () => undefined,
+    })
+  );
+
+  assert.match(html, /data-results-report="true"/);
+  assert.match(html, /data-report-card-name="true"/);
+  assert.match(html, /OP01-001/);
+  assert.match(html, /data-report-combined-hero="true"/);
+  assert.match(html, /worse of front · back/);
+  assert.match(html, /data-report-face-card="front"/);
+  assert.match(html, /data-report-face-card="back"/);
+  assert.match(html, /aspect-\[2\.5\/3\.5\]/);
+  assert.match(html, /Download report/);
+});
+
+test("ResultsPanel front-only report uses untitled fallback and omits back card", () => {
+  const panel = loadModule<ResultsPanelModule>("src/components/lens/ResultsPanel.tsx");
+  const html = renderToStaticMarkup(
+    React.createElement(panel.default, {
+      faces: { front: faces.front },
+      activeFace: "front",
+      cardIdentity: "",
+      onActiveFaceChange: () => undefined,
+      onDownloadReport: () => undefined,
+      onMeasureAnother: () => undefined,
+    })
+  );
+
+  assert.match(html, /Untitled card/);
+  assert.match(html, /front only \(back not measured\)/);
+  assert.match(html, /data-report-face-card="front"/);
+  assert.doesNotMatch(html, /data-report-face-card="back"/);
+});
+
 test("ReviewWorkspace shares active face handler between FaceTabs and result cards", () => {
   const workspace = loadModule<ReviewWorkspaceModule>("src/components/lens/ReviewWorkspace.tsx");
   const selected: LensFace[] = [];

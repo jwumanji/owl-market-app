@@ -1,10 +1,24 @@
 "use client";
 
-import { computeMeasurements, type PsaGrade } from "@/lib/centering-math";
-import FaceResultCard from "./FaceResultCard";
-import GraderStrip from "./GraderStrip";
-import ImageOverlayPanel from "./ImageOverlayPanel";
-import { bareGradeLabel, gradeTierAccentStyleForGrade, graderResultsFromFaces, type GraderResult } from "./grading";
+/* eslint-disable @next/next/no-img-element */
+
+import type { KeyboardEvent } from "react";
+import {
+  computeMeasurements,
+  psaCeilingBack,
+  psaCeilingFront,
+  type PsaGrade,
+} from "@/lib/centering-math";
+import { AxisRatioValue } from "./AxisRatioCard";
+import {
+  axisTone,
+  bareGradeLabel,
+  gradeTierAccentStyleForGrade,
+  gradeTierColorForGrade,
+  graderResultsFromFaces,
+  TONE_TEXT_CLASSES,
+  type GraderResult,
+} from "./grading";
 import type { LensFace, LensFaceState, LensMeasuredFace } from "./lens-types";
 
 type ResultsPanelProps = {
@@ -43,6 +57,7 @@ function combinedPsaResult(faces: LensMeasuredFace[]) {
 
   return {
     psa,
+    graderResults,
     front,
     back,
     worstFace,
@@ -57,7 +72,7 @@ function ActionButtons({
   onMeasureAnother: () => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap justify-center gap-2">
       <button
         type="button"
         onClick={onDownloadReport}
@@ -76,44 +91,202 @@ function ActionButtons({
   );
 }
 
-function ThresholdTable() {
-  const rows = [
-    ["<= 51%", "10", "10 Pristine", "10 Pristine"],
-    ["<= 55%", "10", "9.5 Gem Mint", "10 Gem Mint"],
-    ["<= 60%", "9", "9 Mint", "9 Mint"],
-    ["<= 65%", "8", "8.5 NM-MT+", "8 NM-MT"],
-    ["<= 70%", "7", "8 NM-MT", "7 NM"],
-    ["> 70%", "<=6", "<=7.5", "<=6"],
-  ];
+function ReportCardName({ cardIdentity }: { cardIdentity?: string | null }) {
+  return (
+    <div className="mx-auto max-w-3xl text-center" data-report-card-name="true">
+      <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-text-2">
+        Card name
+      </div>
+      <h2 className="mt-2 text-3xl font-semibold leading-tight text-text">
+        {cardIdentity?.trim() || "Untitled card"}
+      </h2>
+    </div>
+  );
+}
+
+function ReportGraderRow({ results }: { results: GraderResult[] }) {
+  return (
+    <div className="mt-5 grid gap-2 sm:grid-cols-3">
+      {results.map((result) => (
+        <div
+          key={result.name}
+          className="rounded-md border px-4 py-3 text-center"
+          style={gradeTierAccentStyleForGrade(result.ceiling)}
+        >
+          <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-text-2">
+            {result.name}
+          </div>
+          <div className="mt-1.5 font-mono text-3xl font-bold leading-none">
+            {result.value}
+          </div>
+          {result.subLabel && (
+            <div className="mt-1.5 font-mono text-[11px] leading-tight text-text-2">
+              {result.subLabel}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CombinedHero({
+  combined,
+}: {
+  combined: ReturnType<typeof combinedPsaResult>;
+}) {
+  return (
+    <div className="mx-auto max-w-3xl text-center" data-report-combined-hero="true">
+      <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-text-2">
+        Combined ceiling
+      </div>
+      <div
+        className="mt-2 font-mono text-7xl font-bold leading-none sm:text-8xl"
+        style={{ color: gradeTierColorForGrade(combined.psa.ceiling) }}
+      >
+        {bareGradeLabel(combined.psa.ceiling)}
+      </div>
+      <div className="mt-2 font-mono text-[11px] text-text-2">
+        {combined.back ? "worse of front · back" : "front only (back not measured)"}
+      </div>
+      <ReportGraderRow results={combined.graderResults} />
+    </div>
+  );
+}
+
+function FaceAxisPanel({
+  label,
+  firstLabel,
+  firstValue,
+  secondLabel,
+  secondValue,
+  tone,
+}: {
+  label: "L / R" | "T / B";
+  firstLabel: "L" | "T";
+  firstValue: number;
+  secondLabel: "R" | "B";
+  secondValue: number;
+  tone: ReturnType<typeof axisTone>;
+}) {
+  return (
+    <div className="rounded-md border border-border bg-deep p-3">
+      <div className="font-mono text-[9px] font-bold uppercase tracking-wider text-text-2">
+        {label}
+      </div>
+      <AxisRatioValue
+        firstLabel={firstLabel}
+        firstValue={firstValue}
+        secondLabel={secondLabel}
+        secondValue={secondValue}
+        tone={tone}
+        size="md"
+      />
+    </div>
+  );
+}
+
+function ReportFaceCard({
+  face,
+  measurement,
+  imageUrl,
+  isWorst,
+  isActive,
+  onSelect,
+}: LensMeasuredFace & {
+  isWorst: boolean;
+  isActive: boolean;
+  onSelect?: () => void;
+}) {
+  const faceCeiling = face === "back"
+    ? psaCeilingBack(measurement.worstAxisMaxPct)
+    : psaCeilingFront(measurement.worstAxisMaxPct);
+  const leftRightTone = axisTone(measurement.leftPct, measurement.rightPct);
+  const topBottomTone = axisTone(measurement.topPct, measurement.bottomPct);
+  const worstAxis = measurement.worstAxis === "leftRight" ? "L/R" : "T/B";
+  const worstAxisTone = measurement.worstAxis === "leftRight" ? leftRightTone : topBottomTone;
+  const interactive = Boolean(onSelect);
+  const cardClassName = [
+    "rounded-lg border bg-surface p-4",
+    isActive ? "border-owl" : "border-border",
+    interactive
+      ? "cursor-pointer outline-none transition-colors hover:border-border-2 focus-visible:border-owl focus-visible:ring-2 focus-visible:ring-owl/30"
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (!onSelect || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    onSelect();
+  }
 
   return (
-    <div className="rounded-lg border border-border bg-surface p-3">
-      <div className="mb-2 font-mono text-[10px] font-bold uppercase tracking-widest text-text-2">
-        Centering thresholds
+    <article
+      className={cardClassName}
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      aria-label={interactive ? `Switch to ${face} face` : undefined}
+      aria-pressed={interactive ? isActive : undefined}
+      data-active={isActive ? "true" : undefined}
+      data-report-face-card={face}
+      onClick={onSelect}
+      onKeyDown={interactive ? handleKeyDown : undefined}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">{face}</span>
+        <span
+          className="rounded-md border px-2.5 py-1.5 font-mono text-xs font-bold"
+          style={gradeTierAccentStyleForGrade(faceCeiling)}
+        >
+          {bareGradeLabel(faceCeiling)}
+        </span>
       </div>
-      <div className="overflow-hidden rounded-md border border-border">
-        <table className="w-full text-left font-mono text-[10px]">
-          <thead className="bg-deep uppercase tracking-wider text-text-2">
-            <tr>
-              <th className="px-2 py-2">Worst</th>
-              <th className="px-2 py-2">PSA</th>
-              <th className="px-2 py-2">BGS</th>
-              <th className="px-2 py-2">TAG</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(([worst, psa, bgs, tag]) => (
-              <tr key={worst} className="border-t border-border text-text">
-                <td className="px-2 py-2 text-text-2">{worst}</td>
-                <td className="px-2 py-2">{psa}</td>
-                <td className="px-2 py-2">{bgs}</td>
-                <td className="px-2 py-2">{tag}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+      <div className="mt-4 overflow-hidden rounded-md border border-border bg-void">
+        <div className="flex aspect-[2.5/3.5] w-full items-center justify-center bg-deep">
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={`${face} card`}
+              className="h-full w-full object-contain"
+            />
+          ) : (
+            <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-text-3">
+              No image
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <FaceAxisPanel
+          label="L / R"
+          firstLabel="L"
+          firstValue={measurement.leftPct}
+          secondLabel="R"
+          secondValue={measurement.rightPct}
+          tone={leftRightTone}
+        />
+        <FaceAxisPanel
+          label="T / B"
+          firstLabel="T"
+          firstValue={measurement.topPct}
+          secondLabel="B"
+          secondValue={measurement.bottomPct}
+          tone={topBottomTone}
+        />
+      </div>
+
+      <div className="mt-3 font-mono text-[11px] font-bold uppercase tracking-wider text-text-2">
+        Worst axis
+        <span className={`ml-2 ${TONE_TEXT_CLASSES[worstAxisTone]}`}>
+          {worstAxis} @ {measurement.worstAxisMaxPct}%
+        </span>
+        {isWorst && <span className="ml-2 text-owl">worst face</span>}
+      </div>
+    </article>
   );
 }
 
@@ -135,93 +308,33 @@ export default function ResultsPanel({
   }
 
   const combined = combinedPsaResult(measured);
-  const worst = combined.worstFace;
-  const ceiling = combined.psa.ceiling;
   const adjusted = measured.some((face) => face.adjusted);
-  const single = measured.length === 1;
   const currentActiveFace = activeFace ?? measured[0]?.face;
 
-  if (!single) {
-    return (
-      <section className="space-y-4">
-        <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 lg:flex-row lg:items-start lg:justify-between">
-          <div
-            className="rounded-lg border p-4 text-center"
-            style={gradeTierAccentStyleForGrade(ceiling)}
-          >
-            <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-text-2">
-              Combined ceiling
-            </div>
-            <div className="mt-1 font-mono text-5xl font-bold leading-none">{bareGradeLabel(ceiling)}</div>
-            <div className="mt-1 font-mono text-[10px] text-text-2">worse of front · back</div>
-            <GraderStrip
-              frontWorstMax={combined.front.measurement.worstAxisMaxPct}
-              backWorstMax={combined.back?.measurement.worstAxisMaxPct ?? null}
-            />
-          </div>
-          <ActionButtons onDownloadReport={onDownloadReport} onMeasureAnother={onMeasureAnother} />
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          {measured.map((face) => (
-            <FaceResultCard
-              key={face.face}
-              face={face.face}
-              measurement={face.measurement}
-              overlay={face.overlay}
-              imageSize={face.imageSize}
-              imageUrl={face.imageUrl}
-              isWorst={face.face === worst.face}
-              isActive={currentActiveFace === face.face}
-              onSelect={onActiveFaceChange ? () => onActiveFaceChange(face.face) : undefined}
-            />
-          ))}
-        </div>
-        {adjusted && <div className="font-mono text-xs uppercase tracking-wider text-owl">Adjusted manually</div>}
-      </section>
-    );
-  }
-
-  const [face] = measured;
   return (
-    <section className="space-y-4">
-      {cardIdentity && <div className="font-mono text-[11px] font-bold uppercase tracking-wider text-owl">{cardIdentity}</div>}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <ImageOverlayPanel
-          overlay={face.overlay}
-          imageSize={face.imageSize}
-          imageUrl={face.imageUrl}
-          freeCorners={false}
-          mode="readonly"
-          adjusted={Boolean(face.adjusted)}
-          onOverlayChange={() => undefined}
-        />
-        <aside className="space-y-3">
-          <div
-            className="rounded-lg border p-4 text-center"
-            style={gradeTierAccentStyleForGrade(ceiling)}
-          >
-            <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-text-2">Ceiling</div>
-            <div className="mt-1 font-mono text-4xl font-bold leading-none">
-              {bareGradeLabel(ceiling)}
-            </div>
-            <div className="mt-1 font-mono text-[10px] text-text-2">front only (back not measured)</div>
-            <GraderStrip frontWorstMax={face.measurement.worstAxisMaxPct} backWorstMax={null} />
-          </div>
-          <FaceResultCard
-            face={face.face}
-            measurement={face.measurement}
-            overlay={face.overlay}
-            imageSize={face.imageSize}
-            imageUrl={face.imageUrl}
-            isWorst
+    <section className="space-y-8" data-results-report="true">
+      <ReportCardName cardIdentity={cardIdentity} />
+      <CombinedHero combined={combined} />
+
+      <div className="mx-auto grid w-full max-w-[720px] gap-4 md:grid-cols-2">
+        {measured.map((face) => (
+          <ReportFaceCard
+            key={face.face}
+            {...face}
+            isWorst={face.face === combined.worstFace.face}
             isActive={currentActiveFace === face.face}
             onSelect={onActiveFaceChange ? () => onActiveFaceChange(face.face) : undefined}
           />
-          <ThresholdTable />
-          <ActionButtons onDownloadReport={onDownloadReport} onMeasureAnother={onMeasureAnother} />
-        </aside>
+        ))}
       </div>
+
+      {adjusted && (
+        <div className="text-center font-mono text-xs uppercase tracking-wider text-owl">
+          Adjusted manually
+        </div>
+      )}
+
+      <ActionButtons onDownloadReport={onDownloadReport} onMeasureAnother={onMeasureAnother} />
     </section>
   );
 }

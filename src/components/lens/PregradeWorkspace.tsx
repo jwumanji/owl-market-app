@@ -1010,6 +1010,7 @@ export default function PregradeWorkspace() {
   }
 
   const processingFaces = FACE_ORDER.filter((face) => state.uploads[face] && !state.faces[face]);
+  const isResults = state.status === "results";
   const reviewNotice = reviewNoticeNode({
     notice: state.reviewNotice,
     onRetryBack: () => void runMeasurement(["back"]),
@@ -1023,9 +1024,13 @@ export default function PregradeWorkspace() {
           <p className="mb-2 font-mono text-sm font-semibold uppercase tracking-wider text-owl">
             Owl Lens
           </p>
-          <h1 className="text-4xl font-bold text-text">Pre-grade</h1>
+          <h1 className="text-4xl font-bold text-text">
+            {isResults ? "Pre-grade report" : "Pre-grade"}
+          </h1>
           <p className="mt-2 max-w-3xl text-base leading-7 text-text-2">
-            Upload a front scan, add the back when you have it, then verify the overlay before saving the centering result.
+            {isResults
+              ? "Saved centering report with combined ceiling, grader readouts, and per-face ratios."
+              : "Upload a front scan, add the back when you have it, then verify the overlay before saving the centering result."}
           </p>
         </div>
         <Link
