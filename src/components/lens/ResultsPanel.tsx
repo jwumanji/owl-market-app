@@ -32,6 +32,24 @@ type ResultsPanelProps = {
   onMeasureAnother: () => void;
 };
 
+function PencilIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
 function measuredFaces(faces: Partial<Record<LensFace, LensFaceState>>) {
   return (["front", "back"] as LensFace[])
     .map((face) => faces[face])
@@ -217,22 +235,23 @@ function ReportCardName({
           className="mt-2 w-full max-w-xl rounded-lg border border-owl/50 bg-deep px-4 py-3 text-center text-3xl font-semibold leading-tight text-text outline-none placeholder:text-text-3 disabled:cursor-wait disabled:opacity-60"
         />
       ) : (
-        <button
-          type="button"
-          onClick={() => {
-            setDraftName(localName);
-            setIsEditing(true);
-          }}
-          aria-label="Edit card name"
-          className="group mt-2 inline-flex max-w-full flex-wrap items-center justify-center gap-2 rounded-md border border-transparent px-2 py-1 text-center transition-colors hover:border-border hover:bg-surface focus-visible:border-owl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-owl/30"
-        >
-          <span className="truncate text-3xl font-semibold leading-tight text-text group-hover:text-owl">
+        <div className="mt-2 inline-flex max-w-full items-center justify-center gap-2">
+          <span className="truncate text-3xl font-semibold leading-tight text-text">
             {reportCardNameDisplay(localName)}
           </span>
-          <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-text-3 transition-colors group-hover:text-owl">
-            Edit
-          </span>
-        </button>
+          <button
+            type="button"
+            onClick={() => {
+              setDraftName(localName);
+              setIsEditing(true);
+            }}
+            aria-label="Edit card name"
+            data-card-name-edit-button="true"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-text-2 transition-colors hover:border-border hover:bg-surface hover:text-owl focus-visible:border-owl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-owl/30"
+          >
+            <PencilIcon className="h-4 w-4" />
+          </button>
+        </div>
       )}
       {error && <div className="mt-2 text-sm text-loss">{error}</div>}
     </div>

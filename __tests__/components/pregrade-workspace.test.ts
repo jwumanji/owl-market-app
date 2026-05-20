@@ -38,8 +38,9 @@ function transpile(filePath: string) {
   }).outputText;
 }
 
-function linkMock(props: { href: string; children: React.ReactNode; className?: string }) {
-  return React.createElement("a", { href: props.href, className: props.className }, props.children);
+function linkMock(props: { href: string; children: React.ReactNode; className?: string; [key: string]: unknown }) {
+  const { href, children, ...rest } = props;
+  return React.createElement("a", { href, ...rest }, children);
 }
 
 function loadModule<T>(filePath: string, cache = new Map<string, unknown>()): T {
@@ -83,6 +84,7 @@ type Upload = {
 };
 
 type PregradeWorkspaceModule = {
+  default: React.ComponentType;
   PregradeUploadState: (props: {
     cardIdentity: string;
     uploads: Partial<Record<LensFace, Upload>>;
@@ -212,4 +214,14 @@ test("PregradeWorkspace upload failures stay isolated per face", () => {
   assert.equal(uploadPane(frontFailed.tree, "back").props.notice, null);
   assert.equal(uploadPane(backFailed.tree, "front").props.notice, null);
   assert.equal(textContent(uploadPane(backFailed.tree, "back").props.notice), "Back upload failed");
+});
+
+test("PregradeWorkspace header uses a back arrow icon link to Owl Lens", () => {
+  const workspace = loadModule<PregradeWorkspaceModule>("src/components/lens/PregradeWorkspace.tsx");
+  const html = renderToStaticMarkup(React.createElement(workspace.default));
+
+  assert.match(html, /href="\/admin\/lens"/);
+  assert.match(html, /aria-label="Back to Owl Lens"/);
+  assert.match(html, /viewBox="0 0 24 24"/);
+  assert.doesNotMatch(html, /Back to Owl Lens<\/a>/);
 });

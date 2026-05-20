@@ -421,7 +421,9 @@ test("ResultsPanel card name renders editable affordance and display fallback", 
   assert.equal(panel.reportCardNameDisplay("  Nami  "), "Nami");
   assert.equal(panel.reportCardNameDisplay("  "), "Untitled card");
   assert.match(html, /aria-label="Edit card name"/);
+  assert.match(html, /data-card-name-edit-button="true"/);
   assert.match(html, /Untitled card/);
+  assert.doesNotMatch(html, />Edit</);
 });
 
 test("ResultsPanel card name keyboard helper commits Enter and cancels Escape", () => {

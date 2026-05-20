@@ -100,6 +100,24 @@ const MIN_IMAGE_DIMENSION = 400;
 const ACCEPTED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const FACE_ORDER: LensFace[] = ["front", "back"];
 
+function ArrowLeftIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m12 19-7-7 7-7" />
+      <path d="M19 12H5" />
+    </svg>
+  );
+}
+
 const COPY = {
   idleAddBack:
     "Front measurement is saved. Add a back image, then click Measure to complete the pair. The front won't be re-measured.",
@@ -1035,9 +1053,10 @@ export default function PregradeWorkspace() {
         </div>
         <Link
           href="/admin/lens"
-          className="rounded-md border border-border bg-surface px-4 py-2.5 text-center font-mono text-sm font-bold uppercase text-text transition-colors hover:border-border-2 hover:text-owl"
+          aria-label="Back to Owl Lens"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-border bg-surface text-text-2 transition-colors hover:border-border-2 hover:text-owl focus-visible:border-owl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-owl/30"
         >
-          Back to Owl Lens
+          <ArrowLeftIcon className="h-5 w-5" />
         </Link>
       </div>
 
