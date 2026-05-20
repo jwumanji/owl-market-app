@@ -8,9 +8,8 @@ import {
   ceilingDisplayLabel,
   formatPct,
   formatRelativeTime,
-  sessionWorstMax,
-  toneFromHistoryWorstMax,
 } from "./history-utils";
+import { gradeTierAccentStyleFromLabel } from "./grading";
 import type { PreGradeFace, PreGradeSession } from "./lens-types";
 
 export type HistoryRowProps = {
@@ -24,12 +23,6 @@ const TONE_TEXT_CLASSES = {
   gain: "text-gain",
   owl: "text-owl",
   loss: "text-loss",
-} as const;
-
-const TONE_PILL_CLASSES = {
-  gain: "border-gain/40 bg-gain/10 text-gain",
-  owl: "border-owl/40 bg-owl/10 text-owl",
-  loss: "border-loss/40 bg-loss/10 text-loss",
 } as const;
 
 export async function saveHistoryRowRename({
@@ -96,9 +89,8 @@ export default function HistoryRow({ session, variant, onRename, onDelete }: His
     setDraftName(session.cardIdentity ?? "");
   }, [session.cardIdentity]);
 
-  const worstMax = sessionWorstMax(session);
-  const tone = toneFromHistoryWorstMax(worstMax);
   const displayName = localName.trim() || "Add card name...";
+  const ceilingLabel = ceilingDisplayLabel(session.ceiling);
   const href = `/admin/lens/pregrade?session=${encodeURIComponent(session.id)}`;
 
   async function commitRename() {
@@ -232,8 +224,11 @@ export default function HistoryRow({ session, variant, onRename, onDelete }: His
           {faceRatioRows(session.back, "B")}
         </div>
 
-        <div className={`rounded-md border px-2.5 py-1.5 text-center font-mono text-xs font-bold ${TONE_PILL_CLASSES[tone]}`}>
-          {ceilingDisplayLabel(session.ceiling)}
+        <div
+          className="rounded-md border px-2.5 py-1.5 text-center font-mono text-xs font-bold"
+          style={gradeTierAccentStyleFromLabel(ceilingLabel)}
+        >
+          {ceilingLabel}
         </div>
 
         <div className="whitespace-nowrap text-right font-mono text-[11px] text-text-2">

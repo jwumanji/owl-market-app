@@ -74,6 +74,26 @@ export function gradeTierColorFromLabel(label: string) {
   return gradeTierColor(match ? Number(match[0]) : 0);
 }
 
+export function gradeTierColorForGrade(grade: GraderGrade) {
+  return gradeTierColor(gradeRank(grade));
+}
+
+export function gradeTierAccentStyle(color: string) {
+  return {
+    backgroundColor: `color-mix(in srgb, ${color} 10%, transparent)`,
+    borderColor: color,
+    color,
+  };
+}
+
+export function gradeTierAccentStyleFromLabel(label: string) {
+  return gradeTierAccentStyle(gradeTierColorFromLabel(label));
+}
+
+export function gradeTierAccentStyleForGrade(grade: GraderGrade) {
+  return gradeTierAccentStyle(gradeTierColorForGrade(grade));
+}
+
 export function toneFromWorstMax(worstMax: number): GraderTone {
   if (worstMax <= 55) return "gain";
   if (worstMax <= 60) return "owl";

@@ -121,6 +121,15 @@ type FaceResultCardModule = {
   }) => React.ReactElement;
 };
 
+type GraderStripModule = {
+  default: (props: {
+    worstMax?: number;
+    frontWorstMax?: number;
+    backWorstMax?: number | null;
+    category?: "tcg" | "sports";
+  }) => React.ReactElement | null;
+};
+
 type ResultsPanelModule = {
   default: (props: {
     faces: Partial<Record<LensFace, FaceState>>;
@@ -286,6 +295,30 @@ test("FaceResultCard renders active aria and hover styling", () => {
   assert.match(html, /aria-pressed="true"/);
   assert.match(html, /data-active="true"/);
   assert.match(html, /hover:border-border-2/);
+});
+
+test("FaceResultCard ceiling badge uses grade tier color", () => {
+  const card = loadModule<FaceResultCardModule>("src/components/lens/FaceResultCard.tsx");
+  const html = renderToStaticMarkup(
+    React.createElement(card.default, {
+      face: "front",
+      measurement: { ...measurement, worstAxisMaxPct: 82 },
+      isWorst: true,
+      isActive: false,
+    })
+  );
+
+  assert.match(html, /color:var\(--coral\)/);
+  assert.match(html, /border-color:var\(--coral\)/);
+  assert.doesNotMatch(html, /tinted-loss text-loss/);
+});
+
+test("GraderStrip applies tier colors to grader grade badges", () => {
+  const strip = loadModule<GraderStripModule>("src/components/lens/GraderStrip.tsx");
+  const html = renderToStaticMarkup(React.createElement(strip.default, { worstMax: 70 }));
+
+  assert.match(html, /color:var\(--owl\)/);
+  assert.match(html, /color:var\(--coral\)/);
 });
 
 test("ResultsPanel wires face card selection to the active face source of truth", () => {

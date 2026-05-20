@@ -1,5 +1,5 @@
 import type { TagCategory } from "@/lib/centering-math";
-import { graderResultsFromFaces, TINTED_TONE_CLASSES, TONE_TEXT_CLASSES } from "./grading";
+import { gradeTierAccentStyleForGrade, graderResultsFromFaces } from "./grading";
 
 type GraderStripProps = {
   worstMax?: number;
@@ -32,12 +32,13 @@ export default function GraderStrip({
         {results.map((result) => (
           <div
             key={result.name}
-            className={`rounded-md border px-3 py-3 text-center ${TINTED_TONE_CLASSES[result.tone]}`}
+            className="rounded-md border px-3 py-3 text-center"
+            style={gradeTierAccentStyleForGrade(result.ceiling)}
           >
             <div className="font-mono text-[11px] font-bold uppercase tracking-widest text-text-2">
               {result.name}
             </div>
-            <div className={`mt-1.5 font-mono text-[22px] font-bold leading-none ${TONE_TEXT_CLASSES[result.tone]}`}>{result.value}</div>
+            <div className="mt-1.5 font-mono text-[22px] font-bold leading-none">{result.value}</div>
             {result.subLabel && <div className="mt-1.5 font-mono text-[11px] leading-tight text-text-2">{result.subLabel}</div>}
           </div>
         ))}

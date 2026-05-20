@@ -4,7 +4,7 @@ import { computeMeasurements, type PsaGrade } from "@/lib/centering-math";
 import FaceResultCard from "./FaceResultCard";
 import GraderStrip from "./GraderStrip";
 import ImageOverlayPanel from "./ImageOverlayPanel";
-import { bareGradeLabel, graderResultsFromFaces, measurementTone, TINTED_TONE_CLASSES, type GraderResult } from "./grading";
+import { bareGradeLabel, gradeTierAccentStyleForGrade, graderResultsFromFaces, type GraderResult } from "./grading";
 import type { LensFace, LensFaceState, LensMeasuredFace } from "./lens-types";
 
 type ResultsPanelProps = {
@@ -136,7 +136,6 @@ export default function ResultsPanel({
 
   const combined = combinedPsaResult(measured);
   const worst = combined.worstFace;
-  const worstTone = combined.psa.tone;
   const ceiling = combined.psa.ceiling;
   const adjusted = measured.some((face) => face.adjusted);
   const single = measured.length === 1;
@@ -146,7 +145,10 @@ export default function ResultsPanel({
     return (
       <section className="space-y-4">
         <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className={`rounded-lg border p-4 text-center ${TINTED_TONE_CLASSES[worstTone]}`}>
+          <div
+            className="rounded-lg border p-4 text-center"
+            style={gradeTierAccentStyleForGrade(ceiling)}
+          >
             <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-text-2">
               Combined ceiling
             </div>
@@ -181,8 +183,6 @@ export default function ResultsPanel({
   }
 
   const [face] = measured;
-  const tone = measurementTone(face.measurement, face.face);
-
   return (
     <section className="space-y-4">
       {cardIdentity && <div className="font-mono text-[11px] font-bold uppercase tracking-wider text-owl">{cardIdentity}</div>}
@@ -197,7 +197,10 @@ export default function ResultsPanel({
           onOverlayChange={() => undefined}
         />
         <aside className="space-y-3">
-          <div className={`rounded-lg border p-4 text-center ${TINTED_TONE_CLASSES[tone]}`}>
+          <div
+            className="rounded-lg border p-4 text-center"
+            style={gradeTierAccentStyleForGrade(ceiling)}
+          >
             <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-text-2">Ceiling</div>
             <div className="mt-1 font-mono text-4xl font-bold leading-none">
               {bareGradeLabel(ceiling)}

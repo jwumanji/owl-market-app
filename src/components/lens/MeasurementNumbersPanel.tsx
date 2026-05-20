@@ -1,16 +1,21 @@
 "use client";
 
 import { type KeyboardEvent } from "react";
-import { type ComputedCenteringMeasurement, type OverlayGeometry, type PsaGrade } from "@/lib/centering-math";
+import {
+  psaCeilingBack,
+  psaCeilingFront,
+  type ComputedCenteringMeasurement,
+  type OverlayGeometry,
+  type PsaGrade,
+} from "@/lib/centering-math";
 import { AxisRatioValue } from "./AxisRatioCard";
 import FreeCornersToggle from "./FreeCornersToggle";
 import GraderStrip from "./GraderStrip";
 import {
   axisTone,
   bareGradeLabel,
+  gradeTierAccentStyleForGrade,
   graderResultsFromFaces,
-  measurementTone,
-  TINTED_TONE_CLASSES,
   TONE_TEXT_CLASSES,
   type GraderResult,
 } from "./grading";
@@ -75,13 +80,17 @@ function FaceMeasurementCard({
   showWorst: boolean;
   isWorst: boolean;
 }) {
-  const tone = measurementTone(measurement, face);
   const leftRightTone = axisTone(measurement.leftPct, measurement.rightPct);
   const topBottomTone = axisTone(measurement.topPct, measurement.bottomPct);
+  const worstAxisTone = measurement.worstAxis === "leftRight" ? leftRightTone : topBottomTone;
   const worstAxis = measurement.worstAxis === "leftRight" ? "L/R" : "T/B";
+  const faceCeiling = face === "back"
+    ? psaCeilingBack(measurement.worstAxisMaxPct)
+    : psaCeilingFront(measurement.worstAxisMaxPct);
+  const ceilingLabel = bareGradeLabel(faceCeiling);
   const cardClass = active
     ? "border-owl/40 bg-owl/10 shadow-[0_0_0_1px_rgba(232,160,32,0.16)]"
-    : TINTED_TONE_CLASSES[tone];
+    : "border-border bg-surface";
   const interactive = Boolean(onSelect);
 
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
@@ -105,15 +114,18 @@ function FaceMeasurementCard({
       onClick={onSelect}
       onKeyDown={interactive ? handleKeyDown : undefined}
     >
-      {showWorst && isWorst && (
-        <span className="absolute right-2 top-2 rounded border border-owl/40 bg-owl/15 px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase tracking-wider text-owl">
-          worst
-        </span>
-      )}
       <div className="grid grid-cols-[minmax(0,1fr)_80px] gap-3">
         <div className="min-w-0">
-          <div className={`font-mono text-[10px] font-bold uppercase tracking-widest text-text-2 ${showWorst && isWorst ? "pr-14" : ""}`}>
-            {face}
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-text-2">
+              {face}
+            </span>
+            <span
+              className="rounded border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider"
+              style={gradeTierAccentStyleForGrade(faceCeiling)}
+            >
+              {ceilingLabel}
+            </span>
           </div>
           <div className="mt-2 space-y-1.5">
             <AxisRatioValue
@@ -133,9 +145,10 @@ function FaceMeasurementCard({
           </div>
           <div className="mt-2 font-mono text-[10px] font-bold uppercase tracking-wider text-text-2">
             Worst axis
-            <span className={`ml-2 ${TONE_TEXT_CLASSES[tone]}`}>
+            <span className={`ml-2 ${TONE_TEXT_CLASSES[worstAxisTone]}`}>
               {worstAxis} @ {measurement.worstAxisMaxPct}%
             </span>
+            {showWorst && isWorst && <span className="ml-2 text-owl">worst</span>}
           </div>
         </div>
         <OverlayPreview faceState={faceState} />
@@ -200,7 +213,6 @@ export default function MeasurementNumbersPanel({
     back: backMeasurement ? { worstMax: backMeasurement.worstAxisMaxPct } : null,
   });
   const psaResult = graderResults[0] as GraderResult<PsaGrade>;
-  const combinedTone = psaResult.tone;
   const combinedCeiling = psaResult.ceiling;
   const combinedFace: LensFace = psaResult.breakdown.back &&
     psaResult.ceiling === psaResult.breakdown.back.ceiling &&
@@ -214,7 +226,10 @@ export default function MeasurementNumbersPanel({
 
   return (
     <aside className="flex flex-col gap-2.5">
-      <div className={`rounded-lg border p-4 text-center ${TINTED_TONE_CLASSES[combinedTone]}`}>
+      <div
+        className="rounded-lg border p-4 text-center"
+        style={gradeTierAccentStyleForGrade(combinedCeiling)}
+      >
         <div className="font-mono text-[9.5px] font-bold uppercase tracking-wider text-text-2">
           Combined ceiling
         </div>

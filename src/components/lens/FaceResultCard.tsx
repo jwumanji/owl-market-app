@@ -6,7 +6,7 @@ import {
 } from "@/lib/centering-math";
 import type { KeyboardEvent } from "react";
 import AxisRatioCard from "./AxisRatioCard";
-import { axisTone, bareGradeLabel, measurementTone, TINTED_TONE_CLASSES } from "./grading";
+import { axisTone, bareGradeLabel, gradeTierAccentStyleFromLabel } from "./grading";
 
 type FaceResultCardProps = {
   face: "front" | "back";
@@ -33,7 +33,6 @@ export default function FaceResultCard({
   isActive,
   onSelect,
 }: FaceResultCardProps) {
-  const tone = measurementTone(measurement, face);
   const ceiling = bareGradeLabel(
     face === "back"
       ? psaCeilingBack(measurement.worstAxisMaxPct)
@@ -72,7 +71,10 @@ export default function FaceResultCard({
     >
       <div className="flex items-center justify-between gap-3">
         <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">{face}</span>
-        <span className={`rounded-md border px-2.5 py-1.5 font-mono text-xs font-bold ${TINTED_TONE_CLASSES[tone]}`}>
+        <span
+          className="rounded-md border px-2.5 py-1.5 font-mono text-xs font-bold"
+          style={gradeTierAccentStyleFromLabel(ceiling)}
+        >
           {ceiling}
         </span>
       </div>

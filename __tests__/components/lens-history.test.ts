@@ -140,7 +140,17 @@ type PreGradeFace = {
   bottomPct: number | null;
   worstAxis: "leftRight" | "topBottom";
   worstAxisMaxPct: number | null;
-  psaCeiling: "PSA_10" | "PSA_9" | "PSA_8" | "PSA_7" | "BELOW_PSA_7";
+  psaCeiling:
+    | "PSA_10"
+    | "PSA_9"
+    | "PSA_8"
+    | "PSA_7"
+    | "PSA_6"
+    | "PSA_5"
+    | "PSA_4"
+    | "PSA_3_OR_LESS"
+    | "PSA_2_OR_LESS"
+    | "BELOW_PSA_7";
   manualAdjustment: boolean;
 };
 
@@ -149,7 +159,7 @@ type PreGradeSession = {
   cardSessionId: string | null;
   cardIdentity: string | null;
   createdAt: string | null;
-  ceiling: "PSA_10" | "PSA_9" | "PSA_8" | "PSA_7" | "BELOW_PSA_7";
+  ceiling: PreGradeFace["psaCeiling"];
   manualAdjustment: boolean;
   front: PreGradeFace | null;
   back: PreGradeFace | null;
@@ -225,13 +235,13 @@ test("HistoryRow compact variant omits delete and uses compact marker", () => {
   assert.doesNotMatch(html, /Delete/);
 });
 
-test("HistoryRow ceiling pill uses worst face tone across front and back", () => {
+test("HistoryRow ceiling pill uses grade tier color while ratios keep axis tone", () => {
   const historyRow = loadModule<HistoryRowModule>("src/components/lens/HistoryRow.tsx");
   const html = renderToStaticMarkup(
     React.createElement(historyRow.default, {
       session: session({
-        ceiling: "PSA_8",
-        front: face({ worstAxisMaxPct: 52 }),
+        ceiling: "PSA_5",
+        front: face({ leftPct: 58, rightPct: 42, worstAxisMaxPct: 58 }),
         back: face({ face: "back", worstAxisMaxPct: 64, psaCeiling: "PSA_8" }),
       }),
       variant: "full",
@@ -239,7 +249,9 @@ test("HistoryRow ceiling pill uses worst face tone across front and back", () =>
     })
   );
 
-  assert.match(html, /border-loss\/40 bg-loss\/10 text-loss/);
+  assert.match(html, /color:var\(--coral\)/);
+  assert.match(html, /border-color:var\(--coral\)/);
+  assert.match(html, /text-owl/);
 });
 
 test("HistoryRow rename helper trims and calls callback", async () => {

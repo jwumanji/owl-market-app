@@ -8,7 +8,7 @@ import FaceResultCard from "./FaceResultCard";
 import FreeCornersToggle from "./FreeCornersToggle";
 import GraderStrip from "./GraderStrip";
 import ImageOverlayPanel from "./ImageOverlayPanel";
-import { axisTone, bareGradeLabel } from "./grading";
+import { axisTone, bareGradeLabel, gradeTierAccentStyleForGrade } from "./grading";
 import { SAMPLE_BACK_OVERLAY, SAMPLE_FRONT_OVERLAY, SAMPLE_IMAGE, SAMPLE_IMAGE_SIZE } from "./sample-data";
 
 export default function ImageOverlayDev() {
@@ -27,6 +27,7 @@ export default function ImageOverlayDev() {
   });
   const overlay = overlays[activeFace];
   const measurement = useMemo(() => computeMeasurements(overlay), [overlay]);
+  const ceiling = psaCeilingFront(measurement.worstAxisMaxPct);
   const leftRightTone = axisTone(measurement.leftPct, measurement.rightPct);
   const topBottomTone = axisTone(measurement.topPct, measurement.bottomPct);
 
@@ -59,12 +60,15 @@ export default function ImageOverlayDev() {
       </div>
 
       <aside className="space-y-3">
-        <div className="rounded-lg border border-border bg-surface p-4 text-center">
+        <div
+          className="rounded-lg border p-4 text-center"
+          style={gradeTierAccentStyleForGrade(ceiling)}
+        >
           <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-text-2">
             Combined ceiling
           </div>
-          <div className="mt-2 font-mono text-4xl font-bold text-owl">
-            {bareGradeLabel(psaCeilingFront(measurement.worstAxisMaxPct))}
+          <div className="mt-2 font-mono text-4xl font-bold">
+            {bareGradeLabel(ceiling)}
           </div>
           <div className="mt-1 font-mono text-[10px] text-text-2">front only (back not measured)</div>
           <GraderStrip worstMax={measurement.worstAxisMaxPct} />
