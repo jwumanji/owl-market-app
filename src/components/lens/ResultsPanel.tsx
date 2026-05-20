@@ -28,6 +28,7 @@ type ResultsPanelProps = {
   cardSessionId?: string | null;
   onActiveFaceChange?: (face: LensFace) => void;
   onCardIdentityChange?: (value: string) => void;
+  onReMeasure: () => void;
   onDownloadReport: () => void;
   onMeasureAnother: () => void;
 };
@@ -85,14 +86,23 @@ function combinedPsaResult(faces: LensMeasuredFace[]) {
 }
 
 function ActionButtons({
+  onReMeasure,
   onDownloadReport,
   onMeasureAnother,
 }: {
+  onReMeasure: () => void;
   onDownloadReport: () => void;
   onMeasureAnother: () => void;
 }) {
   return (
     <div className="flex flex-wrap justify-center gap-2">
+      <button
+        type="button"
+        onClick={onReMeasure}
+        className="rounded-md border border-border bg-deep px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:bg-surf2"
+      >
+        Re-measure
+      </button>
       <button
         type="button"
         onClick={onDownloadReport}
@@ -451,6 +461,7 @@ export default function ResultsPanel({
   cardSessionId,
   onActiveFaceChange,
   onCardIdentityChange,
+  onReMeasure,
   onDownloadReport,
   onMeasureAnother,
 }: ResultsPanelProps) {
@@ -494,7 +505,11 @@ export default function ResultsPanel({
         </div>
       )}
 
-      <ActionButtons onDownloadReport={onDownloadReport} onMeasureAnother={onMeasureAnother} />
+      <ActionButtons
+        onReMeasure={onReMeasure}
+        onDownloadReport={onDownloadReport}
+        onMeasureAnother={onMeasureAnother}
+      />
     </section>
   );
 }

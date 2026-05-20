@@ -105,6 +105,10 @@ function parsePipelineMode(value: FormDataEntryValue | null): PipelineMode | nul
   return null;
 }
 
+function parseBoolean(value: FormDataEntryValue | null) {
+  return parseString(value).toLowerCase() === "true";
+}
+
 function parseJsonField(value: FormDataEntryValue | null) {
   const raw = parseString(value);
   if (!raw) return undefined;
@@ -205,6 +209,66 @@ function measurementRow({
   };
 }
 
+async function persistMeasurementRow({
+  supabase,
+  row,
+  cardSessionId,
+  face,
+  updateExisting,
+}: {
+  supabase: ReturnType<typeof createServiceClient>;
+  row: ReturnType<typeof measurementRow>;
+  cardSessionId: string;
+  face: CenteringFace;
+  updateExisting: boolean;
+}) {
+  if (updateExisting) {
+    const existingResult = await supabase
+      .from("centering_measurements")
+      .select("id")
+      .eq("card_session_id", cardSessionId)
+      .eq("face", face);
+
+    if (existingResult.error) {
+      return {
+        operation: "update" as const,
+        data: null,
+        error: existingResult.error,
+      };
+    }
+
+    const ids = (existingResult.data ?? [])
+      .map((measurement) => measurement.id)
+      .filter((id): id is string => typeof id === "string");
+
+    if (ids.length > 0) {
+      const updateResult = await supabase
+        .from("centering_measurements")
+        .update(row)
+        .in("id", ids)
+        .select("*");
+
+      return {
+        operation: "update" as const,
+        data: updateResult.data?.[0] ?? null,
+        error: updateResult.error,
+      };
+    }
+  }
+
+  const insertResult = await supabase
+    .from("centering_measurements")
+    .insert(row)
+    .select("*")
+    .single();
+
+  return {
+    operation: "insert" as const,
+    data: insertResult.data ?? null,
+    error: insertResult.error,
+  };
+}
+
 export async function POST(request: Request) {
   let adminUser;
   try {
@@ -267,6 +331,7 @@ export async function POST(request: Request) {
   }
 
   const pipelineVersion = parseOptionalText(formData.get("pipelineVersion")) ?? "manual-save";
+  const updateExisting = parseBoolean(formData.get("updateExisting"));
   const processingMs = parsePositiveInteger(formData.get("processingMs")) ?? 0;
   const cardIdentity = parseOptionalText(formData.get("cardIdentity"));
   const inventoryItemId = parseOptionalText(formData.get("inventoryItemId"));
@@ -316,21 +381,26 @@ export async function POST(request: Request) {
     manualAdjustment,
   });
 
-  const insertResult = await supabase
-    .from("centering_measurements")
-    .insert(row)
-    .select("*")
-    .single();
+  const saveResult = await persistMeasurementRow({
+    supabase,
+    row,
+    cardSessionId,
+    face,
+    updateExisting,
+  });
 
-  if (insertResult.error) {
-    await storage.remove([imagePath]).catch(() => null);
-    return responseError(insertResult.error.message, 500);
+  if (saveResult.error) {
+    if (saveResult.operation === "insert") {
+      await storage.remove([imagePath]).catch(() => null);
+    }
+    return responseError(saveResult.error.message, 500);
   }
 
   return NextResponse.json({
-    measurement: insertResult.data ?? row,
+    measurement: saveResult.data ?? row,
     cardSessionId,
     face,
     imageUrl: imagePath,
+    updatedExisting: saveResult.operation === "update",
   });
 }

@@ -204,6 +204,7 @@ export default function LensComposersDev() {
           activeFace={activeFace}
           cardIdentity={cardIdentity}
           onActiveFaceChange={setActiveFace}
+          onReMeasure={() => undefined}
           onDownloadReport={() => undefined}
           onMeasureAnother={() => undefined}
         />

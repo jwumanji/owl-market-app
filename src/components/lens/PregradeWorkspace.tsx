@@ -57,6 +57,7 @@ type PregradeState = {
   activeReviewFace: LensFace;
   cardIdentity: string;
   cardSessionId: string;
+  remeasureMode: boolean;
   uploads: Partial<Record<LensFace, UploadedFace>>;
   faces: Partial<Record<LensFace, LensFaceState>>;
   faceMeta: Partial<Record<LensFace, FaceMeta>>;
@@ -89,6 +90,7 @@ type Action =
   | { type: "resetFace"; face: LensFace; overlay: OverlayGeometry }
   | { type: "addBack" }
   | { type: "continueFrontOnly" }
+  | { type: "reopenSavedSession" }
   | { type: "cancelReview" }
   | { type: "startSave" }
   | { type: "saveSuccess" }
@@ -140,13 +142,14 @@ function randomId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function initialState(): PregradeState {
+export function createInitialPregradeState(): PregradeState {
   return {
     status: "idle",
     activeUploadFace: "front",
     activeReviewFace: "front",
     cardIdentity: "",
     cardSessionId: randomId(),
+    remeasureMode: false,
     uploads: {},
     faces: {},
     faceMeta: {},
@@ -192,7 +195,7 @@ function defaultPlaceholderOverlay(width: number, height: number): OverlayGeomet
   };
 }
 
-function reducer(state: PregradeState, action: Action): PregradeState {
+export function pregradeReducer(state: PregradeState, action: Action): PregradeState {
   switch (action.type) {
     case "setCardIdentity":
       return { ...state, cardIdentity: action.value };
@@ -225,6 +228,7 @@ function reducer(state: PregradeState, action: Action): PregradeState {
         idleNotices,
         reviewNotice: null,
         addBackMode: false,
+        remeasureMode: false,
       };
     }
     case "clearFace": {
@@ -319,6 +323,7 @@ function reducer(state: PregradeState, action: Action): PregradeState {
         activeReviewFace: action.activeFace,
         reviewNotice: action.notice,
         addBackMode: false,
+        remeasureMode: false,
       };
     case "overlayChange":
       if (!state.faces[action.face]) return state;
@@ -381,7 +386,26 @@ function reducer(state: PregradeState, action: Action): PregradeState {
         reviewNotice: null,
       };
     }
+    case "reopenSavedSession":
+      return {
+        ...state,
+        status: "review",
+        activeReviewFace: state.faces.front ? "front" : state.faces.back ? "back" : state.activeReviewFace,
+        reviewNotice: null,
+        addBackMode: false,
+        isSaving: false,
+        remeasureMode: true,
+      };
     case "cancelReview":
+      if (state.remeasureMode) {
+        return {
+          ...state,
+          status: "results",
+          reviewNotice: null,
+          isSaving: false,
+          remeasureMode: false,
+        };
+      }
       return {
         ...state,
         status: "idle",
@@ -391,7 +415,7 @@ function reducer(state: PregradeState, action: Action): PregradeState {
     case "startSave":
       return { ...state, isSaving: true, reviewNotice: null };
     case "saveSuccess":
-      return { ...state, status: "results", isSaving: false, reviewNotice: null };
+      return { ...state, status: "results", isSaving: false, reviewNotice: null, remeasureMode: false };
     case "saveError":
       return {
         ...state,
@@ -400,7 +424,7 @@ function reducer(state: PregradeState, action: Action): PregradeState {
         reviewNotice: { kind: "saveError", body: action.message },
       };
     case "resetAll":
-      return initialState();
+      return createInitialPregradeState();
     default:
       return state;
   }
@@ -563,13 +587,15 @@ async function measureFace({
   };
 }
 
-async function saveFace({
+export async function saveFace({
   face,
   upload,
   faceState,
   faceMeta,
   cardIdentity,
   cardSessionId,
+  updateExisting = false,
+  fetchImpl = fetch,
 }: {
   face: LensFace;
   upload: UploadedFace;
@@ -577,11 +603,14 @@ async function saveFace({
   faceMeta: FaceMeta | undefined;
   cardIdentity: string;
   cardSessionId: string;
+  updateExisting?: boolean;
+  fetchImpl?: typeof fetch;
 }) {
   const formData = new FormData();
   formData.set("file", upload.file);
   formData.set("face", face);
   formData.set("cardSessionId", cardSessionId);
+  if (updateExisting) formData.set("updateExisting", "true");
   formData.set("overlayGeometry", JSON.stringify(faceState.overlay));
   formData.set("imageWidthPx", String(faceState.imageSize.width));
   formData.set("imageHeightPx", String(faceState.imageSize.height));
@@ -595,7 +624,7 @@ async function saveFace({
     formData.set("cardIdentity", cardIdentity.trim());
   }
 
-  const response = await fetch("/api/centering/save", {
+  const response = await fetchImpl("/api/centering/save", {
     method: "POST",
     body: formData,
   });
@@ -790,7 +819,7 @@ function safeFileName(value: string) {
 }
 
 export default function PregradeWorkspace() {
-  const [state, dispatch] = useReducer(reducer, undefined, initialState);
+  const [state, dispatch] = useReducer(pregradeReducer, undefined, createInitialPregradeState);
   const uploadsRef = useRef(state.uploads);
 
   useEffect(() => {
@@ -968,6 +997,7 @@ export default function PregradeWorkspace() {
           faceMeta: state.faceMeta[face],
           cardIdentity: state.cardIdentity,
           cardSessionId: state.cardSessionId,
+          updateExisting: state.remeasureMode,
         });
       }
       dispatch({ type: "saveSuccess" });
@@ -993,6 +1023,10 @@ export default function PregradeWorkspace() {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     });
     dispatch({ type: "resetAll" });
+  }
+
+  function handleReMeasure() {
+    dispatch({ type: "reopenSavedSession" });
   }
 
   function handleDownloadReport() {
@@ -1087,7 +1121,8 @@ export default function PregradeWorkspace() {
           cardIdentity={state.cardIdentity || null}
           notice={reviewNotice}
           saving={state.isSaving}
-          allowAddBack={state.reviewNotice?.kind !== "backFailed"}
+          mode={state.remeasureMode ? "edit" : "review"}
+          allowAddBack={!state.remeasureMode && state.reviewNotice?.kind !== "backFailed"}
           onActiveFaceChange={(face) => dispatch({ type: "setActiveReviewFace", face })}
           onOverlayChange={(face, overlay) => dispatch({ type: "overlayChange", face, overlay })}
           onFreeCornersChange={(face, enabled) => dispatch({ type: "freeCornersChange", face, enabled })}
@@ -1106,6 +1141,7 @@ export default function PregradeWorkspace() {
           cardSessionId={state.cardSessionId}
           onActiveFaceChange={(face) => dispatch({ type: "setActiveReviewFace", face })}
           onCardIdentityChange={(value) => dispatch({ type: "setCardIdentity", value })}
+          onReMeasure={handleReMeasure}
           onDownloadReport={handleDownloadReport}
           onMeasureAnother={handleMeasureAnother}
         />

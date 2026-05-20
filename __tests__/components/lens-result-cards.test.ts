@@ -138,6 +138,7 @@ type ResultsPanelModule = {
     cardSessionId?: string | null;
     onActiveFaceChange?: (face: LensFace) => void;
     onCardIdentityChange?: (value: string) => void;
+    onReMeasure: () => void;
     onDownloadReport: () => void;
     onMeasureAnother: () => void;
   }) => React.ReactElement;
@@ -340,6 +341,7 @@ test("ResultsPanel wires face card selection to the active face source of truth"
     onActiveFaceChange: (face) => {
       selected = face;
     },
+    onReMeasure: () => undefined,
     onDownloadReport: () => undefined,
     onMeasureAnother: () => undefined,
   }) as React.ReactElement;
@@ -369,6 +371,7 @@ test("ResultsPanel renders saved report hero and large face cards", () => {
       activeFace: "front",
       cardIdentity: "OP01-001",
       onActiveFaceChange: () => undefined,
+      onReMeasure: () => undefined,
       onDownloadReport: () => undefined,
       onMeasureAnother: () => undefined,
     })
@@ -382,6 +385,7 @@ test("ResultsPanel renders saved report hero and large face cards", () => {
   assert.match(html, /data-report-face-card="front"/);
   assert.match(html, /data-report-face-card="back"/);
   assert.match(html, /aspect-\[2\.5\/3\.5\]/);
+  assert.match(html, /Re-measure/);
   assert.match(html, /Download report/);
 });
 
@@ -393,6 +397,7 @@ test("ResultsPanel front-only report uses untitled fallback and omits back card"
       activeFace: "front",
       cardIdentity: "",
       onActiveFaceChange: () => undefined,
+      onReMeasure: () => undefined,
       onDownloadReport: () => undefined,
       onMeasureAnother: () => undefined,
     })
@@ -413,6 +418,7 @@ test("ResultsPanel card name renders editable affordance and display fallback", 
       cardIdentity: null,
       cardSessionId: "11111111-1111-4111-8111-111111111111",
       onCardIdentityChange: () => undefined,
+      onReMeasure: () => undefined,
       onDownloadReport: () => undefined,
       onMeasureAnother: () => undefined,
     })

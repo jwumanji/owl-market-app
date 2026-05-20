@@ -64,8 +64,11 @@ function loadModule<T>(filePath: string, cache = new Map<string, unknown>()): T 
     vm.createContext({
       console,
       exports: moduleStub.exports,
+      File,
+      FormData,
       module: moduleStub,
       process,
+      Response,
       require: localRequire,
     }),
     { filename: absolutePath }
@@ -83,8 +86,44 @@ type Upload = {
   previewUrl: string | null;
 };
 
+type OverlayGeometry = {
+  outer: {
+    tl: { x: number; y: number };
+    tr: { x: number; y: number };
+    br: { x: number; y: number };
+    bl: { x: number; y: number };
+  };
+  inner: {
+    tl: { x: number; y: number };
+    tr: { x: number; y: number };
+    br: { x: number; y: number };
+    bl: { x: number; y: number };
+  };
+};
+
 type PregradeWorkspaceModule = {
   default: React.ComponentType;
+  createInitialPregradeState: () => Record<string, unknown>;
+  pregradeReducer: (state: Record<string, unknown>, action: Record<string, unknown>) => Record<string, unknown>;
+  saveFace: (input: {
+    face: LensFace;
+    upload: Upload & {
+      file: File;
+      imageSize: { width: number; height: number };
+      contentType: string;
+    };
+    faceState: {
+      face: LensFace;
+      overlay: OverlayGeometry;
+      imageUrl: string | null;
+      imageSize: { width: number; height: number };
+    };
+    faceMeta?: undefined;
+    cardIdentity: string;
+    cardSessionId: string;
+    updateExisting?: boolean;
+    fetchImpl: typeof fetch;
+  }) => Promise<void>;
   PregradeUploadState: (props: {
     cardIdentity: string;
     uploads: Partial<Record<LensFace, Upload>>;
@@ -151,6 +190,21 @@ function uploadPane(root: React.ReactElement, face: LensFace) {
   assert.ok(pane);
   return pane;
 }
+
+const overlay: OverlayGeometry = {
+  outer: {
+    tl: { x: 0, y: 0 },
+    tr: { x: 100, y: 0 },
+    br: { x: 100, y: 140 },
+    bl: { x: 0, y: 140 },
+  },
+  inner: {
+    tl: { x: 24, y: 28 },
+    tr: { x: 74, y: 28 },
+    br: { x: 74, y: 108 },
+    bl: { x: 24, y: 108 },
+  },
+};
 
 test("PregradeWorkspace upload state renders card name row above preview and upload boxes", () => {
   const { html } = renderUploadState();
@@ -224,4 +278,72 @@ test("PregradeWorkspace header uses a back arrow icon link to Owl Lens", () => {
   assert.match(html, /aria-label="Back to Owl Lens"/);
   assert.match(html, /viewBox="0 0 24 24"/);
   assert.doesNotMatch(html, /Back to Owl Lens<\/a>/);
+});
+
+test("PregradeWorkspace re-measure returns to review mode with the same session id", () => {
+  const workspace = loadModule<PregradeWorkspaceModule>("src/components/lens/PregradeWorkspace.tsx");
+  const sessionId = "11111111-1111-4111-8111-111111111111";
+  const state = {
+    ...workspace.createInitialPregradeState(),
+    status: "results",
+    activeReviewFace: "back",
+    cardSessionId: sessionId,
+    faces: {
+      front: {
+        face: "front",
+        overlay,
+        imageUrl: "blob:front",
+        imageSize: { width: 100, height: 140 },
+      },
+    },
+  };
+
+  const next = workspace.pregradeReducer(state, { type: "reopenSavedSession" });
+
+  assert.equal(next.status, "review");
+  assert.equal(next.remeasureMode, true);
+  assert.equal(next.cardSessionId, sessionId);
+  assert.equal(next.activeReviewFace, "front");
+});
+
+test("PregradeWorkspace re-measure save targets the existing session id", async () => {
+  const workspace = loadModule<PregradeWorkspaceModule>("src/components/lens/PregradeWorkspace.tsx");
+  const sessionId = "11111111-1111-4111-8111-111111111111";
+  const calls: Array<{ url: string; init: RequestInit | undefined }> = [];
+  const fetchImpl = (async (url: string, init?: RequestInit) => {
+    calls.push({ url, init });
+    return new Response(JSON.stringify({ measurement: {}, updatedExisting: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  await workspace.saveFace({
+    face: "front",
+    upload: {
+      file: new File(["image"], "front.jpg", { type: "image/jpeg" }),
+      fileName: "front.jpg",
+      fileSize: 5,
+      contentType: "image/jpeg",
+      previewUrl: "blob:front",
+      imageSize: { width: 100, height: 140 },
+    },
+    faceState: {
+      face: "front",
+      overlay,
+      imageUrl: "blob:front",
+      imageSize: { width: 100, height: 140 },
+    },
+    faceMeta: undefined,
+    cardIdentity: "Nami",
+    cardSessionId: sessionId,
+    updateExisting: true,
+    fetchImpl,
+  });
+
+  const body = calls[0].init?.body as FormData;
+  assert.equal(calls[0].url, "/api/centering/save");
+  assert.equal(calls[0].init?.method, "POST");
+  assert.equal(body.get("cardSessionId"), sessionId);
+  assert.equal(body.get("updateExisting"), "true");
 });
