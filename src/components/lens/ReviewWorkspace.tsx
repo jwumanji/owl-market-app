@@ -64,6 +64,11 @@ export default function ReviewWorkspace({
   const unviewedFaces = Object.fromEntries(faceList.map((face) => [face, Boolean(faces[face]?.unviewed)]));
   const hasBack = Boolean(faces.back);
 
+  function handleActiveFaceChange(face: LensFace) {
+    if (!faces[face]) return;
+    onActiveFaceChange(face);
+  }
+
   return (
     <section className="flex min-h-0 flex-1 flex-col space-y-3">
       {cardIdentity && (
@@ -82,7 +87,7 @@ export default function ReviewWorkspace({
           faces={faceList}
           adjustedFaces={adjustedFaces}
           unviewedFaces={unviewedFaces}
-          onChange={onActiveFaceChange}
+          onChange={handleActiveFaceChange}
         />
       )}
 
@@ -107,6 +112,7 @@ export default function ReviewWorkspace({
           saveLabel={mode === "edit" ? "Update measurement" : undefined}
           resetLabel={mode === "edit" ? `Revert ${active.face} to saved` : undefined}
           saving={saving}
+          onActiveFaceChange={handleActiveFaceChange}
           onFreeCornersChange={(enabled) => onFreeCornersChange(active.face, enabled)}
           onAddBack={onAddBack}
           onSave={onSave}

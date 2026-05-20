@@ -132,6 +132,41 @@ type ResultsPanelModule = {
   }) => React.ReactElement;
 };
 
+type MeasurementNumbersPanelModule = {
+  default: (props: {
+    activeFace: LensFace;
+    faces: Partial<Record<LensFace, FaceState>>;
+    measurements: Partial<Record<LensFace, Measurement>>;
+    freeCorners: boolean;
+    adjusted: boolean;
+    mode?: "review" | "edit";
+    showAddBack?: boolean;
+    saving?: boolean;
+    onActiveFaceChange?: (face: LensFace) => void;
+    onFreeCornersChange: (enabled: boolean) => void;
+    onAddBack?: () => void;
+    onSave: () => void;
+    onReset: () => void;
+    onCancel: () => void;
+  }) => React.ReactElement;
+};
+
+type ReviewWorkspaceModule = {
+  default: (props: {
+    faces: Partial<Record<LensFace, FaceState>>;
+    activeFace: LensFace;
+    mode?: "review" | "edit";
+    cardIdentity?: string | null;
+    onActiveFaceChange: (face: LensFace) => void;
+    onOverlayChange: (face: LensFace, overlay: OverlayGeometry) => void;
+    onFreeCornersChange: (face: LensFace, enabled: boolean) => void;
+    onAddBack?: () => void;
+    onSave: () => void;
+    onResetFace: (face: LensFace) => void;
+    onCancel: () => void;
+  }) => React.ReactElement;
+};
+
 const measurement: Measurement = {
   leftPct: 52,
   rightPct: 48,
@@ -279,4 +314,99 @@ test("ResultsPanel wires face card selection to the active face source of truth"
 
   frontCard.props.onSelect();
   assert.equal(selected, "front");
+});
+
+test("ReviewWorkspace shares active face handler between FaceTabs and result cards", () => {
+  const workspace = loadModule<ReviewWorkspaceModule>("src/components/lens/ReviewWorkspace.tsx");
+  const selected: LensFace[] = [];
+  const element = workspace.default({
+    faces,
+    activeFace: "back",
+    cardIdentity: "OP01-001",
+    onActiveFaceChange: (face) => {
+      selected.push(face);
+    },
+    onOverlayChange: () => undefined,
+    onFreeCornersChange: () => undefined,
+    onSave: () => undefined,
+    onResetFace: () => undefined,
+    onCancel: () => undefined,
+  }) as React.ReactElement;
+  const elements = walkElements(element);
+  const tabs = elements.find((child) => child.props.adjustedFaces && child.props.onChange);
+  const numbersPanel = elements.find((child) => child.props.measurements && child.props.onActiveFaceChange);
+
+  assert.ok(tabs);
+  assert.ok(numbersPanel);
+  assert.equal(tabs.props.activeFace, "back");
+  assert.equal(numbersPanel.props.activeFace, "back");
+  assert.equal(tabs.props.onChange, numbersPanel.props.onActiveFaceChange);
+
+  numbersPanel.props.onActiveFaceChange("front");
+  tabs.props.onChange("back");
+  assert.deepEqual(selected, ["front", "back"]);
+});
+
+test("MeasurementNumbersPanel result cards click and keyboard switch faces", () => {
+  const panel = loadModule<MeasurementNumbersPanelModule>("src/components/lens/MeasurementNumbersPanel.tsx");
+  const selected: LensFace[] = [];
+  const element = panel.default({
+    activeFace: "back",
+    faces,
+    measurements: { front: measurement, back: { ...measurement, worstAxisMaxPct: 58 } },
+    freeCorners: false,
+    adjusted: false,
+    onActiveFaceChange: (face) => {
+      selected.push(face);
+    },
+    onFreeCornersChange: () => undefined,
+    onSave: () => undefined,
+    onReset: () => undefined,
+    onCancel: () => undefined,
+  }) as React.ReactElement;
+  const cards = walkElements(element).filter(
+    (child) => child.props.face === "front" || child.props.face === "back"
+  );
+  const frontCard = cards.find((child) => child.props.face === "front");
+  const backCard = cards.find((child) => child.props.face === "back");
+
+  assert.ok(frontCard);
+  assert.ok(backCard);
+  assert.equal(frontCard.props.active, false);
+  assert.equal(backCard.props.active, true);
+
+  frontCard.props.onSelect();
+  backCard.props.onSelect();
+
+  const renderedFront = (frontCard.type as (props: Record<string, unknown>) => React.ReactElement)(frontCard.props);
+  let prevented = 0;
+  renderedFront.props.onKeyDown({ key: "Enter", preventDefault: () => { prevented += 1; } });
+  renderedFront.props.onKeyDown({ key: " ", preventDefault: () => { prevented += 1; } });
+
+  assert.deepEqual(selected, ["front", "back", "front", "front"]);
+  assert.equal(prevented, 2);
+});
+
+test("ReviewWorkspace ignores result-card switches to an unmeasured back face", () => {
+  const workspace = loadModule<ReviewWorkspaceModule>("src/components/lens/ReviewWorkspace.tsx");
+  const selected: LensFace[] = [];
+  const element = workspace.default({
+    faces: { front: faces.front },
+    activeFace: "front",
+    onActiveFaceChange: (face) => {
+      selected.push(face);
+    },
+    onOverlayChange: () => undefined,
+    onFreeCornersChange: () => undefined,
+    onSave: () => undefined,
+    onResetFace: () => undefined,
+    onCancel: () => undefined,
+  }) as React.ReactElement;
+  const numbersPanel = walkElements(element).find((child) => child.props.measurements && child.props.onActiveFaceChange);
+
+  assert.ok(numbersPanel);
+  numbersPanel.props.onActiveFaceChange("back");
+  numbersPanel.props.onActiveFaceChange("front");
+
+  assert.deepEqual(selected, ["front"]);
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { type KeyboardEvent } from "react";
 import { type ComputedCenteringMeasurement, type OverlayGeometry, type PsaGrade } from "@/lib/centering-math";
 import { AxisRatioValue } from "./AxisRatioCard";
 import FreeCornersToggle from "./FreeCornersToggle";
@@ -27,6 +28,7 @@ type MeasurementNumbersPanelProps = {
   resetLabel?: string;
   saving?: boolean;
   onFreeCornersChange: (enabled: boolean) => void;
+  onActiveFaceChange?: (face: LensFace) => void;
   onAddBack?: () => void;
   onSave: () => void;
   onReset: () => void;
@@ -61,6 +63,7 @@ function FaceMeasurementCard({
   faceState,
   measurement,
   active,
+  onSelect,
   showWorst,
   isWorst,
 }: {
@@ -68,6 +71,7 @@ function FaceMeasurementCard({
   faceState: LensFaceState;
   measurement: ComputedCenteringMeasurement;
   active: boolean;
+  onSelect?: () => void;
   showWorst: boolean;
   isWorst: boolean;
 }) {
@@ -78,9 +82,29 @@ function FaceMeasurementCard({
   const cardClass = active
     ? "border-owl/40 bg-owl/10 shadow-[0_0_0_1px_rgba(232,160,32,0.16)]"
     : TINTED_TONE_CLASSES[tone];
+  const interactive = Boolean(onSelect);
+
+  function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (!onSelect || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    onSelect();
+  }
 
   return (
-    <div className={`relative rounded-lg border p-3 ${cardClass}`}>
+    <article
+      className={`relative rounded-lg border p-3 ${cardClass} ${
+        interactive
+          ? "cursor-pointer outline-none transition-colors hover:border-border-2 focus-visible:border-owl focus-visible:ring-2 focus-visible:ring-owl/30"
+          : ""
+      }`}
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      aria-label={interactive ? `Switch to ${face} face` : undefined}
+      aria-pressed={interactive ? active : undefined}
+      data-active={active ? "true" : undefined}
+      onClick={onSelect}
+      onKeyDown={interactive ? handleKeyDown : undefined}
+    >
       {showWorst && isWorst && (
         <span className="absolute right-2 top-2 rounded border border-owl/40 bg-owl/15 px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase tracking-wider text-owl">
           worst
@@ -116,7 +140,7 @@ function FaceMeasurementCard({
         </div>
         <OverlayPreview faceState={faceState} />
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -151,6 +175,7 @@ export default function MeasurementNumbersPanel({
   resetLabel,
   saving = false,
   onFreeCornersChange,
+  onActiveFaceChange,
   onAddBack,
   onSave,
   onReset,
@@ -222,6 +247,7 @@ export default function MeasurementNumbersPanel({
               faceState={faceState}
               measurement={measurement}
               active={face === activeFace}
+              onSelect={onActiveFaceChange ? () => onActiveFaceChange(face) : undefined}
               showWorst={showWorst}
               isWorst={combinedFace === face}
             />
