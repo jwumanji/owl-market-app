@@ -61,6 +61,19 @@ export const TONE_TEXT_CLASSES: Record<GraderTone, string> = {
   loss: "text-loss",
 };
 
+export function gradeTierColor(grade: number) {
+  if (!Number.isFinite(grade)) return "var(--red)";
+  if (grade >= 9) return "var(--green)";
+  if (grade >= 7) return "var(--owl)";
+  if (grade >= 5) return "var(--coral)";
+  return "var(--red)";
+}
+
+export function gradeTierColorFromLabel(label: string) {
+  const match = label.match(/\d+(?:\.\d+)?/);
+  return gradeTierColor(match ? Number(match[0]) : 0);
+}
+
 export function toneFromWorstMax(worstMax: number): GraderTone {
   if (worstMax <= 55) return "gain";
   if (worstMax <= 60) return "owl";

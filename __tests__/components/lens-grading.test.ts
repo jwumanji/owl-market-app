@@ -63,6 +63,8 @@ function loadModule<T>(filePath: string, cache = new Map<string, unknown>()): T 
 }
 
 type GradingModule = {
+  gradeTierColor: (grade: number) => string;
+  gradeTierColorFromLabel: (label: string) => string;
   graderResultsFromWorstMax: (worstMax: number) => Array<{ name: string; value: string; subLabel?: string; tone: string }>;
   graderResultsFromFaces: (input: {
     front: { worstMax: number };
@@ -85,6 +87,26 @@ type GradingModule = {
 function loadGrading() {
   return loadModule<GradingModule>("src/components/lens/grading.ts");
 }
+
+test("gradeTierColor maps grade ceilings to shared report colors", () => {
+  const grading = loadGrading();
+
+  assert.equal(grading.gradeTierColor(10), "var(--green)");
+  assert.equal(grading.gradeTierColor(9), "var(--green)");
+  assert.equal(grading.gradeTierColor(8.5), "var(--owl)");
+  assert.equal(grading.gradeTierColor(7), "var(--owl)");
+  assert.equal(grading.gradeTierColor(6.5), "var(--coral)");
+  assert.equal(grading.gradeTierColor(5), "var(--coral)");
+  assert.equal(grading.gradeTierColor(4), "var(--red)");
+});
+
+test("gradeTierColorFromLabel supports compact ceiling labels", () => {
+  const grading = loadGrading();
+
+  assert.equal(grading.gradeTierColorFromLabel("≤6"), "var(--coral)");
+  assert.equal(grading.gradeTierColorFromLabel("<=3"), "var(--red)");
+  assert.equal(grading.gradeTierColorFromLabel("9.5"), "var(--green)");
+});
 
 test("graderResultsFromWorstMax gives BGS 9.5 the second-tier owl tone", () => {
   const grading = loadGrading();
