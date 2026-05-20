@@ -161,7 +161,7 @@ export default function HistoryRow({ session, variant, onRename, onDelete }: His
   return (
     <article
       data-history-row-variant={variant}
-      className={`relative overflow-hidden border border-border bg-surface transition-colors hover:border-border-2 hover:bg-surf2 ${
+      className={`group relative border border-border bg-surface transition-[background-color,border-color,transform] duration-150 hover:border-owl/40 hover:bg-surf2 motion-safe:hover:-translate-y-px ${
         size.row
       }`}
     >
@@ -172,7 +172,7 @@ export default function HistoryRow({ session, variant, onRename, onDelete }: His
         }`}
       >
         <div
-          className={`aspect-[2.5/3.5] overflow-hidden rounded-md border border-border bg-deep ${size.thumbnail}`}
+          className={`aspect-[2.5/3.5] shrink-0 overflow-hidden rounded-md border border-border bg-deep transition-[border-color,box-shadow,transform] duration-150 group-hover:border-owl/40 group-hover:shadow-[0_0_0_3px_rgba(232,160,32,0.15)] motion-safe:group-hover:scale-[1.04] ${size.thumbnail}`}
           data-history-thumbnail="true"
         >
           {session.front?.signedImageUrl ? (

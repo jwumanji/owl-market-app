@@ -281,6 +281,24 @@ test("HistoryRow ceiling pill uses grade tier color while ratios keep axis tone"
   assert.match(html, /text-owl/);
 });
 
+test("HistoryRow exposes row and thumbnail hover highlight classes", () => {
+  const historyRow = loadModule<HistoryRowModule>("src/components/lens/HistoryRow.tsx");
+  const html = renderToStaticMarkup(
+    React.createElement(historyRow.default, {
+      session: session(),
+      variant: "compact",
+      onRename: async () => {},
+    })
+  );
+
+  assert.match(html, /group relative border/);
+  assert.match(html, /hover:border-owl\/40/);
+  assert.match(html, /motion-safe:hover:-translate-y-px/);
+  assert.match(html, /group-hover:border-owl\/40/);
+  assert.match(html, /group-hover:shadow-\[0_0_0_3px_rgba\(232,160,32,0\.15\)\]/);
+  assert.match(html, /motion-safe:group-hover:scale-\[1\.04\]/);
+});
+
 test("HistoryRow rename helper trims and calls callback", async () => {
   const historyRow = loadModule<HistoryRowModule>("src/components/lens/HistoryRow.tsx");
   const calls: Array<[string, string]> = [];
