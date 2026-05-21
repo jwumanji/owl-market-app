@@ -1891,8 +1891,9 @@ nav {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   C1.5 RARITY BADGE — Stage D (canonical 10-rarity palette)
-   Mirrors mockups/02-markets-table.html `.rar-*` rules.
+   C1.5 RARITY BADGE — Stage D.1 (Option A solid-fill palette)
+   Source: mockups/rarity-palette-option-a.html. No gradient text.
+   Hue = family, luminance = tier. MR is the apex chip.
    ══════════════════════════════════════════════════════════════ */
 .c-rar {
   display: inline-flex;
@@ -1900,9 +1901,9 @@ nav {
   justify-content: center;
   font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
   font-weight: 700;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.06em;
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: var(--r-pill);
   border: 1.2px solid;
   flex-shrink: 0;
@@ -1910,39 +1911,27 @@ nav {
   white-space: nowrap;
 }
 
-/* Core 10 — match mockup */
-.c-rar-c   { color: var(--ink-2); border-color: var(--ink-2); background: var(--bg-2); }
-.c-rar-uc  { color: var(--ink);   border-color: var(--ink);   background: var(--bg-3); }
-.c-rar-r   { color: var(--coral); border-color: var(--coral); background: #FFE2DD; }
-.c-rar-l   { color: var(--bg);    border-color: var(--ink);   background: var(--ink); }
-.c-rar-sr  { color: var(--pink);  border-color: var(--pink);  background: #FFE0F0; }
-.c-rar-aa  { color: #7A3FB0;      border-color: #7A3FB0;      background: #F0E4FA; }
-.c-rar-tr  { color: var(--gold);  border-color: var(--gold);  background: #FBF0DA; }
+/* Apex — Manga Rare: ink fill, gold border + gold text */
+.c-rar-mr     { background: #1A0F08; border-color: #E89512; color: #F5BE50; }
 
-/* Premium tier — gradient text via inner span */
-.c-rar-mr,
-.c-rar-sp,
-.c-rar-sec,
-.c-rar-gmr,
-.c-rar-sar {
-  border-color: var(--ink);
-  background: var(--bg-3);
-}
-.c-rar-mr span,
-.c-rar-sp span,
-.c-rar-sec span,
-.c-rar-gmr span,
-.c-rar-sar span {
-  background: var(--grad-brand);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-}
+/* Premium tier — dark saturated fill, cream text */
+.c-rar-gmr    { background: #C28A1A; border-color: #C28A1A; color: #FFF5E4; }
+.c-rar-sec    { background: #C42A45; border-color: #C42A45; color: #FFF5E4; }
+.c-rar-sp     { background: #6E3AA6; border-color: #6E3AA6; color: #FFF5E4; }
+.c-rar-sar    { background: #C43F7E; border-color: #C43F7E; color: #FFF5E4; }
 
-/* Extras (not in core mockup palette) */
-.c-rar-promo  { color: var(--gold); border-color: var(--gold); background: #FBF0DA; }
-.c-rar-sealed { color: #20C9B0; border-color: #20C9B0; background: #DCF6F2; }
+/* Mid tier */
+.c-rar-sr     { background: #2D8A57; border-color: #2D8A57; color: #FFF5E4; }
+.c-rar-aa     { background: #2E6FD6; border-color: #2E6FD6; color: #FFF5E4; }
+.c-rar-l      { background: #137A8C; border-color: #137A8C; color: #FFF5E4; }
+.c-rar-tr     { background: #E89512; border-color: #C97E0C; color: #1A0F08; }
+
+/* Lower / supply tier — light fill, dark text */
+.c-rar-r      { background: #DCE6F7; border-color: #9DB6E0; color: #2E5BA8; }
+.c-rar-promo  { background: #F6E3B6; border-color: #D6B25E; color: #8A5A0C; }
+.c-rar-sealed { background: #D6F2EC; border-color: #8FD3C6; color: #137F70; }
+.c-rar-uc     { background: #FCE6BE; border-color: #D8B36A; color: #5C4534; }
+.c-rar-c      { background: #ECE4D6; border-color: #C9BCA6; color: #5C4534; }
 
 /* ══════════════════════════════════════════════════════════════
    C1.5 MARKET DASHBOARD — Stage D

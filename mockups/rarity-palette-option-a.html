@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OWL Market — Rarity Palette (Option A, solid fills)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Caveat:wght@700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#FFF5E4; --bg-2:#FFFFFF; --bg-3:#FCE6BE;
+    --ink:#1A0F08; --ink-2:#5C4534; --ink-3:#9A8475;
+    --pink:#FF6BB8; --coral:#FF4936; --gold:#E89512; --gain:#2D9961; --loss:#E04E4E;
+    --r-sm:8px; --r-md:14px; --r-pill:999px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--ink);font-family:'Space Grotesk',sans-serif;padding:40px;}
+  h1{font-size:26px;font-weight:700;letter-spacing:-0.02em;margin-bottom:4px;}
+  .sub{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink-2);margin-bottom:28px;letter-spacing:0.04em;}
+  h2{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-3);margin:28px 0 12px;}
+
+  /* THE CHIP — solid fill, no gradient */
+  .rar{display:inline-flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11px;letter-spacing:0.06em;padding:3px 10px;border-radius:var(--r-pill);border:1.2px solid;flex-shrink:0;}
+
+  /* APEX — Manga Rare: ink fill, gold border + gold text (most distinct chip) */
+  .rar-mr  {background:#1A0F08;border-color:#E89512;color:#F5BE50;}
+  /* PREMIUM tier — dark saturated fill, cream text */
+  .rar-gmr {background:#C28A1A;border-color:#C28A1A;color:#FFF5E4;}
+  .rar-sec {background:#C42A45;border-color:#C42A45;color:#FFF5E4;}
+  .rar-sp  {background:#6E3AA6;border-color:#6E3AA6;color:#FFF5E4;}
+  .rar-sar {background:#C43F7E;border-color:#C43F7E;color:#FFF5E4;}
+  /* MID tier */
+  .rar-sr  {background:#2D8A57;border-color:#2D8A57;color:#FFF5E4;}
+  .rar-aa  {background:#2E6FD6;border-color:#2E6FD6;color:#FFF5E4;}
+  .rar-l   {background:#137A8C;border-color:#137A8C;color:#FFF5E4;}
+  .rar-tr  {background:#E89512;border-color:#C97E0C;color:#1A0F08;}
+  /* LOWER tier — light fill, dark text */
+  .rar-r   {background:#DCE6F7;border-color:#9DB6E0;color:#2E5BA8;}
+  .rar-promo{background:#F6E3B6;border-color:#D6B25E;color:#8A5A0C;}
+  .rar-sealed{background:#D6F2EC;border-color:#8FD3C6;color:#137F70;}
+  .rar-uc  {background:#FCE6BE;border-color:#D8B36A;color:#5C4534;}
+  .rar-c   {background:#ECE4D6;border-color:#C9BCA6;color:#5C4534;}
+
+  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;}
+  .cell{display:flex;flex-direction:column;align-items:center;gap:6px;width:96px;}
+  .cell .lbl{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--ink-3);letter-spacing:0.04em;text-align:center;}
+
+  /* sample table context */
+  .tbl{margin-top:14px;background:var(--bg-2);border:1.5px solid var(--ink);border-radius:var(--r-md);overflow:hidden;max-width:560px;}
+  .trow{display:flex;align-items:center;gap:12px;padding:11px 16px;border-top:1px solid var(--bg-3);}
+  .trow:first-child{border-top:none;}
+  .trow .rk{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink-3);width:18px;}
+  .trow .nm{flex:1;font-size:13px;font-weight:600;}
+  .trow .setc{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-2);background:var(--bg-3);border-radius:6px;padding:2px 7px;}
+  .note{margin-top:24px;padding:14px 18px;background:var(--bg-2);border:1.5px dashed var(--ink-3);border-radius:var(--r-md);font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.7;color:var(--ink-2);}
+</style>
+</head>
+<body>
+  <h1>Rarity Palette — Option A (solid fills)</h1>
+  <div class="sub">No gradient text · luminance = tier · every chip high-contrast on cream</div>
+
+  <h2>Apex — Manga Rare stands alone (ink + gold)</h2>
+  <div class="row">
+    <div class="cell"><span class="rar rar-mr">MR</span><span class="lbl">Manga Rare</span></div>
+  </div>
+
+  <h2>Premium tier — dark fill, cream text (pops)</h2>
+  <div class="row">
+    <div class="cell"><span class="rar rar-gmr">GMR</span><span class="lbl">Golden MR</span></div>
+    <div class="cell"><span class="rar rar-sec">SEC</span><span class="lbl">Secret Rare</span></div>
+    <div class="cell"><span class="rar rar-sp">SP</span><span class="lbl">Special Rare</span></div>
+    <div class="cell"><span class="rar rar-sar">SAR</span><span class="lbl">Super Alt Art</span></div>
+  </div>
+
+  <h2>Mid tier</h2>
+  <div class="row">
+    <div class="cell"><span class="rar rar-sr">SR</span><span class="lbl">Super Rare</span></div>
+    <div class="cell"><span class="rar rar-aa">AA</span><span class="lbl">Alt Art</span></div>
+    <div class="cell"><span class="rar rar-l">L</span><span class="lbl">Leader</span></div>
+    <div class="cell"><span class="rar rar-tr">TR</span><span class="lbl">Treasure Rare</span></div>
+  </div>
+
+  <h2>Lower / supply tier — light fill, dark text (recedes)</h2>
+  <div class="row">
+    <div class="cell"><span class="rar rar-r">R</span><span class="lbl">Rare</span></div>
+    <div class="cell"><span class="rar rar-promo">PROMO</span><span class="lbl">Promos</span></div>
+    <div class="cell"><span class="rar rar-sealed">SEALED</span><span class="lbl">Sealed</span></div>
+    <div class="cell"><span class="rar rar-uc">UC</span><span class="lbl">Uncommon</span></div>
+    <div class="cell"><span class="rar rar-c">C</span><span class="lbl">Common</span></div>
+  </div>
+
+  <h2>In a table row (legibility check)</h2>
+  <div class="tbl">
+    <div class="trow"><span class="rk">1</span><span class="nm">Shanks — Divine Departure</span><span class="setc">OP01</span><span class="rar rar-sec">SEC</span></div>
+    <div class="trow"><span class="rk">2</span><span class="nm">Luffy — Gear Fifth</span><span class="setc">OP05</span><span class="rar rar-mr">MR</span></div>
+    <div class="trow"><span class="rk">3</span><span class="nm">Zoro — King of Hell</span><span class="setc">OP06</span><span class="rar rar-sp">SP</span></div>
+    <div class="trow"><span class="rk">4</span><span class="nm">Robin — Veinte Fleurs</span><span class="setc">OP04</span><span class="rar rar-sr">SR</span></div>
+    <div class="trow"><span class="rk">5</span><span class="nm">Mihawk — Black Blade</span><span class="setc">OP02</span><span class="rar rar-aa">AA</span></div>
+    <div class="trow"><span class="rk">6</span><span class="nm">Nami — Happiness Punch</span><span class="setc">OP03</span><span class="rar rar-r">R</span></div>
+    <div class="trow"><span class="rk">7</span><span class="nm">Usopp — Sniper King</span><span class="setc">OP01</span><span class="rar rar-uc">UC</span></div>
+  </div>
+
+  <div class="note">
+    OPTION A · SOLID FILLS · NO GRADIENT<br>
+    APEX: MR #1A0F08 fill / #E89512 border / #F5BE50 text (ink + gold — most distinct chip)<br>
+    PREMIUM (cream text on dark): GMR #C28A1A · SEC #C42A45 · SP #6E3AA6 · SAR #C43F7E<br>
+    MID: SR #2D8A57 · AA #2E6FD6 · L #137A8C · TR #E89512 (ink text)<br>
+    LOWER (dark text on light): R #DCE6F7/#2E5BA8 · PROMO #F6E3B6/#8A5A0C · SEALED #D6F2EC/#137F70 · UC #FCE6BE/#5C4534 · C #ECE4D6/#5C4534<br>
+    HUE = family · LUMINANCE = tier · MR = apex (ink+gold) · GMR = its gold-foil sibling · L is teal (not solid ink)
+  </div>
+</body>
+</html>

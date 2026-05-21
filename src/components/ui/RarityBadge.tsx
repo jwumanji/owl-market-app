@@ -15,15 +15,8 @@ const RARITY_CLASS: Record<string, string> = {
   SEALED: "c-rar-sealed",
 };
 
-const GRADIENT_RARITIES = new Set(["MR", "SP", "SEC", "GMR", "SAR"]);
-
 export default function RarityBadge({ rarity }: { rarity: string | null }) {
   if (!rarity) return null;
   const variant = RARITY_CLASS[rarity] ?? "c-rar-c";
-  const useGradient = GRADIENT_RARITIES.has(rarity);
-  return (
-    <span className={`c-rar ${variant}`}>
-      {useGradient ? <span>{rarity}</span> : rarity}
-    </span>
-  );
+  return <span className={`c-rar ${variant}`}>{rarity}</span>;
 }
