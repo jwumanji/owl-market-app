@@ -69,8 +69,8 @@ function MiniSpark({ data, up, w, h }: { data: number[]; up: boolean; w: number;
   const last = pts[pts.length - 1]!;
   const first = pts[0]!;
   const fill = `${first[0]},${h} ${poly} ${last[0]},${h}`;
-  const stroke = up ? "#00D68F" : "#FF4560";
-  const fillCol = up ? "rgba(0,214,143,0.13)" : "rgba(255,69,96,0.11)";
+  const stroke = up ? "#2D9961" : "#E04E4E";
+  const fillCol = up ? "rgba(45,153,97,0.16)" : "rgba(224,78,78,0.12)";
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", overflow: "visible" }}>
       <polygon points={fill} fill={fillCol} />
@@ -166,27 +166,27 @@ export default function SetDetailClient({
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: "rgba(14,22,40,0.95)",
-        borderColor: "rgba(255,255,255,0.1)",
+        backgroundColor: "rgba(26,15,8,0.95)",
+        borderColor: "rgba(26,15,8,0.10)",
         borderWidth: 1,
-        titleFont: { family: "IBM Plex Mono", size: 10 },
-        bodyFont: { family: "IBM Plex Mono", size: 11 },
-        titleColor: "#7A88A8",
-        bodyColor: "#E4EAF6",
+        titleFont: { family: "JetBrains Mono", size: 10 },
+        bodyFont: { family: "JetBrains Mono", size: 11 },
+        titleColor: "#9A8475",
+        bodyColor: "#FFF5E4",
         padding: 10,
         callbacks: { label: (item) => `  ${fmtUsd(Number(item.parsed.y))}` },
       },
     },
     scales: {
       x: {
-        grid: { color: "rgba(255,255,255,0.03)" },
-        ticks: { font: { family: "IBM Plex Mono", size: 10 }, color: "#7A88A8", maxTicksLimit: 6, maxRotation: 0 },
+        grid: { color: "rgba(26,15,8,0.06)" },
+        ticks: { font: { family: "JetBrains Mono", size: 10 }, color: "#9A8475", maxTicksLimit: 6, maxRotation: 0 },
         border: { display: false },
       },
       y: {
         position: "right",
-        grid: { color: "rgba(255,255,255,0.035)" },
-        ticks: { font: { family: "IBM Plex Mono", size: 10 }, color: "#7A88A8", callback: (v) => "$" + Number(v).toLocaleString() },
+        grid: { color: "rgba(26,15,8,0.06)" },
+        ticks: { font: { family: "JetBrains Mono", size: 10 }, color: "#9A8475", callback: (v) => "$" + Number(v).toLocaleString() },
         border: { display: false },
       },
     },
@@ -341,8 +341,8 @@ export default function SetDetailClient({
               <div className="setd-cc-price-row">
                 <span className="setd-cc-price">{isLive ? fmtUsd(set.price) : "—"}</span>
                 <span className={`setd-cc-delta ${deltaClass}`}>
-                  {set.chg30d >= 0 ? "+" : ""}{set.chg30d}%{" "}
-                  <span style={{ color: "var(--text2)", fontSize: 10, marginLeft: 3 }}>30D</span>
+                  {set.chg30d === 0 ? "" : set.chg30d > 0 ? "+" : ""}{set.chg30d}%{" "}
+                  <span style={{ color: "inherit", opacity: 0.75, fontSize: 10, marginLeft: 3 }}>30D</span>
                 </span>
               </div>
               <div className="setd-cc-sub">Total card value · {set.cards} cards tracked · USD</div>
