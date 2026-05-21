@@ -30,8 +30,8 @@ function CardRow({ card, rank }: { card: DashboardCard; rank: number }) {
         <Image
           src={card.image_url_small}
           alt={card.name}
-          width={26}
-          height={36}
+          width={42}
+          height={59}
           className="c-dthumb"
           unoptimized
         />

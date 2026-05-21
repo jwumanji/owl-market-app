@@ -1618,7 +1618,7 @@ nav {
   grid-template-columns: 56px 1fr 100px 120px 100px;
   align-items: center;
   gap: 16px;
-  padding: 12px 22px;
+  padding: 14px 22px;
 }
 
 .c-teaser-thead {
@@ -1662,16 +1662,16 @@ nav {
 }
 
 .c-teaser-thumb {
-  width: 36px;
-  height: 50px;
-  border-radius: 4px;
+  width: 52px;
+  height: 73px;
+  border-radius: var(--r-sm);
   border: 1.5px solid var(--ink);
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-space-grotesk), system-ui, sans-serif;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 16px;
   color: var(--bg);
   flex-shrink: 0;
   object-fit: cover;
@@ -2008,7 +2008,7 @@ nav {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 16px;
+  padding: 11px 16px;
   border-top: 1px solid var(--bg-3);
   text-decoration: none;
   color: inherit;
@@ -2031,9 +2031,9 @@ nav {
   text-align: center;
 }
 .c-dthumb {
-  width: 26px;
-  height: 36px;
-  border-radius: 3px;
+  width: 42px;
+  height: 59px;
+  border-radius: var(--r-sm);
   border: 1.2px solid var(--ink);
   flex-shrink: 0;
   object-fit: cover;
@@ -2042,7 +2042,7 @@ nav {
   justify-content: center;
   font-family: var(--font-space-grotesk), system-ui, sans-serif;
   font-weight: 700;
-  font-size: 11px;
+  font-size: 14px;
   color: var(--bg);
   background: var(--bg-3);
 }

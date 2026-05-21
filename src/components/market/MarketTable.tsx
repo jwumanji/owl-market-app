@@ -74,7 +74,7 @@ export default function MarketTable({ cards: initialCards, sets }: MarketTablePr
           <thead>
             <tr className="border-b-[1.5px] border-ink bg-bg-3 text-ink-2 text-[11px] font-mono-2 font-semibold uppercase tracking-wider">
               <th className="w-[48px] py-3 px-3 text-center">#</th>
-              <th className="w-[56px] py-3 px-1" />
+              <th className="w-[64px] py-3 px-1" />
               <th className="py-3 px-3 text-left">Card</th>
               <th className="w-[100px] py-3 px-3 text-right">Price</th>
               <th className="w-[80px] py-3 px-3 text-right">24h</th>
@@ -103,13 +103,13 @@ export default function MarketTable({ cards: initialCards, sets }: MarketTablePr
                     <img
                       src={card.image_url_small ?? card.image_url}
                       alt={card.name ?? ""}
-                      width={40}
-                      height={56}
+                      width={52}
+                      height={73}
                       loading="lazy"
-                      className="rounded-[4px] border-[1.5px] border-ink object-cover w-[40px] h-[56px]"
+                      className="rounded-[4px] border-[1.5px] border-ink object-cover w-[52px] h-[73px]"
                     />
                   ) : (
-                    <div className="w-[40px] h-[56px] rounded-[4px] border-[1.5px] border-ink bg-bg-3" />
+                    <div className="w-[52px] h-[73px] rounded-[4px] border-[1.5px] border-ink bg-bg-3" />
                   )}
                 </td>
 
