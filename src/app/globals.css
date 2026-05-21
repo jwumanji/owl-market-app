@@ -1906,3 +1906,69 @@ nav {
 @media (max-width: 600px) {
   .c-games-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* Soft-disabled feature card (Lens placeholder before live route) */
+.c-feature-link[aria-disabled="true"] {
+  color: var(--ink-3);
+  cursor: not-allowed;
+}
+.c-feature-link[aria-disabled="true"]:hover {
+  text-decoration: none;
+}
+.c-feature.disabled {
+  opacity: 0.72;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   C1.5 RARITY BADGE — Stage D (canonical 10-rarity palette)
+   Mirrors mockups/02-markets-table.html `.rar-*` rules.
+   ══════════════════════════════════════════════════════════════ */
+.c-rar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  border: 1.2px solid;
+  flex-shrink: 0;
+  width: fit-content;
+  white-space: nowrap;
+}
+
+/* Core 10 — match mockup */
+.c-rar-c   { color: var(--ink-2); border-color: var(--ink-2); background: var(--bg-2); }
+.c-rar-uc  { color: var(--ink);   border-color: var(--ink);   background: var(--bg-3); }
+.c-rar-r   { color: var(--coral); border-color: var(--coral); background: #FFE2DD; }
+.c-rar-l   { color: var(--bg);    border-color: var(--ink);   background: var(--ink); }
+.c-rar-sr  { color: var(--pink);  border-color: var(--pink);  background: #FFE0F0; }
+.c-rar-aa  { color: #7A3FB0;      border-color: #7A3FB0;      background: #F0E4FA; }
+.c-rar-tr  { color: var(--gold);  border-color: var(--gold);  background: #FBF0DA; }
+
+/* Premium tier — gradient text via inner span */
+.c-rar-mr,
+.c-rar-sp,
+.c-rar-sec,
+.c-rar-gmr,
+.c-rar-sar {
+  border-color: var(--ink);
+  background: var(--bg-3);
+}
+.c-rar-mr span,
+.c-rar-sp span,
+.c-rar-sec span,
+.c-rar-gmr span,
+.c-rar-sar span {
+  background: var(--grad-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Extras (not in core mockup palette) */
+.c-rar-promo  { color: var(--gold); border-color: var(--gold); background: #FBF0DA; }
+.c-rar-sealed { color: #20C9B0; border-color: #20C9B0; background: #DCF6F2; }
