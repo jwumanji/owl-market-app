@@ -1704,42 +1704,7 @@ nav {
   text-overflow: ellipsis;
 }
 
-.c-teaser-rar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
-  font-weight: 600;
-  font-size: 10.5px;
-  letter-spacing: 0.08em;
-  padding: 3px 9px;
-  border-radius: var(--r-pill);
-  border: 1.5px solid;
-  width: fit-content;
-}
-
-.c-teaser-rar-c { color: var(--ink-2); border-color: var(--ink-2); background: var(--bg-2); }
-.c-teaser-rar-uc { color: var(--ink); border-color: var(--ink); background: var(--bg-3); }
-.c-teaser-rar-r { color: var(--coral); border-color: var(--coral); background: #FFE2DD; }
-.c-teaser-rar-sr { color: var(--pink); border-color: var(--pink); background: #FFE0F0; }
-.c-teaser-rar-l { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-.c-teaser-rar-sec,
-.c-teaser-rar-mr,
-.c-teaser-rar-sp,
-.c-teaser-rar-tr {
-  border-color: var(--ink);
-  background: var(--bg-3);
-}
-.c-teaser-rar-sec span,
-.c-teaser-rar-mr span,
-.c-teaser-rar-sp span,
-.c-teaser-rar-tr span {
-  background: var(--grad-brand);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-}
+/* Rarity chip in the teaser uses the canonical .c-rar component (Stage D). */
 
 .c-teaser-price {
   font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
@@ -1770,6 +1735,12 @@ nav {
 
 .c-teaser-delta.down {
   background: var(--loss-2);
+}
+
+/* Neutral / zero — matches pctColor's text-ink-3 semantics. */
+.c-teaser-delta.flat {
+  background: var(--ink-3);
+  color: var(--bg);
 }
 
 .c-teaser-empty {

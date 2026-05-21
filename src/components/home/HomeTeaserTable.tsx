@@ -1,4 +1,6 @@
 import Link from "next/link";
+import RarityBadge from "@/components/ui/RarityBadge";
+import { formatPct } from "@/lib/utils";
 
 export type TeaserCard = {
   id: string;
@@ -11,20 +13,6 @@ export type TeaserCard = {
   market_avg: number | null;
   chg_1d: number | null;
 };
-
-const RARITY_VARIANTS: Record<string, string> = {
-  C: "c-teaser-rar-c",
-  UC: "c-teaser-rar-uc",
-  R: "c-teaser-rar-r",
-  SR: "c-teaser-rar-sr",
-  L: "c-teaser-rar-l",
-  SEC: "c-teaser-rar-sec",
-  MR: "c-teaser-rar-mr",
-  SP: "c-teaser-rar-sp",
-  TR: "c-teaser-rar-tr",
-};
-
-const GRADIENT_RARITIES = new Set(["SEC", "MR", "SP", "TR"]);
 
 function thumbBg(name: string): string {
   let h = 0;
@@ -42,21 +30,10 @@ function formatUsd(value: number | null): string {
   }).format(value);
 }
 
-function formatDelta(chg: number | null): string {
-  if (chg == null) return "—";
-  const sign = chg >= 0 ? "+" : "−";
-  return `${sign}${Math.abs(chg).toFixed(1)}%`;
-}
-
-function RarityChip({ rarity }: { rarity: string | null }) {
-  if (!rarity) return <span className="c-teaser-rar c-teaser-rar-c">—</span>;
-  const variant = RARITY_VARIANTS[rarity] ?? "c-teaser-rar-c";
-  const useGradient = GRADIENT_RARITIES.has(rarity);
-  return (
-    <span className={`c-teaser-rar ${variant}`}>
-      {useGradient ? <span>{rarity}</span> : rarity}
-    </span>
-  );
+/** Three-state delta variant — matches pctColor's neutral-zero semantics. */
+function deltaState(chg: number | null | undefined): "up" | "down" | "flat" {
+  if (chg == null || chg === 0) return "flat";
+  return chg > 0 ? "up" : "down";
 }
 
 function CardThumb({ card }: { card: TeaserCard }) {
@@ -104,7 +81,7 @@ export default function HomeTeaserTable({ cards }: Props) {
         cards.map((card, i) => {
           const setLine = [card.set_code, card.set_name].filter(Boolean).join(" ");
           const cardNum = card.card_number ? ` · #${card.card_number}` : "";
-          const isUp = (card.chg_1d ?? 0) >= 0;
+          const state = deltaState(card.chg_1d);
           return (
             <Link
               key={card.id}
@@ -122,12 +99,10 @@ export default function HomeTeaserTable({ cards }: Props) {
                   </div>
                 </div>
               </div>
-              <RarityChip rarity={card.rarity} />
+              <RarityBadge rarity={card.rarity} />
               <span className="c-teaser-price">{formatUsd(card.market_avg)}</span>
               <span className="c-teaser-delta-wrap">
-                <span className={`c-teaser-delta ${isUp ? "up" : "down"}`}>
-                  {formatDelta(card.chg_1d)}
-                </span>
+                <span className={`c-teaser-delta ${state}`}>{formatPct(card.chg_1d)}</span>
               </span>
             </Link>
           );

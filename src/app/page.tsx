@@ -149,7 +149,7 @@ export default async function Home() {
               </Link>
             </article>
 
-            <article className="c-feature">
+            <article className="c-feature disabled">
               <div className="c-feature-icon">
                 <svg
                   width="22"
@@ -173,9 +173,9 @@ export default async function Home() {
                 Pre-grade your cards with computer-vision centering analysis. See PSA ceilings
                 before you submit and skip the bad bets.
               </p>
-              <Link href="/admin/lens" className="c-feature-link">
+              <span className="c-feature-link" aria-disabled="true">
                 See the Lens →
-              </Link>
+              </span>
             </article>
 
             <article className="c-feature">
