@@ -1,5 +1,6 @@
 import Link from "next/link";
 import RarityBadge from "@/components/ui/RarityBadge";
+import CardHoverZoom from "@/components/ui/CardHoverZoom";
 import { formatPct } from "@/lib/utils";
 
 export type TeaserCard = {
@@ -39,13 +40,15 @@ function deltaState(chg: number | null | undefined): "up" | "down" | "flat" {
 function CardThumb({ card }: { card: TeaserCard }) {
   if (card.image_url_small) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={card.image_url_small}
-        alt=""
-        className="c-teaser-thumb"
-        loading="lazy"
-      />
+      <CardHoverZoom src={card.image_url_small} alt={card.name}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={card.image_url_small}
+          alt=""
+          className="c-teaser-thumb"
+          loading="lazy"
+        />
+      </CardHoverZoom>
     );
   }
   const initial = card.name.trim().charAt(0).toUpperCase() || "?";

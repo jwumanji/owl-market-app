@@ -7,6 +7,7 @@ import { formatPrice } from "@/lib/utils";
 import FilterBar from "./FilterBar";
 import RarityBadge from "../ui/RarityBadge";
 import ChangeCell from "../ui/ChangeCell";
+import CardHoverZoom from "../ui/CardHoverZoom";
 
 interface MarketTableProps {
   cards: CardRow[];
@@ -99,15 +100,20 @@ export default function MarketTable({ cards: initialCards, sets }: MarketTablePr
                 {/* Thumbnail */}
                 <td className="py-2 px-1">
                   {card.image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={card.image_url_small ?? card.image_url}
+                    <CardHoverZoom
+                      src={card.image_url ?? card.image_url_small ?? null}
                       alt={card.name ?? ""}
-                      width={52}
-                      height={73}
-                      loading="lazy"
-                      className="rounded-[4px] border-[1.5px] border-ink object-cover w-[52px] h-[73px]"
-                    />
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={card.image_url_small ?? card.image_url}
+                        alt={card.name ?? ""}
+                        width={52}
+                        height={73}
+                        loading="lazy"
+                        className="rounded-[4px] border-[1.5px] border-ink object-cover w-[52px] h-[73px]"
+                      />
+                    </CardHoverZoom>
                   ) : (
                     <div className="w-[52px] h-[73px] rounded-[4px] border-[1.5px] border-ink bg-bg-3" />
                   )}

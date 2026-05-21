@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import DashboardWidget from "./DashboardWidget";
 import RarityBadge from "@/components/ui/RarityBadge";
+import CardHoverZoom from "@/components/ui/CardHoverZoom";
 import { formatPrice, formatPct, pctColor } from "@/lib/utils";
 import type {
   DashboardData,
@@ -27,14 +28,16 @@ function CardRow({ card, rank }: { card: DashboardCard; rank: number }) {
     <Row href={`/card/${card.card_image_id}`}>
       <span className="c-drank">{rank}</span>
       {card.image_url_small ? (
-        <Image
-          src={card.image_url_small}
-          alt={card.name}
-          width={42}
-          height={59}
-          className="c-dthumb"
-          unoptimized
-        />
+        <CardHoverZoom src={card.image_url_small} alt={card.name}>
+          <Image
+            src={card.image_url_small}
+            alt={card.name}
+            width={42}
+            height={59}
+            className="c-dthumb"
+            unoptimized
+          />
+        </CardHoverZoom>
       ) : (
         <span className="c-dthumb" aria-hidden="true">
           {card.name.charAt(0).toUpperCase()}
