@@ -103,6 +103,18 @@ body:has(.admin-nav) {
   --top: var(--nav-h);
 }
 
+/* C1.5 index/detail surfaces (Stage F) — cream page background.
+   Matches the .c-home-main pattern (Stage C) but applied at <body> so the
+   cream extends past short content without each wrapper needing its own
+   min-height. */
+body:has(.rar-page),
+body:has(.chars-page),
+body:has(.sets-v2-page),
+body:has(.setd-page) {
+  background: var(--bg);
+  color: var(--ink);
+}
+
 input[type="date"] {
   color-scheme: dark;
 }
