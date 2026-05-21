@@ -268,13 +268,32 @@ export default async function MarketsPage() {
   };
 
   return (
-    <section className="max-w-[1400px] mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-1 tracking-tight">Markets</h1>
-      <p className="text-text-2 text-sm mb-6">
-        Top 20 cards by market value
-      </p>
-      <MarketDashboard data={dashboardData} />
-      <MarketTable cards={cards} sets={sets} />
-    </section>
+    <main className="bg-bg text-ink min-h-screen pt-8 pb-24">
+      <section className="max-w-[1280px] mx-auto px-7">
+        <header className="mb-6">
+          <div className="font-mono-2 font-semibold text-[12px] text-ink-2 tracking-[0.14em] uppercase mb-3">
+            TCG · Live prices · Verified data
+          </div>
+          <h1 className="font-grotesk font-bold text-[44px] leading-none tracking-[-0.025em] text-ink">
+            Markets &mdash;{" "}
+            <em
+              className="font-script not-italic bg-grad-brand bg-clip-text text-transparent inline-block"
+              style={{ fontSize: "56px", paddingRight: "12px", paddingBottom: "4px" }}
+            >
+              live
+            </em>
+          </h1>
+          <p className="mt-3 font-mono-2 font-semibold text-[13px] text-ink-2">
+            Top 20 by market value
+            <span className="text-coral mx-1.5">·</span>
+            Updated every 60s
+            <span className="text-coral mx-1.5">·</span>
+            One Piece TCG
+          </p>
+        </header>
+        <MarketDashboard data={dashboardData} />
+        <MarketTable cards={cards} sets={sets} />
+      </section>
+    </main>
   );
 }
