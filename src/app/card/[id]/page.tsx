@@ -432,20 +432,23 @@ function PriceChart({ data, period }: { data: PricePoint[]; period: Period }) {
     datasets: [
       {
         data: data.map((p) => p.market_avg),
-        borderColor: "#E8A020",
+        borderColor: "#2D9961",
         borderWidth: 1.8,
         fill: true,
         backgroundColor: (ctx: { chart: { ctx: CanvasRenderingContext2D; chartArea?: { top: number; bottom: number } } }) => {
           const { ctx: c, chartArea } = ctx.chart;
-          if (!chartArea) return "rgba(232,160,32,0.05)";
+          if (!chartArea) return "rgba(45,153,97,0.05)";
           const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-          g.addColorStop(0, "rgba(232,160,32,0.19)");
-          g.addColorStop(1, "rgba(0,0,0,0)");
+          g.addColorStop(0, "rgba(45,153,97,0.20)");
+          g.addColorStop(1, "rgba(45,153,97,0.02)");
           return g;
         },
         tension: 0.35,
         pointRadius: 0,
         pointHoverRadius: 5,
+        pointBackgroundColor: "#2D9961",
+        pointBorderColor: "#FFFFFF",
+        pointBorderWidth: 2,
       },
     ],
   };
@@ -458,13 +461,13 @@ function PriceChart({ data, period }: { data: PricePoint[]; period: Period }) {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: "rgba(14,22,40,0.95)",
-        borderColor: "rgba(255,255,255,0.1)",
+        backgroundColor: "rgba(26,15,8,0.95)",
+        borderColor: "rgba(26,15,8,0.10)",
         borderWidth: 1,
-        titleFont: { family: "IBM Plex Mono", size: 10 },
-        bodyFont: { family: "IBM Plex Mono", size: 11 },
-        titleColor: "#7A88A8",
-        bodyColor: "#E4EAF6",
+        titleFont: { family: "JetBrains Mono", size: 10 },
+        bodyFont: { family: "JetBrains Mono", size: 11 },
+        titleColor: "#9A8475",
+        bodyColor: "#FFF5E4",
         padding: 10,
         callbacks: {
           label: (v: { parsed: { y: number | null } }) =>
@@ -474,10 +477,10 @@ function PriceChart({ data, period }: { data: PricePoint[]; period: Period }) {
     },
     scales: {
       x: {
-        grid: { color: "rgba(255,255,255,0.03)" },
+        grid: { color: "rgba(26,15,8,0.06)" },
         ticks: {
-          font: { family: "IBM Plex Mono", size: 10 },
-          color: "#7A88A8",
+          font: { family: "JetBrains Mono", size: 10 },
+          color: "#9A8475",
           maxTicksLimit: 8,
           maxRotation: 0,
         },
@@ -485,10 +488,10 @@ function PriceChart({ data, period }: { data: PricePoint[]; period: Period }) {
       },
       y: {
         position: "right" as const,
-        grid: { color: "rgba(255,255,255,0.035)" },
+        grid: { color: "rgba(26,15,8,0.06)" },
         ticks: {
-          font: { family: "IBM Plex Mono", size: 10 },
-          color: "#7A88A8",
+          font: { family: "JetBrains Mono", size: 10 },
+          color: "#9A8475",
           callback: (v: number | string) => "$" + Number(v).toLocaleString(),
         },
         border: { display: false },
