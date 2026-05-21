@@ -13,16 +13,10 @@ import {
   Tooltip,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
-import { formatPrice, formatPct, pctColor } from "@/lib/utils";
+import { formatPrice, formatPct, pctColor, timeAgo } from "@/lib/utils";
 import RarityBadge from "@/components/ui/RarityBadge";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip);
-
-const RARITY_LABELS: Record<string, string> = {
-  MR: "Manga Rare", SP: "Special", SEC: "Secret Rare", TR: "Treasure Rare",
-  AA: "Alternate Art", L: "Leader", SR: "Super Rare", R: "Rare",
-  UC: "Uncommon", C: "Common",
-};
 
 interface CardData {
   id: string;
@@ -101,15 +95,6 @@ function formatAthDate(dateStr: string | null): string {
   return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
 }
 
-const COLOR_LABELS: Record<string, { bg: string; text: string }> = {
-  Red:    { bg: "bg-[#FF4560]/10", text: "text-[#FF4560]" },
-  Blue:   { bg: "bg-[#4F8EF7]/10", text: "text-[#4F8EF7]" },
-  Green:  { bg: "bg-[#00D68F]/10", text: "text-[#00D68F]" },
-  Purple: { bg: "bg-[#9B72FF]/10", text: "text-[#9B72FF]" },
-  Black:  { bg: "bg-white/5",      text: "text-text-2" },
-  Yellow: { bg: "bg-[#E8A020]/10", text: "text-owl" },
-};
-
 export default function CardDetailPage() {
   const params = useParams();
   const id = params.id as string;
@@ -150,17 +135,17 @@ export default function CardDetailPage() {
 
   if (loading) {
     return (
-      <section className="max-w-[1400px] mx-auto px-4 py-8">
-        <p className="text-text-2 text-sm">Loading card data...</p>
+      <section className="max-w-[1180px] mx-auto px-8 py-8">
+        <p className="text-ink-2 text-sm font-mono-2">Loading card data...</p>
       </section>
     );
   }
 
   if (error || !card) {
     return (
-      <section className="max-w-[1400px] mx-auto px-4 py-8">
-        <p className="text-loss text-sm">{error ?? "Card not found"}</p>
-        <Link href="/sets" className="text-owl text-sm mt-4 inline-block">
+      <section className="max-w-[1180px] mx-auto px-8 py-8">
+        <p className="text-loss-2 text-sm font-mono-2">{error ?? "Card not found"}</p>
+        <Link href="/sets" className="text-coral text-sm mt-4 inline-block hover:underline">
           &larr; Back to Sets
         </Link>
       </section>
@@ -173,226 +158,215 @@ export default function CardDetailPage() {
       : null;
 
   const filteredHistory = filterByPeriod(priceHistory, chartPeriod);
+  const chg1d = priceStats?.chg_1d;
+  const heroPrice = priceStats?.market_avg ?? null;
 
   return (
-    <section className="max-w-[1400px] mx-auto px-4 py-8">
+    <section className="max-w-[1180px] mx-auto px-8 pt-8 pb-24 text-ink">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs text-text-3 mb-6 font-mono">
-        <Link href="/sets" className="hover:text-owl transition-colors">Sets</Link>
+      <div className="mb-8 font-mono-2 font-semibold text-[12px] tracking-[0.04em] flex items-center flex-wrap">
+        <Link href="/sets" className="text-ink-3 hover:text-ink transition-colors">
+          Sets
+        </Link>
         {set && (
           <>
-            <span>/</span>
-            <Link href={`/sets/${set.slug}`} className="hover:text-owl transition-colors">
-              {set.code}
+            <span className="mx-2 text-ink-3">/</span>
+            <Link
+              href={`/sets/${set.slug}`}
+              className="text-ink-3 hover:text-ink transition-colors"
+            >
+              {set.code} {set.name}
             </Link>
           </>
         )}
-        <span>/</span>
-        <span className="text-text truncate max-w-[200px]">{card.name}</span>
+        <span className="mx-2 text-ink-3">/</span>
+        <span className="text-ink truncate max-w-[300px]">{card.name}</span>
       </div>
 
       {/* Two-column layout */}
-      <div className="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-8 mb-10">
-        {/* Left — Card Image */}
+      <div className="grid grid-cols-1 md:grid-cols-[380px_1fr] gap-14 items-start">
+        {/* Left col — title block + art */}
         <div>
+          <div className="mb-5">
+            <h1 className="font-grotesk font-bold text-[32px] leading-[1.15] tracking-[-0.02em] text-ink">
+              {card.name}
+            </h1>
+            <div className="mt-3 flex items-center gap-2.5 flex-wrap">
+              <span className="font-mono-2 font-semibold text-[12.5px] text-ink-2">
+                {set ? (
+                  <Link
+                    href={`/sets/${set.slug}`}
+                    className="hover:text-ink transition-colors"
+                  >
+                    {set.code} {set.name}
+                  </Link>
+                ) : null}
+                {card.card_number ? ` · #${card.card_number}` : ""}
+              </span>
+              <RarityBadge rarity={card.rarity} />
+            </div>
+            {(card.card_type ||
+              card.variant_label ||
+              (card.color && card.color.length > 0)) && (
+              <div className="mt-3 flex gap-2 flex-wrap">
+                {card.card_type && <Chip>{card.card_type}</Chip>}
+                {card.variant_label && <Chip>{card.variant_label}</Chip>}
+                {card.color?.map((c) => (
+                  <Chip key={c}>{c}</Chip>
+                ))}
+              </div>
+            )}
+          </div>
+
           {card.image_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={card.image_url}
               alt={card.name}
-              className="w-full max-w-[320px] rounded-lg shadow-lg shadow-black/30"
+              className="w-full aspect-[5/7] object-cover rounded-c-md border-[1.5px] border-ink shadow-[0_10px_24px_rgba(26,15,8,0.10)]"
             />
           ) : (
-            <div className="w-full max-w-[320px] aspect-[63/88] rounded-lg bg-surf3" />
+            <div className="w-full aspect-[5/7] rounded-c-md border-[1.5px] border-ink bg-bg-3" />
           )}
         </div>
 
-        {/* Right — Info + Prices */}
-        <div className="flex flex-col gap-5">
-          {/* Card name */}
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">{card.name}</h1>
-            <div className="flex flex-wrap items-center gap-2 mt-2">
-              <RarityBadge rarity={card.rarity} />
-              {card.rarity && (
-                <span className="text-xs text-text-2">
-                  {RARITY_LABELS[card.rarity] ?? card.rarity}
-                </span>
-              )}
-              {card.card_type && (
-                <span className="text-xs font-mono text-text-2 bg-surf2 px-1.5 py-0.5 rounded border border-border">
-                  {card.card_type}
-                </span>
-              )}
-              {card.variant_label && (
-                <span className="text-xs font-mono text-text-2 bg-surf2 px-1.5 py-0.5 rounded border border-border">
-                  {card.variant_label}
-                </span>
-              )}
+        {/* Right col — price hero + chart + stats */}
+        <div className="min-w-0">
+          {/* Price hero */}
+          <div className="mb-9">
+            <div className="font-mono-2 font-semibold text-[12px] tracking-[0.14em] uppercase text-ink-2 mb-3">
+              Market average
             </div>
-          </div>
-
-          {/* Set & meta info */}
-          <div className="flex flex-wrap items-center gap-3 text-sm text-text-2">
-            {set && (
-              <Link href={`/sets/${set.slug}`} className="hover:text-owl transition-colors">
-                [{set.code}] {set.name}
-              </Link>
+            <div className="flex items-baseline gap-4 flex-wrap">
+              <span className="font-mono-2 font-semibold text-[56px] leading-none tracking-[-0.01em] text-ink">
+                {formatPrice(heroPrice)}
+              </span>
+              {chg1d != null && <DeltaPill value={chg1d} />}
+            </div>
+            {priceStats?.updated_at && (
+              <div className="mt-2.5 font-mono-2 font-semibold text-[13px] text-ink-2">
+                Last updated {timeAgo(priceStats.updated_at)}
+              </div>
             )}
-            {set?.series && <span className="text-text-3">&middot;</span>}
-            {set?.series && <span>{set.series}</span>}
-            {set?.year && <span className="text-text-3">&middot;</span>}
-            {set?.year && <span>{set.year}</span>}
           </div>
 
-          {/* Card number */}
-          {card.card_number && (
-            <div className="text-xs font-mono text-text-3">
-              Card # {card.card_number}
-            </div>
-          )}
-
-          {/* Color tags */}
-          {card.color && card.color.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {card.color.map((c) => {
-                const style = COLOR_LABELS[c] ?? { bg: "bg-white/5", text: "text-text-2" };
-                return (
-                  <span
-                    key={c}
-                    className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-medium ${style.bg} ${style.text}`}
-                  >
-                    {c}
+          {/* Chart block */}
+          <div className="bg-bg-2 border-[1.5px] border-ink rounded-c-md p-5 mb-8">
+            <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+              <div className="flex items-baseline gap-2">
+                <h2 className="font-grotesk font-bold text-[18px] tracking-[-0.01em] text-ink">
+                  Price History
+                </h2>
+                {historySynthetic && filteredHistory.length > 0 && (
+                  <span className="font-mono-2 font-semibold text-[10px] text-ink-3 uppercase tracking-[0.1em]">
+                    Estimated from 30-day stats
                   </span>
-                );
-              })}
+                )}
+              </div>
+              <div className="flex gap-1.5">
+                {PERIODS.map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setChartPeriod(p)}
+                    className={`font-mono-2 font-semibold text-[12px] tracking-[0.04em] px-3 py-1.5 rounded-c-pill transition-colors ${
+                      chartPeriod === p
+                        ? "bg-ink text-bg"
+                        : "text-ink-2 hover:bg-bg-3"
+                    }`}
+                  >
+                    {p.toUpperCase()}
+                  </button>
+                ))}
+              </div>
             </div>
-          )}
 
-          {/* Price cards */}
-          <div className="grid grid-cols-3 gap-3">
-            <PriceCard label="Market Avg" value={priceStats?.market_avg} primary />
-            <PriceCard label="TCG Market" value={priceStats?.tcg_market} />
-            <PriceCard label="eBay Avg" value={priceStats?.ebay_avg} />
+            {filteredHistory.length > 0 ? (
+              <div style={{ height: 280 }}>
+                <PriceChart data={filteredHistory} period={chartPeriod} />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-[280px] text-ink-3 text-sm font-mono-2">
+                No price history available
+              </div>
+            )}
           </div>
 
-          {/* Change row */}
-          <div className="grid grid-cols-3 gap-3">
-            <ChangeCard label="24h" value={priceStats?.chg_1d} />
-            <ChangeCard label="7d" value={priceStats?.chg_7d} />
-            <ChangeCard label="30d" value={priceStats?.chg_30d} />
-          </div>
-
-          {/* ATH / ATL / Growth */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="bg-surface border border-border rounded-lg p-3">
-              <div className="text-[10px] font-mono text-text-3 uppercase tracking-wider mb-1">
-                All-Time High
-              </div>
-              <div className="text-sm font-mono text-owl font-medium">
-                {formatPrice(priceStats?.ath)}
-              </div>
-              <div className="text-[10px] font-mono text-text-3 mt-0.5">
-                {formatAthDate(priceStats?.ath_date ?? null)}
-              </div>
-            </div>
-            <div className="bg-surface border border-border rounded-lg p-3">
-              <div className="text-[10px] font-mono text-text-3 uppercase tracking-wider mb-1">
-                All-Time Low
-              </div>
-              <div className="text-sm font-mono text-text-2 font-medium">
-                {formatPrice(priceStats?.atl)}
-              </div>
-              <div className="text-[10px] font-mono text-text-3 mt-0.5">
-                {formatAthDate(priceStats?.atl_date ?? null)}
-              </div>
-            </div>
-            <div className="bg-surface border border-border rounded-lg p-3">
-              <div className="text-[10px] font-mono text-text-3 uppercase tracking-wider mb-1">
-                Growth from ATL
-              </div>
-              <div className={`text-sm font-mono font-medium ${pctColor(growth)}`}>
-                {formatPct(growth)}
-              </div>
-              <div className="text-[10px] font-mono text-text-3 mt-0.5">
-                price change
-              </div>
-            </div>
+          {/* Stats grid */}
+          <div className="grid grid-cols-3 gap-3.5">
+            <StatTile
+              label="24h change"
+              value={formatPct(priceStats?.chg_1d)}
+              valueClass={pctColor(priceStats?.chg_1d)}
+            />
+            <StatTile
+              label="7d change"
+              value={formatPct(priceStats?.chg_7d)}
+              valueClass={pctColor(priceStats?.chg_7d)}
+            />
+            <StatTile
+              label="30d change"
+              value={formatPct(priceStats?.chg_30d)}
+              valueClass={pctColor(priceStats?.chg_30d)}
+            />
+            <StatTile
+              label="All-time high"
+              value={formatPrice(priceStats?.ath)}
+              foot={formatAthDate(priceStats?.ath_date ?? null)}
+            />
+            <StatTile
+              label="All-time low"
+              value={formatPrice(priceStats?.atl)}
+              foot={formatAthDate(priceStats?.atl_date ?? null)}
+            />
+            <StatTile
+              label="Growth from ATL"
+              value={formatPct(growth)}
+              valueClass={pctColor(growth)}
+            />
           </div>
 
           {/* TCG Range */}
-          {(priceStats?.tcg_low != null || priceStats?.tcg_mid != null || priceStats?.tcg_high != null) && (
-            <div className="bg-surface border border-border rounded-lg p-3">
-              <div className="text-[10px] font-mono text-text-3 uppercase tracking-wider mb-2">
+          {(priceStats?.tcg_low != null ||
+            priceStats?.tcg_mid != null ||
+            priceStats?.tcg_high != null) && (
+            <div className="mt-3.5 bg-bg-2 border-[1.5px] border-ink rounded-c-md px-5 py-4">
+              <div className="font-mono-2 font-semibold text-[11px] tracking-[0.12em] uppercase text-ink-2 mb-2">
                 TCG Price Range (30d)
               </div>
-              <div className="flex items-center gap-4 font-mono text-sm">
+              <div className="flex items-center gap-5 font-mono-2 font-semibold text-[14px] text-ink flex-wrap">
                 <div>
-                  <span className="text-text-3 text-[10px] mr-1">Low</span>
-                  <span className="text-text-2">{formatPrice(priceStats.tcg_low)}</span>
+                  <span className="text-ink-3 text-[11px] mr-1.5 uppercase tracking-[0.06em]">
+                    Low
+                  </span>
+                  {formatPrice(priceStats.tcg_low)}
                 </div>
-                <div className="text-text-3">/</div>
+                <span className="text-ink-3">·</span>
                 <div>
-                  <span className="text-text-3 text-[10px] mr-1">Mid</span>
-                  <span className="text-text">{formatPrice(priceStats.tcg_mid)}</span>
+                  <span className="text-ink-3 text-[11px] mr-1.5 uppercase tracking-[0.06em]">
+                    Mid
+                  </span>
+                  {formatPrice(priceStats.tcg_mid)}
                 </div>
-                <div className="text-text-3">/</div>
+                <span className="text-ink-3">·</span>
                 <div>
-                  <span className="text-text-3 text-[10px] mr-1">High</span>
-                  <span className="text-text-2">{formatPrice(priceStats.tcg_high)}</span>
+                  <span className="text-ink-3 text-[11px] mr-1.5 uppercase tracking-[0.06em]">
+                    High
+                  </span>
+                  {formatPrice(priceStats.tcg_high)}
                 </div>
               </div>
             </div>
           )}
 
-          {/* Last updated */}
-          {priceStats?.updated_at && (
-            <div className="text-[10px] font-mono text-text-3">
-              Prices updated {new Date(priceStats.updated_at).toLocaleDateString("en-US", {
-                month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
-              })}
-            </div>
-          )}
+          {/*
+            Recent-sales table from the mockup is intentionally deferred —
+            no per-sale data source exists today (TCGplayer has no sales-history
+            API). Future source: eBay sold-listings feed. Volume (7d) and PSA 10
+            population tiles are deferred for the same reason. Render the
+            Date / Grade / Source / Price table here using the mockup's
+            `.sales-table` styling once the feed lands.
+          */}
         </div>
-      </div>
-
-      {/* Price History Chart */}
-      <div className="bg-surface border border-border rounded-lg p-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-baseline gap-2">
-            <h2 className="text-lg font-semibold">Price History</h2>
-            {historySynthetic && filteredHistory.length > 0 && (
-              <span className="text-[10px] font-mono text-text-3 uppercase tracking-wider">
-                Estimated from 30-day stats
-              </span>
-            )}
-          </div>
-          <div className="flex gap-1">
-            {PERIODS.map((p) => (
-              <button
-                key={p}
-                onClick={() => setChartPeriod(p)}
-                className={`px-2.5 py-1 rounded text-xs font-mono transition-colors ${
-                  chartPeriod === p
-                    ? "bg-owl/20 text-owl"
-                    : "text-text-3 hover:text-text-2 hover:bg-surf2"
-                }`}
-              >
-                {p.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {filteredHistory.length > 0 ? (
-          <div style={{ height: 280 }}>
-            <PriceChart data={filteredHistory} period={chartPeriod} />
-          </div>
-        ) : (
-          <div className="flex items-center justify-center h-[280px] text-text-3 text-sm font-mono">
-            No price history available
-          </div>
-        )}
       </div>
     </section>
   );
@@ -400,28 +374,54 @@ export default function CardDetailPage() {
 
 /* ── Sub-components ── */
 
-function PriceCard({ label, value, primary }: { label: string; value: number | null | undefined; primary?: boolean }) {
+function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-surface border border-border rounded-lg p-3">
-      <div className="text-[10px] font-mono text-text-3 uppercase tracking-wider mb-1">
-        {label}
-      </div>
-      <div className={`text-lg font-mono font-medium ${primary ? "text-owl" : "text-text"}`}>
-        {formatPrice(value)}
-      </div>
-    </div>
+    <span className="font-mono-2 font-semibold text-[11px] tracking-[0.06em] px-2.5 py-1 rounded-c-pill border-[1.5px] border-ink-2 text-ink-2 bg-bg-2">
+      {children}
+    </span>
   );
 }
 
-function ChangeCard({ label, value }: { label: string; value: number | null | undefined }) {
+function DeltaPill({ value }: { value: number }) {
+  const bg = value > 0 ? "bg-gain-2" : value < 0 ? "bg-loss-2" : "bg-ink-3";
+  const arrow = value > 0 ? "↑ " : value < 0 ? "↓ " : "";
+  const magnitude = value === 0 ? formatPct(value) : formatPct(Math.abs(value));
   return (
-    <div className="bg-surface border border-border rounded-lg p-3">
-      <div className="text-[10px] font-mono text-text-3 uppercase tracking-wider mb-1">
+    <span
+      className={`inline-flex items-center font-mono-2 font-semibold text-[13px] text-bg px-3 py-1.5 rounded-c-pill ${bg}`}
+    >
+      {arrow}
+      {magnitude} · 24h
+    </span>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  foot,
+  valueClass = "text-ink",
+}: {
+  label: string;
+  value: string;
+  foot?: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="bg-bg-2 border-[1.5px] border-ink rounded-c-md px-[18px] py-4">
+      <div className="font-mono-2 font-semibold text-[11px] tracking-[0.12em] uppercase text-ink-2">
         {label}
       </div>
-      <div className={`text-sm font-mono font-medium ${pctColor(value)}`}>
-        {formatPct(value)}
+      <div
+        className={`mt-2 font-mono-2 font-semibold text-[22px] leading-none tracking-[-0.01em] ${valueClass}`}
+      >
+        {value}
       </div>
+      {foot && (
+        <div className="mt-1.5 font-mono-2 font-semibold text-[11px] text-ink-2">
+          {foot}
+        </div>
+      )}
     </div>
   );
 }
