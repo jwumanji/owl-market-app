@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function NewInventoryPage() {
   return (
-    <section className="mx-auto max-w-[1280px] px-4 py-8">
+    <section className="mx-auto max-w-[1100px] pl-7 pr-7 py-8">
       <div className="admin-page-head">
         <div>
           <p className="admin-eyebrow">Internal Tool</p>
