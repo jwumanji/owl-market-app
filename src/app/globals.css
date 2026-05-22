@@ -112,7 +112,8 @@ body:has(.chars-page),
 body:has(.sets-v2-page),
 body:has(.setd-page),
 body:has(.markets-grid-page),
-body:has(.card-page) {
+body:has(.card-page),
+body:has(.login-page) {
   background: var(--bg);
   color: var(--ink);
 }

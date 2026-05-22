@@ -7,10 +7,7 @@ export const metadata = {
 
 export default function LoginPage() {
   return (
-    <section
-      className="flex min-h-[calc(100vh-var(--top))] w-full items-center justify-center px-6 py-12"
-      style={{ backgroundColor: "var(--bg)" }}
-    >
+    <section className="login-page flex min-h-[calc(100vh-var(--top))] w-full items-center justify-center px-6 py-12">
       <Suspense>
         <LoginForm />
       </Suspense>
