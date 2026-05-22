@@ -52,12 +52,12 @@ function formatMeasurementDate(value: string | null | undefined) {
 
 function ceilingClassName(ceiling: CenteringMeasurementRow["psa_ceiling"]) {
   if (ceiling === "PSA_10") {
-    return "border-gain/40 bg-gain/10 text-gain";
+    return "border-gain-2 bg-[#DCF1E6] text-gain-2";
   }
   if (ceiling === "PSA_9" || ceiling === "PSA_8") {
-    return "border-owl/40 bg-owl/10 text-owl";
+    return "border-gold bg-[#FBF0DA] text-gold";
   }
-  return "border-loss/40 bg-loss/10 text-loss";
+  return "border-coral bg-[#FFE2DD] text-coral";
 }
 
 async function loadPregradeHistory(page: number): Promise<HistoryPage> {
@@ -95,95 +95,95 @@ function historyHref(page: number) {
 
 function PregradeHistory({ history }: { history: HistoryPage }) {
   return (
-    <section className="mt-6 rounded-lg border border-border bg-surface p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <section className="admin-card mt-6 overflow-hidden">
+      <div className="flex flex-col gap-3 border-b-[1.5px] border-ink bg-bg-3 px-6 py-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="font-mono text-xs font-bold uppercase text-owl">Pre-grade History</div>
-          <h2 className="mt-1 text-2xl font-bold text-text">Standalone measurements</h2>
+          <div className="font-mono text-[10px] font-bold uppercase tracking-[0.08em] text-ink-2">
+            Pre-grade History
+          </div>
+          <h2 className="mt-1 font-grotesk text-lg font-bold tracking-tight text-ink">
+            Standalone measurements
+          </h2>
         </div>
-        <div className="font-mono text-xs font-semibold uppercase text-text-2">
+        <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.05em] text-ink-2">
           Page {history.page} of {history.pageCount}
         </div>
       </div>
 
-      {history.error && (
-        <div className="mt-5 rounded-md border border-loss/40 bg-loss/10 p-4 text-sm text-text">
-          Pre-grade history is unavailable.
-          <div className="mt-2 font-mono text-xs text-text-2">{history.error}</div>
-        </div>
-      )}
+      <div className="p-5">
+        {history.error && (
+          <div className="rounded-c-sm border-[1.5px] border-coral bg-[#FFE2DD] p-4 font-grotesk text-sm text-ink">
+            Pre-grade history is unavailable.
+            <div className="mt-2 font-mono text-xs text-ink-2">{history.error}</div>
+          </div>
+        )}
 
-      {!history.error && history.rows.length === 0 && (
-        <div className="mt-5 rounded-md border border-dashed border-border-2 bg-deep p-6 text-sm text-text-2">
-          No standalone pre-grade measurements yet.
-        </div>
-      )}
+        {!history.error && history.rows.length === 0 && (
+          <div className="rounded-c-sm border-[1.5px] border-dashed border-ink-3 bg-bg p-6 font-grotesk text-sm text-ink-2">
+            No standalone pre-grade measurements yet.
+          </div>
+        )}
 
-      {!history.error && history.rows.length > 0 && (
-        <div className="mt-5 overflow-x-auto rounded-md border border-border">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="bg-deep font-mono text-xs uppercase text-text-2">
-              <tr>
-                <th className="px-3 py-2">Measured</th>
-                <th className="px-3 py-2">Ceiling</th>
-                <th className="px-3 py-2">L / R</th>
-                <th className="px-3 py-2">T / B</th>
-                <th className="px-3 py-2">Worst axis</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.rows.map((measurement) => (
-                <tr key={measurement.id} className="border-t border-border">
-                  <td className="px-3 py-3 font-mono text-xs text-text-2">
-                    {formatMeasurementDate(measurement.created_at)}
-                  </td>
-                  <td className="px-3 py-3">
-                    <span
-                      className={`inline-flex rounded-md border px-2.5 py-1.5 font-mono text-xs font-bold uppercase ${ceilingClassName(
-                        measurement.psa_ceiling
-                      )}`}
-                    >
-                      {measurement.psa_ceiling}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 font-mono text-text">
-                    {formatPercent(measurement.left_pct)} / {formatPercent(measurement.right_pct)}
-                  </td>
-                  <td className="px-3 py-3 font-mono text-text">
-                    {formatPercent(measurement.top_pct)} / {formatPercent(measurement.bottom_pct)}
-                  </td>
-                  <td className="px-3 py-3 text-text">
-                    {measurement.worst_axis === "leftRight" ? "Left/right" : "Top/bottom"} at{" "}
-                    {formatPercent(measurement.worst_axis_max_pct)}
-                  </td>
+        {!history.error && history.rows.length > 0 && (
+          <div className="overflow-x-auto rounded-c-sm border-[1.5px] border-ink">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="bg-bg-3 font-mono text-[11px] uppercase tracking-[0.07em] text-ink-2">
+                <tr>
+                  <th className="px-3 py-3 font-semibold">Measured</th>
+                  <th className="px-3 py-3 font-semibold">Ceiling</th>
+                  <th className="px-3 py-3 font-semibold">L / R</th>
+                  <th className="px-3 py-3 font-semibold">T / B</th>
+                  <th className="px-3 py-3 font-semibold">Worst axis</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {history.rows.map((measurement) => (
+                  <tr key={measurement.id} className="border-t border-t-bg-3">
+                    <td className="px-3 py-3 font-mono text-xs font-medium text-ink-2">
+                      {formatMeasurementDate(measurement.created_at)}
+                    </td>
+                    <td className="px-3 py-3">
+                      <span
+                        className={`inline-flex rounded-c-pill border-[1.5px] px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.05em] ${ceilingClassName(
+                          measurement.psa_ceiling
+                        )}`}
+                      >
+                        {measurement.psa_ceiling}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 font-mono text-xs font-semibold text-ink">
+                      {formatPercent(measurement.left_pct)} / {formatPercent(measurement.right_pct)}
+                    </td>
+                    <td className="px-3 py-3 font-mono text-xs font-semibold text-ink">
+                      {formatPercent(measurement.top_pct)} / {formatPercent(measurement.bottom_pct)}
+                    </td>
+                    <td className="px-3 py-3 font-mono text-xs font-semibold text-ink">
+                      {measurement.worst_axis === "leftRight" ? "Left/right" : "Top/bottom"} at{" "}
+                      {formatPercent(measurement.worst_axis_max_pct)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-      <div className="mt-4 flex items-center justify-between gap-3">
-        {history.hasPrevious ? (
-          <Link
-            href={historyHref(history.page - 1)}
-            className="rounded-md border border-border bg-deep px-4 py-2.5 font-mono text-xs font-bold uppercase text-text transition-colors hover:border-border-2 hover:bg-surf2"
-          >
-            Previous pre-grades
-          </Link>
-        ) : (
-          <span />
-        )}
-        {history.hasNext ? (
-          <Link
-            href={historyHref(history.page + 1)}
-            className="rounded-md border border-border bg-deep px-4 py-2.5 font-mono text-xs font-bold uppercase text-text transition-colors hover:border-border-2 hover:bg-surf2"
-          >
-            Next pre-grades
-          </Link>
-        ) : (
-          <span />
-        )}
+        <div className="mt-4 flex items-center justify-between gap-3">
+          {history.hasPrevious ? (
+            <Link href={historyHref(history.page - 1)} className="admin-btn admin-btn-ghost">
+              Previous pre-grades
+            </Link>
+          ) : (
+            <span />
+          )}
+          {history.hasNext ? (
+            <Link href={historyHref(history.page + 1)} className="admin-btn admin-btn-ghost">
+              Next pre-grades
+            </Link>
+          ) : (
+            <span />
+          )}
+        </div>
       </div>
     </section>
   );
@@ -207,10 +207,7 @@ export default async function PregradePage({
             Measure centering before the card becomes inventory. Results are stored without image bytes or an inventory link.
           </p>
         </div>
-        <Link
-          href="/admin/lens"
-          className="rounded-md border border-border bg-surface px-4 py-2.5 text-center font-mono text-sm font-bold uppercase text-text transition-colors hover:border-border-2 hover:text-owl"
-        >
+        <Link href="/admin/lens" className="admin-btn admin-btn-ghost">
           Back to Owl Lens
         </Link>
       </div>
