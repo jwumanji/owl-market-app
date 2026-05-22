@@ -197,17 +197,17 @@ export default function InventoryPreviewPage() {
   const totalQuantity = sampleItems.reduce((sum, item) => sum + item.quantity, 0);
   return (
     <section className="mx-auto max-w-[1920px] px-5 py-8 sm:px-7 lg:px-10 xl:px-12">
-      <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div className="admin-page-head">
         <div>
-          <p className="mb-2 font-mono text-sm font-semibold uppercase tracking-wider text-owl">Preview</p>
-          <h1 className="text-4xl font-bold tracking-tight text-text">Inventory</h1>
-          <p className="mt-2 max-w-2xl text-base text-text">
+          <p className="admin-eyebrow">Preview</p>
+          <h1 className="admin-title">Inventory</h1>
+          <p className="admin-subline">
             Sample view for Raw, Damaged, and Graded inventory stages.
           </p>
         </div>
-        <div className="rounded-lg border border-border bg-surface px-4 py-3 text-right">
-          <div className="font-mono text-sm font-semibold uppercase tracking-wider text-text">Total Quantity</div>
-          <div className="mt-1 text-3xl font-bold text-text">{totalQuantity}</div>
+        <div className="admin-stat-card">
+          <div className="lbl">Total Quantity</div>
+          <div className="val">{totalQuantity}</div>
         </div>
       </div>
 

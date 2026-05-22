@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OwlMarket — Admin · PSA Submissions (C1.5 mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Caveat:wght@700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #FFF5E4; --bg-2: #FFFFFF; --bg-3: #FCE6BE;
+      --ink: #1A0F08; --ink-2: #5C4534; --ink-3: #9A8475;
+      --pink: #FF6BB8; --coral: #FF4936; --gold: #E89512;
+      --gain: #2D9961; --loss: #E04E4E;
+      --select: #1F47A1;
+      --grad-brand: linear-gradient(135deg, #FF6BB8 0%, #FF4936 50%, #E89512 100%);
+      --r-sm: 8px; --r-md: 14px; --r-lg: 22px; --r-pill: 999px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: var(--bg); color: var(--ink); font-family: 'Space Grotesk', system-ui, sans-serif; font-weight: 500; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+    .container { max-width: 1480px; margin: 0 auto; padding-left: 28px; padding-right: 28px; }
+    a { color: inherit; }
+
+    /* NAV */
+    .topnav { position: sticky; top: 0; z-index: 50; background: rgba(255, 245, 228, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1.5px solid rgba(26, 15, 8, 0.08); }
+    .topnav-inner { display: flex; align-items: center; gap: 22px; padding: 14px 28px; max-width: 1680px; margin: 0 auto; }
+    .lockup { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; flex-shrink: 0; }
+    .lockup-wm { font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: var(--ink); font-size: 22px; display: inline-flex; align-items: baseline; }
+    .lockup-wm em { font-family: 'Caveat', cursive; font-style: normal; font-weight: 700; font-size: 28px; margin-left: -2px; padding-right: 8px; padding-bottom: 2px; display: inline-block; background: var(--grad-brand); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+    .internal-chip { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--coral); background: #FFE2DD; border: 1.5px solid var(--coral); border-radius: var(--r-pill); padding: 3px 9px; flex-shrink: 0; }
+    .nav-links { display: inline-flex; gap: 22px; list-style: none; margin-left: 6px; }
+    .nav-links a { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: var(--ink-2); text-decoration: none; padding: 4px 0; position: relative; white-space: nowrap; }
+    .nav-links a.active { color: var(--ink); }
+    .nav-links a.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 2px; background: var(--grad-brand); border-radius: 2px; }
+    .nav-right { margin-left: auto; display: inline-flex; align-items: center; gap: 16px; }
+    .nav-view { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; color: var(--ink-2); text-decoration: none; letter-spacing: 0.04em; }
+    .nav-view:hover { color: var(--ink); }
+    .nav-signout { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; color: var(--ink); background: transparent; border: 1.5px solid var(--ink); border-radius: var(--r-pill); padding: 7px 16px; cursor: pointer; text-decoration: none; transition: all 0.15s ease; }
+    .nav-signout:hover { background: var(--ink); color: var(--bg); }
+
+    main { padding: 32px 0 96px; }
+
+    .page-head { margin-bottom: 22px; display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+    .eyebrow { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; color: var(--coral); letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 10px; }
+    h1.title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; letter-spacing: -0.025em; line-height: 1; color: var(--ink); }
+    .subline { margin-top: 10px; font-size: 14px; color: var(--ink-2); max-width: 620px; }
+    .head-actions { display: inline-flex; gap: 12px; flex-wrap: wrap; }
+
+    .btn { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; padding: 0 16px; height: 42px; border-radius: var(--r-sm); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 7px; text-decoration: none; transition: all 0.13s ease; border: 1.5px solid transparent; white-space: nowrap; }
+    .btn-primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+    .btn-primary:hover { background: #2E1C10; }
+    .btn-ghost { background: var(--bg-2); color: var(--ink); border-color: var(--ink); }
+    .btn-ghost:hover { background: var(--bg-3); }
+    .btn-view { height: 40px; }
+
+    /* SUBMISSION CARD (reuses bundle card-list pattern) */
+    .sub-list { display: grid; gap: 18px; }
+    .sub { background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-md); padding: 22px 24px; }
+    .sub-top { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 24px; align-items: start; }
+    .sub-head { min-width: 0; }
+    .sub-name-row { display: flex; align-items: center; gap: 10px; }
+    .sub-name { font-family: 'Space Grotesk'; font-weight: 700; font-size: 24px; letter-spacing: -0.02em; color: var(--ink); }
+    .rename { width: 32px; height: 32px; border-radius: var(--r-sm); border: 1.5px solid var(--ink-3); background: var(--bg-2); color: var(--ink-2); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .rename:hover { border-color: var(--ink); color: var(--ink); }
+    .sub-order { margin-top: 6px; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+    .sub-order .v { color: var(--coral); }
+    .sub-meta { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 14px; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 11px; color: var(--ink-2); }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; align-items: center; }
+    .tier-chip { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--select); border: 1.5px solid var(--select); background: #F2F5FB; border-radius: var(--r-sm); padding: 7px 12px; display: inline-flex; align-items: center; gap: 6px; }
+    .tier-chip .tlbl { color: var(--ink-3); font-weight: 600; }
+    .chip-cards { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-2); border: 1.5px solid var(--ink); background: var(--bg-3); border-radius: var(--r-sm); padding: 7px 12px; }
+    .chip-cards .v { color: var(--ink); }
+    .gpill { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; border: 1.5px solid; border-radius: var(--r-pill); padding: 5px 5px 5px 11px; display: inline-flex; align-items: center; gap: 8px; }
+    .gpill .gc { font-weight: 800; font-size: 10.5px; letter-spacing: 0; min-width: 19px; height: 19px; padding: 0 6px; border-radius: var(--r-pill); display: inline-flex; align-items: center; justify-content: center; background: var(--ink); color: var(--bg); }
+    /* PSA grade band scale — descending: 10 green → 9 lime → 8 gold → 7 orange → ≤6 red */
+    .gpill.g10 { color: #2D9961; border-color: #2D9961; background: #DCF1E6; }
+    .gpill.g9  { color: #5F8E2A; border-color: #5F8E2A; background: #ECF2D9; }
+    .gpill.g8  { color: #B5780E; border-color: #E89512; background: #FBF0DA; }
+    .gpill.g7  { color: #D9641A; border-color: #D9641A; background: #FBE6D6; }
+    .gpill.glow { color: #D23B3B; border-color: #D23B3B; background: #FBE3E3; }
+    .grade-txt { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; }
+    .grade-txt.g10 { color: #2D9961; } .grade-txt.g9 { color: #5F8E2A; } .grade-txt.g8 { color: #B5780E; } .grade-txt.g7 { color: #D9641A; } .grade-txt.glow { color: #D23B3B; }
+
+    .sub-rail { display: flex; flex-direction: column; align-items: flex-end; gap: 14px; min-width: 200px; }
+    .fan { display: flex; }
+    .fan .fan-card { width: 50px; height: 70px; border-radius: 6px; border: 1.5px solid var(--ink); box-shadow: 0 0 0 2.5px var(--bg-2); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk'; font-weight: 700; font-size: 14px; color: var(--bg); margin-left: -12px; }
+    .fan .fan-card:first-child { margin-left: 0; }
+
+    /* DETAIL: View Items table */
+    .detail { margin-top: 22px; background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-md); overflow: hidden; }
+    .detail-head { padding: 18px 22px; border-bottom: 1.5px solid var(--ink); background: var(--bg-3); display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+    .detail-title { font-family: 'Space Grotesk'; font-weight: 700; font-size: 18px; color: var(--ink); }
+    .detail-sub { margin-top: 3px; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 11px; color: var(--ink-2); }
+    .detail-close { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-sm); padding: 7px 12px; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { border-bottom: 1.5px solid var(--ink); font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-2); text-align: left; }
+    th { padding: 12px 14px; white-space: nowrap; }
+    tbody tr { border-top: 1px solid var(--bg-3); }
+    tbody tr:first-child { border-top: none; }
+    td { padding: 12px 14px; vertical-align: middle; font-size: 13px; }
+    .t-thumb { width: 36px; height: 50px; border-radius: 4px; border: 1.5px solid var(--ink); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk'; font-weight: 700; font-size: 12px; color: var(--bg); }
+    .t-name { font-family: 'Space Grotesk'; font-weight: 700; font-size: 13px; color: var(--ink); }
+    .t-meta { margin-top: 2px; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10.5px; color: var(--ink-2); }
+    .mono { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; color: var(--ink); }
+    .rownum { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; color: var(--ink-2); }
+
+    /* result-status badges */
+    .res { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 9px; border-radius: var(--r-pill); border: 1.5px solid; display: inline-flex; white-space: nowrap; }
+    .res-matched { color: var(--gain); border-color: var(--gain); background: #DCF1E6; }
+    .res-needs { color: var(--coral); border-color: var(--coral); background: #FFE2DD; }
+    .res-skipped { color: var(--ink-3); border-color: var(--ink-3); background: var(--bg-2); }
+    .res-inv { color: var(--select); border-color: var(--select); background: #F2F5FB; }
+    .imgstat { font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 11px; color: var(--ink-2); }
+
+    .mock-note { margin-top: 28px; padding: 14px 20px; background: var(--bg-2); border: 1.5px dashed var(--ink-3); border-radius: var(--r-md); font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em; color: var(--ink-2); text-align: center; text-transform: uppercase; font-weight: 600; line-height: 1.7; }
+  </style>
+</head>
+<body>
+
+  <!-- NAV (ADMIN) -->
+  <header class="topnav">
+    <div class="topnav-inner">
+      <a href="#" class="lockup">
+        <svg width="34" height="34" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="og-adm" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FF6BB8"/><stop offset="50%" stop-color="#FF4936"/><stop offset="100%" stop-color="#E89512"/></linearGradient>
+            <mask id="om-adm"><rect width="120" height="120" fill="white"/><circle cx="70" cy="56" r="20" fill="black"/></mask>
+          </defs>
+          <circle cx="60" cy="60" r="52" fill="url(#og-adm)" stroke="#1A0F08" stroke-width="5"/>
+          <circle cx="60" cy="60" r="38" fill="#1A0F08"/>
+          <circle cx="58" cy="60" r="26" fill="#FFF5E4" mask="url(#om-adm)"/>
+          <g transform="translate(80 60)"><path d="M 0,-11 Q 1.65,-1.65 11,0 Q 1.65,1.65 0,11 Q -1.65,1.65 -11,0 Q -1.65,-1.65 0,-11 Z" fill="#FFF5E4"/></g>
+        </svg>
+        <span class="lockup-wm">Owl<em>Market</em></span>
+      </a>
+      <span class="internal-chip">Internal</span>
+      <nav>
+        <ul class="nav-links">
+          <li><a href="#">Inventory</a></li>
+          <li><a href="#">Bundles</a></li>
+          <li><a href="#">Orders</a></li>
+          <li><a href="#">Lens</a></li>
+          <li><a href="#" class="active">PSA</a></li>
+        </ul>
+      </nav>
+      <div class="nav-right">
+        <a href="#" class="nav-view">View site ↗</a>
+        <a href="#" class="nav-signout">Sign out</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Internal Tool</div>
+        <h1 class="title">PSA Submissions</h1>
+        <p class="subline">Review submissions by date, card count, grade results, and open the itemized card list only when needed.</p>
+      </div>
+      <div class="head-actions">
+        <a href="#" class="btn btn-ghost">Back to Inventory</a>
+        <a href="#" class="btn btn-primary">PSA Import</a>
+      </div>
+    </div>
+
+    <div class="sub-list">
+
+      <!-- SUBMISSION 1 -->
+      <article class="sub">
+        <div class="sub-top">
+          <div class="sub-head">
+            <div class="sub-name-row">
+              <span class="sub-name">PSA Order 8842931</span>
+              <button class="rename" aria-label="Rename submission">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              </button>
+            </div>
+            <div class="sub-order">Order # <span class="v">8842931</span></div>
+            <div class="sub-meta">
+              <span>Source: psa-order-8842931.csv</span>
+              <span>Created: May 14, 2026</span>
+            </div>
+            <div class="chips">
+              <span class="tier-chip"><span class="tlbl">Tier</span> Regular</span>
+              <span class="chip-cards">Cards <span class="v">12</span></span>
+              <span class="gpill g10">PSA 10 <span class="gc">6</span></span>
+              <span class="gpill g9">PSA 9 <span class="gc">4</span></span>
+              <span class="gpill g8">PSA 8 <span class="gc">2</span></span>
+            </div>
+          </div>
+          <div class="sub-rail">
+            <div class="fan">
+              <span class="fan-card" style="background:#7C2A1E;">S</span>
+              <span class="fan-card" style="background:#C53A2A;">L</span>
+              <span class="fan-card" style="background:#2D6E4E;">Z</span>
+              <span class="fan-card" style="background:#4A2A52;">R</span>
+              <span class="fan-card" style="background:#6B3F8A;">L</span>
+            </div>
+            <button class="btn btn-ghost btn-view">View Items</button>
+          </div>
+        </div>
+      </article>
+
+      <!-- SUBMISSION 2 -->
+      <article class="sub">
+        <div class="sub-top">
+          <div class="sub-head">
+            <div class="sub-name-row">
+              <span class="sub-name">May Bulk Submission</span>
+              <button class="rename" aria-label="Rename submission">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              </button>
+            </div>
+            <div class="sub-meta">
+              <span>Source: bulk-may-2026.csv</span>
+              <span>Created: May 6, 2026</span>
+            </div>
+            <div class="chips">
+              <span class="tier-chip"><span class="tlbl">Tier</span> Value Bulk</span>
+              <span class="chip-cards">Cards <span class="v">8</span></span>
+              <span class="gpill g10">PSA 10 <span class="gc">3</span></span>
+              <span class="gpill g9">PSA 9 <span class="gc">3</span></span>
+              <span class="gpill g7">PSA 7 <span class="gc">2</span></span>
+            </div>
+          </div>
+          <div class="sub-rail">
+            <div class="fan">
+              <span class="fan-card" style="background:#8B2A2A;">M</span>
+              <span class="fan-card" style="background:#3D2D5C;">B</span>
+              <span class="fan-card" style="background:#594229;">D</span>
+              <span class="fan-card" style="background:#7A4B1C;">G</span>
+            </div>
+            <button class="btn btn-ghost btn-view">View Items</button>
+          </div>
+        </div>
+      </article>
+
+    </div>
+
+    <!-- DETAIL: View Items (open for submission 1) -->
+    <div class="detail">
+      <div class="detail-head">
+        <div>
+          <div class="detail-title">PSA Order 8842931 — Items</div>
+          <div class="detail-sub">12 rows · 9 matched · 2 needs match · 1 skipped</div>
+        </div>
+        <button class="detail-close">Hide Items</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:60px">Row</th>
+            <th style="width:60px">Img</th>
+            <th>Card</th>
+            <th style="width:110px">Grade</th>
+            <th style="width:150px">Certification</th>
+            <th style="width:170px">Result</th>
+            <th style="width:120px">Image</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="rownum">1</td>
+            <td><span class="t-thumb" style="background:#7C2A1E;">S</span></td>
+            <td><div class="t-name">Shanks — Red Hair</div><div class="t-meta">OP01 / OP01-120</div></td>
+            <td><span class="grade-txt g10">PSA 10</span></td>
+            <td class="mono">78451123</td>
+            <td><span class="res res-matched">Matched</span></td>
+            <td class="imgstat">Front + Back</td>
+          </tr>
+          <tr>
+            <td class="rownum">2</td>
+            <td><span class="t-thumb" style="background:#C53A2A;">L</span></td>
+            <td><div class="t-name">Luffy — Gear Fifth</div><div class="t-meta">OP05 / OP05-119</div></td>
+            <td><span class="grade-txt g10">PSA 10</span></td>
+            <td class="mono">89102447</td>
+            <td><span class="res res-matched">Matched</span></td>
+            <td class="imgstat">Front + Back</td>
+          </tr>
+          <tr>
+            <td class="rownum">3</td>
+            <td><span class="t-thumb" style="background:#2D6E4E;">Z</span></td>
+            <td><div class="t-name">Zoro — King of Hell</div><div class="t-meta">OP06 / OP06-022</div></td>
+            <td><span class="grade-txt g9">PSA 9</span></td>
+            <td class="mono">89110044</td>
+            <td><span class="res res-needs">Needs Match</span></td>
+            <td class="imgstat">Front only</td>
+          </tr>
+          <tr>
+            <td class="rownum">4</td>
+            <td><span class="t-thumb" style="background:#4A2A52;">R</span></td>
+            <td><div class="t-name">Nico Robin — Veinte Fleurs</div><div class="t-meta">OP04 / OP04-056</div></td>
+            <td><span class="grade-txt g9">PSA 9</span></td>
+            <td class="mono">89110051</td>
+            <td><span class="res res-matched">Matched</span></td>
+            <td class="imgstat">Front + Back</td>
+          </tr>
+          <tr>
+            <td class="rownum">5</td>
+            <td><span class="t-thumb" style="background:#7C2A1E;">S</span></td>
+            <td><div class="t-name">Shanks — Divine Departure</div><div class="t-meta">OP01 / OP01-119</div></td>
+            <td><span class="grade-txt g8">PSA 8</span></td>
+            <td class="mono">78460921</td>
+            <td><span class="res res-inv">Already in Inventory</span></td>
+            <td class="imgstat">—</td>
+          </tr>
+          <tr>
+            <td class="rownum">6</td>
+            <td><span class="t-thumb" style="background:#6B3F8A;">L</span></td>
+            <td><div class="t-name">Trafalgar Law — Room</div><div class="t-meta">OP05 / OP05-069</div></td>
+            <td><span class="grade-txt g9">PSA 9</span></td>
+            <td class="mono">89110066</td>
+            <td><span class="res res-skipped">Skipped</span></td>
+            <td class="imgstat">Duplicate cert</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mock-note">
+      MOCKUP · /admin/psa-submissions · C1.5 · v2.0 · 2026-05-20 · CARD-LIST PATTERN REUSED + ITEM DATA-TABLE<br>
+      MATCHES REAL + NEW: SUBMISSION CARDS (NAME + RENAME PENCIL · ORDER # · SOURCE/CREATED · CHIPS = PSA TIER + CARDS COUNT + PER-GRADE PILLS · FANNED THUMBS · VIEW ITEMS) · DETAIL TABLE (ROW / IMG / CARD / GRADE / CERT / RESULT / IMAGE-STATUS)<br>
+      RESULT BADGES: MATCHED = GAIN · NEEDS MATCH = CORAL · SKIPPED = MUTED · ALREADY IN INVENTORY = COBALT · v3: TIER BLUE · v4: GRADE BANDS (10 GREEN→≤6 RED) · v5: COUNT = DARK COUNTER BADGE (grade vs count no longer mash)
+    </div>
+
+  </main>
+
+</body>
+</html>

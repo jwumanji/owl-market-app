@@ -10,18 +10,18 @@ interface Props {
 
 export default function DashboardWidget({ icon, title, viewAllHref, children }: Props) {
   return (
-    <div className="dash-card">
-      <div className="dash-header">
-        <span className="dash-title">
-          <span>{icon}</span> {title}
+    <div className="c-widget">
+      <div className="c-widget-head">
+        <span className="c-widget-title">
+          <span className="c-widget-icon">{icon}</span> {title}
         </span>
         {viewAllHref && (
-          <Link href={viewAllHref} className="dash-view-all">
+          <Link href={viewAllHref} className="c-widget-all">
             View all &rarr;
           </Link>
         )}
       </div>
-      <div className="dash-body">{children}</div>
+      <div className="c-widget-body">{children}</div>
     </div>
   );
 }

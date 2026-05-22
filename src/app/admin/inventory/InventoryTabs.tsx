@@ -20,11 +20,11 @@ const CENTERING_CEILING_LABELS: Record<CenteringCeiling, string> = {
 };
 
 const CENTERING_CEILING_CLASSES: Record<CenteringCeiling, string> = {
-  PSA_10: "border-gain/40 bg-gain/10 text-gain",
-  PSA_9: "border-owl/40 bg-owl/10 text-owl",
-  PSA_8: "border-owl/40 bg-owl/10 text-owl",
-  PSA_7: "border-loss/40 bg-loss/10 text-loss",
-  BELOW_PSA_7: "border-loss/40 bg-loss/10 text-loss",
+  PSA_10: "border-gain-2 bg-[#DCF1E6] text-gain-2",
+  PSA_9: "border-gold bg-[#FBF0DA] text-gold",
+  PSA_8: "border-gold bg-[#FBF0DA] text-gold",
+  PSA_7: "border-loss-2 bg-[#FBE3E3] text-loss-2",
+  BELOW_PSA_7: "border-loss-2 bg-[#FBE3E3] text-loss-2",
 };
 
 export function isCenteringCeiling(value: unknown): value is CenteringCeiling {
@@ -152,7 +152,7 @@ const NESTED_ROW_NUMBER_CELL_CLASS =
   "px-3 py-3.5 align-middle";
 const TABLE_IMAGE_COLUMN_CLASS = "w-[120px]";
 const TABLE_IMAGE_CELL_CLASS = "px-3 py-2";
-const NESTED_TABLE_IMAGE_BUTTON_CLASS = "mx-auto flex w-fit flex-col items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-owl";
+const NESTED_TABLE_IMAGE_BUTTON_CLASS = "mx-auto flex w-fit flex-col items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-coral";
 
 type InventoryGroup = {
   key: string;
@@ -228,7 +228,7 @@ function SelectField({
     <div className={`relative ${wrapperClassName}`}>
       <select
         {...props}
-        className={`w-full appearance-none rounded-md border border-border bg-surface py-2.5 pl-3 pr-10 font-mono text-sm font-semibold text-text outline-none transition-colors hover:border-border-2 hover:bg-surf2 focus:border-owl focus:bg-surf2 ${className}`}
+        className={`w-full appearance-none rounded-md border border-ink bg-bg-2 py-2.5 pl-3 pr-10 font-mono text-sm font-semibold text-ink outline-none transition-colors hover:border-ink-3 hover:bg-bg-3 focus:border-coral focus:bg-bg-3 ${className}`}
       >
         {children}
       </select>
@@ -236,7 +236,7 @@ function SelectField({
         aria-hidden="true"
         viewBox="0 0 24 24"
         fill="none"
-        className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-owl"
+        className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-ink"
       >
         <path
           d="m6 9 6 6 6-6"
@@ -1663,14 +1663,14 @@ export default function InventoryTabs({
 
   function groupSelectionClass(group: InventoryGroup) {
     return group.rows.some((item) => selectedItemIds[item.id])
-      ? "border-owl/60 bg-[rgba(245,166,35,0.18)] shadow-[inset_4px_0_0_rgba(245,166,35,0.95)]"
-      : "border-border hover:bg-surf2/70";
+      ? "border-coral bg-[rgba(232,149,18,0.16)] shadow-[inset_4px_0_0_rgba(232,149,18,0.95)]"
+      : "border-ink hover:bg-bg-3/70";
   }
 
   function nestedRowSelectionClass(item: InventoryRow) {
     return selectedItemIds[item.id]
-      ? "border-owl/60 bg-[rgba(245,166,35,0.18)] shadow-[inset_4px_0_0_rgba(245,166,35,0.95)]"
-      : "border-[rgba(79,142,247,0.16)] bg-[rgba(79,142,247,0.075)] shadow-[inset_3px_0_0_rgba(79,142,247,0.45)] hover:bg-[rgba(79,142,247,0.11)]";
+      ? "border-coral bg-[rgba(232,149,18,0.16)] shadow-[inset_4px_0_0_rgba(232,149,18,0.95)]"
+      : "border-[rgba(255,73,54,0.18)] bg-[rgba(255,73,54,0.08)] shadow-[inset_3px_0_0_rgba(255,73,54,0.45)] hover:bg-[rgba(255,73,54,0.12)]";
   }
 
   function renderSelectionCell(group: InventoryGroup, label: string) {
@@ -1679,7 +1679,7 @@ export default function InventoryTabs({
     if (!bulkSelectMode) return null;
 
     return (
-      <label className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-owl/40 bg-owl/10 text-owl hover:bg-owl/15">
+      <label className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-coral/50 bg-bg-3 text-coral hover:bg-bg-3">
         <input
           type="checkbox"
           checked={isSelected}
@@ -1693,7 +1693,7 @@ export default function InventoryTabs({
               Boolean((event.nativeEvent as globalThis.MouseEvent).shiftKey),
             )
           }
-          className="h-4 w-4 accent-owl"
+          className="h-4 w-4 accent-coral"
           aria-label={label}
         />
         {isPartiallySelected && (
@@ -1707,7 +1707,7 @@ export default function InventoryTabs({
     if (!bulkSelectMode) return null;
 
     return (
-      <label className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-owl/40 bg-owl/10 text-owl hover:bg-owl/15">
+      <label className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-coral/50 bg-bg-3 text-coral hover:bg-bg-3">
         <input
           type="checkbox"
           checked={Boolean(selectedItemIds[item.id])}
@@ -1718,7 +1718,7 @@ export default function InventoryTabs({
               Boolean((event.nativeEvent as globalThis.MouseEvent).shiftKey),
             )
           }
-          className="h-4 w-4 accent-owl"
+          className="h-4 w-4 accent-coral"
           aria-label={label}
         />
       </label>
@@ -1729,7 +1729,7 @@ export default function InventoryTabs({
     if (!bulkSelectMode) return null;
 
     return (
-      <label className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-owl/40 bg-owl/10 text-owl hover:bg-owl/15">
+      <label className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-coral/50 bg-bg-3 text-coral hover:bg-bg-3">
         <input
           type="checkbox"
           checked={allVisibleSelected}
@@ -1737,7 +1737,7 @@ export default function InventoryTabs({
             if (input) input.indeterminate = visibleSelectedCount > 0 && !allVisibleSelected;
           }}
           onChange={(event) => setAllVisibleSelected(event.target.checked)}
-          className="h-4 w-4 accent-owl"
+          className="h-4 w-4 accent-coral"
           aria-label="Select all visible inventory items"
         />
       </label>
@@ -1755,7 +1755,7 @@ export default function InventoryTabs({
             type="button"
             disabled={isDeleting}
             onClick={() => deleteItem(item)}
-            className="rounded-md border border-loss bg-loss/10 px-2.5 py-1.5 font-mono text-xs font-bold uppercase tracking-wider text-loss transition-colors hover:bg-loss/15 disabled:cursor-wait disabled:opacity-60"
+            className="rounded-md border border-loss-2 bg-[#FBE3E3] px-2.5 py-1.5 font-mono text-xs font-bold uppercase tracking-wider text-loss-2 transition-colors hover:bg-[#FBD4D4] disabled:cursor-wait disabled:opacity-60"
           >
             Confirm
           </button>
@@ -1769,7 +1769,7 @@ export default function InventoryTabs({
                 return next;
               })
             }
-            className="rounded-md border border-border-2 bg-surface px-2.5 py-1.5 font-mono text-xs font-bold uppercase tracking-wider text-text-2 transition-colors hover:text-text disabled:cursor-wait disabled:opacity-60"
+            className="rounded-md border border-ink-3 bg-bg-2 px-2.5 py-1.5 font-mono text-xs font-bold uppercase tracking-wider text-ink-2 transition-colors hover:text-ink disabled:cursor-wait disabled:opacity-60"
           >
             Cancel
           </button>
@@ -1784,7 +1784,7 @@ export default function InventoryTabs({
         aria-label="Remove item"
         disabled={isDeleting}
         onClick={() => setConfirmingDeleteIds((current) => ({ ...current, [item.id]: true }))}
-        className="inline-flex min-h-8 shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-loss/70 bg-loss/10 px-2.5 py-1.5 font-mono text-xs font-black uppercase leading-none tracking-wider text-loss transition-colors hover:border-loss hover:bg-loss/15 disabled:cursor-wait disabled:opacity-60"
+        className="inline-flex min-h-8 shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-loss-2/70 bg-[#FBE3E3] px-2.5 py-1.5 font-mono text-xs font-black uppercase leading-none tracking-wider text-loss-2 transition-colors hover:border-loss-2 hover:bg-[#FBD4D4] disabled:cursor-wait disabled:opacity-60"
       >
         X Remove Item
       </button>
@@ -1815,16 +1815,16 @@ export default function InventoryTabs({
           title="Inventory actions"
           aria-label="Inventory actions"
           onClick={() => setOpenActionMenuKey((current) => (current === key ? null : key))}
-          className="flex h-8 w-8 items-center justify-center rounded-md border border-border-2 bg-surface font-mono text-lg font-black leading-none text-text-2 transition-colors hover:border-owl hover:text-owl"
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-ink-3 bg-bg-2 font-mono text-lg font-black leading-none text-ink-2 transition-colors hover:border-coral hover:text-coral"
         >
           ...
         </button>
 
         {isOpen && (
-          <div className="absolute right-0 top-10 z-40 rounded-lg border border-border bg-deep p-2 shadow-2xl">
+          <div className="absolute right-0 top-10 z-40 rounded-lg border border-ink bg-bg-2 p-2 shadow-[0_12px_32px_rgba(26,15,8,0.14)]">
             {isConfirmingDelete && canRemove ? (
               <div className="w-[230px] space-y-2 p-1">
-                <div className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
+                <div className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">
                   Remove item?
                 </div>
                 <div className="flex gap-2">
@@ -1835,7 +1835,7 @@ export default function InventoryTabs({
                       deleteItem(item);
                       setOpenActionMenuKey(null);
                     }}
-                    className="flex-1 rounded-md border border-loss bg-loss/10 px-2.5 py-1.5 text-center font-mono text-xs font-bold uppercase tracking-wider text-loss transition-colors hover:bg-loss/15 disabled:cursor-wait disabled:opacity-60"
+                    className="flex-1 rounded-md border border-loss-2 bg-[#FBE3E3] px-2.5 py-1.5 text-center font-mono text-xs font-bold uppercase tracking-wider text-loss-2 transition-colors hover:bg-[#FBD4D4] disabled:cursor-wait disabled:opacity-60"
                   >
                     Confirm
                   </button>
@@ -1849,7 +1849,7 @@ export default function InventoryTabs({
                         return next;
                       })
                     }
-                    className="flex-1 rounded-md border border-border-2 bg-surface px-2.5 py-1.5 text-center font-mono text-xs font-bold uppercase tracking-wider text-text-2 transition-colors hover:text-text disabled:cursor-wait disabled:opacity-60"
+                    className="flex-1 rounded-md border border-ink-3 bg-bg-2 px-2.5 py-1.5 text-center font-mono text-xs font-bold uppercase tracking-wider text-ink-2 transition-colors hover:text-ink disabled:cursor-wait disabled:opacity-60"
                   >
                     Cancel
                   </button>
@@ -1860,7 +1860,7 @@ export default function InventoryTabs({
                 <a
                   href={`/admin/inventory/${item.id}/centering`}
                   onClick={() => setOpenActionMenuKey(null)}
-                  className="flex-1 rounded-md px-3 py-2 text-center font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/10"
+                  className="flex-1 rounded-md px-3 py-2 text-center font-mono text-xs font-bold uppercase tracking-wider text-coral transition-colors hover:bg-bg-3"
                 >
                   Measure centering
                 </a>
@@ -1873,7 +1873,7 @@ export default function InventoryTabs({
                       addIndividualItem(group);
                       setOpenActionMenuKey(null);
                     }}
-                    className="flex-1 rounded-md px-3 py-2 text-center font-mono text-xs font-bold uppercase tracking-wider text-gain transition-colors hover:bg-[rgba(0,214,143,0.10)] disabled:cursor-wait disabled:opacity-60"
+                    className="flex-1 rounded-md px-3 py-2 text-center font-mono text-xs font-bold uppercase tracking-wider text-gain-2 transition-colors hover:bg-[#DCF1E6] disabled:cursor-wait disabled:opacity-60"
                   >
                     Add item
                   </button>
@@ -1884,7 +1884,7 @@ export default function InventoryTabs({
                     type="button"
                     disabled={isDeleting}
                     onClick={() => setConfirmingDeleteIds((current) => ({ ...current, [item.id]: true }))}
-                    className="flex-1 rounded-md px-3 py-2 text-center font-mono text-xs font-bold uppercase tracking-wider text-loss transition-colors hover:bg-loss/10 disabled:cursor-wait disabled:opacity-60"
+                    className="flex-1 rounded-md px-3 py-2 text-center font-mono text-xs font-bold uppercase tracking-wider text-loss-2 transition-colors hover:bg-[#FBE3E3] disabled:cursor-wait disabled:opacity-60"
                   >
                     Remove item
                   </button>
@@ -2058,7 +2058,7 @@ export default function InventoryTabs({
             type="date"
             value={soldDate}
             onChange={(event) => updateItem(item.id, { sold_date: event.target.value })}
-            className="w-full rounded-md border border-border bg-surface px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
+            className="w-full rounded-md border border-ink bg-bg-2 px-3 py-2.5 font-mono text-sm font-semibold text-ink outline-none focus:border-coral"
           />
         </td>
         <td className="px-3 py-4">
@@ -2068,7 +2068,7 @@ export default function InventoryTabs({
             value={item.sold_price ?? ""}
             onChange={(event) => updateItem(item.id, { sold_price: event.target.value })}
             placeholder="0.00"
-            className="w-full rounded-md border border-border bg-surface px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
+            className="w-full rounded-md border border-ink bg-bg-2 px-3 py-2.5 font-mono text-sm font-semibold text-ink outline-none focus:border-coral"
           />
         </td>
       </>
@@ -2082,10 +2082,10 @@ export default function InventoryTabs({
     if (item.shipping_tracking) {
       return (
         <div className="space-y-2">
-          <div className="font-mono text-xs font-semibold text-gain">
+          <div className="font-mono text-xs font-semibold text-gain-2">
             Tracking
             {detectCarrier(item.shipping_tracking) && (
-              <span className="ml-2 rounded border border-border bg-deep px-2 py-0.5 text-text">
+              <span className="ml-2 rounded border border-ink bg-bg-3 px-2 py-0.5 text-ink">
                 {detectCarrier(item.shipping_tracking)}
               </span>
             )}
@@ -2095,12 +2095,12 @@ export default function InventoryTabs({
               href={trackingHref(item.shipping_tracking) ?? undefined}
               target="_blank"
               rel="noreferrer"
-              className="block truncate font-mono text-sm font-semibold text-owl underline-offset-2 hover:underline"
+              className="block truncate font-mono text-sm font-semibold text-coral underline-offset-2 hover:underline"
             >
               {item.shipping_tracking}
             </a>
           ) : (
-            <div className="truncate font-mono text-sm text-text">
+            <div className="truncate font-mono text-sm text-ink">
               {item.shipping_tracking}
             </div>
           )}
@@ -2119,7 +2119,7 @@ export default function InventoryTabs({
             }))
           }
           placeholder="Paste tracking code or link"
-          className="w-full rounded-md border border-border bg-surface px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-owl"
+          className="w-full rounded-md border border-ink bg-bg-2 px-3 py-2.5 font-mono text-sm text-ink outline-none focus:border-coral"
         />
         {canSaveTracking && (
           <button
@@ -2129,12 +2129,12 @@ export default function InventoryTabs({
                 shipping_tracking: draftValue.trim(),
               })
             }
-            className="rounded-md border border-owl bg-owl/10 px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-owl hover:bg-owl/15"
+            className="rounded-md border border-coral bg-bg-3 px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-coral hover:bg-bg-3"
           >
             Save Tracking
           </button>
         )}
-        <div className="font-mono text-xs font-semibold text-text-2">Not shipped yet</div>
+        <div className="font-mono text-xs font-semibold text-ink-2">Not shipped yet</div>
       </div>
     );
   }
@@ -2154,7 +2154,7 @@ export default function InventoryTabs({
             href={href}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex rounded-md border border-blue bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-blue transition-colors hover:bg-blue/15"
+            className="inline-flex rounded-md border border-coral bg-bg-3 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-coral transition-colors hover:bg-coral/15"
           >
             Print Shipping
           </a>
@@ -2166,7 +2166,7 @@ export default function InventoryTabs({
               setShippingLabelDrafts((current) => ({ ...current, [item.id]: savedLabel }));
               setEditingShippingLabelIds((current) => ({ ...current, [item.id]: true }));
             }}
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-border-2 bg-surface text-text-2 transition-colors hover:border-blue hover:text-blue"
+            className="flex h-9 w-9 items-center justify-center rounded-md border border-ink-3 bg-bg-2 text-ink-2 transition-colors hover:border-coral hover:text-coral"
           >
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4">
               <path
@@ -2200,7 +2200,7 @@ export default function InventoryTabs({
             }))
           }
           placeholder="Paste ship label URL or note"
-          className="w-full rounded-md border border-border bg-surface px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-owl"
+          className="w-full rounded-md border border-ink bg-bg-2 px-3 py-2.5 font-mono text-sm text-ink outline-none focus:border-coral"
         />
         {(canConfirmChange || savedLabel) && (
         <div className="flex gap-2">
@@ -2215,7 +2215,7 @@ export default function InventoryTabs({
                   return next;
                 });
               }}
-              className="rounded-md border border-owl bg-owl/10 px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-owl hover:bg-owl/15"
+              className="rounded-md border border-coral bg-bg-3 px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-coral hover:bg-bg-3"
             >
               Confirm Change
             </button>
@@ -2231,7 +2231,7 @@ export default function InventoryTabs({
                   return next;
                 });
               }}
-              className="rounded-md border border-border-2 bg-surface px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-text-2 hover:text-text"
+              className="rounded-md border border-ink-3 bg-bg-2 px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-ink-2 hover:text-ink"
             >
               Cancel
             </button>
@@ -2258,13 +2258,13 @@ export default function InventoryTabs({
             }))
           }
           placeholder="Customer name"
-          className="w-full rounded-md border border-border bg-surface px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-owl"
+          className="w-full rounded-md border border-ink bg-bg-2 px-3 py-2.5 font-mono text-sm text-ink outline-none focus:border-coral"
         />
         {canSaveName && (
           <button
             type="button"
             onClick={() => updateItem(item.id, { customer_name: draftValue.trim() })}
-            className="rounded-md border border-owl bg-owl/10 px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-owl hover:bg-owl/15"
+            className="rounded-md border border-coral bg-bg-3 px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-coral hover:bg-bg-3"
           >
             Save Name
           </button>
@@ -2279,14 +2279,14 @@ export default function InventoryTabs({
     if (isConfirming) {
       return (
         <div className="space-y-2">
-          <div className="font-mono text-xs font-semibold text-text-2">
+          <div className="font-mono text-xs font-semibold text-ink-2">
             Move this item to Sold?
           </div>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => markItemShipped(item)}
-              className="inline-flex items-center justify-center gap-2 rounded-md border border-gain bg-gain px-4 py-3 font-mono text-sm font-extrabold uppercase tracking-wider text-void transition-colors hover:bg-gain/90"
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-gain-2 bg-gain-2 px-4 py-3 font-mono text-sm font-extrabold uppercase tracking-wider text-bg transition-colors hover:bg-[#1F7F4D]"
             >
               <span aria-hidden="true">📦</span>
               <span>Confirm</span>
@@ -2300,7 +2300,7 @@ export default function InventoryTabs({
                   return next;
                 })
               }
-              className="rounded-md border border-border-2 bg-surface px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-text-2 hover:text-text"
+              className="rounded-md border border-ink-3 bg-bg-2 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-ink-2 hover:text-ink"
             >
               Cancel
             </button>
@@ -2313,7 +2313,7 @@ export default function InventoryTabs({
       <button
         type="button"
         onClick={() => setConfirmingShippedIds((current) => ({ ...current, [item.id]: true }))}
-        className="inline-flex items-center justify-center gap-2 rounded-md border border-gain bg-gain px-4 py-3 font-mono text-sm font-extrabold uppercase tracking-wider text-void transition-colors hover:bg-gain/90"
+        className="inline-flex items-center justify-center gap-2 rounded-md border border-gain-2 bg-gain-2 px-4 py-3 font-mono text-sm font-extrabold uppercase tracking-wider text-bg transition-colors hover:bg-[#1F7F4D]"
       >
         <span aria-hidden="true">📦</span>
         <span>Mark Shipped</span>
@@ -2361,7 +2361,7 @@ export default function InventoryTabs({
         )}
         {item.inventory_type === "graded" && (
           <div className="mt-2">
-            <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
+            <span className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">
               Certification Number
             </span>
             <input
@@ -2370,7 +2370,7 @@ export default function InventoryTabs({
               onChange={(event) => updateItem(item.id, { certification_number: event.target.value })}
               placeholder="PSA cert number"
               aria-label="Certification number"
-              className="mt-1.5 w-full rounded-md border border-border bg-surface px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none transition-colors hover:border-border-2 hover:bg-surf2 focus:border-owl focus:bg-surf2"
+              className="mt-1.5 w-full rounded-md border border-ink bg-bg-2 px-3 py-2.5 font-mono text-sm font-semibold text-ink outline-none transition-colors hover:border-ink-3 hover:bg-bg-3 focus:border-coral focus:bg-bg-3"
             />
           </div>
         )}
@@ -2395,11 +2395,11 @@ export default function InventoryTabs({
     );
   }
 
-  function renderCardTitle(item: InventoryRow, titleClassName = "text-base font-bold text-text") {
+  function renderCardTitle(item: InventoryRow, titleClassName = "text-base font-bold text-ink") {
     return (
       <div className="min-w-0">
         {item.item_nickname && (
-          <div className="mb-0.5 truncate font-mono text-xs font-bold uppercase tracking-wider text-owl">
+          <div className="mb-0.5 truncate font-mono text-xs font-bold uppercase tracking-wider text-coral">
             {item.item_nickname}
           </div>
         )}
@@ -2412,7 +2412,7 @@ export default function InventoryTabs({
     return (
       <span
         title={`${inventoryCardLabel(item)} - Inventory item ID: ${item.id}`}
-        className="inline-flex items-center rounded-full border border-owl/50 bg-owl px-3 py-1.5 font-mono text-sm font-black uppercase leading-none tracking-wider text-void shadow-[0_0_14px_rgba(245,166,35,0.28)]"
+        className="inline-flex items-center rounded-c-sm border-[1.5px] border-ink bg-bg-2 px-2.5 py-1 font-mono text-xs font-bold uppercase leading-none tracking-wider text-ink"
       >
         {inventoryCardLabel(item)}
       </span>
@@ -2423,7 +2423,7 @@ export default function InventoryTabs({
     if (!inventoryCardNumber(item)) {
       return (
         <div className="flex w-full justify-center">
-          <span className="font-mono text-sm font-semibold text-text-3">-</span>
+          <span className="font-mono text-sm font-semibold text-ink-3">-</span>
         </div>
       );
     }
@@ -2444,7 +2444,7 @@ export default function InventoryTabs({
     }
 
     return (
-      <span className="inline-flex items-center rounded-full border border-border-2 bg-surf3 px-2.5 py-1 font-mono text-xs font-black uppercase leading-none tracking-wider text-text-2">
+      <span className="inline-flex items-center rounded-full border border-ink-3 bg-bg-3 px-2.5 py-1 font-mono text-xs font-black uppercase leading-none tracking-wider text-ink-2">
         Mixed
       </span>
     );
@@ -2465,22 +2465,22 @@ export default function InventoryTabs({
     } = {}
   ) {
     return (
-      <div className="mt-1.5 flex flex-col items-start gap-1 font-mono text-xs font-medium text-text-2">
+      <div className="mt-1.5 flex flex-col items-start gap-1 font-mono text-xs font-medium text-ink-2">
         <div className="flex flex-wrap items-center gap-2">
           {typeof itemIndex === "number" && <span>#{itemIndex}</span>}
           {item.card.set_code && <span>{item.card.set_code}</span>}
           {item.card.card_number && <span>{item.card.card_number}</span>}
           {item.graded_rating && <span>{item.graded_rating}</span>}
           {typeof quantity === "number" && (
-            <span className="rounded bg-surf3 px-2 py-0.5 text-text">Qty {quantity}</span>
+            <span className="rounded bg-bg-3 px-2 py-0.5 text-ink">Qty {quantity}</span>
           )}
         </div>
         {groupLabel && (
-          <span className="rounded bg-surf3 px-2 py-0.5 text-text">{groupLabel}</span>
+          <span className="rounded bg-bg-3 px-2 py-0.5 text-ink">{groupLabel}</span>
         )}
         {item.certification_number && <span>Cert {item.certification_number}</span>}
         {needsCatalogMatch(item) && (
-          <span className="rounded border border-owl/40 bg-owl/10 px-2 py-0.5 text-owl">
+          <span className="rounded border border-coral/50 bg-bg-3 px-2 py-0.5 text-coral">
             NEEDS MATCH
           </span>
         )}
@@ -2495,8 +2495,8 @@ export default function InventoryTabs({
 
     return (
       <label
-        className={`flex items-start gap-3 rounded-lg border border-border bg-deep p-3 ${className} ${
-          isMatched ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:border-border-2"
+        className={`flex items-start gap-3 rounded-lg border border-ink bg-bg-3 p-3 ${className} ${
+          isMatched ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:border-ink-3"
         }`}
       >
         <input
@@ -2504,13 +2504,13 @@ export default function InventoryTabs({
           checked={status === "custom_verified"}
           disabled={isMatched}
           onChange={(event) => updateCustomVerified(item, event.target.checked)}
-          className="mt-1 h-4 w-4 shrink-0 accent-owl disabled:cursor-not-allowed"
+          className="mt-1 h-4 w-4 shrink-0 accent-coral disabled:cursor-not-allowed"
         />
         <span className="min-w-0">
-          <span className="block font-mono text-xs font-bold uppercase tracking-wider text-text">
+          <span className="block font-mono text-xs font-bold uppercase tracking-wider text-ink">
             Not in catalog
           </span>
-          <span className="mt-1 block text-sm text-text-2">
+          <span className="mt-1 block text-sm text-ink-2">
             This is a real item and does not need catalog matching.
           </span>
         </span>
@@ -2528,10 +2528,10 @@ export default function InventoryTabs({
     const error = matchErrors[item.id];
 
     return (
-      <div className="mt-3 rounded-lg border border-owl/40 bg-owl/10 p-4">
+      <div className="mt-3 rounded-lg border border-coral/50 bg-bg-3 p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
           <label className="block min-w-0 flex-1">
-            <span className="font-mono text-xs font-bold uppercase tracking-wider text-owl">
+            <span className="font-mono text-xs font-bold uppercase tracking-wider text-coral">
               Catalog Card Match Lookup
             </span>
             <input
@@ -2551,14 +2551,14 @@ export default function InventoryTabs({
                 });
               }}
               placeholder="Search by card name or card number"
-              className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 text-sm text-text outline-none focus:border-owl"
+              className="mt-2 w-full rounded-md border border-ink bg-bg-3 px-3 py-2.5 text-sm text-ink outline-none focus:border-coral"
             />
           </label>
           <button
             type="button"
             disabled={query.trim().length < 2 || isSearching}
             onClick={() => searchMatchCandidates(item)}
-            className="rounded-md border border-owl bg-owl/10 px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/15 disabled:cursor-wait disabled:border-border disabled:bg-surface disabled:text-text-3"
+            className="rounded-md border border-coral bg-bg-3 px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-coral transition-colors hover:bg-bg-3 disabled:cursor-wait disabled:border-ink disabled:bg-bg-2 disabled:text-ink-3"
           >
             {isSearching ? "Searching..." : "Search"}
           </button>
@@ -2567,7 +2567,7 @@ export default function InventoryTabs({
         {renderCatalogMatchStatusControl(item, "mt-3")}
 
         {error && (
-          <div className="mt-3 rounded-md border border-loss/30 bg-loss/10 px-3 py-2 text-sm font-semibold text-text">
+          <div className="mt-3 rounded-md border border-loss-2/40 bg-[#FBE3E3] px-3 py-2 text-sm font-semibold text-ink">
             {error}
           </div>
         )}
@@ -2580,7 +2580,7 @@ export default function InventoryTabs({
                 type="button"
                 disabled={isMatching}
                 onClick={() => applyCardMatch(item, card)}
-                className="flex min-w-0 items-center gap-3 rounded-md border border-border bg-deep p-3 text-left transition-colors hover:border-owl hover:bg-surf2 disabled:cursor-wait disabled:opacity-60"
+                className="flex min-w-0 items-center gap-3 rounded-md border border-ink bg-bg-3 p-3 text-left transition-colors hover:border-coral hover:bg-bg-3 disabled:cursor-wait disabled:opacity-60"
               >
                 {card.image_url || card.image_url_small ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -2590,24 +2590,24 @@ export default function InventoryTabs({
                     className="h-16 w-11 shrink-0 rounded object-cover"
                   />
                 ) : (
-                  <div className="flex h-16 w-11 shrink-0 items-center justify-center rounded bg-surf3 font-mono text-[10px] text-text-2">
+                  <div className="flex h-16 w-11 shrink-0 items-center justify-center rounded bg-bg-3 font-mono text-[10px] text-ink-2">
                     BOX
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-bold text-text">{card.name ?? "Unknown Card"}</div>
-                  <div className="mt-1 flex flex-wrap gap-2 font-mono text-xs text-text-2">
+                  <div className="truncate text-sm font-bold text-ink">{card.name ?? "Unknown Card"}</div>
+                  <div className="mt-1 flex flex-wrap gap-2 font-mono text-xs text-ink-2">
                     {setCodeForMatch(card) && <span>{setCodeForMatch(card)}</span>}
                     {card.card_number && <span>{card.card_number}</span>}
                     {card.rarity && <span>{card.rarity}</span>}
                     {card.source === "custom" && (
-                      <span className="rounded border border-gain/40 bg-gain/10 px-1.5 py-0.5 text-gain">
+                      <span className="rounded border border-gain-2/40 bg-[#DCF1E6] px-1.5 py-0.5 text-gain-2">
                         Private
                       </span>
                     )}
                   </div>
                 </div>
-                <span className="shrink-0 rounded border border-owl/60 bg-owl/10 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-owl">
+                <span className="shrink-0 rounded border border-coral bg-bg-3 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-coral">
                   {isMatching ? "Saving" : "Use"}
                 </span>
               </button>
@@ -2640,14 +2640,14 @@ export default function InventoryTabs({
 
     if (!imageUrl) {
       return (
-        <div className={`flex ${dimensions} items-center justify-center rounded-md border border-border bg-surf3 font-mono text-xs font-semibold text-text-2`}>
+        <div className={`flex ${dimensions} items-center justify-center rounded-md border border-ink bg-bg-3 font-mono text-xs font-semibold text-ink-2`}>
           BOX
         </div>
       );
     }
 
     return (
-      <div className={`flex ${dimensions} items-center justify-center overflow-hidden rounded-md border border-border bg-surf3`}>
+      <div className={`flex ${dimensions} items-center justify-center overflow-hidden rounded-md border border-ink bg-bg-3`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageUrl}
@@ -2690,7 +2690,7 @@ export default function InventoryTabs({
                 activeIndex: index,
               })
             }
-            className="group block w-20 rounded-md border border-border bg-deep p-1 transition-colors hover:border-owl"
+            className="group block w-20 rounded-md border border-ink bg-bg-3 p-1 transition-colors hover:border-coral"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -2698,7 +2698,7 @@ export default function InventoryTabs({
               alt={`${scan.label} scan`}
               className="h-24 w-full rounded object-contain"
             />
-            <div className="mt-1 text-center font-mono text-[10px] font-bold uppercase tracking-wider text-text-2 group-hover:text-owl">
+            <div className="mt-1 text-center font-mono text-[10px] font-bold uppercase tracking-wider text-ink-2 group-hover:text-coral">
               {scan.label}
             </div>
           </button>
@@ -2772,7 +2772,7 @@ export default function InventoryTabs({
 
     return (
       <div
-        className="pointer-events-none fixed z-[60] rounded-lg border border-border bg-deep p-2 shadow-2xl"
+        className="pointer-events-none fixed z-[60] rounded-lg border border-ink bg-bg-3 p-2 shadow-2xl"
         style={{ left: hoverPreview.x, top: hoverPreview.y }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2781,7 +2781,7 @@ export default function InventoryTabs({
           alt={hoverPreview.name}
           className={`rounded-md ${hoverPreview.isScanImage ? "h-[410px] w-[300px] object-contain" : "h-[340px] w-[238px] object-cover"}`}
         />
-        <div className={`mt-2 truncate font-mono text-xs font-semibold text-text ${hoverPreview.isScanImage ? "max-w-[300px]" : "max-w-[238px]"}`}>
+        <div className={`mt-2 truncate font-mono text-xs font-semibold text-ink ${hoverPreview.isScanImage ? "max-w-[300px]" : "max-w-[238px]"}`}>
           {hoverPreview.name}
         </div>
       </div>
@@ -2795,20 +2795,20 @@ export default function InventoryTabs({
     if (!activeScan) return null;
 
     return (
-      <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 px-4 py-8">
-        <div className="flex max-h-full w-full max-w-5xl flex-col rounded-lg border border-border bg-deep shadow-2xl">
-          <div className="flex items-start justify-between gap-4 border-b border-border p-4">
+      <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/70 px-4 py-8">
+        <div className="flex max-h-full w-full max-w-5xl flex-col rounded-lg border border-ink bg-bg-3 shadow-2xl">
+          <div className="flex items-start justify-between gap-4 border-b border-ink p-4">
             <div className="min-w-0">
-              <div className="font-mono text-xs font-bold uppercase tracking-wider text-owl">{activeScan.label} Scan</div>
-              <div className="mt-1 truncate text-xl font-bold text-text">{scanViewer.cardName}</div>
+              <div className="font-mono text-xs font-bold uppercase tracking-wider text-coral">{activeScan.label} Scan</div>
+              <div className="mt-1 truncate text-xl font-bold text-ink">{scanViewer.cardName}</div>
               {scanViewer.certificationNumber && (
-                <div className="mt-1 font-mono text-xs font-semibold text-text-2">Cert {scanViewer.certificationNumber}</div>
+                <div className="mt-1 font-mono text-xs font-semibold text-ink-2">Cert {scanViewer.certificationNumber}</div>
               )}
             </div>
             <button
               type="button"
               onClick={() => setScanViewer(null)}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-loss/70 bg-loss/15 text-loss transition-colors hover:bg-loss hover:text-void"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-loss-2/70 bg-[#FBD4D4] text-loss-2 transition-colors hover:bg-loss-2 hover:text-bg"
               aria-label="Close scan viewer"
             >
               <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -2817,7 +2817,7 @@ export default function InventoryTabs({
             </button>
           </div>
           <div className="grid min-h-0 gap-4 p-4 lg:grid-cols-[1fr_160px]">
-            <div className="flex min-h-0 items-center justify-center rounded-md border border-border bg-black/30 p-3">
+            <div className="flex min-h-0 items-center justify-center rounded-md border border-ink bg-bg-3 p-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={activeScan.url}
@@ -2831,10 +2831,10 @@ export default function InventoryTabs({
                   key={scan.label}
                   type="button"
                   onClick={() => setScanViewer((current) => (current ? { ...current, activeIndex: index } : current))}
-                  className={`shrink-0 rounded-md border bg-surface p-1 transition-colors ${
+                  className={`shrink-0 rounded-md border bg-bg-2 p-1 transition-colors ${
                     index === scanViewer.activeIndex
-                      ? "border-owl text-owl"
-                      : "border-border text-text-2 hover:border-border-2 hover:text-owl"
+                      ? "border-coral text-coral"
+                      : "border-ink text-ink-2 hover:border-ink-3 hover:text-coral"
                   }`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2847,7 +2847,7 @@ export default function InventoryTabs({
               <button
                 type="button"
                 onClick={() => setScanViewer(null)}
-                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-blue/70 bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-blue transition-colors hover:bg-blue hover:text-void"
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-coral bg-bg-3 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-coral transition-colors hover:bg-coral hover:text-bg"
               >
                 <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 14 4 9l5-5" />
@@ -2870,20 +2870,20 @@ export default function InventoryTabs({
 
     if (currentBundle) {
       return (
-        <section className="mb-3 rounded-md border border-blue/40 bg-blue/10 p-3">
-          <div className="font-mono text-xs font-extrabold uppercase tracking-wider text-blue">Part of Bundle</div>
-          <div className="mt-1 text-base font-extrabold leading-snug text-owl">{currentBundle.name}</div>
+        <section className="mb-3 rounded-md border border-coral/50 bg-bg-3 p-3">
+          <div className="font-mono text-xs font-extrabold uppercase tracking-wider text-coral">Part of Bundle</div>
+          <div className="mt-1 text-base font-extrabold leading-snug text-coral">{currentBundle.name}</div>
           <div className="mt-1 flex flex-wrap gap-2 font-mono text-xs font-bold uppercase tracking-wider">
-            <span className="rounded border border-border bg-deep px-2 py-1 text-text-2">
+            <span className="rounded border border-ink bg-bg-3 px-2 py-1 text-ink-2">
               {currentBundle.items.length} Cards
             </span>
-            <span className="rounded border border-border bg-deep px-2 py-1 text-text-2">
+            <span className="rounded border border-ink bg-bg-3 px-2 py-1 text-ink-2">
               {STATUS_LABELS[currentBundle.status]}
             </span>
           </div>
           <a
             href={`/admin/bundles/${currentBundle.id}`}
-            className="mt-3 inline-flex items-center justify-center rounded-md border border-owl bg-owl px-3 py-2 font-mono text-xs font-extrabold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
+            className="mt-3 inline-flex items-center justify-center rounded-md border border-coral bg-ink px-3 py-2 font-mono text-xs font-extrabold uppercase tracking-wider text-bg transition-colors hover:bg-[#2E1C10]"
           >
             View Bundle
           </a>
@@ -2892,18 +2892,18 @@ export default function InventoryTabs({
     }
 
     return (
-      <section className="mb-3 rounded-md border border-border bg-deep p-3">
-        <div className="font-mono text-xs font-extrabold uppercase tracking-wider text-owl">
+      <section className="mb-3 rounded-md border border-ink bg-bg-3 p-3">
+        <div className="font-mono text-xs font-extrabold uppercase tracking-wider text-coral">
           Add to Existing Bundle
         </div>
         {bundlesError ? (
-          <div className="mt-2 rounded border border-owl/30 bg-owl/10 px-3 py-2 text-xs font-semibold text-text">
+          <div className="mt-2 rounded border border-coral/40 bg-bg-3 px-3 py-2 text-xs font-semibold text-ink">
             Bundles are not ready yet: {bundlesError}
           </div>
         ) : attachableBundles.length === 0 ? (
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-text-2">
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-ink-2">
             <span>No available bundles yet.</span>
-            <a href="/admin/bundles/new" className="font-mono text-xs font-bold uppercase tracking-wider text-owl">
+            <a href="/admin/bundles/new" className="font-mono text-xs font-bold uppercase tracking-wider text-coral">
               Create Bundle
             </a>
           </div>
@@ -2914,7 +2914,7 @@ export default function InventoryTabs({
               onChange={(event) =>
                 setBundleAttachDrafts((current) => ({ ...current, [item.id]: event.target.value }))
               }
-              className="min-w-0 flex-1 rounded-md border border-border bg-surface px-3 py-2.5 font-mono text-xs font-semibold text-text outline-none focus:border-owl"
+              className="min-w-0 flex-1 rounded-md border border-ink bg-bg-2 px-3 py-2.5 font-mono text-xs font-semibold text-ink outline-none focus:border-coral"
             >
               <option value="">Select bundle</option>
               {attachableBundles.map((bundle) => (
@@ -2927,7 +2927,7 @@ export default function InventoryTabs({
               type="button"
               disabled={!selectedBundleId || attaching}
               onClick={() => attachItemToBundle(item)}
-              className="rounded-md border border-owl bg-owl/10 px-3 py-2.5 font-mono text-xs font-extrabold uppercase tracking-wider text-owl transition-colors hover:bg-owl/15 disabled:cursor-not-allowed disabled:border-border disabled:bg-surface disabled:text-text-3"
+              className="rounded-md border border-coral bg-bg-3 px-3 py-2.5 font-mono text-xs font-extrabold uppercase tracking-wider text-coral transition-colors hover:bg-bg-3 disabled:cursor-not-allowed disabled:border-ink disabled:bg-bg-2 disabled:text-ink-3"
             >
               {attaching ? "Adding..." : "Add"}
             </button>
@@ -2951,22 +2951,22 @@ export default function InventoryTabs({
 
     return (
       <div
-        className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 px-4 pb-8 pt-[120px]"
+        className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/60 px-4 pb-8 pt-[120px]"
         onMouseDown={(event) => {
           if (event.target === event.currentTarget) {
             setSelectedGroupKey(null);
           }
         }}
       >
-        <div className="w-full max-w-6xl rounded-lg border border-border bg-deep shadow-2xl">
-          <div className="flex items-center justify-between gap-4 border-b border-border p-5">
+        <div className="w-full max-w-6xl rounded-lg border border-ink bg-bg-2 shadow-[0_24px_56px_rgba(26,15,8,0.18)]">
+          <div className="flex items-center justify-between gap-4 border-b border-ink p-5">
             <div>
-              <div className="font-mono text-xs font-bold uppercase tracking-wider text-owl">Inventory Detail</div>
+              <div className="font-mono text-xs font-bold uppercase tracking-wider text-coral">Inventory Detail</div>
             </div>
             <button
               type="button"
               onClick={() => setSelectedGroupKey(null)}
-              className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-sm font-bold uppercase tracking-wider text-text hover:border-border-2 hover:text-owl"
+              className="rounded-md border border-ink bg-bg-2 px-3 py-2 font-mono text-sm font-bold uppercase tracking-wider text-ink hover:border-ink-3 hover:text-coral"
             >
               Close
             </button>
@@ -2978,43 +2978,43 @@ export default function InventoryTabs({
               {renderScanImages(item)}
               <a
                 href={`/admin/inventory/${item.id}/centering`}
-                className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-owl bg-owl/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/15"
+                className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-coral bg-bg-3 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-coral transition-colors hover:bg-bg-3"
               >
                 Measure Centering
               </a>
               <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="rounded-md border border-border bg-surface p-3">
-                  <div className="font-mono text-xs uppercase tracking-wider text-text-2">Quantity</div>
-                  <div className="mt-1 text-2xl font-bold text-text">{selectedGroup.quantity}</div>
+                <div className="rounded-md border border-ink bg-bg-2 p-3">
+                  <div className="font-mono text-xs uppercase tracking-wider text-ink-2">Quantity</div>
+                  <div className="mt-1 text-2xl font-bold text-ink">{selectedGroup.quantity}</div>
                 </div>
-                <div className="rounded-md border border-border bg-surface p-3">
-                  <div className="font-mono text-xs uppercase tracking-wider text-text-2">Stage</div>
-                  <div className="mt-1 text-lg font-bold text-text">
+                <div className="rounded-md border border-ink bg-bg-2 p-3">
+                  <div className="font-mono text-xs uppercase tracking-wider text-ink-2">Stage</div>
+                  <div className="mt-1 text-lg font-bold text-ink">
                     {selectedGroup.status ? STATUS_LABELS[selectedGroup.status] : "Mixed"}
                   </div>
                 </div>
               </div>
 
               {selectedOrderMemberships.length > 0 && (
-                <section className="mt-3 rounded-md border border-owl/40 bg-owl/10 p-3">
-                  <div className="font-mono text-xs font-extrabold uppercase tracking-wider text-owl">
+                <section className="mt-3 rounded-md border border-coral/50 bg-bg-3 p-3">
+                  <div className="font-mono text-xs font-extrabold uppercase tracking-wider text-coral">
                     Part of Order
                   </div>
                   <div className="mt-2 grid gap-2">
                     {selectedOrderMemberships.map((order) => (
-                      <div key={order.id} className="rounded-md border border-border bg-deep p-3">
-                        <div className="font-mono text-[11px] font-bold uppercase tracking-wider text-text-2">
+                      <div key={order.id} className="rounded-md border border-ink bg-bg-3 p-3">
+                        <div className="font-mono text-[11px] font-bold uppercase tracking-wider text-ink-2">
                           Order #{displayCustomerOrderNumber(order.id)}
                         </div>
-                        <div className="mt-1 text-base font-extrabold leading-snug text-owl">
+                        <div className="mt-1 text-base font-extrabold leading-snug text-coral">
                           {order.nickname || order.customer_name || "Untitled Order"}
                         </div>
-                        <div className="mt-1 text-sm font-semibold text-text-2">
-                          Customer: <span className="text-text">{order.customer_name}</span>
+                        <div className="mt-1 text-sm font-semibold text-ink-2">
+                          Customer: <span className="text-ink">{order.customer_name}</span>
                         </div>
                         <a
                           href={`/admin/orders/${order.id}`}
-                          className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-owl bg-owl px-3 py-2 font-mono text-xs font-extrabold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
+                          className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-coral bg-ink px-3 py-2 font-mono text-xs font-extrabold uppercase tracking-wider text-bg transition-colors hover:bg-[#2E1C10]"
                         >
                           View Order
                         </a>
@@ -3027,18 +3027,18 @@ export default function InventoryTabs({
 
             <div className="space-y-4">
               {selectedGroup.rows.map((row, index) => (
-                <div key={row.id} className="rounded-lg border border-border bg-surface p-4">
+                <div key={row.id} className="rounded-lg border border-ink bg-bg-2 p-4">
                   <div className="mb-4 flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-start gap-3">
                       <div className="shrink-0">
                         {renderCardImage(row, "small")}
                       </div>
                       <div className="min-w-0">
-                        <div className="font-mono text-sm font-bold uppercase tracking-wider text-text">
+                        <div className="font-mono text-sm font-bold uppercase tracking-wider text-ink">
                           Item #{index + 1}
                         </div>
                         <div className="mt-1">
-                          {renderCardTitle(row, "text-lg font-bold leading-snug text-text")}
+                          {renderCardTitle(row, "text-lg font-bold leading-snug text-ink")}
                         </div>
                         {renderCardMeta(row, { showItemId: true })}
                       </div>
@@ -3054,45 +3054,45 @@ export default function InventoryTabs({
 
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <label className="block">
-                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Nickname</span>
+                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">Nickname</span>
                       <input
                         type="text"
                         value={row.item_nickname ?? ""}
                         onChange={(event) => updateItem(row.id, { item_nickname: event.target.value })}
                         placeholder="Optional searchable item name"
-                        className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
+                        className="mt-2 w-full rounded-md border border-ink bg-bg-3 px-3 py-2.5 font-mono text-sm font-semibold text-ink outline-none focus:border-coral"
                       />
                     </label>
                     <label className="block">
-                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Condition</span>
+                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">Condition</span>
                       <div className="mt-2">{renderConditionControls(row)}</div>
                     </label>
                     <label className="block">
-                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Stage</span>
+                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">Stage</span>
                       <div className="mt-2">{renderStatusControl(row)}</div>
                     </label>
                     <label className="block">
-                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Acquired Date</span>
+                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">Acquired Date</span>
                       <input
                         type="date"
                         value={row.acquired_at ?? ""}
                         onChange={(event) => updateItem(row.id, { acquired_at: event.target.value })}
-                        className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
+                        className="mt-2 w-full rounded-md border border-ink bg-bg-3 px-3 py-2.5 font-mono text-sm font-semibold text-ink outline-none focus:border-coral"
                       />
                     </label>
                     <label className="block">
-                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Cost Basis</span>
+                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">Cost Basis</span>
                       <input
                         type="text"
                         inputMode="decimal"
                         value={row.cost_basis ?? ""}
                         onChange={(event) => updateItem(row.id, { cost_basis: event.target.value })}
                         placeholder="0.00"
-                        className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
+                        className="mt-2 w-full rounded-md border border-ink bg-bg-3 px-3 py-2.5 font-mono text-sm font-semibold text-ink outline-none focus:border-coral"
                       />
                     </label>
                     <label className="block">
-                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Purchased From</span>
+                      <span className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">Purchased From</span>
                       <SelectField
                         value={row.purchased_from ?? ""}
                         onChange={(event) =>
@@ -3116,22 +3116,22 @@ export default function InventoryTabs({
                     <div className="mt-3 grid gap-3 md:grid-cols-4">
                       {row.status === "ship" && (
                         <label className="block">
-                          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Customer Name</span>
+                          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">Customer Name</span>
                           <div className="mt-2">{renderCustomerNameCell(row)}</div>
                         </label>
                       )}
                       <label className="block">
-                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Ship Label</span>
+                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">Ship Label</span>
                         <div className="mt-2">{renderShippingLabelCell(row)}</div>
                       </label>
                       {row.status === "ship" && (
                         <label className="block">
-                          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Shipped</span>
+                          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">Shipped</span>
                           <div className="mt-2">{renderShippedCell(row)}</div>
                         </label>
                       )}
                       <label className="block">
-                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Tracking</span>
+                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">Tracking</span>
                         <div className="mt-2">{renderTrackingCell(row)}</div>
                       </label>
                     </div>
@@ -3140,7 +3140,7 @@ export default function InventoryTabs({
                   {row.status === "sold" && (
                     <div className="mt-3 grid gap-3 md:grid-cols-3">
                       <label className="block">
-                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Sold At</span>
+                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">Sold At</span>
                         <SelectField
                           value={row.sale_channel ?? "not_sold"}
                           onChange={(event) => updateSaleChannel(row, event.target.value as SaleChannel)}
@@ -3154,36 +3154,36 @@ export default function InventoryTabs({
                         </SelectField>
                       </label>
                       <label className="block">
-                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Sold Date</span>
+                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">Sold Date</span>
                         <input
                           type="date"
                           value={row.sold_date ?? ""}
                           onChange={(event) => updateItem(row.id, { sold_date: event.target.value })}
-                          className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
+                          className="mt-2 w-full rounded-md border border-ink bg-bg-3 px-3 py-2.5 font-mono text-sm font-semibold text-ink outline-none focus:border-coral"
                         />
                       </label>
                       <label className="block">
-                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Sold Price</span>
+                        <span className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">Sold Price</span>
                         <input
                           type="text"
                           inputMode="decimal"
                           value={row.sold_price ?? ""}
                           onChange={(event) => updateItem(row.id, { sold_price: event.target.value })}
                           placeholder="0.00"
-                          className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
+                          className="mt-2 w-full rounded-md border border-ink bg-bg-3 px-3 py-2.5 font-mono text-sm font-semibold text-ink outline-none focus:border-coral"
                         />
                       </label>
                     </div>
                   )}
 
                   <label className="mt-3 block">
-                    <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Notes</span>
+                    <span className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">Notes</span>
                     <textarea
                       value={row.notes ?? ""}
                       onChange={(event) => updateItem(row.id, { notes: event.target.value })}
                       rows={3}
                       placeholder="Condition notes, source, purchase details, or internal comments"
-                      className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 text-sm text-text outline-none focus:border-owl"
+                      className="mt-2 w-full rounded-md border border-ink bg-bg-3 px-3 py-2.5 text-sm text-ink outline-none focus:border-coral"
                     />
                   </label>
                 </div>
@@ -3194,7 +3194,7 @@ export default function InventoryTabs({
                   type="button"
                   disabled={addingGroups[selectedGroup.key] ?? false}
                   onClick={() => addIndividualItem(selectedGroup)}
-                  className="rounded-md border border-gain bg-[rgba(0,214,143,0.10)] px-4 py-3 font-mono text-sm font-bold uppercase tracking-wider text-gain transition-colors hover:bg-[rgba(0,214,143,0.16)] disabled:cursor-wait disabled:opacity-60"
+                  className="rounded-md border border-gain-2 bg-[#DCF1E6] px-4 py-3 font-mono text-sm font-bold uppercase tracking-wider text-gain-2 transition-colors hover:bg-[#C8EBD6] disabled:cursor-wait disabled:opacity-60"
                 >
                   Add Individual Item
                 </button>
@@ -3211,7 +3211,7 @@ export default function InventoryTabs({
 
     if (!imageUrl) {
       return (
-        <div className="flex h-28 w-20 shrink-0 items-center justify-center rounded-md border border-border bg-surf3 font-mono text-xs font-semibold text-text-3">
+        <div className="flex h-28 w-20 shrink-0 items-center justify-center rounded-md border border-ink bg-bg-3 font-mono text-xs font-semibold text-ink-3">
           BOX
         </div>
       );
@@ -3219,7 +3219,7 @@ export default function InventoryTabs({
 
     return (
       <div
-        className="flex h-28 w-20 shrink-0 cursor-zoom-in items-center justify-center overflow-hidden rounded-md border border-border bg-surf3 transition-transform hover:scale-[1.02]"
+        className="flex h-28 w-20 shrink-0 cursor-zoom-in items-center justify-center overflow-hidden rounded-md border border-ink bg-bg-3 transition-transform hover:scale-[1.02]"
         onMouseEnter={(event) => updateOrderItemHoverPreview(event, item)}
         onMouseMove={(event) => updateOrderItemHoverPreview(event, item)}
         onMouseLeave={() => setHoverPreview(null)}
@@ -3249,7 +3249,7 @@ export default function InventoryTabs({
 
     if (!imageUrl) {
       return (
-        <div className="flex h-20 w-14 shrink-0 items-center justify-center rounded-md border border-border bg-surf3 font-mono text-[10px] font-semibold uppercase text-text-3">
+        <div className="flex h-20 w-14 shrink-0 items-center justify-center rounded-md border border-ink bg-bg-3 font-mono text-[10px] font-semibold uppercase text-ink-3">
           Box
         </div>
       );
@@ -3257,7 +3257,7 @@ export default function InventoryTabs({
 
     return (
       <div
-        className="flex h-20 w-14 shrink-0 cursor-zoom-in items-center justify-center overflow-hidden rounded-md border border-border bg-surf3 transition-transform hover:scale-[1.03]"
+        className="flex h-20 w-14 shrink-0 cursor-zoom-in items-center justify-center overflow-hidden rounded-md border border-ink bg-bg-3 transition-transform hover:scale-[1.03]"
         onMouseEnter={(event) => updateBundleItemHoverPreview(event, item)}
         onMouseMove={(event) => updateBundleItemHoverPreview(event, item)}
         onMouseLeave={() => setHoverPreview(null)}
@@ -3294,12 +3294,12 @@ export default function InventoryTabs({
             key={item.id}
             type="button"
             onClick={() => setSelectedGroupKey(`item:${item.id}`)}
-            className="grid min-w-0 grid-cols-[3.5rem_minmax(0,1fr)] gap-3 rounded-md border border-border bg-deep p-2 text-left transition-colors hover:border-owl/60 hover:bg-surf2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-owl"
+            className="grid min-w-0 grid-cols-[3.5rem_minmax(0,1fr)] gap-3 rounded-md border border-ink bg-bg-3 p-2 text-left transition-colors hover:border-coral/60 hover:bg-bg-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral"
           >
             {renderBundleThumbnail(item)}
             <div className="min-w-0 self-center">
-              <div className="truncate text-sm font-bold text-text">{bundleItemTitle(item)}</div>
-              <div className="mt-1 truncate font-mono text-xs font-semibold text-owl">
+              <div className="truncate text-sm font-bold text-ink">{bundleItemTitle(item)}</div>
+              <div className="mt-1 truncate font-mono text-xs font-semibold text-coral">
                 {[item.card.set_code, item.card.card_number, item.graded_rating, item.certification_number ? `Cert ${item.certification_number}` : null]
                   .filter(Boolean)
                   .join(" / ")}
@@ -3311,7 +3311,7 @@ export default function InventoryTabs({
           <button
             type="button"
             onClick={() => setExpandedBundleIds((current) => ({ ...current, [bundle.id]: true }))}
-            className="flex min-h-20 items-center justify-center rounded-md border border-dashed border-border bg-deep px-4 py-3 font-mono text-xs font-bold uppercase tracking-wider text-text-2 transition-colors hover:border-owl/60 hover:bg-surf2 hover:text-owl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-owl"
+            className="flex min-h-20 items-center justify-center rounded-md border border-dashed border-ink bg-bg-3 px-4 py-3 font-mono text-xs font-bold uppercase tracking-wider text-ink-2 transition-colors hover:border-coral/60 hover:bg-bg-3 hover:text-coral focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral"
           >
             +{hiddenCount} More
           </button>
@@ -3320,7 +3320,7 @@ export default function InventoryTabs({
           <button
             type="button"
             onClick={() => setExpandedBundleIds((current) => ({ ...current, [bundle.id]: false }))}
-            className="flex min-h-20 items-center justify-center rounded-md border border-border bg-deep px-4 py-3 font-mono text-xs font-bold uppercase tracking-wider text-text-2 transition-colors hover:border-border-2 hover:bg-surf2 hover:text-owl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-owl"
+            className="flex min-h-20 items-center justify-center rounded-md border border-ink bg-bg-3 px-4 py-3 font-mono text-xs font-bold uppercase tracking-wider text-ink-2 transition-colors hover:border-ink-3 hover:bg-bg-3 hover:text-coral focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral"
           >
             Show Less
           </button>
@@ -3331,7 +3331,7 @@ export default function InventoryTabs({
 
   function renderBundlesTable() {
     return (
-      <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+      <div className="overflow-x-auto rounded-lg border border-ink bg-bg-2">
         <table className="w-full min-w-[1280px] table-fixed">
           <colgroup>
             <col className="w-[290px]" />
@@ -3341,7 +3341,7 @@ export default function InventoryTabs({
             <col className="w-[130px]" />
           </colgroup>
           <thead>
-            <tr className="border-b border-border bg-surf2 text-left font-mono text-xs font-semibold uppercase tracking-wider text-text">
+            <tr className="border-b border-ink bg-bg-3 text-left font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">
               <th className="px-4 py-3.5">Bundle</th>
               <th className="px-4 py-3.5">Cards</th>
               <th className="px-4 py-3.5">Status</th>
@@ -3353,7 +3353,7 @@ export default function InventoryTabs({
             {bundlesError ? (
               <tr>
                 <td colSpan={5} className="px-4 py-8">
-                  <div className="rounded-md border border-loss/30 bg-loss/10 px-4 py-3 text-sm font-semibold text-text">
+                  <div className="rounded-md border border-loss-2/40 bg-[#FBE3E3] px-4 py-3 text-sm font-semibold text-ink">
                     Bundles are not ready yet: {bundlesError}
                   </div>
                 </td>
@@ -3363,22 +3363,22 @@ export default function InventoryTabs({
                 const savingBundle = savingBundleIds[bundle.id] ?? false;
 
                 return (
-                  <tr key={bundle.id} className="border-b border-border last:border-b-0">
+                  <tr key={bundle.id} className="border-b border-ink last:border-b-0">
                     <td className="px-4 py-4 align-top">
                       <a
                         href={`/admin/bundles/${bundle.id}`}
-                        className="block text-lg font-black leading-tight text-owl underline-offset-2 transition-colors hover:text-owl-light hover:underline"
+                        className="block text-lg font-black leading-tight text-coral underline-offset-2 transition-colors hover:text-ink hover:underline"
                       >
                         {bundle.name}
                       </a>
-                      <div className="mt-1 font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
+                      <div className="mt-1 font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">
                         Updated {formatOrderDate(bundle.updated_at ?? bundle.created_at)}
                       </div>
-                      {bundle.notes && <div className="mt-2 line-clamp-3 text-sm text-text-2">{bundle.notes}</div>}
+                      {bundle.notes && <div className="mt-2 line-clamp-3 text-sm text-ink-2">{bundle.notes}</div>}
                     </td>
                     <td className="px-4 py-4 align-top">
                       <div className="mb-2 flex flex-wrap gap-2">
-                        <span className="rounded-md border border-blue/40 bg-blue/10 px-2.5 py-1.5 font-mono text-xs font-bold uppercase tracking-wider text-blue">
+                        <span className="rounded-md border border-coral/50 bg-bg-3 px-2.5 py-1.5 font-mono text-xs font-bold uppercase tracking-wider text-coral">
                           {bundle.items.length} Cards
                         </span>
                       </div>
@@ -3390,7 +3390,7 @@ export default function InventoryTabs({
                         disabled={savingBundle}
                         onChange={(event) => updateBundleStatus(bundle, event.target.value as InventoryStatus)}
                         wrapperClassName="w-full"
-                        className="bg-deep"
+                        className="bg-bg-3"
                       >
                         {(Object.keys(STATUS_LABELS) as InventoryStatus[]).map((status) => (
                           <option key={status} value={status}>
@@ -3399,14 +3399,14 @@ export default function InventoryTabs({
                         ))}
                       </SelectField>
                     </td>
-                    <td className="px-4 py-4 align-top font-mono text-xs font-semibold text-text-2">
+                    <td className="px-4 py-4 align-top font-mono text-xs font-semibold text-ink-2">
                       <div className="grid gap-2">
                         <SelectField
                           value={bundle.sale_channel ?? "not_sold"}
                           disabled={savingBundle}
                           onChange={(event) => updateBundleSaleChannel(bundle, event.target.value as SaleChannel)}
                           wrapperClassName="w-full"
-                          className="bg-deep"
+                          className="bg-bg-3"
                         >
                           {(Object.keys(SALE_CHANNEL_LABELS) as SaleChannel[]).map((channel) => (
                             <option key={channel} value={channel}>
@@ -3416,8 +3416,8 @@ export default function InventoryTabs({
                         </SelectField>
                         {(bundle.sale_channel ?? "not_sold") !== "not_sold" && (
                           <div>
-                            <span className="text-text-3">Sold Date</span>
-                            <div className="mt-0.5 text-text">{formatOrderDate(bundle.sold_date)}</div>
+                            <span className="text-ink-3">Sold Date</span>
+                            <div className="mt-0.5 text-ink">{formatOrderDate(bundle.sold_date)}</div>
                           </div>
                         )}
                       </div>
@@ -3425,7 +3425,7 @@ export default function InventoryTabs({
                     <td className="px-4 py-4 align-top">
                       <a
                         href={`/admin/bundles/${bundle.id}`}
-                        className="inline-flex rounded-md border border-border bg-deep px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl"
+                        className="inline-flex rounded-md border border-ink bg-bg-3 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-ink transition-colors hover:border-ink-3 hover:text-coral"
                       >
                         Edit Bundle
                       </a>
@@ -3435,7 +3435,7 @@ export default function InventoryTabs({
               })
             ) : (
               <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-base text-text-2">
+                <td colSpan={5} className="px-4 py-12 text-center text-base text-ink-2">
                   No bundles in this view yet.
                 </td>
               </tr>
@@ -3455,21 +3455,21 @@ export default function InventoryTabs({
     const hasStageOrderCards = stageOrders.length > 0 || stageStandaloneBundles.length > 0;
 
     return (
-      <section className="rounded-lg border border-border bg-surface">
-        <div className="flex flex-col gap-3 border-b border-border p-4 md:flex-row md:items-center md:justify-between">
+      <section className="rounded-lg border border-ink bg-bg-2">
+        <div className="flex flex-col gap-3 border-b border-ink p-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-xl font-bold text-text">{title}</h2>
-            <p className="mt-1 text-sm text-text-2">
+            <h2 className="text-xl font-bold text-ink">{title}</h2>
+            <p className="mt-1 text-sm text-ink-2">
               {shippedStage
                 ? "Customer orders and standalone bundles sold together."
                 : "Customer orders and standalone bundles waiting to ship."}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <span className="rounded-md border border-owl/30 bg-owl/10 px-3 py-2 font-mono text-xs font-bold uppercase text-owl">
+            <span className="rounded-md border border-coral/40 bg-bg-3 px-3 py-2 font-mono text-xs font-bold uppercase text-coral">
               {stageTotalOrderCount} Orders
             </span>
-            <span className="rounded-md border border-blue/30 bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase text-blue">
+            <span className="rounded-md border border-coral/40 bg-bg-3 px-3 py-2 font-mono text-xs font-bold uppercase text-coral">
               {stageTotalCardCount} Cards
             </span>
           </div>
@@ -3477,12 +3477,12 @@ export default function InventoryTabs({
 
         <div className="grid gap-3 p-3">
           {ordersError && (
-            <div className="rounded-lg border border-loss/30 bg-loss/10 p-4 text-sm font-semibold text-text">
+            <div className="rounded-lg border border-loss-2/40 bg-[#FBE3E3] p-4 text-sm font-semibold text-ink">
               Orders are not ready yet: {ordersError}
             </div>
           )}
           {bundlesError && (
-            <div className="rounded-lg border border-loss/30 bg-loss/10 p-4 text-sm font-semibold text-text">
+            <div className="rounded-lg border border-loss-2/40 bg-[#FBE3E3] p-4 text-sm font-semibold text-ink">
               Bundles are not ready yet: {bundlesError}
             </div>
           )}
@@ -3513,41 +3513,41 @@ export default function InventoryTabs({
               return (
               <div
                 key={order.id}
-                className="group grid min-w-0 gap-3 rounded-lg border border-border bg-deep p-3"
+                className="group grid min-w-0 gap-3 rounded-lg border border-ink bg-bg-3 p-3"
               >
                 <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
                     <a
                       href={`/admin/orders/${order.id}`}
-                      className="block truncate text-2xl font-black leading-tight text-owl underline-offset-2 transition-colors hover:text-owl-light hover:underline"
+                      className="block truncate text-2xl font-black leading-tight text-coral underline-offset-2 transition-colors hover:text-ink hover:underline"
                     >
                       {orderTitle}
                     </a>
-                    <div className="mt-1 font-mono text-xs font-bold uppercase tracking-wider text-text-2">
+                    <div className="mt-1 font-mono text-xs font-bold uppercase tracking-wider text-ink-2">
                       Order #{orderNumber}
                     </div>
-                    <div className="mt-1 truncate text-sm text-text-2">{order.customer_name}</div>
+                    <div className="mt-1 truncate text-sm text-ink-2">{order.customer_name}</div>
                   </div>
 
                   <div className="flex shrink-0 flex-wrap gap-2.5">
                     <span
                       className={`rounded-md border px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide sm:text-sm ${
                         order.marked_shipped
-                          ? "border-gain/30 bg-gain/10 text-gain"
-                          : "border-owl/30 bg-owl/10 text-owl"
+                          ? "border-gain-2/40 bg-[#DCF1E6] text-gain-2"
+                          : "border-coral/40 bg-bg-3 text-coral"
                       }`}
                     >
                       {order.marked_shipped ? "Shipped" : "Open"}
                     </span>
-                    <span className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-text-2 sm:text-sm">
+                    <span className="rounded-md border border-ink bg-bg-2 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-ink-2 sm:text-sm">
                       {order.items.length} Cards
                     </span>
-                    <span className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-text-2 sm:text-sm">
+                    <span className="rounded-md border border-ink bg-bg-2 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-ink-2 sm:text-sm">
                       {formatOrderDate(order.updated_at ?? order.created_at)}
                     </span>
                     <a
                       href={`/admin/orders/${order.id}`}
-                      className="rounded-md border border-border-2 bg-surface px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-text transition-colors hover:border-owl hover:text-owl sm:text-sm"
+                      className="rounded-md border border-ink-3 bg-bg-2 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-ink transition-colors hover:border-coral hover:text-coral sm:text-sm"
                     >
                       View Order
                     </a>
@@ -3564,25 +3564,25 @@ export default function InventoryTabs({
                           setHoverPreview(null);
                           setSelectedGroupKey(`item:${item.id}`);
                         }}
-                        className="flex min-w-0 gap-4 rounded-md border border-border bg-surface p-3 text-left transition-colors hover:border-border-2 hover:bg-surf2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-owl"
+                        className="flex min-w-0 gap-4 rounded-md border border-ink bg-bg-2 p-3 text-left transition-colors hover:border-ink-3 hover:bg-bg-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral"
                       >
                         {renderOrderThumbnail(item)}
                         <div className="min-w-0 flex-1">
-                          <div className="line-clamp-3 text-base font-extrabold leading-snug text-text sm:text-lg">
+                          <div className="line-clamp-3 text-base font-extrabold leading-snug text-ink sm:text-lg">
                             {orderItemTitle(item)}
                           </div>
-                          <div className="mt-3 grid gap-1.5 font-mono text-sm font-bold text-text-2">
+                          <div className="mt-3 grid gap-1.5 font-mono text-sm font-bold text-ink-2">
                             <div>
-                              Condition: <span className="text-text">{orderItemConditionLabel(item)}</span>
+                              Condition: <span className="text-ink">{orderItemConditionLabel(item)}</span>
                             </div>
                             {item.inventory_type === "graded" && item.graded_rating && (
                               <div>
-                                Rating: <span className="font-extrabold text-owl">{item.graded_rating}</span>
+                                Rating: <span className="font-extrabold text-coral">{item.graded_rating}</span>
                               </div>
                             )}
                             {item.inventory_type === "graded" && item.certification_number && (
                               <div className="truncate">
-                                Cert: <span className="font-extrabold text-owl">{item.certification_number}</span>
+                                Cert: <span className="font-extrabold text-coral">{item.certification_number}</span>
                               </div>
                             )}
                           </div>
@@ -3591,18 +3591,18 @@ export default function InventoryTabs({
                     ))}
                   </div>
 
-                  <div className="grid gap-3 rounded-md border border-blue/60 bg-[rgba(79,142,247,0.16)] p-4 shadow-[0_0_24px_rgba(79,142,247,0.12),inset_0_1px_0_rgba(255,255,255,0.08)]">
+                  <div className="grid gap-3 rounded-md border border-coral bg-[rgba(255,73,54,0.18)] p-4 shadow-[0_0_24px_rgba(255,73,54,0.12),inset_0_1px_0_rgba(255,255,255,0.08)]">
                     <div className="block">
-                      <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
+                      <span className="font-mono text-xs font-bold uppercase tracking-wider text-ink-2">
                         Customer Name
                       </span>
                       {customerNameValue && !editingCustomerName ? (
-                        <div className="mt-1.5 flex min-w-0 items-center justify-between gap-2 rounded-md border border-border bg-deep px-3 py-2.5">
-                          <div className="min-w-0 truncate text-lg font-extrabold text-text">{customerNameValue}</div>
+                        <div className="mt-1.5 flex min-w-0 items-center justify-between gap-2 rounded-md border border-ink bg-bg-3 px-3 py-2.5">
+                          <div className="min-w-0 truncate text-lg font-extrabold text-ink">{customerNameValue}</div>
                           <button
                             type="button"
                             onClick={() => setOrderFieldEditing(order.id, "customer_name", true)}
-                            className="shrink-0 rounded border border-border-2 bg-surface p-2 text-text-2 transition-colors hover:border-owl hover:text-owl"
+                            className="shrink-0 rounded border border-ink-3 bg-bg-2 p-2 text-ink-2 transition-colors hover:border-coral hover:text-coral"
                             aria-label="Edit customer name"
                             title="Edit customer name"
                           >
@@ -3614,13 +3614,13 @@ export default function InventoryTabs({
                           value={draft.customer_name}
                           onChange={(event) => updateOrderDraft(order.id, "customer_name", event.target.value)}
                           placeholder="Customer name"
-                          className="mt-1.5 w-full rounded-md border border-border bg-deep px-3 py-2.5 text-sm text-text outline-none focus:border-owl"
+                          className="mt-1.5 w-full rounded-md border border-ink bg-bg-3 px-3 py-2.5 text-sm text-ink outline-none focus:border-coral"
                         />
                       )}
                     </div>
 
                     <div className="block">
-                      <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
+                      <span className="font-mono text-xs font-bold uppercase tracking-wider text-ink-2">
                         Ship Label
                       </span>
                       {shippingLabelHref && !editingShippingLabel ? (
@@ -3629,7 +3629,7 @@ export default function InventoryTabs({
                             href={shippingLabelHref}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-md border border-blue bg-blue px-3 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-void transition-colors hover:bg-blue/90"
+                            className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-md border border-coral bg-coral px-3 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-bg transition-colors hover:bg-[#E63B2A]"
                           >
                             <span aria-hidden="true">🖨️</span>
                             <span>Print Shipping</span>
@@ -3637,7 +3637,7 @@ export default function InventoryTabs({
                           <button
                             type="button"
                             onClick={() => setOrderFieldEditing(order.id, "shipping_label", true)}
-                            className="shrink-0 rounded border border-border-2 bg-deep p-2.5 text-text-2 transition-colors hover:border-owl hover:text-owl"
+                            className="shrink-0 rounded border border-ink-3 bg-bg-3 p-2.5 text-ink-2 transition-colors hover:border-coral hover:text-coral"
                             aria-label="Edit shipping label URL"
                             title="Edit shipping label URL"
                           >
@@ -3649,28 +3649,28 @@ export default function InventoryTabs({
                           value={draft.shipping_label}
                           onChange={(event) => updateOrderDraft(order.id, "shipping_label", event.target.value)}
                           placeholder="Paste ship label URL"
-                          className="mt-1.5 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-owl"
+                          className="mt-1.5 w-full rounded-md border border-ink bg-bg-3 px-3 py-2.5 font-mono text-sm text-ink outline-none focus:border-coral"
                         />
                       )}
                     </div>
 
                     <div className="block">
-                      <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
+                      <span className="font-mono text-xs font-bold uppercase tracking-wider text-ink-2">
                         Tracking
                       </span>
                       {trackingValue && !editingTracking ? (
                         <div className="mt-1.5 flex min-w-0 items-center gap-2">
-                          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-border bg-deep px-3 py-2.5">
+                          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-ink bg-bg-3 px-3 py-2.5">
                             <a
                               href={trackingLinkHref ?? undefined}
                               target="_blank"
                               rel="noreferrer"
-                              className="min-w-0 flex-1 truncate font-mono text-sm font-extrabold text-owl underline underline-offset-2 transition-colors hover:text-owl-light"
+                              className="min-w-0 flex-1 truncate font-mono text-sm font-extrabold text-coral underline underline-offset-2 transition-colors hover:text-ink"
                             >
                               {trackingValue}
                             </a>
                             {trackingCarrier && (
-                              <span className="shrink-0 rounded border border-owl/40 bg-owl/10 px-2 py-1 font-mono text-[10px] font-extrabold uppercase tracking-wider text-owl">
+                              <span className="shrink-0 rounded border border-coral/50 bg-bg-3 px-2 py-1 font-mono text-[10px] font-extrabold uppercase tracking-wider text-coral">
                                 {trackingCarrier}
                               </span>
                             )}
@@ -3678,7 +3678,7 @@ export default function InventoryTabs({
                           <button
                             type="button"
                             onClick={() => setOrderFieldEditing(order.id, "tracking_number", true)}
-                            className="shrink-0 rounded border border-border-2 bg-deep p-2.5 text-text-2 transition-colors hover:border-owl hover:text-owl"
+                            className="shrink-0 rounded border border-ink-3 bg-bg-3 p-2.5 text-ink-2 transition-colors hover:border-coral hover:text-coral"
                             aria-label="Edit tracking"
                             title="Edit tracking"
                           >
@@ -3690,20 +3690,20 @@ export default function InventoryTabs({
                           value={draft.tracking_number}
                           onChange={(event) => updateOrderDraft(order.id, "tracking_number", event.target.value)}
                           placeholder="Paste tracking code or link"
-                          className="mt-1.5 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-owl"
+                          className="mt-1.5 w-full rounded-md border border-ink bg-bg-3 px-3 py-2.5 font-mono text-sm text-ink outline-none focus:border-coral"
                         />
                       )}
                     </div>
 
                     <div className="mt-3 grid gap-2">
                       {order.marked_shipped ? (
-                        <div className="inline-flex items-center justify-center gap-2 rounded-md border border-gain bg-gain px-4 py-3 text-center font-mono text-sm font-extrabold uppercase tracking-wider text-void sm:text-base">
+                        <div className="inline-flex items-center justify-center gap-2 rounded-md border border-gain-2 bg-gain-2 px-4 py-3 text-center font-mono text-sm font-extrabold uppercase tracking-wider text-bg sm:text-base">
                           <span aria-hidden="true">📦</span>
                           <span>Marked Shipped{markedShippedDate ? ` ${markedShippedDate}` : ""}</span>
                         </div>
                       ) : isConfirmingShipped ? (
                         <div className="grid gap-2">
-                          <div className="font-mono text-sm font-bold uppercase tracking-wider text-gain">
+                          <div className="font-mono text-sm font-bold uppercase tracking-wider text-gain-2">
                             Confirm move this order to Sold?
                           </div>
                           <div className="flex gap-2">
@@ -3711,7 +3711,7 @@ export default function InventoryTabs({
                               type="button"
                               disabled={isSavingOrder}
                               onClick={() => saveOrderQuickEdit(order, { markedShipped: true })}
-                              className="inline-flex items-center justify-center gap-2 rounded-md border border-gain bg-gain px-4 py-3 font-mono text-sm font-extrabold uppercase tracking-wider text-void transition-colors hover:bg-gain/90 disabled:cursor-wait disabled:opacity-60 sm:text-base"
+                              className="inline-flex items-center justify-center gap-2 rounded-md border border-gain-2 bg-gain-2 px-4 py-3 font-mono text-sm font-extrabold uppercase tracking-wider text-bg transition-colors hover:bg-[#1F7F4D] disabled:cursor-wait disabled:opacity-60 sm:text-base"
                             >
                               <span aria-hidden="true">📦</span>
                               <span>Confirm</span>
@@ -3726,7 +3726,7 @@ export default function InventoryTabs({
                                   return next;
                                 })
                               }
-                              className="rounded-md border border-border-2 bg-deep px-4 py-3 font-mono text-sm font-bold uppercase tracking-wider text-text-2 transition-colors hover:text-text disabled:cursor-wait disabled:opacity-60"
+                              className="rounded-md border border-ink-3 bg-bg-3 px-4 py-3 font-mono text-sm font-bold uppercase tracking-wider text-ink-2 transition-colors hover:text-ink disabled:cursor-wait disabled:opacity-60"
                             >
                               Cancel
                             </button>
@@ -3737,7 +3737,7 @@ export default function InventoryTabs({
                           type="button"
                           disabled={isSavingOrder}
                           onClick={() => setConfirmingShippedOrderIds((current) => ({ ...current, [order.id]: true }))}
-                          className="inline-flex items-center justify-center gap-2 rounded-md border border-gain bg-gain px-4 py-3 font-mono text-sm font-extrabold uppercase tracking-wider text-void transition-colors hover:bg-gain/90 disabled:cursor-wait disabled:opacity-60 sm:text-base"
+                          className="inline-flex items-center justify-center gap-2 rounded-md border border-gain-2 bg-gain-2 px-4 py-3 font-mono text-sm font-extrabold uppercase tracking-wider text-bg transition-colors hover:bg-[#1F7F4D] disabled:cursor-wait disabled:opacity-60 sm:text-base"
                         >
                           <span aria-hidden="true">📦</span>
                           <span>Mark Shipped</span>
@@ -3749,7 +3749,7 @@ export default function InventoryTabs({
                           type="button"
                           disabled={isSavingOrder}
                           onClick={() => saveOrderQuickEdit(order)}
-                          className="rounded-md border border-owl bg-owl/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/15 disabled:cursor-wait disabled:opacity-60"
+                          className="rounded-md border border-coral bg-bg-3 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-coral transition-colors hover:bg-bg-3 disabled:cursor-wait disabled:opacity-60"
                         >
                           {isSavingOrder ? "Saving..." : "Save Order"}
                         </button>
@@ -3778,40 +3778,40 @@ export default function InventoryTabs({
               return (
                 <div
                   key={`bundle:${bundle.id}`}
-                  className="group grid min-w-0 gap-3 rounded-lg border border-owl/45 bg-deep p-3 shadow-[inset_4px_0_0_rgba(255,176,0,0.5)]"
+                  className="group grid min-w-0 gap-3 rounded-lg border border-coral/45 bg-bg-3 p-3 shadow-[inset_4px_0_0_rgba(232,149,18,0.55)]"
                 >
                   <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div className="min-w-0">
                       <a
                         href={`/admin/bundles/${bundle.id}`}
-                        className="block truncate text-2xl font-black leading-tight text-owl underline-offset-2 transition-colors hover:text-owl-light hover:underline"
+                        className="block truncate text-2xl font-black leading-tight text-coral underline-offset-2 transition-colors hover:text-ink hover:underline"
                       >
                         {bundle.name}
                       </a>
-                      <div className="mt-1 font-mono text-xs font-bold uppercase tracking-wider text-text-2">
+                      <div className="mt-1 font-mono text-xs font-bold uppercase tracking-wider text-ink-2">
                         Standalone Bundle Order
                       </div>
-                      {bundle.notes && <div className="mt-1 line-clamp-2 text-sm text-text-2">{bundle.notes}</div>}
+                      {bundle.notes && <div className="mt-1 line-clamp-2 text-sm text-ink-2">{bundle.notes}</div>}
                     </div>
 
                     <div className="flex shrink-0 flex-wrap gap-2.5">
-                      <span className="rounded-md border border-owl/40 bg-owl/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-owl sm:text-sm">
+                      <span className="rounded-md border border-coral/50 bg-bg-3 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-coral sm:text-sm">
                         Bundle
                       </span>
-                      <span className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-text-2 sm:text-sm">
+                      <span className="rounded-md border border-ink bg-bg-2 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-ink-2 sm:text-sm">
                         {bundle.items.length} Cards
                       </span>
-                      <span className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-text-2 sm:text-sm">
+                      <span className="rounded-md border border-ink bg-bg-2 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-ink-2 sm:text-sm">
                         {primaryDate}
                       </span>
                       {savingBundle && (
-                        <span className="rounded-md border border-blue/30 bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-blue sm:text-sm">
+                        <span className="rounded-md border border-coral/40 bg-bg-3 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-coral sm:text-sm">
                           Saving
                         </span>
                       )}
                       <a
                         href={`/admin/bundles/${bundle.id}`}
-                        className="rounded-md border border-border-2 bg-surface px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-text transition-colors hover:border-owl hover:text-owl sm:text-sm"
+                        className="rounded-md border border-ink-3 bg-bg-2 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-ink transition-colors hover:border-coral hover:text-coral sm:text-sm"
                       >
                         View Bundle
                       </a>
@@ -3821,9 +3821,9 @@ export default function InventoryTabs({
                   <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
                     {renderBundleItems(bundle)}
 
-                    <div className="grid content-start gap-3 rounded-md border border-owl/50 bg-owl/10 p-4">
+                    <div className="grid content-start gap-3 rounded-md border border-coral/60 bg-bg-3 p-4">
                       <div>
-                        <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
+                        <span className="font-mono text-xs font-bold uppercase tracking-wider text-ink-2">
                           {stageDetailLabel}
                         </span>
                         {shippedStage ? (
@@ -3832,7 +3832,7 @@ export default function InventoryTabs({
                             disabled={savingBundle}
                             onChange={(event) => updateBundleSaleChannel(bundle, event.target.value as SaleChannel)}
                             wrapperClassName="mt-1.5 w-full"
-                            className="bg-deep text-base font-extrabold"
+                            className="bg-bg-3 text-base font-extrabold"
                           >
                             {(Object.keys(SALE_CHANNEL_LABELS) as SaleChannel[]).map((channel) => (
                               <option key={channel} value={channel}>
@@ -3841,13 +3841,13 @@ export default function InventoryTabs({
                             ))}
                           </SelectField>
                         ) : (
-                          <div className="mt-1.5 rounded-md border border-border bg-deep px-3 py-2.5 text-base font-extrabold text-text">
+                          <div className="mt-1.5 rounded-md border border-ink bg-bg-3 px-3 py-2.5 text-base font-extrabold text-ink">
                             {stageDetailValue}
                           </div>
                         )}
                       </div>
                       <div>
-                        <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
+                        <span className="font-mono text-xs font-bold uppercase tracking-wider text-ink-2">
                           {dateDetailLabel}
                         </span>
                         {shippedStage ? (
@@ -3856,16 +3856,16 @@ export default function InventoryTabs({
                             value={bundle.sold_date ?? ""}
                             disabled={savingBundle}
                             onChange={(event) => updateBundle(bundle, { sold_date: event.target.value || null })}
-                            className="mt-1.5 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-base font-extrabold text-text outline-none focus:border-owl disabled:cursor-wait disabled:opacity-60"
+                            className="mt-1.5 w-full rounded-md border border-ink bg-bg-3 px-3 py-2.5 font-mono text-base font-extrabold text-ink outline-none focus:border-coral disabled:cursor-wait disabled:opacity-60"
                           />
                         ) : (
-                          <div className="mt-1.5 rounded-md border border-border bg-deep px-3 py-2.5 text-base font-extrabold text-text">
+                          <div className="mt-1.5 rounded-md border border-ink bg-bg-3 px-3 py-2.5 text-base font-extrabold text-ink">
                             {dateDetailValue}
                           </div>
                         )}
                       </div>
                       <div>
-                        <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">
+                        <span className="font-mono text-xs font-bold uppercase tracking-wider text-ink-2">
                           {priceDetailLabel}
                         </span>
                         {shippedStage ? (
@@ -3876,10 +3876,10 @@ export default function InventoryTabs({
                             disabled={savingBundle}
                             onChange={(event) => updateBundle(bundle, { sold_price: event.target.value })}
                             placeholder="0.00"
-                            className="mt-1.5 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-base font-extrabold text-text outline-none focus:border-owl disabled:cursor-wait disabled:opacity-60"
+                            className="mt-1.5 w-full rounded-md border border-ink bg-bg-3 px-3 py-2.5 font-mono text-base font-extrabold text-ink outline-none focus:border-coral disabled:cursor-wait disabled:opacity-60"
                           />
                         ) : (
-                          <div className="mt-1.5 rounded-md border border-border bg-deep px-3 py-2.5 text-base font-extrabold text-text">
+                          <div className="mt-1.5 rounded-md border border-ink bg-bg-3 px-3 py-2.5 text-base font-extrabold text-ink">
                             {salePrice ?? "No price"}
                           </div>
                         )}
@@ -3891,7 +3891,7 @@ export default function InventoryTabs({
             })}
             </>
           ) : (
-            <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-text-2">
+            <div className="rounded-lg border border-dashed border-ink p-8 text-center text-sm text-ink-2">
               {emptyText}
             </div>
           )}
@@ -3914,91 +3914,82 @@ export default function InventoryTabs({
             value={searchDraft}
             onChange={(event) => setSearchDraft(event.target.value)}
             placeholder="Search inventory"
-            className="h-10 min-w-0 flex-1 rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus:border-owl"
+            className="admin-input min-w-0 flex-1"
           />
           <div className="flex gap-2">
-            <button
-              type="submit"
-              className="h-10 rounded-md bg-owl px-4 font-mono text-xs font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
-            >
+            <button type="submit" className="admin-btn admin-btn-primary">
               Search
             </button>
-          {searchQuery && (
-            <button
+            {searchQuery && (
+              <button
                 type="button"
                 onClick={() => {
                   setSearchDraft("");
                   setSearchQuery("");
                 }}
-                className="h-10 rounded-md border border-border bg-surface px-3 font-mono text-xs font-bold uppercase tracking-wider text-text hover:border-border-2 hover:text-owl"
+                className="admin-btn admin-btn-ghost"
               >
-              Clear
-            </button>
-          )}
-          {pendingMatchOnly && (
-            <button
-              type="button"
-              onClick={() => {
-                setNeedsMatchReview(false);
-              }}
-              className="h-10 rounded-md border border-border bg-surface px-3 font-mono text-xs font-bold uppercase tracking-wider text-text hover:border-border-2 hover:text-owl"
-            >
-              Clear Match
-            </button>
-          )}
-        </div>
-      </form>
+                Clear
+              </button>
+            )}
+            {pendingMatchOnly && (
+              <button
+                type="button"
+                onClick={() => {
+                  setNeedsMatchReview(false);
+                }}
+                className="admin-btn admin-btn-ghost"
+              >
+                Clear Match
+              </button>
+            )}
+          </div>
+        </form>
 
         <div className="flex shrink-0 flex-wrap justify-start gap-2 xl:justify-end">
           <details className="inventory-tools relative">
-            <summary className="flex h-10 cursor-pointer list-none items-center rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl">
+            <summary className="admin-btn admin-btn-ghost list-none cursor-pointer">
               Tools
+              <svg viewBox="0 0 24 24" fill="none" className="h-3 w-3" stroke="currentColor" strokeWidth="3" strokeLinecap="round" aria-hidden="true">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
             </summary>
-            <div className="absolute right-0 top-11 z-40 grid min-w-[190px] gap-1 rounded-lg border border-border bg-deep p-2 shadow-2xl">
+            <div className="absolute right-0 top-12 z-40 grid min-w-[200px] gap-0.5 rounded-c-md border-[1.5px] border-ink bg-bg-2 p-1.5 shadow-[0_12px_32px_rgba(26,15,8,0.14)]">
               <a
                 href="/admin/psa-submissions"
-                className="rounded-md px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:bg-surface hover:text-owl"
+                className="rounded-c-sm px-3 py-2.5 font-mono-2 text-xs font-semibold uppercase tracking-wider text-ink-2 transition-colors hover:bg-bg-3 hover:text-ink"
               >
                 PSA Submissions
               </a>
               <a
                 href="/admin/inventory/import/psa"
-                className="rounded-md px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:bg-surface hover:text-owl"
+                className="rounded-c-sm px-3 py-2.5 font-mono-2 text-xs font-semibold uppercase tracking-wider text-ink-2 transition-colors hover:bg-bg-3 hover:text-ink"
               >
                 PSA Import
               </a>
             </div>
           </details>
-          <a
-            href="/admin/orders/new"
-            className="h-10 rounded-md border border-owl/40 bg-owl/10 px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/15"
-          >
+          <a href="/admin/orders/new" className="admin-btn admin-btn-ghost">
             Add Order
           </a>
-          <a
-            href={createBundleHref}
-            className="h-10 rounded-md border border-owl/40 bg-owl/10 px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/15"
-          >
+          <a href={createBundleHref} className="admin-btn admin-btn-ghost">
             {selectedCount > 0 ? `Bundle Selected ${selectedCount}` : "Create Bundle"}
           </a>
-          <a
-            href="/admin/inventory/new"
-            className="h-10 rounded-md bg-owl px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
-          >
+          <a href="/admin/inventory/new" className="admin-btn admin-btn-primary">
             Add Inventory
           </a>
         </div>
       </div>
 
       {searchQuery && (
-        <div className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
-          Search: <span className="text-owl">{searchQuery}</span>
+        <div className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">
+          Search: <span className="text-coral">{searchQuery}</span>
         </div>
       )}
 
       {pendingMatchOnly && (
-        <div className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
-          Review: <span className="text-owl">Needs Match</span>
+        <div className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">
+          Review: <span className="text-coral">Needs Match</span>
         </div>
       )}
 
@@ -4010,14 +4001,16 @@ export default function InventoryTabs({
               onClick={() => {
                 switchInventoryTab(tab.id);
               }}
-              className={`rounded-md border px-4 py-2.5 font-mono text-sm font-semibold transition-colors ${
+              className={`rounded-c-sm border-[1.5px] px-4 py-2.5 font-grotesk text-sm font-semibold transition-colors ${
                 activeTab === tab.id && !pendingMatchOnly
-                  ? "border-owl bg-owl/10 text-owl"
-                  : "border-border bg-surface text-text hover:border-border-2 hover:text-owl"
+                  ? "border-ink bg-ink text-bg"
+                  : "border-ink-3 bg-bg-2 text-ink-2 hover:border-ink hover:text-ink"
               }`}
             >
               {tab.label}
-              <span className="ml-2 text-text-2">
+              <span className={`ml-2 font-mono-2 text-xs font-semibold ${
+                activeTab === tab.id && !pendingMatchOnly ? "text-bg/70" : "text-ink-3"
+              }`}>
                 {tab.id === "bundles" ? filteredBundles.length : counts[tab.id]}
               </span>
             </button>
@@ -4029,45 +4022,45 @@ export default function InventoryTabs({
             onClick={() => {
               setNeedsMatchReview(!pendingMatchOnly);
             }}
-            className={`rounded-md border px-4 py-2.5 font-mono text-sm font-semibold transition-colors ${
+            className={`rounded-c-sm border-[1.5px] px-4 py-2.5 font-grotesk text-sm font-semibold transition-colors ${
               pendingMatchOnly
-                ? "border-owl bg-owl/10 text-owl"
-                : "border-border bg-surface text-text hover:border-border-2 hover:text-owl"
+                ? "border-coral bg-[#FFE2DD] text-coral"
+                : "border-coral text-coral bg-[#FFE2DD] hover:bg-[#FFD3CC]"
             }`}
           >
             Needs Match
-            <span className="ml-2 text-text-2">{pendingMatchCount}</span>
+            <span className="ml-2 font-mono-2 text-xs font-semibold text-coral">{pendingMatchCount}</span>
           </button>
         )}
       </div>
 
       {activeTab === "graded" && !pendingMatchOnly && (
-        <div className="flex flex-wrap gap-2 rounded-lg border border-border bg-surface p-2">
+        <div className="flex flex-wrap gap-2 rounded-c-md border-[1.5px] border-ink bg-bg-2 p-2">
           <button
             type="button"
             onClick={() => setGradedFilter("all")}
-            className={`rounded-md border px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
+            className={`rounded-c-sm border-[1.5px] px-3 py-2 font-mono-2 text-xs font-bold uppercase tracking-wider transition-colors ${
               gradedFilter === "all"
-                ? "border-owl bg-owl/10 text-owl"
-                : "border-border bg-deep text-text hover:border-border-2 hover:text-owl"
+                ? "border-ink bg-ink text-bg"
+                : "border-ink-3 bg-bg-2 text-ink-2 hover:border-ink hover:text-ink"
             }`}
           >
             All Grades
-            <span className="ml-2 text-text-2">{counts.graded}</span>
+            <span className={`ml-2 ${gradedFilter === "all" ? "text-bg/70" : "text-ink-3"}`}>{counts.graded}</span>
           </button>
           {visibleGradedFilters.map((rating) => (
             <button
               key={rating}
               type="button"
               onClick={() => setGradedFilter(rating)}
-              className={`rounded-md border px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider transition-colors ${
+              className={`rounded-c-sm border-[1.5px] px-3 py-2 font-mono-2 text-xs font-bold uppercase tracking-wider transition-colors ${
                 gradedFilter === rating
-                  ? "border-owl bg-owl/10 text-owl"
-                  : "border-border bg-deep text-text hover:border-border-2 hover:text-owl"
+                  ? "border-ink bg-ink text-bg"
+                  : "border-ink-3 bg-bg-2 text-ink-2 hover:border-ink hover:text-ink"
               }`}
             >
               {rating}
-              <span className="ml-2 text-text-2">{gradedCounts[rating] ?? 0}</span>
+              <span className={`ml-2 ${gradedFilter === rating ? "text-bg/70" : "text-ink-3"}`}>{gradedCounts[rating] ?? 0}</span>
             </button>
           ))}
         </div>
@@ -4081,30 +4074,30 @@ export default function InventoryTabs({
             if (bulkSelectMode) clearBulkSelection();
             else setBulkSelectMode(true);
           }}
-          className={`rounded-md border px-4 py-2.5 font-mono text-sm font-semibold uppercase tracking-wider transition-colors ${
+          className={
             bulkSelectMode
-              ? "border-owl bg-owl/10 text-owl"
-              : "border-border bg-surface text-text hover:border-border-2 hover:text-owl"
-          }`}
+              ? "admin-btn admin-btn-ghost border-coral text-coral bg-[#FFE2DD]"
+              : "admin-btn admin-btn-ghost"
+          }
         >
           {bulkSelectMode ? "Cancel Selection" : "Select Items"}
         </button>
         {bulkSelectMode && (
           <>
-            <div className="rounded-md border border-border bg-surface px-3 py-2.5 font-mono text-sm font-semibold text-text">
-              Selected <span className="text-owl">{selectedCount}</span>
+            <div className="rounded-c-sm border-[1.5px] border-ink bg-bg-2 px-3 py-2.5 font-mono-2 text-sm font-semibold text-ink">
+              Selected <span className="text-coral">{selectedCount}</span>
             </div>
             {selectedCount > 0 && (
               <button
                 type="button"
                 disabled={bulkDeleting}
                 onClick={handleBulkDeleteClick}
-                className={`rounded-md border px-4 py-2.5 font-mono text-sm font-bold uppercase tracking-wider transition-colors disabled:cursor-wait disabled:opacity-60 ${
+                className={`rounded-c-sm border-[1.5px] px-4 py-2.5 font-mono-2 text-sm font-bold uppercase tracking-wider transition-colors disabled:cursor-wait disabled:opacity-60 ${
                   bulkDeleteStep === 0
-                    ? "border-loss/60 bg-loss/10 text-loss hover:bg-loss/15"
+                    ? "border-coral bg-bg-2 text-coral hover:bg-[#FFE2DD]"
                     : bulkDeleteStep === 1
-                      ? "border-loss bg-loss/15 text-loss hover:bg-loss/20"
-                      : "border-loss bg-loss text-void hover:bg-loss/90"
+                      ? "border-coral bg-[#FFE2DD] text-coral hover:bg-[#FFD3CC]"
+                      : "border-coral bg-coral text-bg hover:bg-[#E63B2A]"
                 }`}
               >
                 {bulkDeleting
@@ -4117,7 +4110,7 @@ export default function InventoryTabs({
               </button>
             )}
             {selectedCount > 0 && (
-              <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface p-2">
+              <div className="flex flex-wrap items-center gap-2 rounded-c-md border-[1.5px] border-ink bg-bg-2 p-2">
                 <SelectField
                   value={bulkStatusDraft}
                   onChange={(event) => {
@@ -4126,7 +4119,6 @@ export default function InventoryTabs({
                     setBulkDeleteStep(0);
                   }}
                   wrapperClassName="w-[190px]"
-                  className="bg-deep"
                 >
                   <option value="">Set status...</option>
                   {(Object.keys(STATUS_LABELS) as InventoryStatus[]).map((status) => (
@@ -4143,7 +4135,6 @@ export default function InventoryTabs({
                     setBulkDeleteStep(0);
                   }}
                   wrapperClassName="w-[190px]"
-                  className="bg-deep"
                 >
                   <option value="">Set condition...</option>
                   {(Object.keys(CONDITION_LABELS) as InventoryType[]).map((condition) => (
@@ -4156,10 +4147,10 @@ export default function InventoryTabs({
                   type="button"
                   disabled={!hasBulkEditDraft || bulkUpdating}
                   onClick={handleBulkApplyClick}
-                  className={`rounded-md border px-4 py-2.5 font-mono text-sm font-bold uppercase tracking-wider transition-colors disabled:cursor-not-allowed disabled:border-border disabled:bg-deep disabled:text-text-3 ${
+                  className={`rounded-c-sm border-[1.5px] px-4 py-2.5 font-mono-2 text-sm font-bold uppercase tracking-wider transition-colors disabled:cursor-not-allowed disabled:border-ink-3 disabled:bg-bg-3 disabled:text-ink-3 ${
                     bulkApplyStep === 0
-                      ? "border-owl bg-owl/10 text-owl hover:bg-owl/15"
-                      : "border-owl bg-owl text-void hover:bg-owl-light"
+                      ? "border-ink bg-bg-2 text-ink hover:bg-bg-3"
+                      : "border-ink bg-ink text-bg hover:bg-[#2E1C10]"
                   }`}
                 >
                   {bulkUpdating ? "Applying..." : bulkApplyStep === 0 ? "Apply Change" : "Confirm Apply"}
@@ -4167,14 +4158,14 @@ export default function InventoryTabs({
               </div>
             )}
             {bulkDeleteStep > 0 && (
-              <div className="rounded-md border border-loss/40 bg-loss/10 px-3 py-2 text-sm font-semibold text-text">
+              <div className="rounded-c-sm border-[1.5px] border-coral bg-[#FFE2DD] px-3 py-2 text-sm font-semibold text-ink">
                 {bulkDeleteStep === 1
                   ? `Confirm once more to delete ${selectedCount} selected item${selectedCount === 1 ? "" : "s"}.`
                   : "Final confirmation. This permanently removes the selected inventory records."}
               </div>
             )}
             {bulkApplyStep > 0 && (
-              <div className="rounded-md border border-owl/40 bg-owl/10 px-3 py-2 text-sm font-semibold text-text">
+              <div className="rounded-c-sm border-[1.5px] border-ink bg-bg-3 px-3 py-2 text-sm font-semibold text-ink">
                 Confirm to apply selected status/condition changes to {selectedCount} item{selectedCount === 1 ? "" : "s"}.
               </div>
             )}
@@ -4184,7 +4175,7 @@ export default function InventoryTabs({
       )}
 
       {actionError && (
-        <div className="rounded-md border border-loss/30 bg-loss/10 px-4 py-3 text-sm font-semibold text-text">
+        <div className="rounded-c-sm border-[1.5px] border-loss-2/50 bg-[#FBE3E3] px-4 py-3 text-sm font-semibold text-ink">
           {actionError}
         </div>
       )}
@@ -4192,16 +4183,16 @@ export default function InventoryTabs({
       {activeTab !== "bundles" && renderStageOrdersSection()}
 
       {activeTab !== "bundles" && (statusFilter === "ship" || statusFilter === "sold") && (
-        <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-lg border border-ink bg-bg-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-xl font-bold text-text">Single Card Orders</h2>
-            <p className="mt-1 text-sm text-text-2">Individual cards waiting for shipping or sale completion.</p>
+            <h2 className="text-xl font-bold text-ink">Single Card Orders</h2>
+            <p className="mt-1 text-sm text-ink-2">Individual cards waiting for shipping or sale completion.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <span className="rounded-md border border-owl/30 bg-owl/10 px-3 py-2 font-mono text-xs font-bold uppercase text-owl">
+            <span className="rounded-md border border-coral/40 bg-bg-3 px-3 py-2 font-mono text-xs font-bold uppercase text-coral">
               {stageSingleCardOrderCount} Orders
             </span>
-            <span className="rounded-md border border-blue/30 bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase text-blue">
+            <span className="rounded-md border border-coral/40 bg-bg-3 px-3 py-2 font-mono text-xs font-bold uppercase text-coral">
               {stageSingleCardCount} Cards
             </span>
           </div>
@@ -4211,7 +4202,7 @@ export default function InventoryTabs({
       {activeTab === "bundles" ? (
         renderBundlesTable()
       ) : statusFilter === "ship" ? (
-      <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+      <div className="overflow-x-auto rounded-lg border border-ink bg-bg-2">
         <table className="w-full min-w-[1390px] table-fixed">
           <colgroup>
             <col className={ROW_NUMBER_COLUMN_CLASS} />
@@ -4225,7 +4216,7 @@ export default function InventoryTabs({
             <col className="w-[240px]" />
           </colgroup>
           <thead>
-            <tr className="border-b border-border bg-surf2 text-left font-mono text-xs font-semibold uppercase tracking-wider text-text">
+            <tr className="border-b border-ink bg-bg-3 text-left font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">
               <th className="px-3 py-3.5 text-center">{ROW_NUMBER_LABEL}</th>
               <th className="px-3 py-3.5">{renderSelectionHeader()}</th>
               <th className="px-4 py-3.5">Image</th>
@@ -4263,8 +4254,8 @@ export default function InventoryTabs({
                           }
                           className={`flex h-9 w-9 items-center justify-center rounded-md border transition-colors ${
                             isOpen
-                              ? "border-owl bg-owl/15 text-owl"
-                              : "border-border-2 bg-deep text-text hover:border-owl hover:text-owl"
+                              ? "border-coral bg-bg-3 text-coral"
+                              : "border-ink-3 bg-bg-3 text-ink hover:border-coral hover:text-coral"
                           }`}
                         >
                           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5">
@@ -4286,7 +4277,7 @@ export default function InventoryTabs({
                         onMouseEnter={(event) => updateHoverPreview(event, item)}
                         onMouseMove={(event) => updateHoverPreview(event, item)}
                         onMouseLeave={() => setHoverPreview(null)}
-                        className="block rounded-md outline-none transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-owl"
+                        className="block rounded-md outline-none transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-coral"
                       >
                         {renderCardImage(item)}
                       </button>
@@ -4297,7 +4288,7 @@ export default function InventoryTabs({
                           <button
                             type="button"
                             onClick={() => setSelectedGroupKey(group.key)}
-                            className="block max-w-full truncate text-left text-base font-bold text-text underline-offset-2 hover:text-owl hover:underline"
+                            className="block max-w-full truncate text-left text-base font-bold text-ink underline-offset-2 hover:text-coral hover:underline"
                           >
                             {renderCardTitle(item)}
                           </button>
@@ -4320,7 +4311,7 @@ export default function InventoryTabs({
                       {group.rows.length === 1 ? (
                         renderCustomerNameCell(group.rows[0])
                       ) : (
-                        <span className={group.rows.some((row) => row.customer_name) ? "font-semibold text-text" : "text-text-2"}>
+                        <span className={group.rows.some((row) => row.customer_name) ? "font-semibold text-ink" : "text-ink-2"}>
                           {sameValue(group.rows.map((row) => row.customer_name ?? "")) || "Mixed"}
                         </span>
                       )}
@@ -4329,7 +4320,7 @@ export default function InventoryTabs({
                       {group.rows.length === 1 ? (
                         renderShippingLabelCell(group.rows[0])
                       ) : (
-                        <span className={group.rows.some((row) => row.shipping_label_url) ? "font-semibold text-owl" : "text-text-2"}>
+                        <span className={group.rows.some((row) => row.shipping_label_url) ? "font-semibold text-coral" : "text-ink-2"}>
                           {group.rows.some((row) => row.shipping_label_url) ? "Label saved" : "No label"}
                         </span>
                       )}
@@ -4341,7 +4332,7 @@ export default function InventoryTabs({
                       {group.rows.length === 1 ? (
                         renderTrackingCell(group.rows[0])
                       ) : (
-                        <span className={group.rows.some((row) => row.shipping_tracking) ? "font-semibold text-gain" : "text-text-2"}>
+                        <span className={group.rows.some((row) => row.shipping_tracking) ? "font-semibold text-gain-2" : "text-ink-2"}>
                           {group.rows.some((row) => row.shipping_tracking) ? "Tracking saved" : "No tracking"}
                         </span>
                       )}
@@ -4379,9 +4370,9 @@ export default function InventoryTabs({
                                 <button
                                   type="button"
                                   onClick={() => setSelectedGroupKey(group.key)}
-                                  className="block max-w-full truncate text-left text-base font-semibold text-text underline-offset-2 hover:text-owl hover:underline"
+                                  className="block max-w-full truncate text-left text-base font-semibold text-ink underline-offset-2 hover:text-coral hover:underline"
                                 >
-                                  {renderCardTitle(child, "text-base font-semibold text-text")}
+                                  {renderCardTitle(child, "text-base font-semibold text-ink")}
                                 </button>
                                 {renderCardMeta(child, { showItemId: true })}
                               </div>
@@ -4395,7 +4386,7 @@ export default function InventoryTabs({
                           <td className="px-3 py-3.5">{renderTrackingCell(child)}</td>
                         </tr>
                       ))}
-                      <tr className="border-b border-[rgba(79,142,247,0.16)] bg-[rgba(79,142,247,0.045)] shadow-[inset_3px_0_0_rgba(79,142,247,0.32)] last:border-b-0">
+                      <tr className="border-b border-[rgba(255,73,54,0.18)] bg-[rgba(255,73,54,0.06)] shadow-[inset_3px_0_0_rgba(255,73,54,0.32)] last:border-b-0">
                         <td className="px-3 py-3.5" />
                         <td className="px-3 py-3.5" />
                         <td colSpan={7} className="px-3 py-3.5">
@@ -4403,7 +4394,7 @@ export default function InventoryTabs({
                             type="button"
                             disabled={isAdding}
                             onClick={() => addIndividualItem(group)}
-                            className="inline-flex items-center gap-2 rounded-md border border-gain bg-[rgba(0,214,143,0.10)] px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-gain transition-colors hover:bg-[rgba(0,214,143,0.16)] disabled:cursor-wait disabled:opacity-60"
+                            className="inline-flex items-center gap-2 rounded-md border border-gain-2 bg-[#DCF1E6] px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-gain-2 transition-colors hover:bg-[#C8EBD6] disabled:cursor-wait disabled:opacity-60"
                           >
                             <span className="text-base leading-none">+</span>
                             Add individual item
@@ -4418,7 +4409,7 @@ export default function InventoryTabs({
 
             {groups.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-3 py-12 text-center text-base text-text-2">
+                <td colSpan={9} className="px-3 py-12 text-center text-base text-ink-2">
                   No inventory items need shipping yet.
                 </td>
               </tr>
@@ -4427,7 +4418,7 @@ export default function InventoryTabs({
         </table>
       </div>
       ) : (
-      <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+      <div className="overflow-x-auto rounded-lg border border-ink bg-bg-2">
         <table className={`w-full ${standardTableMinWidth} table-fixed`}>
           <colgroup>
             <col className={ROW_NUMBER_COLUMN_CLASS} />
@@ -4444,7 +4435,7 @@ export default function InventoryTabs({
             <col className="w-[150px]" />
           </colgroup>
           <thead>
-            <tr className="border-b border-border bg-surf2 text-left font-mono text-xs font-semibold uppercase tracking-wider text-text">
+            <tr className="border-b border-ink bg-bg-3 text-left font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">
               <th className="px-3 py-3.5 text-center">{ROW_NUMBER_LABEL}</th>
               <th className="px-3 py-3.5">{renderSelectionHeader()}</th>
               <th className="px-4 py-3.5">Image</th>
@@ -4488,8 +4479,8 @@ export default function InventoryTabs({
                           }
                           className={`flex h-9 w-9 items-center justify-center rounded-md border transition-colors ${
                             isOpen
-                              ? "border-owl bg-owl/15 text-owl"
-                              : "border-border-2 bg-deep text-text hover:border-owl hover:text-owl"
+                              ? "border-coral bg-bg-3 text-coral"
+                              : "border-ink-3 bg-bg-3 text-ink hover:border-coral hover:text-coral"
                           }`}
                         >
                           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5">
@@ -4511,7 +4502,7 @@ export default function InventoryTabs({
                         onMouseEnter={(event) => updateHoverPreview(event, item)}
                         onMouseMove={(event) => updateHoverPreview(event, item)}
                         onMouseLeave={() => setHoverPreview(null)}
-                        className="block rounded-md outline-none transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-owl"
+                        className="block rounded-md outline-none transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-coral"
                       >
                         {renderCardImage(item)}
                       </button>
@@ -4522,7 +4513,7 @@ export default function InventoryTabs({
                           <button
                             type="button"
                             onClick={() => setSelectedGroupKey(group.key)}
-                            className="block max-w-full truncate text-left text-base font-bold text-text underline-offset-2 hover:text-owl hover:underline"
+                            className="block max-w-full truncate text-left text-base font-bold text-ink underline-offset-2 hover:text-coral hover:underline"
                           >
                             {renderCardTitle(item)}
                           </button>
@@ -4536,14 +4527,14 @@ export default function InventoryTabs({
                         })}
                       </div>
                     </td>
-                    <td className="px-3 py-4 text-right font-mono text-base font-semibold text-text">{group.quantity}</td>
+                    <td className="px-3 py-4 text-right font-mono text-base font-semibold text-ink">{group.quantity}</td>
                     <td className="px-3 py-4">{renderGroupCenteringCeiling(group)}</td>
                     {showShippingActions && (
                       <td className="px-3 py-4 font-mono text-sm">
                         {group.rows.length === 1 ? (
                           renderCustomerNameCell(group.rows[0])
                         ) : (
-                          <span className={group.rows.some((row) => row.customer_name) ? "font-semibold text-text" : "text-text-2"}>
+                          <span className={group.rows.some((row) => row.customer_name) ? "font-semibold text-ink" : "text-ink-2"}>
                             {sameValue(group.rows.map((row) => row.customer_name ?? "")) || "Mixed"}
                           </span>
                         )}
@@ -4554,7 +4545,7 @@ export default function InventoryTabs({
                         {group.rows.length === 1 ? (
                           renderShippingLabelCell(group.rows[0])
                         ) : (
-                          <span className={group.rows.some((row) => row.shipping_label_url) ? "font-semibold text-owl" : "text-text-2"}>
+                          <span className={group.rows.some((row) => row.shipping_label_url) ? "font-semibold text-coral" : "text-ink-2"}>
                             {group.rows.some((row) => row.shipping_label_url) ? "Label saved" : "No label"}
                           </span>
                         )}
@@ -4570,7 +4561,7 @@ export default function InventoryTabs({
                         {group.rows.length === 1 ? (
                           renderTrackingCell(group.rows[0])
                         ) : (
-                          <span className={group.rows.some((row) => row.shipping_tracking) ? "font-semibold text-gain" : "text-text-2"}>
+                          <span className={group.rows.some((row) => row.shipping_tracking) ? "font-semibold text-gain-2" : "text-ink-2"}>
                             {group.rows.some((row) => row.shipping_tracking) ? "Tracking saved" : "No tracking"}
                           </span>
                         )}
@@ -4579,27 +4570,27 @@ export default function InventoryTabs({
                     {showSaleFields && group.rows.length === 1 && renderSaleFields(group.rows[0])}
                     {showSaleFields && group.rows.length > 1 && (
                       <>
-                        <td className="px-3 py-4 font-mono text-sm font-semibold text-text-2">
+                        <td className="px-3 py-4 font-mono text-sm font-semibold text-ink-2">
                           {sameValue(group.rows.map((row) => row.sale_channel ?? "not_sold"))
                             ? SALE_CHANNEL_LABELS[sameValue(group.rows.map((row) => row.sale_channel ?? "not_sold")) as SaleChannel]
                             : "Mixed"}
                         </td>
-                        <td className="px-3 py-4 font-mono text-sm font-semibold text-text-2">
+                        <td className="px-3 py-4 font-mono text-sm font-semibold text-ink-2">
                           {sameValue(group.rows.map((row) => row.sold_date ?? "")) || "Mixed"}
                         </td>
-                        <td className="px-3 py-4 font-mono text-sm font-semibold text-text-2">
+                        <td className="px-3 py-4 font-mono text-sm font-semibold text-ink-2">
                           {sameValue(group.rows.map((row) => String(row.sold_price ?? ""))) || "Mixed"}
                         </td>
                       </>
                     )}
-                    <td className="px-3 py-4 font-mono text-sm font-medium text-text">
+                    <td className="px-3 py-4 font-mono text-sm font-medium text-ink">
                       {hasNestedRows
                         ? group.condition
                           ? CONDITION_LABELS[group.condition]
                           : "Mixed"
                         : renderConditionControls(item)}
                     </td>
-                    <td className="px-3 py-4 font-mono text-sm font-medium text-text">
+                    <td className="px-3 py-4 font-mono text-sm font-medium text-ink">
                       {hasNestedRows
                         ? group.status
                           ? STATUS_LABELS[group.status]
@@ -4639,16 +4630,16 @@ export default function InventoryTabs({
                                 <button
                                   type="button"
                                   onClick={() => setSelectedGroupKey(group.key)}
-                                  className="block max-w-full truncate text-left text-base font-semibold text-text underline-offset-2 hover:text-owl hover:underline"
+                                  className="block max-w-full truncate text-left text-base font-semibold text-ink underline-offset-2 hover:text-coral hover:underline"
                                 >
-                                  {renderCardTitle(child, "text-base font-semibold text-text")}
+                                  {renderCardTitle(child, "text-base font-semibold text-ink")}
                                 </button>
                                 {renderCardMeta(child, { showItemId: true })}
                               </div>
                               {renderRowActions({ group, item: child, canAdd: true, canRemove: true })}
                             </div>
                           </td>
-                          <td className="px-3 py-3.5 text-right font-mono text-base font-semibold text-text">{child.quantity}</td>
+                          <td className="px-3 py-3.5 text-right font-mono text-base font-semibold text-ink">{child.quantity}</td>
                           <td className="px-3 py-3.5">{renderCenteringCeilingBadge(child.centering_ceiling)}</td>
                           {showShippingActions && (
                             <td className="px-3 py-3.5">
@@ -4679,7 +4670,7 @@ export default function InventoryTabs({
                           </td>
                         </tr>
                       ))}
-                      <tr className="border-b border-[rgba(79,142,247,0.16)] bg-[rgba(79,142,247,0.045)] shadow-[inset_3px_0_0_rgba(79,142,247,0.32)] last:border-b-0">
+                      <tr className="border-b border-[rgba(255,73,54,0.18)] bg-[rgba(255,73,54,0.06)] shadow-[inset_3px_0_0_rgba(255,73,54,0.32)] last:border-b-0">
                         <td className="px-3 py-3.5" />
                         <td className="px-3 py-3.5" />
                         <td colSpan={(showTracking ? 7 : 6) + (showShippingActions ? 3 : 0) + (showSaleFields ? 3 : 0)} className="px-3 py-3.5">
@@ -4687,7 +4678,7 @@ export default function InventoryTabs({
                             type="button"
                             disabled={isAdding}
                             onClick={() => addIndividualItem(group)}
-                            className="inline-flex items-center gap-2 rounded-md border border-gain bg-[rgba(0,214,143,0.10)] px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-gain transition-colors hover:bg-[rgba(0,214,143,0.16)] disabled:cursor-wait disabled:opacity-60"
+                            className="inline-flex items-center gap-2 rounded-md border border-gain-2 bg-[#DCF1E6] px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-gain-2 transition-colors hover:bg-[#C8EBD6] disabled:cursor-wait disabled:opacity-60"
                           >
                             <span className="text-base leading-none">+</span>
                             Add individual item
@@ -4702,7 +4693,7 @@ export default function InventoryTabs({
 
             {groups.length === 0 && (
               <tr>
-                <td colSpan={(showTracking ? 9 : 8) + (showShippingActions ? 3 : 0) + (showSaleFields ? 3 : 0)} className="px-3 py-12 text-center text-base text-text-2">
+                <td colSpan={(showTracking ? 9 : 8) + (showShippingActions ? 3 : 0) + (showSaleFields ? 3 : 0)} className="px-3 py-12 text-center text-base text-ink-2">
                   No inventory items in this view yet.
                 </td>
               </tr>

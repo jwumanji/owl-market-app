@@ -357,9 +357,12 @@ export const CHARACTERS: CharacterData[] = [
   },
 ];
 
-// Tier labels
+// Tier labels — C1.5 mirrors the Option A rarity palette hierarchy.
+// S = apex (ink fill + gold accent, matches .c-rar-mr).
+// A = mid (blue solid, matches .c-rar-aa).
+// B = lower (cream fill + ink text, matches .c-rar-r supply tier).
 export const TIER_LABELS: Record<number, { label: string; color: string; bg: string }> = {
-  1: { label: "S", color: "#E8A020", bg: "rgba(232,160,32,0.18)" },
-  2: { label: "A", color: "#4F8EF7", bg: "rgba(79,142,247,0.14)" },
-  3: { label: "B", color: "#7A88A8", bg: "rgba(122,136,168,0.14)" },
+  1: { label: "S", color: "#F5BE50", bg: "#1A0F08" },
+  2: { label: "A", color: "#FFF5E4", bg: "#2E6FD6" },
+  3: { label: "B", color: "#2E5BA8", bg: "#DCE6F7" },
 };

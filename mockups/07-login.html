@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OwlMarket — Sign in (C1.5 mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Caveat:wght@700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #FFF5E4;
+      --bg-2: #FFFFFF;
+      --bg-3: #FCE6BE;
+      --ink: #1A0F08;
+      --ink-2: #5C4534;
+      --ink-3: #9A8475;
+      --pink: #FF6BB8;
+      --coral: #FF4936;
+      --gold: #E89512;
+      --grad-brand: linear-gradient(135deg, #FF6BB8 0%, #FF4936 50%, #E89512 100%);
+      --r-sm: 8px;
+      --r-md: 14px;
+      --r-lg: 22px;
+      --r-pill: 999px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+
+    /* ============ PAGE FRAME ============ */
+    .page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 24px;
+    }
+
+    /* ============ HERO LOCKUP ============ */
+    .lockup-hero {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 40px;
+    }
+    .lockup-hero-wm {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1;
+      color: var(--ink);
+      font-size: 56px;
+      display: inline-flex;
+      align-items: baseline;
+    }
+    .lockup-hero-wm em {
+      font-family: 'Caveat', cursive;
+      font-style: normal;
+      font-weight: 700;
+      font-size: 72px;
+      margin-left: -4px;
+      padding-right: 18px;
+      padding-bottom: 6px;
+      display: inline-block;
+      background: var(--grad-brand);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+    }
+
+    /* ============ CARD ============ */
+    .auth-card {
+      width: 100%;
+      max-width: 400px;
+      background: var(--bg-2);
+      border: 1.5px solid var(--ink);
+      border-radius: var(--r-md);
+      padding: 36px 32px 32px;
+    }
+
+    .auth-eyebrow {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--ink-2);
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .auth-heading {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 26px;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      text-align: center;
+      line-height: 1.1;
+      margin-bottom: 8px;
+    }
+    .auth-sub {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--ink-2);
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    /* ============ FORM ============ */
+    .form {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .field-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+    .field-label {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--ink-2);
+    }
+    .field-link {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 500;
+      font-size: 12px;
+      color: var(--coral);
+      text-decoration: none;
+    }
+    .field-link:hover { text-decoration: underline; }
+    .field input {
+      width: 100%;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 500;
+      font-size: 16px;
+      color: var(--ink);
+      background: var(--bg-2);
+      border: 1.5px solid var(--ink);
+      border-radius: var(--r-sm);
+      padding: 12px 14px;
+      outline: none;
+      transition: box-shadow 0.15s ease, border-color 0.15s ease;
+    }
+    .field input::placeholder {
+      color: var(--ink-3);
+      font-weight: 500;
+    }
+    .field input:focus {
+      border-color: var(--coral);
+      box-shadow: 0 0 0 3px rgba(255, 73, 54, 0.18);
+    }
+
+    .submit-btn {
+      width: 100%;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--bg);
+      background: var(--grad-brand);
+      border: none;
+      border-radius: var(--r-pill);
+      padding: 14px 0;
+      cursor: pointer;
+      margin-top: 8px;
+      letter-spacing: 0.02em;
+      transition: transform 0.1s ease;
+    }
+    .submit-btn:hover { transform: translateY(-1px); }
+    .submit-btn:active { transform: translateY(0); }
+
+    /* ============ DIVIDER + ALT ============ */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 24px 0 18px;
+    }
+    .divider::before,
+    .divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: rgba(26, 15, 8, 0.15);
+    }
+    .divider-text {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-weight: 600;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--ink-2);
+    }
+
+    .alt-btn {
+      width: 100%;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--ink);
+      background: var(--bg-2);
+      border: 1.5px solid var(--ink);
+      border-radius: var(--r-pill);
+      padding: 11px 0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.15s ease;
+    }
+    .alt-btn:hover { background: var(--bg-3); }
+
+    /* ============ FOOTER LINE ============ */
+    .auth-foot {
+      text-align: center;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 500;
+      font-size: 13.5px;
+      color: var(--ink-2);
+      margin-top: 24px;
+    }
+    .auth-foot a {
+      font-weight: 600;
+      background: var(--grad-brand);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      text-decoration: none;
+      padding-right: 2px;
+    }
+
+    /* ============ TINY FOOTER ============ */
+    .tiny-foot {
+      margin-top: 48px;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-weight: 600;
+      font-size: 11px;
+      color: var(--ink-2);
+      letter-spacing: 0.08em;
+      text-align: center;
+    }
+    .tiny-foot a {
+      color: var(--ink-2);
+      text-decoration: none;
+      margin: 0 8px;
+    }
+    .tiny-foot a:hover { color: var(--ink); }
+
+    /* mock note */
+    .mock-note {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 18px;
+      background: var(--bg-2);
+      border: 1.5px dashed var(--ink-3);
+      border-radius: var(--r-md);
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      color: var(--ink-2);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="page">
+
+    <!-- HERO LOCKUP -->
+    <div class="lockup-hero">
+      <svg width="64" height="64" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="owl-grad-hero" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#FF6BB8"/>
+            <stop offset="50%" stop-color="#FF4936"/>
+            <stop offset="100%" stop-color="#E89512"/>
+          </linearGradient>
+          <mask id="owl-moon-mask-hero">
+            <rect width="120" height="120" fill="white"/>
+            <circle cx="70" cy="56" r="20" fill="black"/>
+          </mask>
+        </defs>
+        <circle cx="60" cy="60" r="52" fill="url(#owl-grad-hero)" stroke="#1A0F08" stroke-width="5"/>
+        <circle cx="60" cy="60" r="38" fill="#1A0F08"/>
+        <circle cx="58" cy="60" r="26" fill="#FFF5E4" mask="url(#owl-moon-mask-hero)"/>
+        <g transform="translate(80 60)">
+          <path d="M 0,-11 Q 1.65,-1.65 11,0 Q 1.65,1.65 0,11 Q -1.65,1.65 -11,0 Q -1.65,-1.65 0,-11 Z" fill="#FFF5E4"/>
+        </g>
+      </svg>
+      <span class="lockup-hero-wm">Owl<em>Market</em></span>
+    </div>
+
+    <!-- CARD -->
+    <div class="auth-card">
+
+      <div class="auth-eyebrow">Account</div>
+      <h1 class="auth-heading">Sign in to OwlMarket</h1>
+      <p class="auth-sub">Welcome back.</p>
+
+      <form class="form" onsubmit="return false;">
+
+        <div class="field">
+          <span class="field-label">Email</span>
+          <input type="email" placeholder="you@example.com" />
+        </div>
+
+        <div class="field">
+          <div class="field-row">
+            <span class="field-label">Password</span>
+            <a href="#" class="field-link">Forgot?</a>
+          </div>
+          <input type="password" placeholder="••••••••" />
+        </div>
+
+        <button type="submit" class="submit-btn">Sign in →</button>
+
+      </form>
+
+      <div class="divider">
+        <span class="divider-text">or</span>
+      </div>
+
+      <button class="alt-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        Continue with Google
+      </button>
+
+      <p class="auth-foot">
+        New here? <a href="#">Create an account</a>
+      </p>
+
+    </div>
+
+    <div class="tiny-foot">
+      <a href="#">Terms</a>·<a href="#">Privacy</a>·<a href="#">Support</a>
+    </div>
+
+  </div>
+
+  <div class="mock-note">
+    MOCKUP · /login · C1.5 PLAYFUL MODERN · v1.0
+  </div>
+
+</body>
+</html>

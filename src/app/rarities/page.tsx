@@ -57,10 +57,22 @@ function RankCard({ r, rank, active, onClick }: { r: RarityData; rank: number; a
       <div className="ch-rank-price">
         {r.indexValue > 0 ? `$${r.indexValue.toLocaleString()}` : "\u2014"}
       </div>
-      <div className="ch-rank-chg" style={{ color: r.indexValue > 0 ? (r.up ? "var(--green)" : "var(--red)") : "var(--text2)" }}>
+      <div
+        className="ch-rank-chg"
+        style={{
+          color:
+            r.indexValue <= 0
+              ? "var(--ink-3)"
+              : r.chg7d === 0
+              ? "var(--ink-3)"
+              : r.up
+              ? "var(--gain-2)"
+              : "var(--loss-2)",
+        }}
+      >
         {r.indexValue > 0 ? (
           <>
-            {r.up ? "\u2191" : "\u2193"} {Math.abs(r.chg7d)}% <span className="ch-rank-period">7D</span>
+            {r.chg7d === 0 ? "" : r.up ? "\u2191" : "\u2193"} {Math.abs(r.chg7d)}% <span className="ch-rank-period">7D</span>
           </>
         ) : (
           "\u00A0"
@@ -77,7 +89,7 @@ function SmallRankCard({ r, rank, active, onClick }: { r: RarityData; rank: numb
       className="ch-rank-card ch-rank-card-sm"
       style={{
         ["--ch-color" as string]: r.color,
-        ...(active ? { borderColor: r.color, boxShadow: `0 0 0 1px ${r.color}, 0 4px 14px rgba(0,0,0,0.3)` } : {}),
+        ...(active ? { borderColor: r.color, boxShadow: `0 0 0 1px ${r.color}, 0 6px 18px rgba(26, 15, 8, 0.10)` } : {}),
       }}
       onClick={onClick}
     >
@@ -87,8 +99,11 @@ function SmallRankCard({ r, rank, active, onClick }: { r: RarityData; rank: numb
       </div>
       <div className="ch-rank-name">{r.name}</div>
       <div className="ch-rank-price">${r.indexValue.toLocaleString()}</div>
-      <div className="ch-rank-chg" style={{ color: r.up ? "var(--green)" : "var(--red)" }}>
-        {r.up ? "\u2191" : "\u2193"} {Math.abs(r.chg7d)}% <span className="ch-rank-period">7D</span>
+      <div
+        className="ch-rank-chg"
+        style={{ color: r.chg7d === 0 ? "var(--ink-3)" : r.up ? "var(--gain-2)" : "var(--loss-2)" }}
+      >
+        {r.chg7d === 0 ? "" : r.up ? "\u2191" : "\u2193"} {Math.abs(r.chg7d)}% <span className="ch-rank-period">7D</span>
       </div>
     </div>
   );
@@ -113,8 +128,8 @@ function RarityDetail({ r }: { r: RarityData }) {
           [
             ["Rarity Index", `$${r.indexValue.toLocaleString()}`, r.color],
             ["Avg Card Price", `$${r.avgCardPrice.toFixed(2)}`, undefined],
-            ["7D Change", `${r.up ? "+" : ""}${r.chg7d}%`, r.up ? "var(--green)" : "var(--red)"],
-            ["30D Change", `${r.chg30d >= 0 ? "+" : ""}${r.chg30d}%`, r.chg30d >= 0 ? "var(--green)" : "var(--red)"],
+            ["7D Change", `${r.chg7d === 0 ? "" : r.up ? "+" : ""}${r.chg7d}%`, r.chg7d === 0 ? "var(--ink-3)" : r.up ? "var(--gain-2)" : "var(--loss-2)"],
+            ["30D Change", `${r.chg30d === 0 ? "" : r.chg30d > 0 ? "+" : ""}${r.chg30d}%`, r.chg30d === 0 ? "var(--ink-3)" : r.chg30d > 0 ? "var(--gain-2)" : "var(--loss-2)"],
             ["Cards Tracked", String(r.cardCount), undefined],
           ].map(([k, v, clr]) => (
             <div className="ch-stat-row" key={k}>
@@ -123,7 +138,7 @@ function RarityDetail({ r }: { r: RarityData }) {
             </div>
           ))
         ) : (
-          <div className="ch-stat-row" style={{ justifyContent: "center", padding: "24px 0", color: "var(--text2)" }}>
+          <div className="ch-stat-row" style={{ justifyContent: "center", padding: "28px 0", color: "var(--ink-3)" }}>
             Data coming soon
           </div>
         )}
@@ -234,7 +249,7 @@ export default function RaritiesPage() {
       <div className="breadcrumb">
         <Link href="/">OWL Market</Link>
         <span className="bsep"> &rsaquo; </span>
-        <span style={{ color: "var(--text)" }}>Rarities</span>
+        <span style={{ color: "var(--ink)" }}>Rarities</span>
       </div>
       <div className="ph-eyebrow">One Piece TCG</div>
       <div className="ph-title">

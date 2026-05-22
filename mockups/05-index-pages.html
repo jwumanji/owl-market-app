@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OwlMarket — Index pages (C1.5 mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Caveat:wght@700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #FFF5E4;
+      --bg-2: #FFFFFF;
+      --bg-3: #FCE6BE;
+      --ink: #1A0F08;
+      --ink-2: #5C4534;
+      --ink-3: #9A8475;
+      --pink: #FF6BB8;
+      --coral: #FF4936;
+      --gold: #E89512;
+      --gain: #2D9961;
+      --loss: #E04E4E;
+      --grad-brand: linear-gradient(135deg, #FF6BB8 0%, #FF4936 50%, #E89512 100%);
+      --r-sm: 8px;
+      --r-md: 14px;
+      --r-lg: 22px;
+      --r-pill: 999px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-weight: 500;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding-left: 32px;
+      padding-right: 32px;
+    }
+
+    /* ============ NAV ============ */
+    .topnav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(255, 245, 228, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-bottom: 1.5px solid rgba(26, 15, 8, 0.08);
+    }
+    .topnav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 32px;
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+    .lockup { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+    .lockup-wm {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      color: var(--ink);
+      font-size: 22px;
+      display: inline-flex;
+      align-items: baseline;
+    }
+    .lockup-wm em {
+      font-family: 'Caveat', cursive;
+      font-style: normal;
+      font-weight: 700;
+      font-size: 28px;
+      margin-left: -2px;
+      padding-right: 8px;
+      padding-bottom: 2px;
+      display: inline-block;
+      background: var(--grad-brand);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+    }
+    .nav-links { display: inline-flex; gap: 28px; list-style: none; }
+    .nav-links a {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--ink-2);
+      text-decoration: none;
+      padding: 4px 0;
+      position: relative;
+    }
+    .signin-btn {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--ink);
+      background: transparent;
+      border: 1.5px solid var(--ink);
+      border-radius: var(--r-pill);
+      padding: 8px 18px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+    .signin-btn:hover { background: var(--ink); color: var(--bg); }
+
+    /* ============ SECTION ============ */
+    .route-section {
+      padding: 32px 0 32px;
+      border-bottom: 1px dashed rgba(26, 15, 8, 0.12);
+    }
+    .route-section:last-of-type { border-bottom: none; padding-bottom: 96px; }
+
+    h1.section-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 48px;
+      letter-spacing: -0.025em;
+      line-height: 1;
+      color: var(--ink);
+    }
+    h1.section-title em {
+      font-family: 'Caveat', cursive;
+      font-style: normal;
+      font-weight: 700;
+      font-size: 60px;
+      margin-left: 4px;
+      padding-right: 16px;
+      padding-bottom: 6px;
+      display: inline-block;
+      line-height: 1;
+      vertical-align: -4px;
+      background: var(--grad-brand);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+    }
+    .section-subline {
+      margin-top: 14px;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--ink-2);
+    }
+    .section-subline .dot { color: var(--coral); margin: 0 6px; }
+
+    /* ============ GRID ============ */
+    .tile-grid {
+      margin-top: 32px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 22px;
+    }
+
+    .tile {
+      background: var(--bg-2);
+      border: 1.5px solid var(--ink);
+      border-radius: var(--r-md);
+      padding: 22px 22px 20px;
+      cursor: pointer;
+      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+      display: flex;
+      flex-direction: column;
+      min-height: 240px;
+    }
+    .tile:hover {
+      transform: translateY(-2px);
+      border-color: var(--coral);
+      box-shadow: 0 8px 20px rgba(26, 15, 8, 0.08);
+    }
+
+    /* ============ RARITY TILES ============ */
+    .tile-rarity .tile-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .tile-rarity .tile-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      line-height: 1.15;
+    }
+    .tile-rarity .tile-count {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--ink-2);
+      margin-top: 6px;
+    }
+    .thumb-strip {
+      margin-top: auto;
+      display: flex;
+      gap: 8px;
+      padding-top: 18px;
+    }
+    .thumb-mini {
+      width: 44px;
+      height: 60px;
+      border-radius: 4px;
+      border: 1.5px solid var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--bg);
+      flex-shrink: 0;
+    }
+
+    /* Rarity pills (matches table/detail) */
+    .rar {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      padding: 4px 10px;
+      border-radius: var(--r-pill);
+      border: 1.5px solid;
+      flex-shrink: 0;
+    }
+    .rar-c   { color: var(--ink-2); border-color: var(--ink-2); background: var(--bg-2); }
+    .rar-uc  { color: var(--ink);   border-color: var(--ink);   background: var(--bg-3); }
+    .rar-r   { color: var(--coral); border-color: var(--coral); background: #FFE2DD; }
+    .rar-sr  { color: var(--pink);  border-color: var(--pink);  background: #FFE0F0; }
+    .rar-sec {
+      border-color: var(--ink);
+      background: var(--bg-3);
+    }
+    .rar-sec span {
+      background: var(--grad-brand);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+    }
+    .rar-l {
+      background: var(--ink);
+      color: var(--bg);
+      border-color: var(--ink);
+    }
+
+    /* ============ SET TILES ============ */
+    .tile-set .tile-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .set-badge {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 1.5px solid var(--ink);
+      background: var(--bg-3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      color: var(--ink);
+      flex-shrink: 0;
+    }
+    .set-date {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--ink-2);
+      letter-spacing: 0.04em;
+    }
+    .tile-set .tile-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      line-height: 1.15;
+    }
+    .tile-set .tile-meta {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-weight: 600;
+      font-size: 12.5px;
+      color: var(--ink-2);
+      margin-top: 6px;
+    }
+    .tile-set .tile-meta .accent { color: var(--coral); font-weight: 600; }
+
+    .top-cards {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px dashed rgba(26, 15, 8, 0.12);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .top-card-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .thumb-tiny {
+      width: 28px;
+      height: 40px;
+      border-radius: 3px;
+      border: 1.2px solid var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 11px;
+      color: var(--bg);
+      flex-shrink: 0;
+    }
+    .top-card-name {
+      flex: 1;
+      min-width: 0;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 500;
+      font-size: 13px;
+      color: var(--ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .top-card-price {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--ink);
+      letter-spacing: -0.01em;
+    }
+
+    /* ============ CHARACTER TILES ============ */
+    .tile-character .tile-head {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .char-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 1.5px solid var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--bg);
+      flex-shrink: 0;
+    }
+    .tile-character .tile-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 20px;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      line-height: 1.15;
+    }
+    .tile-character .tile-meta {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-weight: 600;
+      font-size: 12.5px;
+      color: var(--ink-2);
+      margin-top: 3px;
+    }
+
+    /* mock note */
+    .mock-note {
+      margin-top: 32px;
+      padding: 14px 20px;
+      background: var(--bg-2);
+      border: 1.5px dashed var(--ink-3);
+      border-radius: var(--r-md);
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: var(--ink-2);
+      text-align: center;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============ NAV ============ -->
+  <header class="topnav">
+    <div class="topnav-inner">
+      <a href="#" class="lockup">
+        <svg width="36" height="36" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="owl-grad-nav" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#FF6BB8"/>
+              <stop offset="50%" stop-color="#FF4936"/>
+              <stop offset="100%" stop-color="#E89512"/>
+            </linearGradient>
+            <mask id="owl-moon-mask-nav">
+              <rect width="120" height="120" fill="white"/>
+              <circle cx="70" cy="56" r="20" fill="black"/>
+            </mask>
+          </defs>
+          <circle cx="60" cy="60" r="52" fill="url(#owl-grad-nav)" stroke="#1A0F08" stroke-width="5"/>
+          <circle cx="60" cy="60" r="38" fill="#1A0F08"/>
+          <circle cx="58" cy="60" r="26" fill="#FFF5E4" mask="url(#owl-moon-mask-nav)"/>
+          <g transform="translate(80 60)">
+            <path d="M 0,-11 Q 1.65,-1.65 11,0 Q 1.65,1.65 0,11 Q -1.65,1.65 -11,0 Q -1.65,-1.65 0,-11 Z" fill="#FFF5E4"/>
+          </g>
+        </svg>
+        <span class="lockup-wm">Owl<em>Market</em></span>
+      </a>
+      <nav>
+        <ul class="nav-links">
+          <li><a href="#">Markets</a></li>
+          <li><a href="#">Rarities</a></li>
+          <li><a href="#">Sets</a></li>
+          <li><a href="#">Characters</a></li>
+        </ul>
+      </nav>
+      <a href="#" class="signin-btn">Sign in</a>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- =============================================
+         /rarities
+         ============================================= -->
+    <section class="route-section">
+      <h1 class="section-title">Rarities — <em>explore</em></h1>
+      <p class="section-subline">7 rarities tracked<span class="dot">·</span>2,104 cards mapped<span class="dot">·</span>across all sets</p>
+
+      <div class="tile-grid">
+
+        <!-- Secret Rare -->
+        <div class="tile tile-rarity">
+          <div class="tile-head">
+            <div>
+              <div class="tile-name">Secret Rare</div>
+              <div class="tile-count">24 cards · 8 chase</div>
+            </div>
+            <span class="rar rar-sec"><span>SEC</span></span>
+          </div>
+          <div class="thumb-strip">
+            <div class="thumb-mini" style="background:#7C2A1E;">S</div>
+            <div class="thumb-mini" style="background:#C53A2A;">L</div>
+            <div class="thumb-mini" style="background:#D85A8E;">B</div>
+          </div>
+        </div>
+
+        <!-- Super Rare -->
+        <div class="tile tile-rarity">
+          <div class="tile-head">
+            <div>
+              <div class="tile-name">Super Rare</div>
+              <div class="tile-count">142 cards · 38 chase</div>
+            </div>
+            <span class="rar rar-sr">SR</span>
+          </div>
+          <div class="thumb-strip">
+            <div class="thumb-mini" style="background:#C53A2A;">L</div>
+            <div class="thumb-mini" style="background:#2D6E4E;">Z</div>
+            <div class="thumb-mini" style="background:#6B3F8A;">L</div>
+          </div>
+        </div>
+
+        <!-- Rare -->
+        <div class="tile tile-rarity">
+          <div class="tile-head">
+            <div>
+              <div class="tile-name">Rare</div>
+              <div class="tile-count">384 cards</div>
+            </div>
+            <span class="rar rar-r">R</span>
+          </div>
+          <div class="thumb-strip">
+            <div class="thumb-mini" style="background:#C7521A;">A</div>
+            <div class="thumb-mini" style="background:#1E4F87;">S</div>
+            <div class="thumb-mini" style="background:#6B5D3B;">C</div>
+          </div>
+        </div>
+
+        <!-- Uncommon -->
+        <div class="tile tile-rarity">
+          <div class="tile-head">
+            <div>
+              <div class="tile-name">Uncommon</div>
+              <div class="tile-count">612 cards</div>
+            </div>
+            <span class="rar rar-uc">UC</span>
+          </div>
+          <div class="thumb-strip">
+            <div class="thumb-mini" style="background:#D9A028;">N</div>
+            <div class="thumb-mini" style="background:#3D6B8E;">U</div>
+            <div class="thumb-mini" style="background:#A0522D;">C</div>
+          </div>
+        </div>
+
+        <!-- Common -->
+        <div class="tile tile-rarity">
+          <div class="tile-head">
+            <div>
+              <div class="tile-name">Common</div>
+              <div class="tile-count">894 cards</div>
+            </div>
+            <span class="rar rar-c">C</span>
+          </div>
+          <div class="thumb-strip">
+            <div class="thumb-mini" style="background:#7A6F5E;">M</div>
+            <div class="thumb-mini" style="background:#7A6F5E;">M</div>
+            <div class="thumb-mini" style="background:#7A6F5E;">M</div>
+          </div>
+        </div>
+
+        <!-- Leader -->
+        <div class="tile tile-rarity">
+          <div class="tile-head">
+            <div>
+              <div class="tile-name">Leader</div>
+              <div class="tile-count">48 cards · 12 colors</div>
+            </div>
+            <span class="rar rar-l">L</span>
+          </div>
+          <div class="thumb-strip">
+            <div class="thumb-mini" style="background:#C53A2A;">L</div>
+            <div class="thumb-mini" style="background:#1E4F87;">L</div>
+            <div class="thumb-mini" style="background:#2D6E4E;">L</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- =============================================
+         /sets
+         ============================================= -->
+    <section class="route-section">
+      <h1 class="section-title">Sets — <em>browse</em></h1>
+      <p class="section-subline">9 main sets<span class="dot">·</span>2,104 cards<span class="dot">·</span>Jul 2022 → present</p>
+
+      <div class="tile-grid">
+
+        <!-- OP01 -->
+        <div class="tile tile-set">
+          <div class="tile-head">
+            <div class="set-badge">OP01</div>
+            <span class="set-date">JUL 2022</span>
+          </div>
+          <div class="tile-name">Romance Dawn</div>
+          <div class="tile-meta">121 cards<span style="color:var(--ink-3);"> · </span><span class="accent">8 SEC</span></div>
+          <div class="top-cards">
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#7C2A1E;">S</div>
+              <span class="top-card-name">Shanks — Divine Departure</span>
+              <span class="top-card-price">$1,420</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#C53A2A;">L</div>
+              <span class="top-card-name">Luffy — Gum-Gum Pistol</span>
+              <span class="top-card-price">$284</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#D9A028;">N</div>
+              <span class="top-card-name">Nami — Mirage Tempo</span>
+              <span class="top-card-price">$18</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- OP02 -->
+        <div class="tile tile-set">
+          <div class="tile-head">
+            <div class="set-badge">OP02</div>
+            <span class="set-date">OCT 2022</span>
+          </div>
+          <div class="tile-name">Paramount War</div>
+          <div class="tile-meta">121 cards<span style="color:var(--ink-3);"> · </span><span class="accent">6 SEC</span></div>
+          <div class="top-cards">
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#2D6E4E;">Z</div>
+              <span class="top-card-name">Zoro — Santoryu</span>
+              <span class="top-card-price">$231</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#6B5D3B;">C</div>
+              <span class="top-card-name">Crocodile — Sables</span>
+              <span class="top-card-price">$112</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#C7521A;">A</div>
+              <span class="top-card-name">Ace — Fire Fist</span>
+              <span class="top-card-price">$94</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- OP03 -->
+        <div class="tile tile-set">
+          <div class="tile-head">
+            <div class="set-badge">OP03</div>
+            <span class="set-date">FEB 2023</span>
+          </div>
+          <div class="tile-name">Pillars of Strength</div>
+          <div class="tile-meta">121 cards<span style="color:var(--ink-3);"> · </span><span class="accent">7 SEC</span></div>
+          <div class="top-cards">
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#1E4F87;">S</div>
+              <span class="top-card-name">Sanji — Diable Jambe</span>
+              <span class="top-card-price">$76</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#7C2A1E;">K</div>
+              <span class="top-card-name">Kaido — Boro Breath</span>
+              <span class="top-card-price">$320</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#3D2D5C;">B</div>
+              <span class="top-card-name">Big Mom — Soul Pocus</span>
+              <span class="top-card-price">$245</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- OP04 -->
+        <div class="tile tile-set">
+          <div class="tile-head">
+            <div class="set-badge">OP04</div>
+            <span class="set-date">JUN 2023</span>
+          </div>
+          <div class="tile-name">Kingdoms of Intrigue</div>
+          <div class="tile-meta">121 cards<span style="color:var(--ink-3);"> · </span><span class="accent">6 SEC</span></div>
+          <div class="top-cards">
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#4A2A52;">R</div>
+              <span class="top-card-name">Nico Robin — Veinte Fleurs</span>
+              <span class="top-card-price">$208</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#2D5240;">F</div>
+              <span class="top-card-name">Franky — Radical Beam</span>
+              <span class="top-card-price">$72</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#B89548;">B</div>
+              <span class="top-card-name">Brook — Soul Solid</span>
+              <span class="top-card-price">$58</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- OP05 -->
+        <div class="tile tile-set">
+          <div class="tile-head">
+            <div class="set-badge">OP05</div>
+            <span class="set-date">SEP 2023</span>
+          </div>
+          <div class="tile-name">Awakening of the New Era</div>
+          <div class="tile-meta">121 cards<span style="color:var(--ink-3);"> · </span><span class="accent">8 SEC</span></div>
+          <div class="top-cards">
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#6B3F8A;">L</div>
+              <span class="top-card-name">Trafalgar Law — Room</span>
+              <span class="top-card-price">$172</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#8B3E2D;">K</div>
+              <span class="top-card-name">Kid — Punk Gibson</span>
+              <span class="top-card-price">$148</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#1A4F2D;">Y</div>
+              <span class="top-card-name">Yamato — Thunder Bagua</span>
+              <span class="top-card-price">$96</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- OP06 -->
+        <div class="tile tile-set">
+          <div class="tile-head">
+            <div class="set-badge">OP06</div>
+            <span class="set-date">DEC 2023</span>
+          </div>
+          <div class="tile-name">Wings of the Captain</div>
+          <div class="tile-meta">121 cards<span style="color:var(--ink-3);"> · </span><span class="accent">9 SEC</span></div>
+          <div class="top-cards">
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#D85A8E;">B</div>
+              <span class="top-card-name">Buggy — The Genius Jester</span>
+              <span class="top-card-price">$890</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#594229;">D</div>
+              <span class="top-card-name">Dragon — Revolutionary</span>
+              <span class="top-card-price">$412</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#7A4B1C;">G</div>
+              <span class="top-card-name">Garp — Galaxy Impact</span>
+              <span class="top-card-price">$268</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- =============================================
+         /characters
+         ============================================= -->
+    <section class="route-section">
+      <h1 class="section-title">Characters — <em>meet</em></h1>
+      <p class="section-subline">218 unique characters<span class="dot">·</span>2,104 cards total<span class="dot">·</span>sorted by market value</p>
+
+      <div class="tile-grid">
+
+        <!-- Luffy -->
+        <div class="tile tile-character">
+          <div class="tile-head">
+            <div class="char-avatar" style="background:#C53A2A;">L</div>
+            <div>
+              <div class="tile-name">Monkey D. Luffy</div>
+              <div class="tile-meta">38 cards · 4 SEC versions</div>
+            </div>
+          </div>
+          <div class="top-cards">
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#C53A2A;">L</div>
+              <span class="top-card-name">Gum-Gum Pistol</span>
+              <span class="top-card-price">$284</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#C53A2A;">L</div>
+              <span class="top-card-name">Gear Fifth — Nika</span>
+              <span class="top-card-price">$640</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#C53A2A;">L</div>
+              <span class="top-card-name">Straw Hat Crew</span>
+              <span class="top-card-price">$118</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Zoro -->
+        <div class="tile tile-character">
+          <div class="tile-head">
+            <div class="char-avatar" style="background:#2D6E4E;">Z</div>
+            <div>
+              <div class="tile-name">Roronoa Zoro</div>
+              <div class="tile-meta">24 cards · 2 SEC versions</div>
+            </div>
+          </div>
+          <div class="top-cards">
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#2D6E4E;">Z</div>
+              <span class="top-card-name">Santoryu</span>
+              <span class="top-card-price">$231</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#2D6E4E;">Z</div>
+              <span class="top-card-name">King of Hell</span>
+              <span class="top-card-price">$385</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#2D6E4E;">Z</div>
+              <span class="top-card-name">Asura</span>
+              <span class="top-card-price">$142</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Shanks -->
+        <div class="tile tile-character">
+          <div class="tile-head">
+            <div class="char-avatar" style="background:#7C2A1E;">S</div>
+            <div>
+              <div class="tile-name">Shanks</div>
+              <div class="tile-meta">18 cards · 3 SEC versions</div>
+            </div>
+          </div>
+          <div class="top-cards">
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#7C2A1E;">S</div>
+              <span class="top-card-name">Divine Departure</span>
+              <span class="top-card-price">$1,420</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#7C2A1E;">S</div>
+              <span class="top-card-name">Red Hair Pirates</span>
+              <span class="top-card-price">$680</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#7C2A1E;">S</div>
+              <span class="top-card-name">Conqueror's Haki</span>
+              <span class="top-card-price">$295</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Law -->
+        <div class="tile tile-character">
+          <div class="tile-head">
+            <div class="char-avatar" style="background:#6B3F8A;">L</div>
+            <div>
+              <div class="tile-name">Trafalgar Law</div>
+              <div class="tile-meta">22 cards · 2 SEC versions</div>
+            </div>
+          </div>
+          <div class="top-cards">
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#6B3F8A;">L</div>
+              <span class="top-card-name">Room</span>
+              <span class="top-card-price">$172</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#6B3F8A;">L</div>
+              <span class="top-card-name">Surgeon of Death</span>
+              <span class="top-card-price">$340</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#6B3F8A;">L</div>
+              <span class="top-card-name">Heart Pirates Captain</span>
+              <span class="top-card-price">$95</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ace -->
+        <div class="tile tile-character">
+          <div class="tile-head">
+            <div class="char-avatar" style="background:#C7521A;">A</div>
+            <div>
+              <div class="tile-name">Portgas D. Ace</div>
+              <div class="tile-meta">16 cards · 2 SEC versions</div>
+            </div>
+          </div>
+          <div class="top-cards">
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#C7521A;">A</div>
+              <span class="top-card-name">Fire Fist</span>
+              <span class="top-card-price">$94</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#C7521A;">A</div>
+              <span class="top-card-name">Flame Emperor</span>
+              <span class="top-card-price">$420</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#C7521A;">A</div>
+              <span class="top-card-name">Spade Pirates</span>
+              <span class="top-card-price">$68</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Robin -->
+        <div class="tile tile-character">
+          <div class="tile-head">
+            <div class="char-avatar" style="background:#4A2A52;">R</div>
+            <div>
+              <div class="tile-name">Nico Robin</div>
+              <div class="tile-meta">20 cards · 1 SEC version</div>
+            </div>
+          </div>
+          <div class="top-cards">
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#4A2A52;">R</div>
+              <span class="top-card-name">Veinte Fleurs</span>
+              <span class="top-card-price">$208</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#4A2A52;">R</div>
+              <span class="top-card-name">Demonio Fleur</span>
+              <span class="top-card-price">$185</span>
+            </div>
+            <div class="top-card-row">
+              <div class="thumb-tiny" style="background:#4A2A52;">R</div>
+              <span class="top-card-name">Devil Child</span>
+              <span class="top-card-price">$74</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="mock-note">
+        MOCKUPS · /rarities · /sets · /characters · C1.5 PLAYFUL MODERN · v1.0 · 2026-05-19 · STATIC FAKE DATA · TBD: VERBS (EXPLORE / BROWSE / MEET) · TBD: RARITY TAXONOMY
+      </div>
+    </section>
+
+  </main>
+
+</body>
+</html>

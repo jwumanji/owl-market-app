@@ -28,7 +28,7 @@ export default async function SetDetailPage({ params }: { params: { slug: string
           <span className="bsep">›</span>
           <Link href="/sets">Sets</Link>
         </div>
-        <p style={{ color: "var(--red)", fontFamily: "var(--font-ibm-plex-mono), monospace", fontSize: 12 }}>
+        <p style={{ color: "var(--loss-2)", fontFamily: "var(--font-jetbrains-mono), ui-monospace, monospace", fontSize: 13, fontWeight: 600 }}>
           Failed to load set data.
         </p>
       </section>

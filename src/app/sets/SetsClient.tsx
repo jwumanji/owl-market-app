@@ -56,8 +56,8 @@ function SparkSVG({ data, up, w, h }: { data: number[]; up: boolean; w: number; 
   const last = pts[pts.length - 1]!;
   const first = pts[0]!;
   const fillPoly = `${first[0]},${h} ${poly} ${last[0]},${h}`;
-  const stroke = up ? "#00D68F" : "#FF4560";
-  const fillCol = up ? "rgba(0,214,143,0.13)" : "rgba(255,69,96,0.11)";
+  const stroke = up ? "#2D9961" : "#E04E4E";
+  const fillCol = up ? "rgba(45,153,97,0.16)" : "rgba(224,78,78,0.12)";
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", overflow: "visible" }}>
       <polygon points={fillPoly} fill={fillCol} />
@@ -84,8 +84,8 @@ function HeadlineCard({
     const cls = set.chg30d === 0 ? "neutral" : set.chg30d >= 0 ? "up" : "dn";
     footer = (
       <span className={`sets-v2-hl-pct ${cls}`}>
-        {set.chg30d >= 0 ? "+" : ""}{set.chg30d}%{" "}
-        <span style={{ fontSize: 10, color: "var(--text2)", marginLeft: 4 }}>30D</span>
+        {set.chg30d === 0 ? "" : set.chg30d > 0 ? "+" : ""}{set.chg30d}%{" "}
+        <span style={{ fontSize: 10, color: "var(--ink-3)", marginLeft: 4 }}>30D</span>
       </span>
     );
   } else {
@@ -312,7 +312,7 @@ export default function SetsClient({ initialSets }: { initialSets: SetData[] }) 
           <tbody>
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={10} style={{ textAlign: "center", color: "var(--text3)", padding: 40 }}>
+                <td colSpan={10} style={{ textAlign: "center", color: "var(--ink-3)", padding: 40 }}>
                   No sets match these filters.
                 </td>
               </tr>
@@ -345,7 +345,7 @@ export default function SetsClient({ initialSets }: { initialSets: SetData[] }) 
                     <td>{empty ? <span className="sv2-pct flat">—</span> : fmtPct(s.chg30d)}</td>
                     <td className="sv2-cards">{empty ? "—" : s.cards}</td>
                     <td className="sv2-spark">
-                      {empty ? <span style={{ color: "var(--text3)" }}>—</span> : <SparkSVG data={s.spark} up={s.chg30d >= 0} w={100} h={22} />}
+                      {empty ? <span style={{ color: "var(--ink-3)" }}>—</span> : <SparkSVG data={s.spark} up={s.chg30d >= 0} w={100} h={22} />}
                     </td>
                   </tr>
                 );

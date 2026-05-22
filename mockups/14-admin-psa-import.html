@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OwlMarket — Admin · PSA Import (C1.5 mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Caveat:wght@700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #FFF5E4; --bg-2: #FFFFFF; --bg-3: #FCE6BE;
+      --ink: #1A0F08; --ink-2: #5C4534; --ink-3: #9A8475;
+      --pink: #FF6BB8; --coral: #FF4936; --gold: #E89512;
+      --gain: #2D9961; --loss: #E04E4E;
+      --select: #1F47A1;
+      --grad-brand: linear-gradient(135deg, #FF6BB8 0%, #FF4936 50%, #E89512 100%);
+      --r-sm: 8px; --r-md: 14px; --r-lg: 22px; --r-pill: 999px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: var(--bg); color: var(--ink); font-family: 'Space Grotesk', system-ui, sans-serif; font-weight: 500; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+    .container { max-width: 1280px; margin: 0 auto; padding-left: 28px; padding-right: 28px; }
+    a { color: inherit; }
+
+    /* NAV */
+    .topnav { position: sticky; top: 0; z-index: 50; background: rgba(255, 245, 228, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1.5px solid rgba(26, 15, 8, 0.08); }
+    .topnav-inner { display: flex; align-items: center; gap: 22px; padding: 14px 28px; max-width: 1680px; margin: 0 auto; }
+    .lockup { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; flex-shrink: 0; }
+    .lockup-wm { font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: var(--ink); font-size: 22px; display: inline-flex; align-items: baseline; }
+    .lockup-wm em { font-family: 'Caveat', cursive; font-style: normal; font-weight: 700; font-size: 28px; margin-left: -2px; padding-right: 8px; padding-bottom: 2px; display: inline-block; background: var(--grad-brand); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+    .internal-chip { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--coral); background: #FFE2DD; border: 1.5px solid var(--coral); border-radius: var(--r-pill); padding: 3px 9px; flex-shrink: 0; }
+    .nav-links { display: inline-flex; gap: 22px; list-style: none; margin-left: 6px; }
+    .nav-links a { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: var(--ink-2); text-decoration: none; padding: 4px 0; position: relative; white-space: nowrap; }
+    .nav-links a.active { color: var(--ink); }
+    .nav-links a.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 2px; background: var(--grad-brand); border-radius: 2px; }
+    .nav-right { margin-left: auto; display: inline-flex; align-items: center; gap: 16px; }
+    .nav-view { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; color: var(--ink-2); text-decoration: none; letter-spacing: 0.04em; }
+    .nav-view:hover { color: var(--ink); }
+    .nav-signout { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; color: var(--ink); background: transparent; border: 1.5px solid var(--ink); border-radius: var(--r-pill); padding: 7px 16px; cursor: pointer; text-decoration: none; transition: all 0.15s ease; }
+    .nav-signout:hover { background: var(--ink); color: var(--bg); }
+
+    main { padding: 32px 0 96px; }
+
+    .crumb { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; letter-spacing: 0.04em; color: var(--ink-2); text-decoration: none; display: inline-flex; gap: 6px; margin-bottom: 18px; }
+    .crumb:hover { color: var(--ink); }
+    .page-head { margin-bottom: 24px; display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+    .eyebrow { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; color: var(--coral); letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 10px; }
+    h1.title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; letter-spacing: -0.025em; line-height: 1; color: var(--ink); }
+    .subline { margin-top: 10px; font-size: 14px; color: var(--ink-2); max-width: 560px; }
+    .head-actions { display: inline-flex; gap: 12px; flex-wrap: wrap; }
+
+    .btn { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; padding: 0 16px; height: 42px; border-radius: var(--r-sm); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 7px; text-decoration: none; transition: all 0.13s ease; border: 1.5px solid transparent; white-space: nowrap; }
+    .btn-primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+    .btn-primary:hover { background: #2E1C10; }
+    .btn-ghost { background: var(--bg-2); color: var(--ink); border-color: var(--ink); }
+    .btn-ghost:hover { background: var(--bg-3); }
+    .btn-lg { height: 48px; font-size: 13px; padding: 0 22px; }
+
+    .panel { background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-md); padding: 24px; margin-bottom: 18px; }
+    .panel-title { font-family: 'Space Grotesk'; font-weight: 700; font-size: 20px; color: var(--ink); letter-spacing: -0.01em; }
+    .panel-sub { margin-top: 6px; font-size: 13.5px; color: var(--ink-2); max-width: 620px; }
+
+    .field-label { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2); display: block; margin-bottom: 8px; }
+    .input { font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 14px; color: var(--ink); background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-sm); padding: 10px 12px; width: 100%; outline: none; transition: border-color 0.12s, box-shadow 0.12s; }
+    .input::placeholder { color: var(--ink-3); }
+    .input:focus { border-color: var(--coral); box-shadow: 0 0 0 3px rgba(255,73,54,0.14); }
+    .input[type="date"] { font-family: 'JetBrains Mono', monospace; }
+    .select { font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 14px; color: var(--ink); background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-sm); padding: 10px 34px 10px 12px; width: 100%; outline: none; appearance: none; -webkit-appearance: none; cursor: pointer; transition: border-color 0.12s, box-shadow 0.12s; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%231A0F08' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+    .select:focus { border-color: var(--coral); box-shadow: 0 0 0 3px rgba(255,73,54,0.14); }
+    .field-hint { font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10.5px; letter-spacing: 0.03em; color: var(--ink-3); margin-top: 6px; }
+    .field-hint b { color: var(--ink-2); }
+    .form-body { margin-top: 20px; max-width: 640px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+
+    /* file dropzone */
+    .file-zone { display: flex; align-items: center; gap: 14px; border: 1.5px dashed var(--ink); border-radius: var(--r-md); padding: 16px; background: var(--bg-3); }
+    .file-zone .fz-icon { width: 44px; height: 44px; border-radius: var(--r-sm); border: 1.5px solid var(--ink); background: var(--bg-2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--ink); }
+    .file-zone .fz-text { flex: 1; min-width: 0; }
+    .file-zone .fz-file { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 13px; color: var(--ink); }
+    .file-zone .fz-hint { font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 11px; color: var(--ink-2); margin-top: 2px; }
+    .file-zone .fz-btn { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--bg); background: var(--ink); border: none; border-radius: var(--r-sm); padding: 9px 14px; cursor: pointer; flex-shrink: 0; }
+
+    /* checkbox-box with reveal */
+    .check-box { margin-top: 16px; display: flex; align-items: flex-start; gap: 12px; border: 1.5px solid var(--ink); border-radius: var(--r-md); padding: 15px 16px; background: var(--bg-2); cursor: pointer; }
+    .check-box.on { border-color: var(--gain); background: #F3FAF6; }
+    .check-box .cb { width: 20px; height: 20px; border: 1.5px solid var(--ink); border-radius: 5px; flex-shrink: 0; margin-top: 1px; display: inline-flex; align-items: center; justify-content: center; background: var(--bg-2); }
+    .check-box.on .cb { background: var(--gain); border-color: var(--gain); color: var(--bg); }
+    .check-box .cb-ttl { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); }
+    .check-box .cb-desc { font-size: 13px; color: var(--ink-2); margin-top: 4px; }
+    /* revealed field = dashed conditional box (gated by checkbox) */
+    .reveal { margin-top: 12px; border: 1.5px dashed var(--gain); border-radius: var(--r-md); padding: 16px; background: #F3FAF6; }
+    .reveal-tag { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gain); background: #DCF1E6; border: 1.2px solid var(--gain); border-radius: 4px; padding: 2px 7px; margin-bottom: 12px; display: inline-block; }
+
+    .submit-row { margin-top: 22px; }
+
+    /* RESULT SUMMARY */
+    .result { background: var(--bg-2); border: 1.5px solid var(--gain); border-radius: var(--r-md); overflow: hidden; }
+    .result-head { padding: 16px 22px; background: #DCF1E6; border-bottom: 1.5px solid var(--gain); display: flex; align-items: center; gap: 8px; }
+    .result-head .rh-ttl { font-family: 'Space Grotesk'; font-weight: 700; font-size: 16px; color: var(--ink); }
+    .result-head .rh-check { color: var(--gain); }
+    .result-body { padding: 20px 22px; }
+    .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .stat { border: 1.5px solid var(--ink); border-radius: var(--r-sm); padding: 12px 14px; }
+    .stat .s-lbl { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+    .stat .s-num { font-family: 'Space Grotesk'; font-weight: 700; font-size: 26px; color: var(--ink); margin-top: 2px; }
+    .stat.imported { border-color: var(--gain); } .stat.imported .s-num { color: var(--gain); }
+    .stat.needs { border-color: var(--coral); } .stat.needs .s-num { color: var(--coral); }
+    .stat.skipped .s-num { color: var(--ink-3); }
+    .result-links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+    .rlink { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; border-radius: var(--r-sm); padding: 9px 14px; border: 1.5px solid; text-decoration: none; }
+    .rlink.attn { color: var(--coral); border-color: var(--coral); background: var(--bg-2); }
+    .rlink.attn:hover { background: #FFE2DD; }
+    .rlink.ghost { color: var(--ink); border-color: var(--ink); background: var(--bg-2); }
+    .rlink.ghost:hover { background: var(--bg-3); }
+
+    .mock-note { margin-top: 28px; padding: 14px 20px; background: var(--bg-2); border: 1.5px dashed var(--ink-3); border-radius: var(--r-md); font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em; color: var(--ink-2); text-align: center; text-transform: uppercase; font-weight: 600; line-height: 1.7; }
+  </style>
+</head>
+<body>
+
+  <!-- NAV (ADMIN) -->
+  <header class="topnav">
+    <div class="topnav-inner">
+      <a href="#" class="lockup">
+        <svg width="34" height="34" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="og-adm" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FF6BB8"/><stop offset="50%" stop-color="#FF4936"/><stop offset="100%" stop-color="#E89512"/></linearGradient>
+            <mask id="om-adm"><rect width="120" height="120" fill="white"/><circle cx="70" cy="56" r="20" fill="black"/></mask>
+          </defs>
+          <circle cx="60" cy="60" r="52" fill="url(#og-adm)" stroke="#1A0F08" stroke-width="5"/>
+          <circle cx="60" cy="60" r="38" fill="#1A0F08"/>
+          <circle cx="58" cy="60" r="26" fill="#FFF5E4" mask="url(#om-adm)"/>
+          <g transform="translate(80 60)"><path d="M 0,-11 Q 1.65,-1.65 11,0 Q 1.65,1.65 0,11 Q -1.65,1.65 -11,0 Q -1.65,-1.65 0,-11 Z" fill="#FFF5E4"/></g>
+        </svg>
+        <span class="lockup-wm">Owl<em>Market</em></span>
+      </a>
+      <span class="internal-chip">Internal</span>
+      <nav>
+        <ul class="nav-links">
+          <li><a href="#">Inventory</a></li>
+          <li><a href="#">Bundles</a></li>
+          <li><a href="#">Orders</a></li>
+          <li><a href="#">Lens</a></li>
+          <li><a href="#" class="active">PSA</a></li>
+        </ul>
+      </nav>
+      <div class="nav-right">
+        <a href="#" class="nav-view">View site ↗</a>
+        <a href="#" class="nav-signout">Sign out</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <a href="#" class="crumb">← Inventory</a>
+
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Internal Tool</div>
+        <h1 class="title">PSA Import</h1>
+        <p class="subline">Import PSA file exports into Graded Card inventory as individual item entries.</p>
+      </div>
+      <div class="head-actions">
+        <a href="#" class="btn btn-ghost">View Submissions</a>
+        <a href="#" class="btn btn-ghost">Back to Inventory</a>
+      </div>
+    </div>
+
+    <!-- IMPORT FORM -->
+    <div class="panel">
+      <div class="panel-title">PSA Import</div>
+      <p class="panel-sub">Import a PSA CSV as individual Graded Card entries and save it as a tracked submission.</p>
+
+      <div class="form-body">
+        <label>
+          <span class="field-label">Submission Name</span>
+          <input class="input" type="text" value="PSA Order 8842931" placeholder="PSA submission name" />
+        </label>
+
+        <div class="grid2">
+          <label>
+            <span class="field-label">PSA Tier</span>
+            <select class="select">
+              <option>Value Bulk</option>
+              <option>Value</option>
+              <option>Value Plus</option>
+              <option>Value Max</option>
+              <option selected>Regular</option>
+              <option>Express</option>
+              <option>Super Express</option>
+              <option>Walk-Through</option>
+            </select>
+            <span class="field-hint"><b>$79.99/card</b> · Max insured $1,500 · 30–40 business days</span>
+          </label>
+          <label>
+            <span class="field-label">Submission Date</span>
+            <input class="input" type="date" value="2026-05-14" />
+          </label>
+        </div>
+
+        <div style="margin-top:16px;">
+          <span class="field-label">PSA CSV File</span>
+          <div class="file-zone">
+            <span class="fz-icon">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>
+            </span>
+            <span class="fz-text">
+              <span class="fz-file">psa-order-8842931.csv</span>
+              <span class="fz-hint">.csv · 12 rows detected</span>
+            </span>
+            <button class="fz-btn">Choose file</button>
+          </div>
+        </div>
+
+        <!-- bundle checkbox (checked → reveals Bundle Name) -->
+        <label class="check-box on">
+          <span class="cb"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg></span>
+          <span>
+            <span class="cb-ttl">Create Inventory Bundle From This Upload</span>
+            <span class="cb-desc">Groups every imported card into one bundle that moves through inventory together.</span>
+          </span>
+        </label>
+        <div class="reveal">
+          <span class="reveal-tag">shows when checkbox is on</span>
+          <label>
+            <span class="field-label">Bundle Name</span>
+            <input class="input" type="text" value="PSA Order 8842931" placeholder="Sequential PSA bundle name" />
+          </label>
+        </div>
+
+        <div class="submit-row">
+          <button class="btn btn-primary btn-lg">Import and Track Submission</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESULT SUMMARY (post-import success state) -->
+    <div class="result">
+      <div class="result-head">
+        <span class="rh-check"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg></span>
+        <span class="rh-ttl">Import complete</span>
+      </div>
+      <div class="result-body">
+        <div class="stat-row">
+          <div class="stat imported"><div class="s-lbl">Imported</div><div class="s-num">11</div></div>
+          <div class="stat"><div class="s-lbl">Matched</div><div class="s-num">9</div></div>
+          <div class="stat needs"><div class="s-lbl">Needs Match</div><div class="s-num">2</div></div>
+          <div class="stat skipped"><div class="s-lbl">Skipped</div><div class="s-num">1</div></div>
+        </div>
+        <div class="result-links">
+          <a href="#" class="rlink attn">Review Needs Match →</a>
+          <a href="#" class="rlink ghost">View Submission</a>
+          <a href="#" class="rlink ghost">View Bundle</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="mock-note">
+      MOCKUP · /admin/inventory/import/psa · C1.5 · v2.0 · 2026-05-20<br>
+      MATCHES REAL + NEW: SUBMISSION NAME (top) · PSA TIER dropdown [NEW FIELD → needs psa_tier schema column] + SUBMISSION DATE · PSA CSV FILE · "CREATE BUNDLE FROM UPLOAD" CHECKBOX → REVEALS BUNDLE NAME · IMPORT AND TRACK SUBMISSION · RESULT (IMPORTED / MATCHED / NEEDS MATCH / SKIPPED + LINKS)<br>
+      PSA TIERS: VALUE BULK · VALUE · VALUE PLUS · VALUE MAX · REGULAR · EXPRESS · SUPER EXPRESS · WALK-THROUGH · v2: NAME MOVED TO TOP, PSA TIER ADDED
+    </div>
+
+  </main>
+
+</body>
+</html>

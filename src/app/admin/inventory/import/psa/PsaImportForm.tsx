@@ -75,19 +75,17 @@ export default function PsaImportForm() {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-surface p-5">
+    <div className="admin-card p-6">
       <div>
-        <div>
-          <h2 className="text-xl font-bold text-text">PSA Import</h2>
-          <p className="mt-1 max-w-2xl text-sm text-text-2">
-            Import a PSA CSV as individual Graded Card entries and save it as a tracked submission.
-          </p>
-        </div>
+        <h2 className="font-grotesk text-xl font-bold tracking-tight text-ink">PSA Import</h2>
+        <p className="mt-1 max-w-2xl font-grotesk text-sm text-ink-2">
+          Import a PSA CSV as individual Graded Card entries and save it as a tracked submission.
+        </p>
       </div>
 
       <div className="mt-5 max-w-xl">
         <label className="block">
-          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">PSA CSV File</span>
+          <span className="admin-field-label block">PSA CSV File</span>
           <input
             type="file"
             accept=".csv,text/csv,text/plain"
@@ -97,75 +95,79 @@ export default function PsaImportForm() {
               if (!submissionName) setSubmissionName(defaultSubmissionName(nextFile));
               if (!bundleName) setBundleName(defaultSubmissionName(nextFile));
             }}
-            className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 text-sm text-text file:mr-3 file:rounded file:border-0 file:bg-owl file:px-3 file:py-2 file:font-mono file:text-xs file:font-bold file:uppercase file:text-void"
+            className="admin-input mt-2 w-full !h-auto !py-2.5 file:mr-3 file:rounded file:border-0 file:bg-ink file:px-3 file:py-2 file:font-mono file:text-xs file:font-bold file:uppercase file:tracking-wider file:text-bg hover:file:bg-[#2E1C10]"
           />
         </label>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Submission Name</span>
+            <span className="admin-field-label block">Submission Name</span>
             <input
               value={submissionName}
               onChange={(event) => setSubmissionName(event.target.value)}
               placeholder="PSA submission name"
-              className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 text-sm text-text outline-none focus:border-owl"
+              className="admin-input mt-2 w-full"
             />
           </label>
           <label className="block">
-            <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Submission Date</span>
+            <span className="admin-field-label block">Submission Date</span>
             <input
               type="date"
               value={submittedAt}
               onChange={(event) => setSubmittedAt(event.target.value)}
-              className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-owl"
+              className="admin-input mt-2 w-full"
             />
           </label>
         </div>
-        <div className="mt-4 rounded-md border border-border bg-deep p-3">
+        <div className="admin-card-inset mt-4 p-4">
           <label className="flex items-start gap-3">
             <input
               type="checkbox"
               checked={createBundle}
               onChange={(event) => setCreateBundle(event.target.checked)}
-              className="mt-1 h-4 w-4 accent-owl"
+              className="mt-1 h-4 w-4 accent-coral"
             />
             <span>
-              <span className="block font-mono text-xs font-bold uppercase tracking-wider text-text">
+              <span className="block font-mono text-[11px] font-bold uppercase tracking-[0.1em] text-ink">
                 Create Inventory Bundle From This Upload
               </span>
-              <span className="mt-1 block text-sm text-text-2">
+              <span className="mt-1 block font-grotesk text-sm text-ink-2">
                 Use this for sequential PSA submissions or groups of graded cards that should stay together.
               </span>
             </span>
           </label>
           {createBundle && (
             <label className="mt-3 block">
-              <span className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">Bundle Name</span>
+              <span className="admin-field-label block">Bundle Name</span>
               <input
                 value={bundleName}
                 onChange={(event) => setBundleName(event.target.value)}
                 placeholder="Sequential PSA bundle name"
-                className="mt-2 w-full rounded-md border border-border bg-surface px-3 py-2.5 text-sm text-text outline-none focus:border-owl"
+                className="admin-input mt-2 w-full"
               />
             </label>
           )}
         </div>
-        <div className="mt-4">
+        <div className="mt-5">
           <button
             type="button"
             disabled={!psaFile || importing}
             onClick={submit}
-            className="rounded-md bg-owl px-4 py-3 font-mono text-sm font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light disabled:cursor-not-allowed disabled:bg-surf3 disabled:text-text-3"
+            className="admin-btn admin-btn-primary disabled:cursor-not-allowed disabled:opacity-60"
           >
             {importing ? "Importing..." : "Import and Track Submission"}
           </button>
         </div>
       </div>
 
-      {error && <div className="mt-4 rounded-md border border-loss/30 bg-loss/10 p-3 text-sm text-text">{error}</div>}
+      {error && (
+        <div className="mt-4 rounded-c-md border-[1.5px] border-coral bg-[#FFE2DD] px-4 py-3 font-grotesk text-sm font-semibold text-ink">
+          {error}
+        </div>
+      )}
 
       {result && (
-        <div className="mt-4 rounded-md border border-gain/30 bg-[rgba(0,214,143,0.08)] p-4">
-          <div className="grid gap-3 font-mono text-sm font-semibold text-text md:grid-cols-4">
+        <div className="mt-4 rounded-c-md border-[1.5px] border-gain-2 bg-[#DCF1E6] p-4">
+          <div className="grid gap-3 font-mono text-sm font-semibold text-ink md:grid-cols-4">
             <div>Imported {result.count}</div>
             <div>Matched {result.matched}</div>
             <div>Skipped {result.skipped_duplicates ?? 0}</div>
@@ -174,7 +176,7 @@ export default function PsaImportForm() {
               {result.pending_match > 0 && (
                 <a
                   href="/admin/inventory?review=needs-match"
-                  className="rounded border border-owl/60 bg-owl/10 px-2 py-1 font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/15"
+                  className="rounded border-[1.5px] border-coral bg-bg-2 px-2 py-1 font-mono text-xs font-bold uppercase tracking-wider text-coral transition-colors hover:bg-[#FFE2DD]"
                 >
                   Review
                 </a>
@@ -185,34 +187,45 @@ export default function PsaImportForm() {
             {result.submission_id && (
               <a
                 href={`/admin/psa-submissions#submission-${result.submission_id}`}
-                className="rounded border border-blue/60 bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-blue transition-colors hover:bg-blue/15"
+                className="rounded border-[1.5px] border-select bg-bg-2 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-select transition-colors hover:bg-[#F2F5FB]"
               >
                 View Submission
               </a>
             )}
             {result.submission_warning && (
-              <span className="rounded border border-owl/40 bg-owl/10 px-3 py-2 text-xs font-semibold text-text">
+              <span className="rounded border-[1.5px] border-gold bg-[#FBF0DA] px-3 py-2 font-grotesk text-xs font-semibold text-ink">
                 Submission tracking skipped: {result.submission_warning}
               </span>
             )}
             {result.bundle_id && (
               <a
                 href={`/admin/bundles/${result.bundle_id}`}
-                className="rounded border border-owl/60 bg-owl/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/15"
+                className="rounded border-[1.5px] border-ink bg-bg-2 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-ink transition-colors hover:bg-bg-3"
               >
                 View Bundle
               </a>
             )}
             {result.bundle_warning && (
-              <span className="rounded border border-owl/40 bg-owl/10 px-3 py-2 text-xs font-semibold text-text">
+              <span className="rounded border-[1.5px] border-gold bg-[#FBF0DA] px-3 py-2 font-grotesk text-xs font-semibold text-ink">
                 Bundle skipped: {result.bundle_warning}
               </span>
             )}
           </div>
-          <div className="mt-3 max-h-48 overflow-y-auto rounded border border-border bg-deep">
+          <div className="mt-3 max-h-48 overflow-y-auto rounded border-[1.5px] border-ink bg-bg-2">
             {result.rows.map((row, index) => (
-              <div key={`${row.certification_number ?? "row"}-${index}`} className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2 text-xs text-text-2 last:border-b-0">
-                <span className={row.skipped_duplicate ? "font-semibold text-blue" : row.matched ? "font-semibold text-gain" : "font-semibold text-owl"}>
+              <div
+                key={`${row.certification_number ?? "row"}-${index}`}
+                className="flex flex-wrap items-center gap-2 border-b border-b-bg-3 px-3 py-2 font-mono text-xs text-ink-2 last:border-b-0"
+              >
+                <span
+                  className={
+                    row.skipped_duplicate
+                      ? "font-semibold text-select"
+                      : row.matched
+                        ? "font-semibold text-gain-2"
+                        : "font-semibold text-coral"
+                  }
+                >
                   {row.skipped_duplicate && row.image_status?.includes("Already in inventory")
                     ? "Already in Inventory"
                     : row.skipped_duplicate
@@ -224,10 +237,10 @@ export default function PsaImportForm() {
                 {row.set_code && <span>{row.set_code}</span>}
                 {row.card_number && <span>{row.card_number}</span>}
                 {row.graded_rating && <span>{row.graded_rating}</span>}
-                <span className="min-w-0 flex-1 truncate text-text">{row.card_name ?? "Unknown Card"}</span>
+                <span className="min-w-0 flex-1 truncate font-grotesk text-ink">{row.card_name ?? "Unknown Card"}</span>
                 {row.certification_number && <span>Cert {row.certification_number}</span>}
                 {row.image_status && (
-                  <span className={row.image_status.includes("imported") ? "font-semibold text-gain" : "font-semibold text-text-2"}>
+                  <span className={row.image_status.includes("imported") ? "font-semibold text-gain-2" : "font-semibold text-ink-2"}>
                     {row.image_status}
                   </span>
                 )}
@@ -236,7 +249,6 @@ export default function PsaImportForm() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

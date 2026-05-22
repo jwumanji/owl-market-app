@@ -113,28 +113,22 @@ export default function InventoryShell({
             key={status}
             type="button"
             onClick={() => setStatusFilter(statusFilter === status ? "all" : status)}
-            className={`rounded-lg border p-4 text-left transition-colors ${
-              statusFilter === status
-                ? "border-owl bg-owl/10"
-                : "border-border bg-surface hover:border-border-2 hover:bg-surf2"
-            }`}
+            className={`admin-scard${statusFilter === status ? " active" : ""}`}
           >
-            <div className="font-mono text-sm font-semibold uppercase tracking-wider text-text">
-              {STATUS_LABELS[status]}
-            </div>
+            <div className="slbl">{STATUS_LABELS[status]}</div>
             {status === "ship" ? (
-              <div className="mt-3 grid gap-1 font-mono font-bold uppercase tracking-wider">
-                <div className="text-2xl text-owl">{needShippingOrderCount} Orders</div>
-                <div className="text-lg text-blue">{byStatus.ship} Cards</div>
-              </div>
+              <>
+                <div className="mt-auto font-grotesk text-2xl font-bold text-coral">
+                  {needShippingOrderCount} Orders
+                </div>
+                <div className="mt-1 font-grotesk text-base font-bold text-ink-2">
+                  {byStatus.ship} Cards
+                </div>
+              </>
             ) : (
               <>
-                <div className="mt-2 text-3xl font-bold text-text">{byStatus[status]}</div>
-                {status === "sold" && (
-                  <div className="mt-1 font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
-                    {shippedOrderCount} Orders
-                  </div>
-                )}
+                <div className="snum">{byStatus[status]}</div>
+                {status === "sold" && <div className="ssub">{shippedOrderCount} Orders</div>}
               </>
             )}
           </button>
@@ -142,7 +136,7 @@ export default function InventoryShell({
       </div>
 
       {psa10CandidatesOnly && (
-        <div className="mb-4 inline-flex flex-wrap items-center gap-2 rounded-md border border-gain/30 bg-gain/10 px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-gain">
+        <div className="mb-4 inline-flex flex-wrap items-center gap-2 rounded-md border border-gain-2/50 bg-[#DCF1E6] px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-gain-2">
           <span>
             {psa10CandidateCount} PSA 10 centering candidate{psa10CandidateCount === 1 ? "" : "s"} shown
           </span>
@@ -150,7 +144,7 @@ export default function InventoryShell({
             type="button"
             aria-pressed={psa10CandidatesOnly}
             onClick={() => setPsa10CandidateFilter(false)}
-            className="rounded border border-gain/40 px-2 py-1 text-[11px] transition-colors hover:bg-gain/10"
+            className="rounded border border-gain-2/50 px-2 py-1 text-[11px] transition-colors hover:bg-[#C8EBD6]"
           >
             Clear
           </button>

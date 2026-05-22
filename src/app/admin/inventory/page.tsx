@@ -337,30 +337,30 @@ export default async function AdminInventoryPage({
 
   return (
     <section className="mx-auto max-w-[1920px] px-5 py-8 sm:px-7 lg:px-10 xl:px-12">
-      <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div className="admin-page-head">
         <div>
-          <p className="mb-2 font-mono text-sm font-semibold uppercase tracking-wider text-owl">Internal Tool</p>
-          <h1 className="text-4xl font-bold tracking-tight text-text">Inventory</h1>
-          <p className="mt-2 max-w-2xl text-base text-text">
+          <p className="admin-eyebrow">Internal Tool</p>
+          <h1 className="admin-title">Inventory</h1>
+          <p className="admin-subline">
             Track cards by condition and movement stage: New, Grading, For Sale, Need Shipping, and Sold.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-3">
-          <div className="rounded-lg border border-border bg-surface px-4 py-3 text-right">
-            <div className="font-mono text-sm font-semibold uppercase tracking-wider text-text">Total Quantity</div>
-            <div className="mt-1 text-3xl font-bold text-text">{totalQuantity}</div>
+          <div className="admin-stat-card">
+            <div className="lbl">Total Quantity</div>
+            <div className="val">{totalQuantity}</div>
           </div>
         </div>
       </div>
 
       {configError || error || cardError ? (
-        <div className="rounded-lg border border-loss/30 bg-loss/10 p-4 text-base text-text">
+        <div className="rounded-lg border border-loss-2/40 bg-[#FBE3E3] p-4 text-base text-ink">
           Inventory query failed: {configError ?? error?.message ?? cardError?.message}
         </div>
       ) : (
         <>
           {migrationWarning && (
-            <div className="mb-4 rounded-lg border border-owl/40 bg-owl/10 p-4 text-sm font-semibold text-text">
+            <div className="mb-4 rounded-lg border border-gold bg-[#FBF0DA] p-4 text-sm font-semibold text-ink">
               {migrationWarning}
             </div>
           )}

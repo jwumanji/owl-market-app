@@ -2,79 +2,88 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import OwlMark from "@/components/brand/OwlMark";
+import Wordmark from "@/components/brand/Wordmark";
 import Ticker from "./Ticker";
 
-const NAV_LINKS = [
-  { label: "HOME", href: "/" },
-  { label: "MARKETS", href: "/markets" },
-  { label: "RARITIES", href: "/rarities" },
-  { label: "SETS", href: "/sets" },
-  { label: "CHARACTERS", href: "/characters" },
-  { label: "PORTFOLIO", href: "/portfolio" },
-  { label: "INVENTORY", href: "/admin/inventory" },
-  { label: "OWL LENS", href: "/admin/lens" },
+type NavVariant = "public" | "admin";
+
+type NavProps = {
+  variant?: NavVariant;
+};
+
+const PUBLIC_LINKS = [
+  { label: "Home", href: "/" },
+  { label: "Markets", href: "/markets" },
+  { label: "Rarities", href: "/rarities" },
+  { label: "Sets", href: "/sets" },
+  { label: "Characters", href: "/characters" },
 ];
 
-const ADMIN_NAV_LINKS = [
-  { label: "INVENTORY", href: "/admin/inventory" },
-  { label: "ORDERS", href: "/admin/orders" },
-  { label: "BUNDLES", href: "/admin/bundles" },
+const ADMIN_LINKS = [
+  { label: "Inventory", href: "/admin/inventory" },
+  { label: "Bundles", href: "/admin/bundles" },
+  { label: "Orders", href: "/admin/orders" },
+  { label: "Lens", href: "/admin/lens" },
   { label: "PSA", href: "/admin/psa-submissions" },
-  { label: "OWL LENS", href: "/admin/lens" },
 ];
 
 function isActivePath(pathname: string, href: string) {
-  if (href === "/") {
-    return pathname === href;
-  }
-
+  if (href === "/") return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export default function Nav() {
+export default function Nav({ variant }: NavProps) {
   const pathname = usePathname();
-  const isAdmin = pathname.startsWith("/admin");
-  const links = isAdmin ? ADMIN_NAV_LINKS : NAV_LINKS;
+  const resolvedVariant: NavVariant =
+    variant ?? (pathname.startsWith("/admin") ? "admin" : "public");
+  const isAdmin = resolvedVariant === "admin";
+  const links = isAdmin ? ADMIN_LINKS : PUBLIC_LINKS;
 
   return (
-    <nav className={isAdmin ? "admin-nav" : undefined}>
-      <div className="nav-row">
-        <Link href="/" className="logo">
-          <div className="logo-owl">🦉</div>
-          <span className="logo-name">
-            OWL<span> Market</span>
-          </span>
+    <nav className="c-topnav" aria-label="Primary">
+      <div className={`c-topnav-inner${isAdmin ? " is-admin" : ""}`}>
+        <Link href="/" className="c-lockup">
+          <OwlMark size={36} />
+          <Wordmark />
         </Link>
 
-        <div className="nav-mid">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`nav-link${isActivePath(pathname, link.href) ? " active" : ""}`}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </div>
+        {isAdmin ? <span className="c-internal-chip">INTERNAL</span> : null}
 
-        <div className="nav-right">
+        <ul className="c-nav-links">
+          {links.map((link) => (
+            <li key={link.href}>
+              <Link
+                href={link.href}
+                className={`c-nav-link${isActivePath(pathname, link.href) ? " active" : ""}`}
+              >
+                {link.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+
+        <div className="c-nav-right">
           {isAdmin ? (
-            <div className="live-badge admin-badge">INTERNAL</div>
+            <>
+              <Link href="/" className="c-nav-view">
+                View site ↗
+              </Link>
+              <Link href="/logout" className="c-signin-btn">
+                Sign out
+              </Link>
+            </>
           ) : (
             <>
-              <div className="live-badge">
-                <span className="live-dot" />
+              <span className="c-live-chip">
+                <span className="c-live-dot" />
                 LIVE
-              </div>
-              <Link href="/login" className="btn-login">
-                Login
+              </span>
+              <Link href="/login" className="c-signin-btn">
+                Sign in
               </Link>
             </>
           )}
-          <Link href="/logout" className="btn-login">
-            Logout
-          </Link>
         </div>
       </div>
 

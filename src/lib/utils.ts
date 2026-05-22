@@ -14,12 +14,13 @@ export function formatPct(pct: number | null | undefined): string {
   return `${sign}${pct.toFixed(1)}%`;
 }
 
-/** Return Tailwind color class based on percent change */
+/** Return Tailwind color class based on percent change.
+ *  Zero / null / undefined → neutral (ink-3), NOT green. */
 export function pctColor(pct: number | null | undefined): string {
-  if (pct == null) return "text-text-2";
-  if (pct > 0) return "text-gain";
-  if (pct < 0) return "text-loss";
-  return "text-text-2";
+  if (pct == null) return "text-ink-3";
+  if (pct > 0) return "text-gain-2";
+  if (pct < 0) return "text-loss-2";
+  return "text-ink-3";
 }
 
 /** Human-readable time ago: '5m ago', '2h ago', '3d ago' */

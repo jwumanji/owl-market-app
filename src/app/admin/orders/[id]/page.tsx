@@ -26,35 +26,29 @@ export default async function EditOrderPage({ params }: { params: { id: string }
 
   return (
     <section className="mx-auto max-w-[1600px] px-5 py-8 sm:px-7 lg:px-10 xl:px-12">
-      <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div className="admin-page-head">
         <div>
-          <p className="mb-2 font-mono text-sm font-semibold uppercase tracking-wider text-text-2">Nickname Order</p>
-          <h1 className="text-4xl font-black tracking-tight text-owl">{orderTitle}</h1>
-          <p className="mt-1 font-mono text-sm font-bold uppercase tracking-wider text-text-2">
+          <p className="admin-eyebrow">Nickname Order</p>
+          <h1 className="admin-title">{orderTitle}</h1>
+          <p className="mt-2 font-mono text-[13px] font-bold uppercase tracking-[0.08em] text-ink-2">
             Order #{orderNumber}
           </p>
-          <p className="mt-3 max-w-2xl text-base text-text">
+          <p className="admin-subline">
             Edit the customer details, shipping state, tracking number, and bundled inventory items.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link
-            href="/admin/inventory?status=ship"
-            className="rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-sm font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl"
-          >
+          <Link href="/admin/inventory?status=ship" className="admin-btn admin-btn-ghost">
             Back to Inventory
           </Link>
-          <Link
-            href="/admin/orders/new"
-            className="rounded-md bg-owl px-4 py-2.5 font-mono text-sm font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
-          >
+          <Link href="/admin/orders/new" className="admin-btn admin-btn-primary">
             Add Order
           </Link>
         </div>
       </div>
 
       {error || !orderResult.data ? (
-        <div className="rounded-lg border border-loss/30 bg-loss/10 p-4 text-base text-text">
+        <div className="rounded-c-md border-[1.5px] border-coral bg-[#FFE2DD] px-4 py-3 font-grotesk text-sm text-ink">
           Order query failed: {error ?? "Order not found"}
         </div>
       ) : (

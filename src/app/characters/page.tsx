@@ -40,15 +40,16 @@ interface CharacterData {
   spark?: number[];
 }
 
-// Assign colors based on index position for API data
+// Per-character accent palette — dynamic, not semantic. Hues shifted to
+// read well on cream (closer to brand sunset stops + Option-A jewel tones).
 const PALETTE = [
-  { color: "#FF4560", colorD: "rgba(255,69,96,0.14)", colorBd: "rgba(255,69,96,0.3)" },
-  { color: "#00D68F", colorD: "rgba(0,214,143,0.14)", colorBd: "rgba(0,214,143,0.3)" },
-  { color: "#4F8EF7", colorD: "rgba(79,142,247,0.14)", colorBd: "rgba(79,142,247,0.3)" },
-  { color: "#E8A020", colorD: "rgba(232,160,32,0.18)", colorBd: "rgba(232,160,32,0.38)" },
-  { color: "#9B72FF", colorD: "rgba(155,114,255,0.14)", colorBd: "rgba(155,114,255,0.3)" },
-  { color: "#F472B6", colorD: "rgba(244,114,182,0.14)", colorBd: "rgba(244,114,182,0.3)" },
-  { color: "#00C9A7", colorD: "rgba(0,201,167,0.14)", colorBd: "rgba(0,201,167,0.3)" },
+  { color: "#C42A45", colorD: "rgba(196,42,69,0.14)",  colorBd: "rgba(196,42,69,0.32)"  }, // secret-red
+  { color: "#2D8A57", colorD: "rgba(45,138,87,0.16)",  colorBd: "rgba(45,138,87,0.32)"  }, // sr-green
+  { color: "#2E6FD6", colorD: "rgba(46,111,214,0.14)", colorBd: "rgba(46,111,214,0.32)" }, // aa-blue
+  { color: "#E89512", colorD: "rgba(232,149,18,0.16)", colorBd: "rgba(232,149,18,0.38)" }, // gold
+  { color: "#6E3AA6", colorD: "rgba(110,58,166,0.14)", colorBd: "rgba(110,58,166,0.32)" }, // sp-purple
+  { color: "#C43F7E", colorD: "rgba(196,63,126,0.14)", colorBd: "rgba(196,63,126,0.32)" }, // sar-pink
+  { color: "#137A8C", colorD: "rgba(19,122,140,0.14)", colorBd: "rgba(19,122,140,0.32)" }, // l-teal
 ];
 
 function assignColors(chars: CharacterData[]): CharacterData[] {
@@ -110,8 +111,8 @@ function SparkSvg({ data, up, w, h, pad }: { data: number[]; up: boolean; w: num
   const pts = sparkPoints(data, w, h, pad);
   const poly = pts.map((p) => p.join(",")).join(" ");
   const fill = `${pts[0][0]},${h} ${poly} ${pts[pts.length - 1][0]},${h}`;
-  const s = up ? "#00D68F" : "#FF4560";
-  const f = up ? "rgba(0,214,143,0.13)" : "rgba(255,69,96,0.11)";
+  const s = up ? "#2D9961" : "#E04E4E";
+  const f = up ? "rgba(45,153,97,0.16)" : "rgba(224,78,78,0.12)";
   const [lx, ly] = pts[pts.length - 1];
   return (
     <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ display: "block", overflow: "visible" }}>
@@ -126,8 +127,8 @@ function RowSpark({ data, up }: { data: number[]; up: boolean }) {
   const pts = sparkPoints(data, 88, 22, 2);
   const poly = pts.map((p) => p.join(",")).join(" ");
   const fill = `${pts[0][0]},22 ${poly} ${pts[pts.length - 1][0]},22`;
-  const s = up ? "#00D68F" : "#FF4560";
-  const f = up ? "rgba(0,214,143,0.13)" : "rgba(255,69,96,0.11)";
+  const s = up ? "#2D9961" : "#E04E4E";
+  const f = up ? "rgba(45,153,97,0.16)" : "rgba(224,78,78,0.12)";
   const [lx, ly] = pts[pts.length - 1];
   return (
     <div style={{ display: "flex", justifyContent: "flex-end" }}>
@@ -213,7 +214,7 @@ function CardImageCell({ card }: { card: CharacterCard }) {
 /* ── Character Ranking Card (top row) ── */
 function RankCard({ c, rank, active, onClick }: { c: CharacterData; rank: number; active: boolean; onClick: () => void }) {
   const tier = TIER_LABELS[c.tier] || TIER_LABELS[3];
-  const color = c.color || "#E8A020";
+  const color = c.color || "#E89512";
   const avatar = getCharAvatar(c);
   return (
     <div
@@ -236,8 +237,11 @@ function RankCard({ c, rank, active, onClick }: { c: CharacterData; rank: number
         </div>
       </div>
       <div className="ch-rank-price">${c.indexValue.toLocaleString()}</div>
-      <div className="ch-rank-chg" style={{ color: c.up ? "var(--green)" : "var(--red)" }}>
-        {c.up ? "\u2191" : "\u2193"} {Math.abs(c.chg7d)}% <span className="ch-rank-period">7D</span>
+      <div
+        className="ch-rank-chg"
+        style={{ color: c.chg7d === 0 ? "var(--ink-3)" : c.up ? "var(--gain-2)" : "var(--loss-2)" }}
+      >
+        {c.chg7d === 0 ? "" : c.up ? "\u2191" : "\u2193"} {Math.abs(c.chg7d)}% <span className="ch-rank-period">7D</span>
       </div>
       <div className="ch-rank-spark">
         <SparkSvg data={c.spark || [0, 0]} up={c.up} w={200} h={28} pad={3} />
@@ -343,12 +347,12 @@ function CharToolbar({
 /* ── Character Detail Panel ── */
 function CharacterDetail({ c }: { c: CharacterData }) {
   const tier = TIER_LABELS[c.tier] || TIER_LABELS[3];
-  const color = c.color || "#E8A020";
+  const color = c.color || "#E89512";
   const avatar = getCharAvatar(c);
   const fullImg = c.topCards?.[0]?.imageUrl ?? c.topCards?.[0]?.imageUrlSmall ?? null;
   return (
     <div className="ch-detail">
-      <div className="ch-detail-header" style={{ background: `linear-gradient(135deg,${c.colorD || "rgba(232,160,32,0.18)"},transparent)` }}>
+      <div className="ch-detail-header" style={{ background: `linear-gradient(135deg,${c.colorD || "rgba(232,149,18,0.16)"},transparent)` }}>
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,transparent,${color},transparent)` }} />
         <div className="ch-detail-header-inner">
           {fullImg ? (
@@ -373,8 +377,8 @@ function CharacterDetail({ c }: { c: CharacterData }) {
       <div className="ch-detail-stats">
         {[
           ["Character Index", `$${c.indexValue.toLocaleString()}`, color],
-          ["7D Change", `${c.up ? "+" : ""}${c.chg7d}%`, c.up ? "var(--green)" : "var(--red)"],
-          ["30D Change", `${c.chg30d >= 0 ? "+" : ""}${c.chg30d}%`, c.chg30d >= 0 ? "var(--green)" : "var(--red)"],
+          ["7D Change", `${c.chg7d === 0 ? "" : c.up ? "+" : ""}${c.chg7d}%`, c.chg7d === 0 ? "var(--ink-3)" : c.up ? "var(--gain-2)" : "var(--loss-2)"],
+          ["30D Change", `${c.chg30d === 0 ? "" : c.chg30d > 0 ? "+" : ""}${c.chg30d}%`, c.chg30d === 0 ? "var(--ink-3)" : c.chg30d > 0 ? "var(--gain-2)" : "var(--loss-2)"],
           ["Cards Tracked", String(c.cardCount), undefined],
         ].map(([k, v, clr]) => (
           <div className="ch-stat-row" key={k}>
@@ -470,8 +474,11 @@ function AllCharactersGrid({ chars, activeSlug, onSelect }: { chars: CharacterDa
                   <span className="ch-grid-rank">#{i + 1}</span>
                   <span className="ch-tier-badge" style={{ background: tier.bg, color: tier.color }}>{tier.label}</span>
                 </div>
-                <span className="ch-grid-chg" style={{ color: c.chg30d >= 0 ? "var(--green)" : "var(--red)" }}>
-                  {c.chg30d >= 0 ? "+" : ""}{c.chg30d}%
+                <span
+                  className="ch-grid-chg"
+                  style={{ color: c.chg30d === 0 ? "var(--ink-3)" : c.chg30d > 0 ? "var(--gain-2)" : "var(--loss-2)" }}
+                >
+                  {c.chg30d === 0 ? "" : c.chg30d > 0 ? "+" : ""}{c.chg30d}%
                 </span>
               </div>
               <div className="ch-grid-name-row">
@@ -487,8 +494,8 @@ function AllCharactersGrid({ chars, activeSlug, onSelect }: { chars: CharacterDa
                 <SparkSvg data={c.spark || [0, 0]} up={c.up} w={200} h={48} pad={4} />
               </div>
               <div className="ch-grid-footer">
-                <div className="ch-grid-stat">7D <span style={{ color: c.up ? "var(--green)" : "var(--red)" }}>{c.up ? "+" : ""}{c.chg7d}%</span></div>
-                <div className="ch-grid-stat">30D <span style={{ color: c.chg30d >= 0 ? "var(--green)" : "var(--red)" }}>{c.chg30d >= 0 ? "+" : ""}{c.chg30d}%</span></div>
+                <div className="ch-grid-stat">7D <span style={{ color: c.chg7d === 0 ? "var(--ink-3)" : c.up ? "var(--gain-2)" : "var(--loss-2)" }}>{c.chg7d === 0 ? "" : c.up ? "+" : ""}{c.chg7d}%</span></div>
+                <div className="ch-grid-stat">30D <span style={{ color: c.chg30d === 0 ? "var(--ink-3)" : c.chg30d > 0 ? "var(--gain-2)" : "var(--loss-2)" }}>{c.chg30d === 0 ? "" : c.chg30d > 0 ? "+" : ""}{c.chg30d}%</span></div>
               </div>
             </div>
           );
@@ -551,7 +558,7 @@ export default function CharactersPage() {
       <div className="breadcrumb">
         <Link href="/">OWL Market</Link>
         <span className="bsep"> &rsaquo; </span>
-        <span style={{ color: "var(--text)" }}>Characters</span>
+        <span style={{ color: "var(--ink)" }}>Characters</span>
       </div>
       <div className="ph-eyebrow">One Piece TCG</div>
       <div className="ph-title">

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OwlMarket — Admin · Owl Lens (C1.5 mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Caveat:wght@700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #FFF5E4; --bg-2: #FFFFFF; --bg-3: #FCE6BE;
+      --ink: #1A0F08; --ink-2: #5C4534; --ink-3: #9A8475;
+      --pink: #FF6BB8; --coral: #FF4936; --gold: #E89512;
+      --gain: #2D9961; --loss: #E04E4E; --select: #1F47A1;
+      --grad-brand: linear-gradient(135deg, #FF6BB8 0%, #FF4936 50%, #E89512 100%);
+      --r-sm: 8px; --r-md: 14px; --r-lg: 22px; --r-pill: 999px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: var(--bg); color: var(--ink); font-family: 'Space Grotesk', system-ui, sans-serif; font-weight: 500; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+    .container { max-width: 1280px; margin: 0 auto; padding-left: 28px; padding-right: 28px; }
+    a { color: inherit; }
+
+    .topnav { position: sticky; top: 0; z-index: 50; background: rgba(255, 245, 228, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1.5px solid rgba(26, 15, 8, 0.08); }
+    .topnav-inner { display: flex; align-items: center; gap: 22px; padding: 14px 28px; max-width: 1680px; margin: 0 auto; }
+    .lockup { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; flex-shrink: 0; }
+    .lockup-wm { font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: var(--ink); font-size: 22px; display: inline-flex; align-items: baseline; }
+    .lockup-wm em { font-family: 'Caveat', cursive; font-style: normal; font-weight: 700; font-size: 28px; margin-left: -2px; padding-right: 8px; padding-bottom: 2px; display: inline-block; background: var(--grad-brand); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+    .internal-chip { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--coral); background: #FFE2DD; border: 1.5px solid var(--coral); border-radius: var(--r-pill); padding: 3px 9px; flex-shrink: 0; }
+    .nav-links { display: inline-flex; gap: 22px; list-style: none; margin-left: 6px; }
+    .nav-links a { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: var(--ink-2); text-decoration: none; padding: 4px 0; position: relative; white-space: nowrap; }
+    .nav-links a.active { color: var(--ink); }
+    .nav-links a.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 2px; background: var(--grad-brand); border-radius: 2px; }
+    .nav-right { margin-left: auto; display: inline-flex; align-items: center; gap: 16px; }
+    .nav-view { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; color: var(--ink-2); text-decoration: none; letter-spacing: 0.04em; }
+    .nav-view:hover { color: var(--ink); }
+    .nav-signout { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; color: var(--ink); background: transparent; border: 1.5px solid var(--ink); border-radius: var(--r-pill); padding: 7px 16px; text-decoration: none; }
+    .nav-signout:hover { background: var(--ink); color: var(--bg); }
+
+    main { padding: 32px 0 96px; }
+    .page-head { margin-bottom: 24px; }
+    .eyebrow { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; color: var(--coral); letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 10px; }
+    h1.title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; letter-spacing: -0.025em; line-height: 1; color: var(--ink); }
+    .subline { margin-top: 10px; font-size: 14px; color: var(--ink-2); max-width: 620px; line-height: 1.6; }
+
+    .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .tool { background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-md); padding: 22px; }
+    .tool.coming { opacity: 0.66; border-color: var(--ink-3); }
+    .tool-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .tool-title { font-family: 'Space Grotesk'; font-weight: 700; font-size: 22px; color: var(--ink); letter-spacing: -0.01em; }
+    .badge { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; border-radius: var(--r-sm); padding: 5px 9px; border: 1.5px solid; white-space: nowrap; }
+    .badge.active { color: var(--gain); border-color: var(--gain); background: #DCF1E6; }
+    .badge.soon { color: var(--ink-2); border-color: var(--ink-3); background: var(--bg-3); }
+    .tool-desc { margin-top: 12px; font-size: 13.5px; color: var(--ink-2); line-height: 1.55; }
+    .tool-btn { margin-top: 18px; display: inline-flex; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; background: var(--ink); color: var(--bg); border-radius: var(--r-sm); padding: 11px 18px; text-decoration: none; }
+    .tool-btn:hover { background: #2E1C10; }
+
+    .mock-note { margin-top: 28px; padding: 14px 20px; background: var(--bg-2); border: 1.5px dashed var(--ink-3); border-radius: var(--r-md); font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em; color: var(--ink-2); text-align: center; text-transform: uppercase; font-weight: 600; line-height: 1.7; }
+  </style>
+</head>
+<body>
+
+  <header class="topnav">
+    <div class="topnav-inner">
+      <a href="#" class="lockup">
+        <svg width="34" height="34" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="og-adm" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FF6BB8"/><stop offset="50%" stop-color="#FF4936"/><stop offset="100%" stop-color="#E89512"/></linearGradient>
+            <mask id="om-adm"><rect width="120" height="120" fill="white"/><circle cx="70" cy="56" r="20" fill="black"/></mask>
+          </defs>
+          <circle cx="60" cy="60" r="52" fill="url(#og-adm)" stroke="#1A0F08" stroke-width="5"/>
+          <circle cx="60" cy="60" r="38" fill="#1A0F08"/>
+          <circle cx="58" cy="60" r="26" fill="#FFF5E4" mask="url(#om-adm)"/>
+          <g transform="translate(80 60)"><path d="M 0,-11 Q 1.65,-1.65 11,0 Q 1.65,1.65 0,11 Q -1.65,1.65 -11,0 Q -1.65,-1.65 0,-11 Z" fill="#FFF5E4"/></g>
+        </svg>
+        <span class="lockup-wm">Owl<em>Market</em></span>
+      </a>
+      <span class="internal-chip">Internal</span>
+      <nav><ul class="nav-links">
+        <li><a href="#">Inventory</a></li>
+        <li><a href="#">Bundles</a></li>
+        <li><a href="#">Orders</a></li>
+        <li><a href="#" class="active">Lens</a></li>
+        <li><a href="#">PSA</a></li>
+      </ul></nav>
+      <div class="nav-right">
+        <a href="#" class="nav-view">View site ↗</a>
+        <a href="#" class="nav-signout">Sign out</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="page-head">
+      <div class="eyebrow">Internal Tool</div>
+      <h1 class="title">Owl Lens</h1>
+      <p class="subline">A suite of scan-based tools for pre-grading, inventory intake, and centering review.</p>
+    </div>
+
+    <div class="tools">
+      <a href="#" class="tool">
+        <div class="tool-head">
+          <span class="tool-title">Pre-grade</span>
+          <span class="badge active">Active</span>
+        </div>
+        <p class="tool-desc">Run a standalone centering measurement before deciding whether to create inventory.</p>
+        <span class="tool-btn">Open tool →</span>
+      </a>
+
+      <div class="tool coming">
+        <div class="tool-head">
+          <span class="tool-title">Inventory import</span>
+          <span class="badge soon">Coming next</span>
+        </div>
+        <p class="tool-desc">Bulk ingest scans and prepare inventory records from detected cards.</p>
+      </div>
+
+      <div class="tool coming">
+        <div class="tool-head">
+          <span class="tool-title">Multi-card scan (4–9 cards)</span>
+          <span class="badge soon">Coming later</span>
+        </div>
+        <p class="tool-desc">Detect several cards in one scan and split them into individual review jobs.</p>
+      </div>
+
+      <div class="tool coming">
+        <div class="tool-head">
+          <span class="tool-title">Front + back centering</span>
+          <span class="badge soon">Coming later</span>
+        </div>
+        <p class="tool-desc">Measure both sides and compare complete grading risk before submission.</p>
+      </div>
+    </div>
+
+    <div class="mock-note">
+      MOCKUP · /admin/lens · C1.5 · v1.0 · 2026-05-20 · TOOL-HUB PATTERN<br>
+      MATCHES REAL: 2-COL TOOL CARDS · PRE-GRADE (ACTIVE, OPEN TOOL) · INVENTORY IMPORT / MULTI-CARD SCAN / FRONT+BACK (COMING — disabled/dimmed)<br>
+      CONVENTION: ACTIVE BADGE = GAIN · COMING BADGE = MUTED · OPEN TOOL = INK PRIMARY · DISABLED CARD = 0.66 OPACITY + INK-3 BORDER
+    </div>
+  </main>
+
+</body>
+</html>

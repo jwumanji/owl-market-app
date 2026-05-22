@@ -154,41 +154,35 @@ export default async function PsaSubmissionsPage() {
 
   return (
     <section className="mx-auto max-w-[1480px] px-4 py-8">
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="admin-page-head">
         <div>
-          <p className="mb-2 font-mono text-sm font-semibold uppercase tracking-wider text-owl">Internal Tool</p>
-          <h1 className="text-4xl font-bold tracking-tight text-text">PSA Submissions</h1>
-          <p className="mt-2 max-w-3xl text-base text-text">
+          <p className="admin-eyebrow">Internal Tool</p>
+          <h1 className="admin-title">PSA Submissions</h1>
+          <p className="admin-subline">
             Review submissions by date, card count, grade results, and open the itemized card list only when needed.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link
-            href="/admin/inventory"
-            className="rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-sm font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl"
-          >
+          <Link href="/admin/inventory" className="admin-btn admin-btn-ghost">
             Back to Inventory
           </Link>
-          <Link
-            href="/admin/inventory/import/psa"
-            className="rounded-md bg-owl px-4 py-2.5 font-mono text-sm font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
-          >
+          <Link href="/admin/inventory/import/psa" className="admin-btn admin-btn-primary">
             PSA Import
           </Link>
         </div>
       </div>
 
       {error && (
-        <div className="mb-5 rounded-lg border border-owl/40 bg-owl/10 p-4 text-sm text-text">
+        <div className="mb-5 rounded-c-md border-[1.5px] border-coral bg-[#FFE2DD] px-4 py-3 font-grotesk text-sm text-ink">
           PSA submission tracking is not available yet. Run{" "}
-          <span className="font-mono font-semibold text-owl">schema-migration-v20-psa-submissions.sql</span> in Supabase,
+          <span className="font-mono font-semibold text-coral">schema-migration-v20-psa-submissions.sql</span> in Supabase,
           then import a PSA file again.
-          <div className="mt-2 font-mono text-xs text-text-2">{error}</div>
+          <div className="mt-2 font-mono text-xs text-ink-2">{error}</div>
         </div>
       )}
 
       {!error && submissions.length === 0 && (
-        <div className="rounded-lg border border-dashed border-border bg-surface p-10 text-center text-text-2">
+        <div className="rounded-c-md border-[1.5px] border-dashed border-ink-3 bg-bg-2 p-10 text-center font-grotesk text-sm text-ink-2">
           No PSA submissions have been tracked yet.
         </div>
       )}

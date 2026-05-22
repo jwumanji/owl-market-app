@@ -13,26 +13,23 @@ export default async function NewOrderPage() {
 
   return (
     <section className="mx-auto max-w-[1600px] px-5 py-8 sm:px-7 lg:px-10 xl:px-12">
-      <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div className="admin-page-head">
         <div>
-          <p className="mb-2 font-mono text-sm font-semibold uppercase tracking-wider text-owl">Internal Tool</p>
-          <h1 className="text-4xl font-bold tracking-tight text-text">Add Order</h1>
-          <p className="mt-2 max-w-2xl text-base text-text">
+          <p className="admin-eyebrow">Internal Tool</p>
+          <h1 className="admin-title">Add Order</h1>
+          <p className="admin-subline">
             Search inventory, bundle selected cards, and create a customer order for shipping.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link
-            href="/admin/inventory?status=ship"
-            className="rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-sm font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl"
-          >
+          <Link href="/admin/inventory?status=ship" className="admin-btn admin-btn-ghost">
             Back to Inventory
           </Link>
         </div>
       </div>
 
       {error ? (
-        <div className="rounded-lg border border-loss/30 bg-loss/10 p-4 text-base text-text">
+        <div className="rounded-c-md border-[1.5px] border-coral bg-[#FFE2DD] px-4 py-3 font-grotesk text-sm text-ink">
           Orders are not ready yet: {error}. Run schema-migration-v18-customer-orders.sql in Supabase.
         </div>
       ) : (

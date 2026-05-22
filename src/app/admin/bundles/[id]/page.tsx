@@ -16,36 +16,30 @@ export default async function InventoryBundleDetailPage({ params }: { params: { 
 
   return (
     <section className="mx-auto max-w-[1480px] px-4 py-8">
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="admin-page-head">
         <div>
-          <p className="mb-2 font-mono text-sm font-semibold uppercase tracking-wider text-owl">Inventory Bundle</p>
-          <h1 className="text-4xl font-bold tracking-tight text-text">{bundleResult.data?.name ?? "Bundle Details"}</h1>
-          <p className="mt-2 max-w-3xl text-base text-text">
+          <p className="admin-eyebrow">Inventory Bundle</p>
+          <h1 className="admin-title">{bundleResult.data?.name ?? "Bundle Details"}</h1>
+          <p className="admin-subline">
             Edit the bundle name, status, sale details, and grouped inventory items.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link
-            href="/admin/bundles"
-            className="rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-sm font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl"
-          >
+          <Link href="/admin/bundles" className="admin-btn admin-btn-ghost">
             Back to Bundles
           </Link>
-          <Link
-            href="/admin/bundles/new"
-            className="rounded-md bg-owl px-4 py-2.5 font-mono text-sm font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
-          >
+          <Link href="/admin/bundles/new" className="admin-btn admin-btn-primary">
             Create Bundle
           </Link>
         </div>
       </div>
 
       {bundleResult.error || inventoryResult.error || !bundleResult.data ? (
-        <div className="rounded-lg border border-owl/40 bg-owl/10 p-4 text-sm text-text">
+        <div className="rounded-c-md border-[1.5px] border-coral bg-[#FFE2DD] px-4 py-3 font-grotesk text-sm text-ink">
           Inventory bundle details are not available yet. Run{" "}
-          <span className="font-mono font-semibold text-owl">schema-migration-v22-inventory-bundles.sql</span> in Supabase,
+          <span className="font-mono font-semibold text-coral">schema-migration-v22-inventory-bundles.sql</span> in Supabase,
           then open this bundle again.
-          <div className="mt-2 font-mono text-xs text-text-2">
+          <div className="mt-2 font-mono text-xs text-ink-2">
             {bundleResult.error ?? inventoryResult.error ?? "Bundle not found."}
           </div>
         </div>
