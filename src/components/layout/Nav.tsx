@@ -42,7 +42,7 @@ export default function Nav({ variant }: NavProps) {
 
   return (
     <nav className="c-topnav" aria-label="Primary">
-      <div className="c-topnav-inner">
+      <div className={`c-topnav-inner${isAdmin ? " is-admin" : ""}`}>
         <Link href="/" className="c-lockup">
           <OwlMark size={36} />
           <Wordmark />
@@ -66,10 +66,10 @@ export default function Nav({ variant }: NavProps) {
         <div className="c-nav-right">
           {isAdmin ? (
             <>
-              <Link href="/" className="c-textlink">
+              <Link href="/" className="c-nav-view">
                 View site ↗
               </Link>
-              <Link href="/logout" className="c-textlink">
+              <Link href="/logout" className="c-signin-btn">
                 Sign out
               </Link>
             </>
