@@ -84,25 +84,25 @@ const TONE_STYLES: Record<
   }
 > = {
   green: {
-    stroke: "#00D68F",
-    bgClass: "bg-gain",
-    borderClass: "border-gain/40",
-    textClass: "text-gain",
-    softClass: "bg-gain/10",
+    stroke: "#2D9961",
+    bgClass: "bg-gain-2",
+    borderClass: "border-gain-2/50",
+    textClass: "text-gain-2",
+    softClass: "bg-[#DCF1E6]",
   },
   yellow: {
-    stroke: "#E8A020",
-    bgClass: "bg-owl",
-    borderClass: "border-owl/40",
-    textClass: "text-owl",
-    softClass: "bg-owl/10",
+    stroke: "#E89512",
+    bgClass: "bg-gold",
+    borderClass: "border-gold/50",
+    textClass: "text-gold",
+    softClass: "bg-[#FCEBCF]",
   },
   red: {
-    stroke: "#FF4560",
-    bgClass: "bg-loss",
-    borderClass: "border-loss/40",
-    textClass: "text-loss",
-    softClass: "bg-loss/10",
+    stroke: "#E04E4E",
+    bgClass: "bg-loss-2",
+    borderClass: "border-loss-2/50",
+    textClass: "text-loss-2",
+    softClass: "bg-[#FBE3E3]",
   },
 };
 
@@ -285,7 +285,7 @@ export async function downloadReportElement({
   const dataUrl = await toPngImpl(element, {
     cacheBust: true,
     pixelRatio: 2,
-    backgroundColor: "#03050D",
+    backgroundColor: "#FFF5E4",
   });
   const link = document.createElement("a");
   link.href = dataUrl;
@@ -446,28 +446,28 @@ function StatusPanel({ status }: { status: WorkspaceStatus }) {
   const activeIndex = status === "uploading" ? 0 : status === "processing" ? 2 : -1;
 
   return (
-    <div className="rounded-lg border border-border bg-surface p-5">
+    <div className="admin-card p-5">
       <div className="flex items-center gap-3">
-        <div className="h-7 w-7 animate-spin rounded-full border-2 border-border-2 border-t-owl" />
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-ink/30 border-t-coral" />
         <div>
-          <div className="font-mono text-xs font-bold uppercase text-owl">
+          <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-coral">
             {status === "uploading" ? "Uploading" : "Processing"}
           </div>
-          <div className="mt-1 text-sm text-text-2">Expected processing time is 1-3 seconds.</div>
+          <div className="mt-1 text-sm text-ink-2">Expected processing time is 1-3 seconds.</div>
         </div>
       </div>
       <ol className="mt-5 grid gap-2">
         {PROCESSING_STEPS.map((step, index) => (
           <li
             key={step}
-            className={`flex items-center gap-3 rounded-md border px-3 py-2 text-sm ${
+            className={`flex items-center gap-3 rounded-md border-[1.5px] px-3 py-2 text-sm ${
               index <= activeIndex
-                ? "border-owl/40 bg-owl/10 text-text"
-                : "border-border bg-deep text-text-2"
+                ? "border-coral bg-bg-3 text-ink"
+                : "border-ink/20 bg-bg-2 text-ink-3"
             }`}
           >
             <span
-              className={`h-2 w-2 rounded-full ${index <= activeIndex ? "bg-owl" : "bg-text-3"}`}
+              className={`h-2 w-2 rounded-full ${index <= activeIndex ? "bg-coral" : "bg-ink-3"}`}
               aria-hidden="true"
             />
             {step}
@@ -492,15 +492,15 @@ function UploadZone({
   return (
     <div
       {...getRootProps()}
-      className={`flex min-h-[560px] cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center outline-none transition-colors ${
-        isDragActive ? "border-owl bg-owl/10" : "border-border-2 bg-surface hover:border-owl/50 hover:bg-surf2"
+      className={`flex min-h-[560px] cursor-pointer flex-col items-center justify-center rounded-c-md border-[1.5px] border-dashed p-8 text-center outline-none transition-colors ${
+        isDragActive ? "border-coral bg-bg-3" : "border-ink/40 bg-bg-2 hover:border-coral hover:bg-bg-3"
       }`}
     >
       <input {...getInputProps()} />
       {imageSrc ? (
         <div className="w-full">
-          <div className="mb-4 font-mono text-xs font-bold uppercase text-text-2">Ready to measure</div>
-          <div className="mx-auto flex aspect-[5/7] max-h-[420px] max-w-[300px] items-center justify-center rounded-md border border-border bg-deep">
+          <div className="mb-4 font-mono-2 text-xs font-bold uppercase tracking-wider text-ink-2">Ready to measure</div>
+          <div className="mx-auto flex aspect-[5/7] max-h-[420px] max-w-[300px] items-center justify-center rounded-c-sm border-[1.5px] border-ink bg-bg-3">
             <svg viewBox="0 0 100 140" role="img" aria-label="Selected card image preview" className="h-full w-full">
               <image href={imageSrc} x="0" y="0" width="100" height="140" preserveAspectRatio="xMidYMid meet" />
             </svg>
@@ -508,7 +508,7 @@ function UploadZone({
         </div>
       ) : (
         <div className="max-w-xl">
-          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-md border border-owl/40 bg-owl/10 text-owl">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-c-sm border-[1.5px] border-coral bg-bg-3 text-coral">
             <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7" fill="none">
               <path
                 d="M12 16V4m0 0 4 4m-4-4-4 4M5 16v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"
@@ -519,14 +519,12 @@ function UploadZone({
               />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-text">Upload a front scan</h2>
-          <p className="mt-3 text-sm leading-6 text-text-2">
+          <h2 className="font-grotesk text-2xl font-bold text-ink">Upload a front scan</h2>
+          <p className="mt-3 text-sm leading-6 text-ink-2">
             Drop, paste, or browse for a JPEG, PNG, or WEBP image. The browser sends it through the
             authenticated OWL proxy, never directly to the CV service.
           </p>
-          <div className="mt-6 inline-flex rounded-md border border-owl/40 bg-owl px-4 py-2.5 font-mono text-xs font-bold uppercase text-void">
-            Browse scan
-          </div>
+          <div className="admin-btn admin-btn-primary mt-6">Browse scan</div>
         </div>
       )}
     </div>
@@ -543,27 +541,19 @@ function PreloadedImagePanel({
   onUploadDifferent: () => void;
 }) {
   return (
-    <div className="flex min-h-[560px] flex-col items-center justify-center rounded-lg border border-border bg-surface p-8 text-center">
+    <div className="admin-card flex min-h-[560px] flex-col items-center justify-center p-8 text-center">
       <div className="w-full">
-        <div className="mb-4 font-mono text-xs font-bold uppercase text-text-2">Ready to measure</div>
-        <div className="mx-auto flex aspect-[5/7] max-h-[420px] max-w-[300px] items-center justify-center rounded-md border border-border bg-deep">
+        <div className="mb-4 font-mono-2 text-xs font-bold uppercase tracking-wider text-ink-2">Ready to measure</div>
+        <div className="mx-auto flex aspect-[5/7] max-h-[420px] max-w-[300px] items-center justify-center rounded-c-sm border-[1.5px] border-ink bg-bg-3">
           <svg viewBox="0 0 100 140" role="img" aria-label="Saved card image preview" className="h-full w-full">
             <image href={imageSrc} x="0" y="0" width="100" height="140" preserveAspectRatio="xMidYMid meet" />
           </svg>
         </div>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <button
-            type="button"
-            onClick={onMeasure}
-            className="rounded-md border border-owl/40 bg-owl px-4 py-2.5 font-mono text-xs font-bold uppercase text-void transition-colors hover:bg-owl-light"
-          >
+          <button type="button" onClick={onMeasure} className="admin-btn admin-btn-primary">
             Measure this card
           </button>
-          <button
-            type="button"
-            onClick={onUploadDifferent}
-            className="rounded-md border border-border bg-deep px-4 py-2.5 font-mono text-xs font-bold uppercase text-text transition-colors hover:border-border-2 hover:bg-surf2"
-          >
+          <button type="button" onClick={onUploadDifferent} className="admin-btn admin-btn-ghost">
             Upload a different image
           </button>
         </div>
@@ -591,7 +581,7 @@ function OverlaySvg({
       viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}
       role="img"
       aria-label="Measured card centering overlay"
-      className="h-full max-h-[720px] w-full rounded-md bg-black/30"
+      className="h-full max-h-[720px] w-full rounded-c-sm bg-bg-3"
     >
       {imageSrc && (
         <image
@@ -622,8 +612,8 @@ function OverlaySvg({
         y={innerFrame.y}
         width={innerFrame.width}
         height={innerFrame.height}
-        fill="rgba(0,0,0,0.10)"
-        stroke="#E4EAF6"
+        fill="rgba(26,15,8,0.06)"
+        stroke="#1A0F08"
         strokeDasharray="14 10"
         strokeWidth="3"
       />
@@ -691,70 +681,62 @@ function ResultPanel({
 
   return (
     <div ref={reportRef} className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
-      <section className="rounded-lg border border-border bg-surface p-4">
+      <section className="admin-card p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <div className="font-mono text-xs font-bold uppercase text-owl">Measured Overlay</div>
-            <h2 className="mt-1 text-xl font-bold text-text">{cardIdentity.name}</h2>
+            <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-coral">Measured Overlay</div>
+            <h2 className="mt-1 font-grotesk text-xl font-bold text-ink">{cardIdentity.name}</h2>
           </div>
           {cardIdentity.rarity && (
-            <span className="rounded-md border border-owl/40 bg-owl/10 px-3 py-1.5 font-mono text-xs font-bold uppercase text-owl">
+            <span className="inline-flex items-center rounded-c-pill border-[1.2px] border-coral bg-bg-3 px-3 py-1 font-mono-2 text-xs font-bold uppercase tracking-wider text-coral">
               {cardIdentity.rarity}
             </span>
           )}
         </div>
-        <div className="flex min-h-[520px] items-center justify-center rounded-md border border-border bg-deep p-3">
+        <div className="admin-card-inset flex min-h-[520px] items-center justify-center p-3">
           <OverlaySvg imageSrc={imageSrc} overlay={result.overlay} imageSize={imageSize} tone={viewModel.tone} />
         </div>
       </section>
 
-      <section className="rounded-lg border border-border bg-surface p-5">
-        <div className={`inline-flex rounded-md border px-3 py-2 font-mono text-xs font-bold uppercase ${tone.borderClass} ${tone.softClass} ${tone.textClass}`}>
+      <section className="admin-card p-5">
+        <div className={`inline-flex rounded-c-sm border-[1.5px] px-3 py-2 font-mono-2 text-xs font-bold uppercase tracking-wider ${tone.borderClass} ${tone.softClass} ${tone.textClass}`}>
           {viewModel.ceilingLabel}
         </div>
         <div className="mt-5 grid grid-cols-2 gap-3">
           <RatioBox label="Left / Right" value={viewModel.leftRight} tone={viewModel.tone} />
           <RatioBox label="Top / Bottom" value={viewModel.topBottom} tone={viewModel.tone} />
         </div>
-        <div className={`mt-4 rounded-md border p-4 ${tone.borderClass} ${tone.softClass}`}>
-          <div className="font-mono text-xs font-bold uppercase text-text-2">Worst axis</div>
+        <div className={`mt-4 rounded-c-sm border-[1.5px] p-4 ${tone.borderClass} ${tone.softClass}`}>
+          <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-ink-2">Worst axis</div>
           <div className={`mt-2 text-lg font-bold ${tone.textClass}`}>
             {viewModel.worstAxisLabel} at {viewModel.worstAxisValue}
           </div>
         </div>
-        <div className="mt-5 overflow-hidden rounded-md border border-border">
+        <div className="mt-5 overflow-hidden rounded-c-sm border-[1.5px] border-ink">
           <table className="w-full text-left text-sm">
-            <thead className="bg-deep font-mono text-xs uppercase text-text-2">
+            <thead className="bg-bg-3 font-mono-2 text-xs uppercase tracking-wider text-ink-2">
               <tr>
-                <th className="px-3 py-2">Ceiling</th>
-                <th className="px-3 py-2">Ratio</th>
-                <th className="px-3 py-2 text-right">Max major</th>
+                <th className="px-3 py-2 font-semibold">Ceiling</th>
+                <th className="px-3 py-2 font-semibold">Ratio</th>
+                <th className="px-3 py-2 text-right font-semibold">Max major</th>
               </tr>
             </thead>
             <tbody>
               {viewModel.thresholds.map((threshold) => (
-                <tr key={threshold.ceiling} className="border-t border-border">
-                  <td className="px-3 py-2 font-semibold text-text">{threshold.label}</td>
-                  <td className="px-3 py-2 font-mono text-text-2">{threshold.ratioLabel}</td>
-                  <td className="px-3 py-2 text-right font-mono text-text">{threshold.maxMajorPercent}%</td>
+                <tr key={threshold.ceiling} className="border-t border-bg-3">
+                  <td className="px-3 py-2 font-semibold text-ink">{threshold.label}</td>
+                  <td className="px-3 py-2 font-mono-2 text-ink-2">{threshold.ratioLabel}</td>
+                  <td className="px-3 py-2 text-right font-mono-2 text-ink">{threshold.maxMajorPercent}%</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         <div className="mt-5 flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={onDownload}
-            className="rounded-md border border-owl/40 bg-owl px-4 py-2.5 font-mono text-xs font-bold uppercase text-void transition-colors hover:bg-owl-light"
-          >
+          <button type="button" onClick={onDownload} className="admin-btn admin-btn-primary">
             Download report
           </button>
-          <button
-            type="button"
-            onClick={onReset}
-            className="rounded-md border border-border bg-deep px-4 py-2.5 font-mono text-xs font-bold uppercase text-text transition-colors hover:border-border-2 hover:bg-surf2"
-          >
+          <button type="button" onClick={onReset} className="admin-btn admin-btn-ghost">
             Measure another
           </button>
         </div>
@@ -774,9 +756,9 @@ function RatioBox({
 }) {
   const style = TONE_STYLES[tone];
   return (
-    <div className={`rounded-md border p-4 ${style.borderClass} ${style.softClass}`}>
-      <div className="font-mono text-xs font-bold uppercase text-text-2">{label}</div>
-      <div className={`mt-2 font-mono text-2xl font-bold ${style.textClass}`}>{value}</div>
+    <div className={`rounded-c-sm border-[1.5px] p-4 ${style.borderClass} ${style.softClass}`}>
+      <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-ink-2">{label}</div>
+      <div className={`mt-2 font-mono-2 text-2xl font-bold ${style.textClass}`}>{value}</div>
     </div>
   );
 }
@@ -828,7 +810,7 @@ function ManualOverlayEditor({
   return (
     <svg
       viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}
-      className="h-full max-h-[620px] w-full rounded-md bg-black/30"
+      className="h-full max-h-[620px] w-full rounded-c-sm bg-bg-3"
       onPointerMove={onPointerMove}
       onPointerUp={() => setActiveHandle(null)}
       onPointerLeave={() => setActiveHandle(null)}
@@ -841,13 +823,13 @@ function ManualOverlayEditor({
       <EditableRect
         rect={overlay.outerCard}
         target="outerCard"
-        stroke="#E8A020"
+        stroke="#E89512"
         onHandlePointerDown={(target, corner) => setActiveHandle({ target, corner })}
       />
       <EditableRect
         rect={overlay.innerFrame}
         target="innerFrame"
-        stroke="#00D68F"
+        stroke="#2D9961"
         onHandlePointerDown={(target, corner) => setActiveHandle({ target, corner })}
       />
     </svg>
@@ -879,7 +861,7 @@ function EditableRect({
         y={rect.y}
         width={rect.width}
         height={rect.height}
-        fill="rgba(0,0,0,0.10)"
+        fill="rgba(26,15,8,0.06)"
         stroke={stroke}
         strokeWidth="4"
       />
@@ -890,7 +872,7 @@ function EditableRect({
           cy={handle.y}
           r="12"
           fill={stroke}
-          stroke="#03050D"
+          stroke="#1A0F08"
           strokeWidth="4"
           className="cursor-move"
           onPointerDown={(event) => {
@@ -926,24 +908,24 @@ function FailurePanel({
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
-      <section className="rounded-lg border border-loss/40 bg-loss/10 p-4">
-        <div className="font-mono text-xs font-bold uppercase text-loss">{error?.code ?? "MEASUREMENT_FAILED"}</div>
-        <h2 className="mt-2 text-2xl font-bold text-text">{error?.message ?? "Measurement failed."}</h2>
+      <section className="rounded-c-md border-[1.5px] border-loss-2 bg-[#FBE3E3] p-4">
+        <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-loss-2">{error?.code ?? "MEASUREMENT_FAILED"}</div>
+        <h2 className="mt-2 font-grotesk text-2xl font-bold text-ink">{error?.message ?? "Measurement failed."}</h2>
         {showManualCorrection ? (
-          <p className="mt-2 text-sm leading-6 text-text-2">
+          <p className="mt-2 text-sm leading-6 text-ink-2">
             Drag the outer card and inner frame corners, then re-measure with those corrections.
           </p>
         ) : (
-          <p className="mt-2 text-sm leading-6 text-text-2">
+          <p className="mt-2 text-sm leading-6 text-ink-2">
             Try another image or return to the upload state.
           </p>
         )}
       </section>
 
-      <section className="rounded-lg border border-border bg-surface p-4 lg:col-span-2">
+      <section className="admin-card p-4 lg:col-span-2">
         {showManualCorrection ? (
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-            <div className="flex min-h-[520px] items-center justify-center rounded-md border border-border bg-deep p-3">
+            <div className="admin-card-inset flex min-h-[520px] items-center justify-center p-3">
               <ManualOverlayEditor
                 imageSrc={imageSrc}
                 imageSize={imageSize}
@@ -952,9 +934,9 @@ function FailurePanel({
               />
             </div>
             <div className="space-y-4">
-              <div className="rounded-md border border-border bg-deep p-4">
-                <div className="font-mono text-xs font-bold uppercase text-text-2">Manual correction</div>
-                <div className="mt-3 grid grid-cols-2 gap-3 font-mono text-xs text-text">
+              <div className="admin-card-inset p-4">
+                <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-ink-2">Manual correction</div>
+                <div className="mt-3 grid grid-cols-2 gap-3 font-mono-2 text-xs text-ink">
                   <div>Outer X {Math.round(manualOverlay.outerCard.x)}</div>
                   <div>Outer Y {Math.round(manualOverlay.outerCard.y)}</div>
                   <div>Inner X {Math.round(manualOverlay.innerFrame.x)}</div>
@@ -965,25 +947,21 @@ function FailurePanel({
                 type="button"
                 onClick={onRetry}
                 disabled={!canRetry}
-                className="w-full rounded-md border border-owl/40 bg-owl px-4 py-2.5 font-mono text-xs font-bold uppercase text-void transition-colors hover:bg-owl-light disabled:cursor-not-allowed disabled:opacity-50"
+                className="admin-btn admin-btn-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Re-measure with my corrections
               </button>
               <button
                 type="button"
                 onClick={onReset}
-                className="w-full rounded-md border border-border bg-deep px-4 py-2.5 font-mono text-xs font-bold uppercase text-text transition-colors hover:border-border-2 hover:bg-surf2"
+                className="admin-btn admin-btn-ghost w-full justify-center"
               >
                 Measure another
               </button>
             </div>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={onReset}
-            className="rounded-md border border-border bg-deep px-4 py-2.5 font-mono text-xs font-bold uppercase text-text transition-colors hover:border-border-2 hover:bg-surf2"
-          >
+          <button type="button" onClick={onReset} className="admin-btn admin-btn-ghost">
             Measure another
           </button>
         )}
@@ -1129,11 +1107,11 @@ export default function CenteringWorkspace({
     <section className="space-y-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="font-mono text-xs font-bold uppercase text-owl">Owl Lens</div>
-          <h2 className="mt-2 text-3xl font-bold text-text">{cardIdentity.name}</h2>
-          {headerMeta && <div className="mt-2 font-mono text-xs font-semibold uppercase text-text-2">{headerMeta}</div>}
+          <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-coral">Owl Lens</div>
+          <h2 className="mt-2 font-grotesk text-3xl font-bold text-ink">{cardIdentity.name}</h2>
+          {headerMeta && <div className="mt-2 font-mono-2 text-xs font-semibold uppercase tracking-wider text-ink-2">{headerMeta}</div>}
         </div>
-        <div className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs font-semibold uppercase text-text-2">
+        <div className="admin-card px-3 py-2 font-mono-2 text-xs font-semibold uppercase tracking-wider text-ink-2">
           {state.status}
         </div>
       </div>
@@ -1141,7 +1119,7 @@ export default function CenteringWorkspace({
       {state.status === "idle" && (
         <>
           {preloadFetchError && (
-            <div className="rounded-md border border-loss/40 bg-loss/10 px-4 py-3 text-sm font-semibold text-text">
+            <div className="rounded-c-sm border-[1.5px] border-loss-2 bg-[#FBE3E3] px-4 py-3 text-sm font-semibold text-ink">
               {preloadFetchError}
             </div>
           )}
