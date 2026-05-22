@@ -282,13 +282,11 @@ export default async function InventoryCenteringPage({
 
   return (
     <section className="mx-auto max-w-[1280px] px-4 py-8">
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="admin-page-head">
         <div>
-          <p className="mb-2 font-mono text-sm font-semibold uppercase text-owl">
-            Inventory Tool
-          </p>
-          <h1 className="text-4xl font-bold text-text">Card Centering Measurement</h1>
-          <p className="mt-2 max-w-3xl text-base leading-7 text-text-2">
+          <p className="admin-eyebrow">Inventory Tool</p>
+          <h1 className="admin-title">Card Centering Measurement</h1>
+          <p className="admin-subline">
             Measure centering against the Owl Lens CV service and keep the latest grade ceiling tied
             to this inventory item.
           </p>

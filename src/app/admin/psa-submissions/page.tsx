@@ -154,11 +154,11 @@ export default async function PsaSubmissionsPage() {
 
   return (
     <section className="mx-auto max-w-[1480px] px-4 py-8">
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="admin-page-head">
         <div>
-          <p className="mb-2 font-mono text-sm font-semibold uppercase tracking-wider text-owl">Internal Tool</p>
-          <h1 className="text-4xl font-bold tracking-tight text-text">PSA Submissions</h1>
-          <p className="mt-2 max-w-3xl text-base text-text">
+          <p className="admin-eyebrow">Internal Tool</p>
+          <h1 className="admin-title">PSA Submissions</h1>
+          <p className="admin-subline">
             Review submissions by date, card count, grade results, and open the itemized card list only when needed.
           </p>
         </div>

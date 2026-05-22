@@ -30,11 +30,11 @@ export default async function NewInventoryBundlePage({
 
   return (
     <section className="mx-auto max-w-[1480px] px-4 py-8">
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="admin-page-head">
         <div>
-          <p className="mb-2 font-mono text-sm font-semibold uppercase tracking-wider text-owl">Inventory Bundle</p>
-          <h1 className="text-4xl font-bold tracking-tight text-text">Create Bundle</h1>
-          <p className="mt-2 max-w-3xl text-base text-text">
+          <p className="admin-eyebrow">Inventory Bundle</p>
+          <h1 className="admin-title">Create Bundle</h1>
+          <p className="admin-subline">
             Search inventory, group cards together, and keep the bundle moving through inventory as one unit.
           </p>
         </div>

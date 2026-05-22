@@ -35,12 +35,14 @@ const TOOLS = [
 export default function AdminLensPage() {
   return (
     <section className="mx-auto max-w-[1280px] px-4 py-8">
-      <div className="mb-6">
-        <p className="mb-2 font-mono text-sm font-semibold uppercase tracking-wider text-owl">Internal Tool</p>
-        <h1 className="text-4xl font-bold tracking-tight text-text">Owl Lens</h1>
-        <p className="mt-2 max-w-3xl text-base leading-7 text-text-2">
-          A suite of scan-based tools for pre-grading, inventory intake, and centering review.
-        </p>
+      <div className="admin-page-head">
+        <div>
+          <p className="admin-eyebrow">Internal Tool</p>
+          <h1 className="admin-title">Owl Lens</h1>
+          <p className="admin-subline">
+            A suite of scan-based tools for pre-grading, inventory intake, and centering review.
+          </p>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
