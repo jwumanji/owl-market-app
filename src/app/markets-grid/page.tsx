@@ -48,17 +48,14 @@ export default async function MarketsGridPage() {
   );
 
   return (
-    <main style={{ padding: "2rem 1.5rem", maxWidth: 1400, margin: "0 auto" }}>
-      <h1
-        style={{
-          fontSize: 28,
-          fontWeight: 700,
-          marginBottom: 24,
-          color: "var(--text)",
-        }}
-      >
-        Market Grid
-      </h1>
+    <main className="markets-grid-page">
+      <div className="ph-eyebrow">TCG &middot; Live prices &middot; Grid view</div>
+      <div className="ph-title">
+        Market grid &mdash; <span>top 20</span>
+      </div>
+      <div className="ph-sub">
+        Sorted by market avg &middot; Updated every 60s &middot; One Piece TCG
+      </div>
       <MarketGrid cards={cards} />
     </main>
   );
