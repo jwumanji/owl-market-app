@@ -205,9 +205,9 @@ export default function InventoryPreviewPage() {
             Sample view for Raw, Damaged, and Graded inventory stages.
           </p>
         </div>
-        <div className="rounded-lg border border-border bg-surface px-4 py-3 text-right">
-          <div className="font-mono text-sm font-semibold uppercase tracking-wider text-text">Total Quantity</div>
-          <div className="mt-1 text-3xl font-bold text-text">{totalQuantity}</div>
+        <div className="admin-stat-card">
+          <div className="lbl">Total Quantity</div>
+          <div className="val">{totalQuantity}</div>
         </div>
       </div>
 

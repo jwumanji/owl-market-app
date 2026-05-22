@@ -10,25 +10,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // ── Legacy (kept during migration) ──
-        void: "var(--void)",
-        deep: "var(--deep)",
-        surface: "var(--surface)",
-        surf2: "var(--surf2)",
-        surf3: "var(--surf3)",
-        border: "var(--border)",
-        "border-2": "var(--border2)",
-        owl: "var(--owl)",
-        "owl-light": "var(--owl2)",
-        gain: "var(--green)",
-        loss: "var(--red)",
-        blue: "var(--blue)",
-        purple: "var(--purple)",
-        text: "var(--text)",
-        "text-2": "var(--text2)",
-        "text-3": "var(--text3)",
-
-        // ── C1.5 (introduced in Stage A) ──
+        // ── C1.5 ──
         bg: "var(--bg)",
         "bg-2": "var(--bg-2)",
         "bg-3": "var(--bg-3)",
