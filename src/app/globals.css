@@ -113,7 +113,8 @@ body:has(.sets-v2-page),
 body:has(.setd-page),
 body:has(.markets-grid-page),
 body:has(.card-page),
-body:has(.login-page) {
+body:has(.login-page),
+body:has(.admin-page) {
   background: var(--bg);
   color: var(--ink);
 }
@@ -2269,4 +2270,22 @@ nav {
 @media (max-width: 640px) {
   .c-dash-top,
   .c-dash-bottom { grid-template-columns: 1fr; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   C1.5 ADMIN SHELL — Stage I
+   Foundation for every /admin/* route: cream page background
+   (registered above in the body:has() rule) + wide container.
+   Source of truth: mockups/08-admin-inventory.html.
+   ══════════════════════════════════════════════════════════════ */
+.admin-page {
+  padding: 32px 0 96px;
+}
+
+.admin-container {
+  max-width: 1680px;
+  margin: 0 auto;
+  /* Individual sides only — `padding: 0 28px` would zero vertical padding. */
+  padding-left: 28px;
+  padding-right: 28px;
 }
