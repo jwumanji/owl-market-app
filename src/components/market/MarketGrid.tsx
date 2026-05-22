@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { CardRow } from "@/lib/types";
 import { formatPrice, formatPct } from "@/lib/utils";
+import RarityBadge from "@/components/ui/RarityBadge";
 
 function changeVariant(pct: number | null | undefined): "up" | "down" | "flat" {
   if (pct == null || pct === 0) return "flat";
@@ -12,8 +13,9 @@ function changeVariant(pct: number | null | undefined): "up" | "down" | "flat" {
 export default function MarketGrid({ cards }: { cards: CardRow[] }) {
   return (
     <div className="mgrid">
-      {cards.map((card) => {
+      {cards.map((card, i) => {
         const ps = card.price_stats;
+        const rank = String(i + 1).padStart(2, "0");
         return (
           <Link
             key={card.id}
@@ -21,6 +23,10 @@ export default function MarketGrid({ cards }: { cards: CardRow[] }) {
             className="mgrid-card"
           >
             <div className="mgrid-img">
+              <span className="mgrid-rank">#{rank}</span>
+              <span className="mgrid-rar">
+                <RarityBadge rarity={card.rarity} />
+              </span>
               {card.image_url ? (
                 <img
                   src={card.image_url}
