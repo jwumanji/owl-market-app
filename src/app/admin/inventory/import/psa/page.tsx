@@ -16,16 +16,10 @@ export default function PsaImportPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <a
-            href="/admin/psa-submissions"
-            className="rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-sm font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl"
-          >
+          <a href="/admin/psa-submissions" className="admin-btn admin-btn-ghost">
             View Submissions
           </a>
-          <a
-            href="/admin/inventory"
-            className="rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-sm font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl"
-          >
+          <a href="/admin/inventory" className="admin-btn admin-btn-ghost">
             Back to Inventory
           </a>
         </div>
