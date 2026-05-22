@@ -135,7 +135,7 @@ export default function CardDetailPage() {
 
   if (loading) {
     return (
-      <section className="max-w-[1180px] mx-auto px-8 py-8">
+      <section className="card-page max-w-[1180px] mx-auto px-8 py-8">
         <p className="text-ink-2 text-sm font-mono-2">Loading card data...</p>
       </section>
     );
@@ -143,7 +143,7 @@ export default function CardDetailPage() {
 
   if (error || !card) {
     return (
-      <section className="max-w-[1180px] mx-auto px-8 py-8">
+      <section className="card-page max-w-[1180px] mx-auto px-8 py-8">
         <p className="text-loss-2 text-sm font-mono-2">{error ?? "Card not found"}</p>
         <Link href="/sets" className="text-coral text-sm mt-4 inline-block hover:underline">
           &larr; Back to Sets
@@ -162,7 +162,7 @@ export default function CardDetailPage() {
   const heroPrice = priceStats?.market_avg ?? null;
 
   return (
-    <section className="max-w-[1180px] mx-auto px-8 pt-8 pb-24 text-ink">
+    <section className="card-page max-w-[1180px] mx-auto px-8 pt-8 pb-24 text-ink">
       {/* Breadcrumb */}
       <div className="mb-8 font-mono-2 font-semibold text-[12px] tracking-[0.04em] flex items-center flex-wrap">
         <Link href="/sets" className="text-ink-3 hover:text-ink transition-colors">

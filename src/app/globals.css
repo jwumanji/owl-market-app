@@ -111,7 +111,8 @@ body:has(.rar-page),
 body:has(.chars-page),
 body:has(.sets-v2-page),
 body:has(.setd-page),
-body:has(.markets-grid-page) {
+body:has(.markets-grid-page),
+body:has(.card-page) {
   background: var(--bg);
   color: var(--ink);
 }
