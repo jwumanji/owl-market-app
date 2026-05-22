@@ -22,17 +22,14 @@ export default async function NewOrderPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link
-            href="/admin/inventory?status=ship"
-            className="rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-sm font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:text-owl"
-          >
+          <Link href="/admin/inventory?status=ship" className="admin-btn admin-btn-ghost">
             Back to Inventory
           </Link>
         </div>
       </div>
 
       {error ? (
-        <div className="rounded-lg border border-loss/30 bg-loss/10 p-4 text-base text-text">
+        <div className="rounded-c-md border-[1.5px] border-coral bg-[#FFE2DD] px-4 py-3 font-grotesk text-sm text-ink">
           Orders are not ready yet: {error}. Run schema-migration-v18-customer-orders.sql in Supabase.
         </div>
       ) : (
