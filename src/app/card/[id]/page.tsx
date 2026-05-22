@@ -206,11 +206,13 @@ export default function CardDetailPage() {
               <RarityBadge rarity={card.rarity} />
             </div>
             {(card.card_type ||
-              card.variant_label ||
+              (card.variant_label && card.variant_label !== card.rarity) ||
               (card.color && card.color.length > 0)) && (
               <div className="mt-3 flex gap-2 flex-wrap">
                 {card.card_type && <Chip>{card.card_type}</Chip>}
-                {card.variant_label && <Chip>{card.variant_label}</Chip>}
+                {card.variant_label && card.variant_label !== card.rarity && (
+                  <Chip>{card.variant_label}</Chip>
+                )}
                 {card.color?.map((c) => (
                   <Chip key={c}>{c}</Chip>
                 ))}
