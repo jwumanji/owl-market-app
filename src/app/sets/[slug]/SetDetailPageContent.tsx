@@ -24,9 +24,11 @@ export async function SetDetailPageContent({
   const slug = decodeURIComponent(rawSlug).toLowerCase();
 
   let loadedSets: SetData[] = [];
+  let gameName = "One Piece TCG";
   try {
     const data = await loadSets({ game: gameRouteSlug });
     loadedSets = data.sets as unknown as SetData[];
+    gameName = data.game.name;
   } catch (e) {
     console.error("Failed to load sets for detail page:", e);
     return (
@@ -48,7 +50,7 @@ export async function SetDetailPageContent({
     notFound();
   }
 
-  return <SetDetailClient set={set} allSets={loadedSets} gameRouteSlug={gameRouteSlug} />;
+  return <SetDetailClient set={set} allSets={loadedSets} gameRouteSlug={gameRouteSlug} gameName={gameName} />;
 }
 
 export default async function SetDetailPage({ params }: { params: { slug: string } }) {

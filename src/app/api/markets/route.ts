@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { withOnePiecePayloadFallbacksList } from "@/lib/game-payload";
-import { gameParamFromRequest, resolveGameScope } from "@/lib/game-scope";
+import { gameParamFromRequest, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   const supabase = createServiceClient();
   const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
     defaultToOnePiece: true,
-    publicOnly: true,
+    publicOnly: publicOnlyForCatalogPreview(),
   });
 
   if (gameResult.error) {

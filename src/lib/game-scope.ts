@@ -67,6 +67,18 @@ function gamePayload(game: GameScope) {
   };
 }
 
+export function allowsPrivateGamePreview() {
+  return (
+    process.env.ENABLE_PRIVATE_GAME_PREVIEW === "1" ||
+    process.env.VERCEL_ENV === "preview" ||
+    process.env.NODE_ENV !== "production"
+  );
+}
+
+export function publicOnlyForCatalogPreview() {
+  return !allowsPrivateGamePreview();
+}
+
 export function gameResponsePayload(game: GameScope) {
   return gamePayload(game);
 }

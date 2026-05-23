@@ -4,7 +4,7 @@ import MarketTable from "@/components/market/MarketTable";
 import MarketDashboard from "@/components/market/MarketDashboard";
 import { RARITY_META } from "@/app/rarities/rarities-data";
 import { withOnePiecePayloadFallbacksList } from "@/lib/game-payload";
-import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG, resolveGameScope } from "@/lib/game-scope";
+import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +45,7 @@ export async function MarketsPageContent({
   const supabase = createServiceClient();
   const gameResult = await resolveGameScope(supabase, gameRouteSlug, {
     defaultToOnePiece: true,
-    publicOnly: true,
+    publicOnly: publicOnlyForCatalogPreview(),
   });
 
   if (gameResult.error) {

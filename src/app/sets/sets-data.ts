@@ -4,7 +4,7 @@ export interface SetData {
   displayCode?: string;
   name: string;
   year: number | null;
-  type?: "op" | "eb" | "prb" | "st" | "promo";
+  type?: "op" | "eb" | "prb" | "st" | "promo" | "main" | "organized" | "judge";
   color: string;
   colorD: string;
   colorBd: string;
@@ -24,6 +24,7 @@ export interface SetData {
   perfUp: boolean[];
   topCards: TopCard[];
   comingSoon?: boolean;
+  pricingStatus?: "priced" | "catalog_only";
 }
 
 export interface TopCard {

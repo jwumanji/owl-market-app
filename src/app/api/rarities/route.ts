@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { RARITY_META } from "@/app/rarities/rarities-data";
-import { gameParamFromRequest, resolveGameScope } from "@/lib/game-scope";
+import { gameParamFromRequest, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const supabase = createServiceClient();
   const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
     defaultToOnePiece: true,
-    publicOnly: true,
+    publicOnly: publicOnlyForCatalogPreview(),
   });
 
   if (gameResult.error) {

@@ -36,6 +36,14 @@ function fmtUsd(v: number): string {
   return `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function isCatalogOnly(set: SetData) {
+  return set.pricingStatus === "catalog_only";
+}
+
+function setCardCount(set: SetData) {
+  return set.cardsTotal ?? set.cards;
+}
+
 function hexToRgba(hex: string, alpha: number): string {
   const h = hex.replace("#", "");
   const r = parseInt(h.substring(0, 2), 16);
@@ -81,12 +89,14 @@ function MiniSpark({ data, up, w, h }: { data: number[]; up: boolean; w: number;
   );
 }
 
-function PerfCell({ period, v }: { period: string; v: number }) {
-  const cls = v === 0 ? "flat" : v > 0 ? "up" : "dn";
+function PerfCell({ period, v }: { period: string; v: number | null }) {
+  const cls = v == null || v === 0 ? "flat" : v > 0 ? "up" : "dn";
   return (
     <div className="setd-perf-cell">
       <div className="setd-perf-period">{period}</div>
-      <div className={`setd-perf-val ${cls}`}>{v === 0 ? "0.0%" : `${v > 0 ? "+" : ""}${v.toFixed(1)}%`}</div>
+      <div className={`setd-perf-val ${cls}`}>
+        {v == null ? "—" : v === 0 ? "0.0%" : `${v > 0 ? "+" : ""}${v.toFixed(1)}%`}
+      </div>
     </div>
   );
 }
@@ -120,10 +130,12 @@ export default function SetDetailClient({
   set,
   allSets,
   gameRouteSlug,
+  gameName = "One Piece TCG",
 }: {
   set: SetData;
   allSets: SetData[];
   gameRouteSlug?: string | null;
+  gameName?: string;
 }) {
   const router = useRouter();
   const [range, setRange] = useState<RangeKey>("1m");
@@ -196,12 +208,17 @@ export default function SetDetailClient({
   }), []);
 
   const boosters = allSets.filter((s) => (s.type ?? "") === "op");
+  const mains = allSets.filter((s) => (s.type ?? "") === "main");
   const extras = allSets.filter((s) => (s.type ?? "") === "eb");
   const premiums = allSets.filter((s) => (s.type ?? "") === "prb");
   const starters = allSets.filter((s) => (s.type ?? "") === "st");
   const promos = allSets.filter((s) => (s.type ?? "") === "promo");
+  const organized = allSets.filter((s) => (s.type ?? "") === "organized");
+  const judges = allSets.filter((s) => (s.type ?? "") === "judge");
 
-  const isLive = !set.comingSoon && set.cards > 0;
+  const catalogOnly = isCatalogOnly(set);
+  const cardCount = setCardCount(set);
+  const isLive = !catalogOnly && !set.comingSoon && set.cards > 0;
   const deltaClass = set.chg30d === 0 ? "flat" : set.chg30d > 0 ? "up" : "dn";
 
   const imgSlug = set.slug.replace(/-/g, "").toLowerCase();
@@ -252,6 +269,12 @@ export default function SetDetailClient({
       </div>
 
       <div className="setd-switcher">
+        {mains.length > 0 && (
+          <div className="setd-switcher-row">
+            <span className="setd-switcher-label">Main</span>
+            <div className="setd-switcher-chips">{mains.map(chip)}</div>
+          </div>
+        )}
         {boosters.length > 0 && (
           <div className="setd-switcher-row">
             <span className="setd-switcher-label">Booster</span>
@@ -280,6 +303,18 @@ export default function SetDetailClient({
             <div className="setd-switcher-chips">{promos.map(chip)}</div>
           </div>
         )}
+        {organized.length > 0 && (
+          <div className="setd-switcher-row">
+            <span className="setd-switcher-label">Organized</span>
+            <div className="setd-switcher-chips">{organized.map(chip)}</div>
+          </div>
+        )}
+        {judges.length > 0 && (
+          <div className="setd-switcher-row">
+            <span className="setd-switcher-label">Judge</span>
+            <div className="setd-switcher-chips">{judges.map(chip)}</div>
+          </div>
+        )}
       </div>
 
       <div className="setd-hero">
@@ -301,7 +336,9 @@ export default function SetDetailClient({
             <span className="setd-id-code">{set.code}{set.year ? ` · ${set.year}` : ""}</span>
             <div className="setd-id-name">{set.name}</div>
             <div className="setd-id-desc">
-              One Piece TCG {set.code} — {set.cards} priced cards in this print run.
+              {catalogOnly
+                ? `${gameName} ${set.code} - ${cardCount.toLocaleString()} catalog cards imported. Pricing is not enabled yet.`
+                : `${gameName} ${set.code} - ${set.cards} priced cards in this print run.`}
             </div>
           </div>
           <div className="setd-id-rows">
@@ -320,9 +357,11 @@ export default function SetDetailClient({
               <span className="setd-id-val">{isLive ? set.atl : "—"}</span>
             </div>
             <div className="setd-id-row">
-              <span className="setd-id-key">Cards Priced</span>
+              <span className="setd-id-key">{catalogOnly ? "Cards Imported" : "Cards Priced"}</span>
               <span className="setd-id-val">
-                {set.cards}{set.cardsTotal && set.cardsTotal !== set.cards ? `/${set.cardsTotal}` : ""}
+                {catalogOnly
+                  ? cardCount.toLocaleString()
+                  : `${set.cards}${set.cardsTotal && set.cardsTotal !== set.cards ? `/${set.cardsTotal}` : ""}`}
               </span>
             </div>
             <div className="setd-id-row">
@@ -348,7 +387,9 @@ export default function SetDetailClient({
                   <span style={{ color: "inherit", opacity: 0.75, fontSize: 10, marginLeft: 3 }}>30D</span>
                 </span>
               </div>
-              <div className="setd-cc-sub">Total card value · {set.cards} cards tracked · USD</div>
+              <div className="setd-cc-sub">
+                {isLive ? `Total card value · ${set.cards} cards tracked · USD` : `${cardCount.toLocaleString()} catalog cards tracked`}
+              </div>
             </div>
             <div className="setd-cc-times">
               {(["7d", "1m", "3m", "1y", "max"] as RangeKey[]).map((r) => (
@@ -371,12 +412,12 @@ export default function SetDetailClient({
             )}
           </div>
           <div className="setd-perf-strip">
-            <PerfCell period="1H" v={0} />
-            <PerfCell period="24H" v={set.chg1d} />
-            <PerfCell period="7D" v={set.chg7d} />
-            <PerfCell period="30D" v={set.chg30d} />
-            <PerfCell period="1Y" v={set.chgMax} />
-            <PerfCell period="MAX" v={set.chgMax} />
+            <PerfCell period="1H" v={isLive ? 0 : null} />
+            <PerfCell period="24H" v={isLive ? set.chg1d : null} />
+            <PerfCell period="7D" v={isLive ? set.chg7d : null} />
+            <PerfCell period="30D" v={isLive ? set.chg30d : null} />
+            <PerfCell period="1Y" v={isLive ? set.chgMax : null} />
+            <PerfCell period="MAX" v={isLive ? set.chgMax : null} />
           </div>
         </div>
       </div>
@@ -387,12 +428,18 @@ export default function SetDetailClient({
             <div className="setd-tc-eyebrow">Holdings</div>
             <div className="setd-tc-title">Top Cards in <span>{set.code}</span></div>
             <div className="setd-tc-sub">
-              {set.topCards.length} of {set.cards} cards · sorted by average market price
+              {catalogOnly
+                ? `${cardCount.toLocaleString()} catalog cards imported · pricing not enabled`
+                : `${set.topCards.length} of ${cardCount.toLocaleString()} cards · sorted by average market price`}
             </div>
           </div>
-          <Link href={`${gamePath(gameRouteSlug, "/markets")}?set=${set.slug}`} className="setd-tc-link">
-            View all {set.cards} in markets →
-          </Link>
+          {catalogOnly ? (
+            <span className="setd-tc-link">Catalog only</span>
+          ) : (
+            <Link href={`${gamePath(gameRouteSlug, "/markets")}?set=${set.slug}`} className="setd-tc-link">
+              View all {cardCount.toLocaleString()} in markets →
+            </Link>
+          )}
         </div>
         <div className="setd-tc-wrap">
           {set.topCards.length === 0 ? (
@@ -476,6 +523,7 @@ export default function SetDetailClient({
 
 function boxArtIcon(code: string): string {
   const prefix = code.replace(/[0-9]/g, "");
+  if (["OGN", "SFD", "UNL", "OGS", "OPP", "JDG"].includes(code)) return "RB";
   if (prefix === "OP") return "⚓";
   if (prefix === "EB") return "✨";
   if (prefix === "PRB") return "💎";
@@ -486,6 +534,10 @@ function boxArtIcon(code: string): string {
 
 function boxArtCaption(code: string): string {
   const prefix = code.replace(/[0-9]/g, "");
+  if (["OGN", "SFD", "UNL"].includes(code)) return `Main Set · ${code}`;
+  if (code === "OGS") return `Starter Deck · ${code}`;
+  if (code === "OPP") return `Organized Play · ${code}`;
+  if (code === "JDG") return `Judge Promo · ${code}`;
   if (prefix === "OP") return `Booster Box · ${code}`;
   if (prefix === "EB") return `Extra Booster · ${code}`;
   if (prefix === "PRB") return `Premium · ${code}`;

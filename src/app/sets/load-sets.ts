@@ -1,10 +1,12 @@
 import { createServiceClient } from "@/lib/supabase-server";
 import { withOnePiecePayloadFallbacks } from "@/lib/game-payload";
 import {
+  allowsPrivateGamePreview,
   gameResponsePayload,
   resolveGameScope,
   type GameScope,
 } from "@/lib/game-scope";
+import { ONE_PIECE_DB_SLUG } from "@/lib/games/one-piece";
 
 // ---------------------------------------------------------------------------
 // loadSets() — groups cards by cards.printed_set_code so EB04, OP14, OP15 etc
@@ -93,17 +95,112 @@ export type LoadedSets = {
   game: ReturnType<typeof gameResponsePayload>;
 };
 
+const CATALOG_TYPE_COLOR: Record<string, string> = {
+  main: "#4F8EF7",
+  st: "#00D68F",
+  promo: "#F472B6",
+  organized: "#E8A020",
+  judge: "#9B72FF",
+};
+
+function classifyCatalogType(code: string | null | undefined, setTypeCode: string | null | undefined) {
+  const type = (setTypeCode ?? "").toUpperCase();
+  if (type === "MAIN_SET") return "main";
+  if (type === "PROVING_GROUNDS") return "st";
+  if (type === "ORGANIZED_PLAY_PROMO") return "organized";
+  if (type === "JUDGE_PROMO") return "judge";
+  if (type === "PROMO") return "promo";
+
+  const setCode = (code ?? "").toUpperCase();
+  if (["OGN", "SFD", "UNL"].includes(setCode)) return "main";
+  if (setCode === "OGS") return "st";
+  if (setCode === "OPP") return "organized";
+  if (setCode === "JDG") return "judge";
+  return "promo";
+}
+
+async function loadCatalogOnlySets(supabase: ReturnType<typeof createServiceClient>, game: GameScope): Promise<LoadedSets> {
+  const { data: setRows, error: setsErr } = await supabase
+    .from("sets")
+    .select("id, slug, code, name, year, color, card_count, set_type_id")
+    .eq("game_id", game.id)
+    .order("code");
+
+  if (setsErr) throw new Error(setsErr.message);
+
+  const { data: setTypeRows, error: setTypeErr } = await supabase
+    .from("game_set_types")
+    .select("id, code, name")
+    .eq("game_id", game.id);
+
+  if (setTypeErr) throw new Error(setTypeErr.message);
+
+  const setTypeById = new Map(
+    ((setTypeRows ?? []) as Array<{ id: string; code: string | null; name: string | null }>).map((row) => [row.id, row])
+  );
+
+  const sets = ((setRows ?? []) as Array<{
+    id: string;
+    slug: string;
+    code: string | null;
+    name: string;
+    year: number | null;
+    color: string | null;
+    card_count: number | null;
+    set_type_id: string | null;
+  }>).map((set) => {
+    const setType = set.set_type_id ? setTypeById.get(set.set_type_id) : null;
+    const type = classifyCatalogType(set.code, setType?.code);
+    const color = set.color || CATALOG_TYPE_COLOR[type] || DEFAULT_COLOR;
+    const totalCards = set.card_count ?? 0;
+
+    return {
+      slug: set.slug,
+      code: set.code ?? set.slug,
+      name: set.name,
+      year: set.year,
+      type,
+      color,
+      colorD: hexToRgba(color, 0.14),
+      colorBd: hexToRgba(color, 0.3),
+      price: 0,
+      chg7d: 0,
+      chg1d: 0,
+      chg30d: 0,
+      chgMax: 0,
+      cards: 0,
+      cardsTotal: totalCards,
+      volume: "catalog only",
+      ath: "—",
+      atl: "—",
+      up: true,
+      spark: [10, 10],
+      perf: { h1: "0%", h24: "0%", d7: "0%", m1: "0%", y1: "0%", max: "0%" },
+      perfUp: [true, true, true, true, true, true],
+      topCards: [],
+      comingSoon: false,
+      pricingStatus: "catalog_only",
+    };
+  });
+
+  return { sets, extraSets: [], game: gameResponsePayload(game) };
+}
+
 export async function loadSets(options: { game?: string | null; publicOnly?: boolean } = {}): Promise<LoadedSets> {
   const supabase = createServiceClient();
   const gameResult = await resolveGameScope(supabase, options.game, {
     defaultToOnePiece: true,
-    publicOnly: options.publicOnly ?? true,
+    publicOnly: options.publicOnly ?? !allowsPrivateGamePreview(),
   });
 
   if (gameResult.error) {
     throw new Error(gameResult.error.message);
   }
   const game: GameScope = gameResult.game;
+
+  if (game.slug !== ONE_PIECE_DB_SLUG) {
+    return loadCatalogOnlySets(supabase, game);
+  }
 
   // 1. All sets meta (for name / year / color lookup keyed by code)
   const { data: allSets, error: setsErr } = await supabase

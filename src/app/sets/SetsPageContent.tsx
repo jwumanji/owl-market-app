@@ -5,22 +5,36 @@ import { SETS as FALLBACK_SETS, type SetData } from "./sets-data";
 
 export const dynamic = "force-dynamic";
 
+function fallbackGameName(gameRouteSlug: string | null | undefined) {
+  if (!gameRouteSlug || gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG) return "One Piece TCG";
+  return gameRouteSlug
+    .split(/[-_]/g)
+    .filter(Boolean)
+    .map((part) => part[0]!.toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 export async function SetsPageContent({
   gameRouteSlug = DEFAULT_PUBLIC_GAME_ROUTE_SLUG,
 }: {
   gameRouteSlug?: string | null;
 } = {}) {
   let initialSets: SetData[];
+  let gameName = fallbackGameName(gameRouteSlug);
+  let loadError: string | null = null;
+  const isDefaultGame = !gameRouteSlug || gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
+
   try {
     const data = await loadSets({ game: gameRouteSlug });
     const loadedSets = data.sets as unknown as SetData[];
-    initialSets = loadedSets.length > 0
-      ? loadedSets
-      : FALLBACK_SETS;
+    gameName = data.game.name;
+    initialSets = loadedSets.length > 0 ? loadedSets : isDefaultGame ? FALLBACK_SETS : [];
   } catch {
-    initialSets = FALLBACK_SETS;
+    initialSets = isDefaultGame ? FALLBACK_SETS : [];
+    loadError = isDefaultGame ? null : `Failed to load ${gameName} catalog data.`;
   }
-  return <SetsClient initialSets={initialSets} gameRouteSlug={gameRouteSlug} />;
+
+  return <SetsClient initialSets={initialSets} gameRouteSlug={gameRouteSlug} gameName={gameName} loadError={loadError} />;
 }
 
 export default async function SetsPage() {
