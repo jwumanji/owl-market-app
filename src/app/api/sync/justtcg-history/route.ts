@@ -1,31 +1,35 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
-import { SET_SLUG_MAP, extractVariantLabel } from "@/lib/justtcg-match";
+import {
+  ONE_PIECE_JUSTTCG_GAME_SLUG,
+  buildJustTcgCodeToSlugs,
+  extractVariantLabel,
+  onePieceGame,
+  resolveOnePieceGame,
+} from "@/lib/games/one-piece";
 
 export const maxDuration = 60;
 
 const JUSTTCG_BASE = "https://api.justtcg.com/v1";
-const GAME = "one-piece-card-game";
+const GAME = ONE_PIECE_JUSTTCG_GAME_SLUG;
 const LOCK_TTL_MS = 55 * 60 * 1000;
 const DEFAULT_MAX_SETS = 1;
 const VALID_DURATIONS = new Set(["7d", "30d", "90d", "180d", "1y"]);
 
-const CODE_TO_SLUGS: Record<string, string[]> = {};
-for (const [slug, code] of Object.entries(SET_SLUG_MAP)) {
-  if (!CODE_TO_SLUGS[code]) CODE_TO_SLUGS[code] = [];
-  CODE_TO_SLUGS[code].push(slug);
-}
+const CODE_TO_SLUGS = buildJustTcgCodeToSlugs(onePieceGame.justTcgSetSlugMap);
 
 type Duration = "7d" | "30d" | "90d" | "180d" | "1y";
 
 interface DbSet {
   id: string;
+  game_id: string;
   code: string | null;
   name: string | null;
 }
 
 interface DbCard {
   id: string;
+  game_id: string;
   card_image_id: string | null;
   card_number: string | null;
   name: string | null;
@@ -57,6 +61,7 @@ interface PriceHistoryPoint {
 }
 
 interface HistoryInsert {
+  game_id: string;
   card_id: string;
   tcg_market: number;
   market_avg: number;
@@ -115,9 +120,11 @@ async function syncHistory(request: Request) {
     .filter(Boolean);
 
   const supabase = createServiceClient();
+  const game = await resolveOnePieceGame(supabase);
   const { data: dbSets, error: setsError } = await supabase
     .from("sets")
-    .select("id, code, name")
+    .select("id, game_id, code, name")
+    .eq("game_id", game.id)
     .order("code");
 
   if (setsError) {
@@ -165,7 +172,7 @@ async function syncHistory(request: Request) {
   try {
     for (const dbSet of setsToProcess) {
       try {
-        const result = await syncOneSetHistory(supabase, dbSet, historyDuration);
+        const result = await syncOneSetHistory(supabase, game.id, dbSet, historyDuration);
         results.push(result);
         processedForCursor++;
       } catch (error) {
@@ -193,6 +200,8 @@ async function syncHistory(request: Request) {
   const inserted = results.reduce((sum, result) => sum + result.inserted, 0);
   const response = {
     mode: manualCodes?.length ? "manual" : "cursor",
+    game: game.slug,
+    provider: "justtcg",
     historyDuration,
     maxSets,
     startIndex: manualCodes?.length ? null : startIndex,
@@ -215,6 +224,7 @@ async function syncHistory(request: Request) {
 async function syncOneSetHistory(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
+  gameId: string,
   dbSet: DbSet,
   historyDuration: Duration
 ): Promise<SetResult> {
@@ -242,7 +252,8 @@ async function syncOneSetHistory(
 
   const { data: dbCards, error: cardsError } = await supabase
     .from("cards")
-    .select("id,card_image_id,card_number,name,name_base,variant_label,set_id,tcg_product_id")
+    .select("id,game_id,card_image_id,card_number,name,name_base,variant_label,set_id,tcg_product_id")
+    .eq("game_id", gameId)
     .eq("set_id", dbSet.id);
 
   if (cardsError) {
@@ -274,7 +285,7 @@ async function syncOneSetHistory(
           continue;
         }
 
-        const rows = historyRowsForVariant(match.card.id, variant);
+        const rows = historyRowsForVariant(gameId, match.card.id, variant);
         if (rows.length === 0) {
           result.skipped.no_history++;
           continue;
@@ -475,7 +486,7 @@ function chooseVariant(jtCard: JTCard, isVariantCard: boolean): JTVariant | null
   return isVariantCard ? foil ?? normal ?? nearMint[0] ?? null : normal ?? foil ?? nearMint[0] ?? null;
 }
 
-function historyRowsForVariant(cardId: string, variant: JTVariant): HistoryInsert[] {
+function historyRowsForVariant(gameId: string, cardId: string, variant: JTVariant): HistoryInsert[] {
   const points = Array.isArray(variant.priceHistory)
     ? variant.priceHistory
     : Array.isArray(variant.priceHistory30d)
@@ -489,6 +500,7 @@ function historyRowsForVariant(cardId: string, variant: JTVariant): HistoryInser
     if (price === null || price <= 0 || timestamp === null) continue;
     const ms = timestamp > 1_000_000_000_000 ? timestamp : timestamp * 1000;
     rows.push({
+      game_id: gameId,
       card_id: cardId,
       tcg_market: price,
       market_avg: price,

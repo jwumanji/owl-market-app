@@ -640,6 +640,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   flex-shrink: 0;
 }
 
+.c-nav-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
 .c-lockup-wm {
   font-family: var(--font-space-grotesk), system-ui, sans-serif;
   font-weight: 700;
@@ -757,7 +765,40 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 /* Widen the shared Stage-B nav above admin pages so the wordmark/links
    align with the 1680px .admin-container (vs the 1280px public layout). */
 .c-topnav-inner.is-admin {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto minmax(260px, 1fr);
+  column-gap: 24px;
   max-width: 1680px;
+  padding-left: clamp(28px, 5vw, 76px);
+  padding-right: clamp(28px, 5vw, 76px);
+}
+
+.c-topnav-inner.is-admin .c-nav-left {
+  justify-self: start;
+}
+
+.c-topnav-inner.is-admin .c-nav-links {
+  justify-self: center;
+}
+
+.c-topnav-inner.is-admin .c-nav-right {
+  justify-self: end;
+}
+
+@media (max-width: 900px) {
+  .c-topnav-inner.is-admin {
+    grid-template-columns: 1fr auto;
+    row-gap: 12px;
+  }
+
+  .c-topnav-inner.is-admin .c-nav-links {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: start;
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
 }
 
 /* Mono "View site ↗" link in the admin nav right slot (mockup `.nav-view`). */

@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { INVENTORY_STATUSES, type InventoryStatus } from "@/lib/inventory-options";
 import { SALE_CHANNELS, type SaleChannel } from "@/lib/sale-options";
+import {
+  gameParamFromBody,
+  gameParamFromRequest,
+  resolveGameScope,
+} from "@/lib/game-scope";
 import { createServiceClient } from "@/lib/supabase-server";
 
 type RequestBody = Record<string, unknown>;
@@ -69,6 +74,7 @@ function inventoryItemIds(body: RequestBody) {
 
 async function validateInventoryItems(
   supabase: ReturnType<typeof createServiceClient>,
+  gameId: string,
   bundleId: string,
   ids: string[]
 ) {
@@ -79,6 +85,7 @@ async function validateInventoryItems(
   const inventoryRes = await supabase
     .from("inventory_items")
     .select("id")
+    .eq("game_id", gameId)
     .in("id", ids);
 
   if (inventoryRes.error) {
@@ -150,7 +157,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   const supabase = createServiceClient();
-  const inventoryValidation = await validateInventoryItems(supabase, params.id, ids);
+  const gameResult = await resolveGameScope(
+    supabase,
+    gameParamFromBody(requestBody) ?? gameParamFromRequest(request)
+  );
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
+
+  const inventoryValidation = await validateInventoryItems(supabase, game.id, params.id, ids);
   if (inventoryValidation.error) {
     return NextResponse.json({ error: inventoryValidation.error }, { status: 400 });
   }
@@ -211,6 +228,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       sale_channel: saleChannel.value,
       sold_date: saleChannel.value === "not_sold" ? null : soldDate,
     })
+    .eq("game_id", game.id)
     .in("id", ids);
 
   if (inventoryError) {
@@ -220,8 +238,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   return NextResponse.json({ id: params.id });
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request));
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+
   const { error } = await supabase
     .from("inventory_bundles")
     .delete()

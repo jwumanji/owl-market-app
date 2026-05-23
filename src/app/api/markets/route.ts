@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { withOnePiecePayloadFallbacksList } from "@/lib/game-payload";
+import { gameParamFromRequest, resolveGameScope } from "@/lib/game-scope";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -8,6 +10,15 @@ export async function GET(request: Request) {
   const limit = Math.min(parseInt(searchParams.get("limit") ?? "20", 10), 100);
 
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
+    defaultToOnePiece: true,
+    publicOnly: true,
+  });
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
 
   // Map sort key to column
   const sortCol: Record<string, string> = {
@@ -30,6 +41,7 @@ export async function GET(request: Request) {
       rarity,
       card_type,
       color,
+      game_payload,
       image_url,
       image_url_small,
       price_stats (
@@ -50,6 +62,7 @@ export async function GET(request: Request) {
         year
       )
     `)
+    .eq("game_id", game.id)
     .not("price_stats", "is", null)
     .order(orderBy, { referencedTable: "price_stats", ascending: false })
     .limit(limit);
@@ -65,7 +78,7 @@ export async function GET(request: Request) {
   }
 
   // Fallback JS sort in case referencedTable ordering doesn't work
-  const sorted = (data ?? []).sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
+  const sorted = withOnePiecePayloadFallbacksList((data ?? []) as Record<string, unknown>[]).sort((a, b) => {
     const pa = a.price_stats as Record<string, number> | null;
     const pb = b.price_stats as Record<string, number> | null;
     return (pb?.[orderBy] ?? 0) - (pa?.[orderBy] ?? 0);

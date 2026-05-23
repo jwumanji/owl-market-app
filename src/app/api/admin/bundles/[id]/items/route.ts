@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import {
+  gameParamFromBody,
+  gameParamFromRequest,
+  resolveGameScope,
+} from "@/lib/game-scope";
 
 type RequestBody = Record<string, unknown>;
 
@@ -22,6 +27,16 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(
+    supabase,
+    gameParamFromBody(body as RequestBody) ?? gameParamFromRequest(request)
+  );
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
+
   const bundleRes = await supabase
     .from("inventory_bundles")
     .select("id, status, sale_channel, sold_date")
@@ -35,6 +50,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const inventoryRes = await supabase
     .from("inventory_items")
     .select("id")
+    .eq("game_id", game.id)
     .eq("id", itemId)
     .single();
 
@@ -87,6 +103,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       sale_channel: bundle.sale_channel ?? "not_sold",
       sold_date: bundle.sale_channel === "not_sold" ? null : bundle.sold_date,
     })
+    .eq("game_id", game.id)
     .eq("id", itemId);
 
   if (inventoryUpdateError) {

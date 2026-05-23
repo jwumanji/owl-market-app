@@ -1,13 +1,27 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import {
+  gameParamFromRequest,
+  gameResponsePayload,
+  resolveGameScope,
+} from "@/lib/game-scope";
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
+    defaultToOnePiece: true,
+  });
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
 
   // Fetch all sets with card_count
   const { data: sets, error } = await supabase
     .from("sets")
     .select("id, slug, code, name, series, card_count")
+    .eq("game_id", game.id)
     .order("code");
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -18,6 +32,7 @@ export async function GET() {
       const { data } = await supabase
         .from("cards")
         .select("id")
+        .eq("game_id", game.id)
         .eq("set_id", set.id);
       return { set, cardIds: data?.map((c) => c.id) ?? [] };
     })
@@ -35,6 +50,7 @@ export async function GET() {
           chg_1d, chg_7d, chg_30d,
           card:card_id (name, rarity)
         `)
+        .eq("game_id", game.id)
         .in("card_id", cardIds)
         .not("tcg_market", "is", null)
         .order("tcg_market", { ascending: false })
@@ -54,6 +70,7 @@ export async function GET() {
     ? await supabase
         .from("price_history")
         .select("card_id, tcg_market, recorded_at")
+        .eq("game_id", game.id)
         .in("card_id", allTopIds)
         .order("recorded_at", { ascending: false })
         .limit(allTopIds.length * 9)
@@ -86,5 +103,5 @@ export async function GET() {
     })),
   }));
 
-  return NextResponse.json(result);
+  return NextResponse.json({ game: gameResponsePayload(game), sets: result });
 }

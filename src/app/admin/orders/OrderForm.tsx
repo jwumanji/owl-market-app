@@ -3,6 +3,7 @@
 import { type FormEvent, type MouseEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { displayCustomerOrderNumber } from "@/lib/customer-orders";
+import { DEFAULT_PUBLIC_GAME_DB_SLUG } from "@/lib/game-scope";
 import { SALE_CHANNEL_LABELS, SALE_CHANNELS, type SaleChannel } from "@/lib/sale-options";
 import type { CustomerOrderFormValue, OrderInventoryItem } from "./order-types";
 
@@ -24,6 +25,7 @@ const TYPE_LABELS: Record<string, string> = {
 type Props = {
   inventoryItems: OrderInventoryItem[];
   initialOrder?: CustomerOrderFormValue | null;
+  gameSlug?: string;
 };
 
 type HoverPreview = {
@@ -88,7 +90,11 @@ function todayDateString() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function OrderForm({ inventoryItems, initialOrder }: Props) {
+export default function OrderForm({
+  inventoryItems,
+  initialOrder,
+  gameSlug = DEFAULT_PUBLIC_GAME_DB_SLUG,
+}: Props) {
   const router = useRouter();
   const [nickname, setNickname] = useState(initialOrder?.nickname ?? "");
   const [customerName, setCustomerName] = useState(initialOrder?.customer_name ?? "");
@@ -160,10 +166,14 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
     }
 
     setSaving(true);
-    const res = await fetch(initialOrder ? `/api/admin/orders/${initialOrder.id}` : "/api/admin/orders", {
+    const endpoint = initialOrder
+      ? `/api/admin/orders/${initialOrder.id}?game=${encodeURIComponent(gameSlug)}`
+      : "/api/admin/orders";
+    const res = await fetch(endpoint, {
       method: initialOrder ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        game: gameSlug,
         nickname,
         customer_name: customerName,
         shipping_label: shippingLabel,
@@ -184,7 +194,7 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
       return;
     }
 
-    router.push(`/admin/orders/${payload.id}`);
+    router.push(`/admin/orders/${payload.id}?game=${encodeURIComponent(gameSlug)}`);
     router.refresh();
   }
 
@@ -193,7 +203,7 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
 
     setDeleting(true);
     setError(null);
-    const res = await fetch(`/api/admin/orders/${initialOrder.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/admin/orders/${initialOrder.id}?game=${encodeURIComponent(gameSlug)}`, { method: "DELETE" });
     const payload = await res.json().catch(() => null);
     setDeleting(false);
 
@@ -202,7 +212,7 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
       return;
     }
 
-    router.push("/admin/inventory?status=ship");
+    router.push(`/admin/inventory?game=${encodeURIComponent(gameSlug)}&status=ship`);
     router.refresh();
   }
 

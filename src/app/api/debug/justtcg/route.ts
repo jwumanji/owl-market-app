@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { JustTCG } from "justtcg-js";
+import { ONE_PIECE_JUSTTCG_GAME_SLUG } from "@/lib/games/one-piece";
 
-const GAME = "one-piece-card-game";
+const GAME = ONE_PIECE_JUSTTCG_GAME_SLUG;
 
 // Debug endpoint to inspect raw JustTCG API data for a set
 // Usage: /api/debug/justtcg?set=awakening-of-the-new-era-one-piece-card-game&search=luffy

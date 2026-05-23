@@ -5,6 +5,7 @@ import Image from "next/image";
 import DashboardWidget from "./DashboardWidget";
 import RarityBadge from "@/components/ui/RarityBadge";
 import CardHoverZoom from "@/components/ui/CardHoverZoom";
+import { gamePath } from "@/lib/game-routes";
 import { formatPrice, formatPct, pctColor } from "@/lib/utils";
 import type {
   DashboardData,
@@ -23,9 +24,9 @@ function Row({ href, children }: { href?: string; children: React.ReactNode }) {
 }
 
 /* ── Card row (Trending / Gainers / Losers) ── */
-function CardRow({ card, rank }: { card: DashboardCard; rank: number }) {
+function CardRow({ card, rank, gameRouteSlug }: { card: DashboardCard; rank: number; gameRouteSlug?: string | null }) {
   return (
-    <Row href={`/card/${card.card_image_id}`}>
+    <Row href={gamePath(gameRouteSlug, `/card/${card.card_image_id}`)}>
       <span className="c-drank">{rank}</span>
       {card.image_url_small ? (
         <CardHoverZoom src={card.image_url_small} alt={card.name}>
@@ -59,9 +60,9 @@ function CardRow({ card, rank }: { card: DashboardCard; rank: number }) {
 }
 
 /* ── Rarity ranking row ── */
-function RarityRow({ item, rank }: { item: RarityRankItem; rank: number }) {
+function RarityRow({ item, rank, gameRouteSlug }: { item: RarityRankItem; rank: number; gameRouteSlug?: string | null }) {
   return (
-    <Row href="/rarities">
+    <Row href={gamePath(gameRouteSlug, "/rarities")}>
       <span className="c-drank">{rank}</span>
       <RarityBadge rarity={item.code} />
       <span className="c-dinfo">
@@ -76,9 +77,9 @@ function RarityRow({ item, rank }: { item: RarityRankItem; rank: number }) {
 }
 
 /* ── Character row ── */
-function CharacterRow({ item, rank }: { item: CharacterRankItem; rank: number }) {
+function CharacterRow({ item, rank, gameRouteSlug }: { item: CharacterRankItem; rank: number; gameRouteSlug?: string | null }) {
   return (
-    <Row href="/characters">
+    <Row href={gamePath(gameRouteSlug, "/characters")}>
       <span className="c-drank">{rank}</span>
       <span className="c-dinfo">
         <span className="c-dname">{item.name}</span>
@@ -133,45 +134,51 @@ function Empty() {
 /* ══════════════════════════════
    Main Dashboard Component
 ══════════════════════════════ */
-export default function MarketDashboard({ data }: { data: DashboardData }) {
+export default function MarketDashboard({
+  data,
+  gameRouteSlug,
+}: {
+  data: DashboardData;
+  gameRouteSlug?: string | null;
+}) {
   return (
     <div className="c-dashboard">
       {/* ── Top row: 3 columns ── */}
       <div className="c-dash-top">
-        <DashboardWidget icon="🔥" title="Trending" viewAllHref="/markets?sort=chg_1d">
+        <DashboardWidget icon="🔥" title="Trending" viewAllHref={`${gamePath(gameRouteSlug, "/markets")}?sort=chg_1d`}>
           {data.trending.length > 0
-            ? data.trending.map((c, i) => <CardRow key={c.id} card={c} rank={i + 1} />)
+            ? data.trending.map((c, i) => <CardRow key={c.id} card={c} rank={i + 1} gameRouteSlug={gameRouteSlug} />)
             : <Empty />}
         </DashboardWidget>
 
-        <DashboardWidget icon="🚀" title="Top Gainers" viewAllHref="/markets?sort=chg_1d">
+        <DashboardWidget icon="🚀" title="Top Gainers" viewAllHref={`${gamePath(gameRouteSlug, "/markets")}?sort=chg_1d`}>
           {data.topGainers.length > 0
-            ? data.topGainers.map((c, i) => <CardRow key={c.id} card={c} rank={i + 1} />)
+            ? data.topGainers.map((c, i) => <CardRow key={c.id} card={c} rank={i + 1} gameRouteSlug={gameRouteSlug} />)
             : <Empty />}
         </DashboardWidget>
 
-        <DashboardWidget icon="📉" title="Top Losers" viewAllHref="/markets?sort=chg_1d">
+        <DashboardWidget icon="📉" title="Top Losers" viewAllHref={`${gamePath(gameRouteSlug, "/markets")}?sort=chg_1d`}>
           {data.topLosers.length > 0
-            ? data.topLosers.map((c, i) => <CardRow key={c.id} card={c} rank={i + 1} />)
+            ? data.topLosers.map((c, i) => <CardRow key={c.id} card={c} rank={i + 1} gameRouteSlug={gameRouteSlug} />)
             : <Empty />}
         </DashboardWidget>
       </div>
 
       {/* ── Bottom row: 4 columns ── */}
       <div className="c-dash-bottom">
-        <DashboardWidget icon="🏆" title="Rarity Ranking" viewAllHref="/rarities">
+        <DashboardWidget icon="🏆" title="Rarity Ranking" viewAllHref={gamePath(gameRouteSlug, "/rarities")}>
           {data.rarityRanking.length > 0
-            ? data.rarityRanking.map((r, i) => <RarityRow key={r.code} item={r} rank={i + 1} />)
+            ? data.rarityRanking.map((r, i) => <RarityRow key={r.code} item={r} rank={i + 1} gameRouteSlug={gameRouteSlug} />)
             : <Empty />}
         </DashboardWidget>
 
-        <DashboardWidget icon="⭐" title="Top Characters" viewAllHref="/characters">
+        <DashboardWidget icon="⭐" title="Top Characters" viewAllHref={gamePath(gameRouteSlug, "/characters")}>
           {data.topCharacters.length > 0
-            ? data.topCharacters.map((c, i) => <CharacterRow key={c.slug} item={c} rank={i + 1} />)
+            ? data.topCharacters.map((c, i) => <CharacterRow key={c.slug} item={c} rank={i + 1} gameRouteSlug={gameRouteSlug} />)
             : <Empty />}
         </DashboardWidget>
 
-        <DashboardWidget icon="📦" title="Sealed Boxes" viewAllHref="/rarities">
+        <DashboardWidget icon="📦" title="Sealed Boxes" viewAllHref={gamePath(gameRouteSlug, "/rarities")}>
           {data.sealedBoxes.length > 0
             ? data.sealedBoxes.map((s, i) => <SealedRow key={i} item={s} rank={i + 1} />)
             : <Empty />}

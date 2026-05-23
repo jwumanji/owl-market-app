@@ -5,6 +5,11 @@ import {
   isShortCustomerOrderId,
 } from "@/lib/customer-orders";
 import { SALE_CHANNELS, type SaleChannel } from "@/lib/sale-options";
+import {
+  gameParamFromBody,
+  gameParamFromRequest,
+  resolveGameScope,
+} from "@/lib/game-scope";
 import { createServiceClient } from "@/lib/supabase-server";
 
 type RequestBody = Record<string, unknown>;
@@ -101,6 +106,7 @@ async function nextOrderId(supabase: ReturnType<typeof createServiceClient>) {
 
 async function validateInventoryItems(
   supabase: ReturnType<typeof createServiceClient>,
+  gameId: string,
   ids: string[]
 ) {
   if (ids.length === 0) {
@@ -110,6 +116,7 @@ async function validateInventoryItems(
   const inventoryRes = await supabase
     .from("inventory_items")
     .select("id")
+    .eq("game_id", gameId)
     .in("id", ids);
 
   if (inventoryRes.error) {
@@ -151,7 +158,17 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServiceClient();
-  const inventoryValidation = await validateInventoryItems(supabase, ids);
+  const gameResult = await resolveGameScope(
+    supabase,
+    gameParamFromBody(requestBody) ?? gameParamFromRequest(request)
+  );
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
+
+  const inventoryValidation = await validateInventoryItems(supabase, game.id, ids);
   if (inventoryValidation.error) {
     return NextResponse.json({ error: inventoryValidation.error }, { status: 400 });
   }
@@ -232,6 +249,7 @@ export async function POST(request: Request) {
       sale_channel: saleChannel.value,
       sold_date: saleChannel.value === "not_sold" ? null : soldDate,
     })
+    .eq("game_id", game.id)
     .in("id", ids);
 
   if (inventoryError) {

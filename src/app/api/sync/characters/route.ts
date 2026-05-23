@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import {
+  gameParamFromRequest,
+  gameResponsePayload,
+  resolveGameScope,
+} from "@/lib/game-scope";
 
 export const maxDuration = 60;
 
@@ -51,12 +56,21 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
+    defaultToOnePiece: true,
+  });
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
 
   // 0. If reset mode, clear all character_id values first
   if (reset) {
     const { error: resetErr } = await supabase
       .from("cards")
       .update({ character_id: null })
+      .eq("game_id", game.id)
       .not("character_id", "is", null);
 
     if (resetErr) {
@@ -68,6 +82,7 @@ export async function POST(request: Request) {
   const { data: characters, error: charErr } = await supabase
     .from("characters")
     .select("id, name, slug, aliases")
+    .eq("game_id", game.id)
     .order("name");
 
   if (charErr) {
@@ -99,6 +114,7 @@ export async function POST(request: Request) {
     const { data: batch, error: cardsErr } = await supabase
       .from("cards")
       .select("id, name, name_base")
+      .eq("game_id", game.id)
       .is("character_id", null)
       .range(from, from + pageSize - 1);
 
@@ -146,6 +162,7 @@ export async function POST(request: Request) {
       supabase
         .from("cards")
         .update({ character_id: u.character_id })
+        .eq("game_id", game.id)
         .eq("id", u.id)
     );
 
@@ -155,6 +172,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     message: reset ? "Reset + backfill complete" : "Backfill complete",
+    game: gameResponsePayload(game),
     total_cards: allCards.length,
     matched: updates.length,
     updated,

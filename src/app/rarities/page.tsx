@@ -2,6 +2,9 @@
 
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
+import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
+import { gamePath, gameQueryValue } from "@/lib/game-routes";
 import {
   RARITIES as FALLBACK_RARITIES,
   TOP_5_SLUGS,
@@ -35,6 +38,19 @@ function buildTieredRarities(apiData: RarityData[], fallback: RarityData[]) {
   const top5 = TOP_5_SLUGS.map((s) => lookup.get(s)).filter(Boolean) as RarityData[];
   const tier2 = TIER_2_SLUGS.map((s) => lookup.get(s)).filter(Boolean) as RarityData[];
   return { top5, tier2, all: [...top5, ...tier2] };
+}
+
+function routeParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function gameDisplayName(gameRouteSlug: string) {
+  if (gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG) return "One Piece TCG";
+  return gameRouteSlug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 /* ── Rarity Ranking Card (top 5) ── */
@@ -148,7 +164,7 @@ function RarityDetail({ r }: { r: RarityData }) {
 }
 
 /* ── Rarity Cards Table ── */
-function RarityCards({ r }: { r: RarityData }) {
+function RarityCards({ r, gameRouteSlug }: { r: RarityData; gameRouteSlug: string }) {
   return (
     <div className="ch-cards-section">
       <div className="section-header">
@@ -160,7 +176,7 @@ function RarityCards({ r }: { r: RarityData }) {
               : "No card data available yet"}
           </div>
         </div>
-        <Link href="/markets" className="section-action">View all in markets &rarr;</Link>
+        <Link href={gamePath(gameRouteSlug, "/markets")} className="section-action">View all in markets &rarr;</Link>
       </div>
       {r.topCards.length > 0 ? (
         <div className="cards-table-wrap">
@@ -178,7 +194,7 @@ function RarityCards({ r }: { r: RarityData }) {
             </thead>
             <tbody>
               {r.topCards.map((card, i) => {
-                const href = card.cardImageId ? `/card/${card.cardImageId}` : undefined;
+                const href = card.cardImageId ? gamePath(gameRouteSlug, `/card/${card.cardImageId}`) : undefined;
                 return (
                 <tr key={i} onClick={href ? () => window.location.href = href : undefined} style={href ? { cursor: "pointer" } : undefined} className={href ? "tr-link" : undefined}>
                   <td className="rank-n">{i + 1}</td>
@@ -219,12 +235,15 @@ function RarityCards({ r }: { r: RarityData }) {
 /* ── Main Page ── */
 
 export default function RaritiesPage() {
+  const params = useParams<{ game?: string | string[] }>();
+  const gameRouteSlug = routeParam(params.game) ?? DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
   const [allRarities, setAllRarities] = useState<RarityData[]>([]);
   const [activeRarity, setActiveRarity] = useState<string>(TOP_5_SLUGS[0]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/rarities", { cache: "no-store" })
+    const query = new URLSearchParams({ game: gameQueryValue(gameRouteSlug) });
+    fetch(`/api/rarities?${query}`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
@@ -233,7 +252,7 @@ export default function RaritiesPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [gameRouteSlug]);
 
   const { top5, tier2, all } = buildTieredRarities(allRarities, FALLBACK_RARITIES);
   const r = all.find((x) => x.slug === activeRarity) || top5[0];
@@ -251,7 +270,7 @@ export default function RaritiesPage() {
         <span className="bsep"> &rsaquo; </span>
         <span style={{ color: "var(--ink)" }}>Rarities</span>
       </div>
-      <div className="ph-eyebrow">One Piece TCG</div>
+      <div className="ph-eyebrow">{gameDisplayName(gameRouteSlug)}</div>
       <div className="ph-title">
         Rarity <span>Index</span>
       </div>
@@ -304,14 +323,14 @@ export default function RaritiesPage() {
           {/* Detail + Cards table */}
           <div className="ch-detail-section">
             <RarityDetail r={r} />
-            <RarityCards r={r} />
+            <RarityCards r={r} gameRouteSlug={gameRouteSlug} />
           </div>
         </>
       )}
 
       {/* See All Cards */}
       <div className="rar-see-all">
-        <Link href="/markets" className="rar-see-all-btn">
+        <Link href={gamePath(gameRouteSlug, "/markets")} className="rar-see-all-btn">
           See All Cards &rarr;
         </Link>
       </div>

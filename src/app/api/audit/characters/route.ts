@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import {
+  gameParamFromRequest,
+  gameResponsePayload,
+  resolveGameScope,
+} from "@/lib/game-scope";
 
 export const maxDuration = 60;
 
@@ -46,11 +51,20 @@ export async function GET(request: Request) {
   }
 
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
+    defaultToOnePiece: true,
+  });
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
 
   // 1. Fetch all characters
   const { data: characters, error: charErr } = await supabase
     .from("characters")
     .select("id, name, slug, aliases")
+    .eq("game_id", game.id)
     .order("name");
 
   if (charErr) {
@@ -78,6 +92,7 @@ export async function GET(request: Request) {
     const { data: batch, error: cardsErr } = await supabase
       .from("cards")
       .select("id, name, name_base, character_id")
+      .eq("game_id", game.id)
       .range(from, from + pageSize - 1);
 
     if (cardsErr) {
@@ -175,6 +190,7 @@ export async function GET(request: Request) {
   const wouldBeTagged = matched.length;
 
   return NextResponse.json({
+    game: gameResponsePayload(game),
     summary: {
       total_cards: allCards.length,
       currently_tagged_in_db: currentlyTagged,

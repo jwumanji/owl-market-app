@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BundlesList } from "./BundlesList";
 import { loadBundleSummaries } from "./bundle-data";
+import { DEFAULT_PUBLIC_GAME_DB_SLUG } from "@/lib/game-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -15,10 +16,13 @@ function searchParamValue(value?: string | string[]) {
 export default async function InventoryBundlesPage({
   searchParams,
 }: {
-  searchParams?: { created?: string | string[] };
+  searchParams?: { created?: string | string[]; game?: string | string[] } | Promise<{ created?: string | string[]; game?: string | string[] }>;
 }) {
-  const { data: bundles, error } = await loadBundleSummaries();
-  const createdBundleName = searchParamValue(searchParams?.created);
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const gameSlug = searchParamValue(resolvedSearchParams?.game) || DEFAULT_PUBLIC_GAME_DB_SLUG;
+  const encodedGameSlug = encodeURIComponent(gameSlug);
+  const { data: bundles, error } = await loadBundleSummaries(gameSlug);
+  const createdBundleName = searchParamValue(resolvedSearchParams?.created);
 
   return (
     <section className="mx-auto max-w-[1480px] px-4 py-8">
@@ -31,10 +35,10 @@ export default async function InventoryBundlesPage({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/admin/inventory" className="admin-btn admin-btn-ghost">
+          <Link href={`/admin/inventory?game=${encodedGameSlug}`} className="admin-btn admin-btn-ghost">
             Back to Inventory
           </Link>
-          <Link href="/admin/bundles/new" className="admin-btn admin-btn-primary">
+          <Link href={`/admin/bundles/new?game=${encodedGameSlug}`} className="admin-btn admin-btn-primary">
             Create Bundle
           </Link>
         </div>
@@ -62,7 +66,7 @@ export default async function InventoryBundlesPage({
       )}
 
       {!error && bundles.length > 0 && (
-        <BundlesList bundles={bundles} />
+        <BundlesList bundles={bundles} gameSlug={gameSlug} />
       )}
     </section>
   );

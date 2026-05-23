@@ -7,5 +7,5 @@ export const metadata = {
 };
 
 export default function OrdersPage() {
-  redirect("/admin/inventory?status=ship");
+  redirect("/admin/inventory?game=one_piece&status=ship");
 }

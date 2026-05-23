@@ -2,8 +2,10 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { CHARACTERS as FALLBACK_CHARS, TIER_LABELS } from "./characters-data";
+import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
+import { gamePath, gameQueryValue } from "@/lib/game-routes";
 
 /* ── Types ── */
 interface CharacterCard {
@@ -60,6 +62,19 @@ function assignColors(chars: CharacterData[]): CharacterData[] {
     colorBd: c.colorBd || PALETTE[i % PALETTE.length].colorBd,
     spark: c.spark || generateSparkFromChange(c.chg7d, c.chg30d),
   }));
+}
+
+function routeParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function gameDisplayName(gameRouteSlug: string) {
+  if (gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG) return "One Piece TCG";
+  return gameRouteSlug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function generateSparkFromChange(chg7d: number, chg30d: number): number[] {
@@ -168,7 +183,7 @@ function CharAvatar({ src, name, size = 28 }: { src: string | null; name: string
 }
 
 /* ── Card Image with Hover Preview ── */
-function CardImageCell({ card }: { card: CharacterCard }) {
+function CardImageCell({ card, gameRouteSlug }: { card: CharacterCard; gameRouteSlug: string }) {
   const router = useRouter();
   const [showPreview, setShowPreview] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
@@ -182,7 +197,7 @@ function CardImageCell({ card }: { card: CharacterCard }) {
   };
   const handleClick = () => {
     if (card.cardImageId) {
-      router.push(`/card/${card.cardImageId}`);
+      router.push(gamePath(gameRouteSlug, `/card/${card.cardImageId}`));
     }
   };
 
@@ -392,7 +407,7 @@ function CharacterDetail({ c }: { c: CharacterData }) {
 }
 
 /* ── Character Cards Table ── */
-function CharacterCards({ c }: { c: CharacterData }) {
+function CharacterCards({ c, gameRouteSlug }: { c: CharacterData; gameRouteSlug: string }) {
   return (
     <div className="ch-cards-section">
       <div className="section-header">
@@ -400,7 +415,7 @@ function CharacterCards({ c }: { c: CharacterData }) {
           <div className="section-title">Top Cards &mdash; <span style={{ color: c.color }}>{c.name}</span></div>
           <div className="section-sub">Top {c.topCards.length} highest value cards across all sets</div>
         </div>
-        <Link href="/markets" className="section-action">View all in markets &rarr;</Link>
+        <Link href={gamePath(gameRouteSlug, "/markets")} className="section-action">View all in markets &rarr;</Link>
       </div>
       <div className="cards-table-wrap">
         <table className="cards-table">
@@ -420,7 +435,7 @@ function CharacterCards({ c }: { c: CharacterData }) {
               <tr key={i} className={card.cardImageId ? "ch-card-clickable" : ""}>
                 <td className="rank-n">{i + 1}</td>
                 <td className="ch-card-img-td">
-                  <CardImageCell card={card} />
+                  <CardImageCell card={card} gameRouteSlug={gameRouteSlug} />
                 </td>
                 <td>
                   <div className="card-cell">
@@ -508,6 +523,8 @@ function AllCharactersGrid({ chars, activeSlug, onSelect }: { chars: CharacterDa
 /* ── Main Page ── */
 
 export default function CharactersPage() {
+  const params = useParams<{ game?: string | string[] }>();
+  const gameRouteSlug = routeParam(params.game) ?? DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
   const [characters, setCharacters] = useState<CharacterData[]>(() => assignColors(FALLBACK_CHARS));
   const [activeChar, setActiveChar] = useState(FALLBACK_CHARS[0].slug);
   const [loading, setLoading] = useState(true);
@@ -515,7 +532,8 @@ export default function CharactersPage() {
   const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
-    fetch("/api/characters")
+    const query = new URLSearchParams({ game: gameQueryValue(gameRouteSlug) });
+    fetch(`/api/characters?${query}`)
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
@@ -527,7 +545,7 @@ export default function CharactersPage() {
         // keep fallback data
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [gameRouteSlug]);
 
   const c = characters.find((x) => x.slug === activeChar) || characters[0];
 
@@ -560,7 +578,7 @@ export default function CharactersPage() {
         <span className="bsep"> &rsaquo; </span>
         <span style={{ color: "var(--ink)" }}>Characters</span>
       </div>
-      <div className="ph-eyebrow">One Piece TCG</div>
+      <div className="ph-eyebrow">{gameDisplayName(gameRouteSlug)}</div>
       <div className="ph-title">
         Character <span>Index</span>
       </div>
@@ -588,7 +606,7 @@ export default function CharactersPage() {
       {/* Detail + Cards */}
       <div className="ch-detail-section">
         <CharacterDetail c={c} />
-        <CharacterCards c={c} />
+        <CharacterCards c={c} gameRouteSlug={gameRouteSlug} />
       </div>
 
       {/* See All Characters Button / Grid */}

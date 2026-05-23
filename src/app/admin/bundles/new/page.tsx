@@ -1,6 +1,7 @@
 import Link from "next/link";
 import BundleForm from "../BundleForm";
 import { loadBundleInventory } from "../bundle-data";
+import { DEFAULT_PUBLIC_GAME_DB_SLUG } from "@/lib/game-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +9,16 @@ export const metadata = {
   title: "Create Bundle - OWL Market",
 };
 
-function selectedInventoryIds(searchParams?: { items?: string | string[] }) {
+type NewBundleSearchParams = {
+  items?: string | string[];
+  game?: string | string[];
+};
+
+function searchParamValue(value?: string | string[]) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function selectedInventoryIds(searchParams?: NewBundleSearchParams) {
   const raw = Array.isArray(searchParams?.items) ? searchParams?.items.join(",") : searchParams?.items ?? "";
   return Array.from(
     new Set(
@@ -23,10 +33,13 @@ function selectedInventoryIds(searchParams?: { items?: string | string[] }) {
 export default async function NewInventoryBundlePage({
   searchParams,
 }: {
-  searchParams?: { items?: string | string[] };
+  searchParams?: NewBundleSearchParams | Promise<NewBundleSearchParams>;
 }) {
-  const inventoryResult = await loadBundleInventory();
-  const initialSelectedIds = selectedInventoryIds(searchParams);
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const gameSlug = searchParamValue(resolvedSearchParams?.game) || DEFAULT_PUBLIC_GAME_DB_SLUG;
+  const encodedGameSlug = encodeURIComponent(gameSlug);
+  const inventoryResult = await loadBundleInventory(undefined, gameSlug);
+  const initialSelectedIds = selectedInventoryIds(resolvedSearchParams);
 
   return (
     <section className="mx-auto max-w-[1480px] px-4 py-8">
@@ -39,7 +52,7 @@ export default async function NewInventoryBundlePage({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/admin/bundles" className="admin-btn admin-btn-ghost">
+          <Link href={`/admin/bundles?game=${encodedGameSlug}`} className="admin-btn admin-btn-ghost">
             Back to Bundles
           </Link>
         </div>
@@ -53,7 +66,7 @@ export default async function NewInventoryBundlePage({
           <div className="mt-2 font-mono text-xs text-ink-2">{inventoryResult.error}</div>
         </div>
       ) : (
-        <BundleForm inventoryItems={inventoryResult.data} initialSelectedIds={initialSelectedIds} />
+        <BundleForm inventoryItems={inventoryResult.data} initialSelectedIds={initialSelectedIds} gameSlug={gameSlug} />
       )}
     </section>
   );

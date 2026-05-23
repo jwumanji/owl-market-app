@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { RARITY_META } from "@/app/rarities/rarities-data";
+import { gameParamFromRequest, resolveGameScope } from "@/lib/game-scope";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -9,8 +10,17 @@ export const maxDuration = 30;
 // GET /api/rarities — returns rarity index data with top cards + prices
 // ---------------------------------------------------------------------------
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
+    defaultToOnePiece: true,
+    publicOnly: true,
+  });
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
 
   const distinctRarities = Object.keys(RARITY_META).filter((k) => k !== "SEALED");
   const nonPromoRarities = distinctRarities.filter((k) => k !== "PROMO");
@@ -19,6 +29,7 @@ export async function GET() {
   const { data: promoSet } = await supabase
     .from("sets")
     .select("id")
+    .eq("game_id", game.id)
     .eq("slug", "promo")
     .single();
   const promoSetId = promoSet?.id as string | null;
@@ -40,7 +51,8 @@ export async function GET() {
     if (code === "PROMO") {
       let q = supabase
         .from("cards")
-        .select("id", { count: "exact", head: true });
+        .select("id", { count: "exact", head: true })
+        .eq("game_id", game.id);
       q = applyPromoFilter(q);
       const { count } = await q;
       return { code, count: count ?? 0 };
@@ -48,6 +60,7 @@ export async function GET() {
     let q = supabase
       .from("cards")
       .select("id", { count: "exact", head: true })
+      .eq("game_id", game.id)
       .eq("rarity", code);
     if (promoSetId) q = q.neq("set_id", promoSetId);
     const { count } = await q;
@@ -61,6 +74,7 @@ export async function GET() {
     let q = supabase
       .from("cards")
       .select("rarity, price_stats!inner (tcg_market, chg_7d, chg_30d)")
+      .eq("game_id", game.id)
       .in("rarity", nonPromoRarities)
       .not("price_stats.tcg_market", "is", null)
       .range(priceFrom, priceFrom + pricePageSize - 1);
@@ -95,6 +109,7 @@ export async function GET() {
     let q = supabase
       .from("cards")
       .select("rarity, price_stats!inner (tcg_market, chg_7d, chg_30d)")
+      .eq("game_id", game.id)
       .not("price_stats.tcg_market", "is", null)
       .range(promoFrom, promoFrom + pricePageSize - 1);
     q = applyPromoFilter(q);
@@ -157,6 +172,7 @@ export async function GET() {
       let q = supabase
         .from("cards")
         .select(fields)
+        .eq("game_id", game.id)
         .not("price_stats.tcg_market", "is", null)
         .order("price_stats(tcg_market)", { ascending: false })
         .limit(10);
@@ -168,6 +184,7 @@ export async function GET() {
     let q = supabase
       .from("cards")
       .select(fields)
+      .eq("game_id", game.id)
       .eq("rarity", code)
       .not("price_stats.tcg_market", "is", null)
       .order("price_stats(tcg_market)", { ascending: false })
@@ -197,6 +214,7 @@ export async function GET() {
       const { data } = await supabase
         .from("price_history")
         .select("card_id, tcg_market, recorded_at")
+        .eq("game_id", game.id)
         .in("card_id", batch)
         .order("recorded_at", { ascending: false })
         .limit(batch.length * 10);

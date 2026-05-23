@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { getCurrentAdminUser } from "@/lib/admin-user";
 import { createServiceClient } from "@/lib/supabase-server";
 import { saveCardMatchAlias, type CardMatchAliasSource } from "@/lib/card-match-aliases";
+import {
+  gameParamFromBody,
+  gameParamFromRequest,
+  resolveGameScope,
+} from "@/lib/game-scope";
 import { CATALOG_MATCH_STATUSES, GRADED_RATINGS } from "@/lib/inventory-options";
 import { getPrivateCustomCard, isMissingPrivateCustomCardsError } from "@/lib/private-custom-cards";
 
@@ -51,6 +56,15 @@ export async function PATCH(
   }
 
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(
+    supabase,
+    gameParamFromBody(body) ?? gameParamFromRequest(request)
+  );
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
   const updates: Record<string, string | number | boolean | null> = {};
 
   if ("card_id" in body) {
@@ -62,6 +76,20 @@ export async function PATCH(
     updates.card_id = cardId;
 
     if (cardId) {
+      const { data: catalogCard, error: cardError } = await supabase
+        .from("cards")
+        .select("id")
+        .eq("game_id", game.id)
+        .eq("id", cardId)
+        .maybeSingle();
+
+      if (cardError) {
+        return NextResponse.json({ error: cardError.message }, { status: 500 });
+      }
+      if (!catalogCard) {
+        return NextResponse.json({ error: "Catalog card was not found for this game" }, { status: 400 });
+      }
+
       updates.custom_card_id = null;
       updates.manual_card_name = null;
       updates.manual_card_number = null;
@@ -89,7 +117,7 @@ export async function PATCH(
         return NextResponse.json({ error: "Sign in before using private cards." }, { status: 401 });
       }
 
-      const privateCardResult = await getPrivateCustomCard(supabase, currentUser.id, customCardId);
+      const privateCardResult = await getPrivateCustomCard(supabase, currentUser.id, customCardId, game.id);
       if (privateCardResult.error || !privateCardResult.card) {
         const message = isMissingPrivateCustomCardsError(privateCardResult.error)
           ? "Private card table is not ready. Run schema-migration-v25-private-custom-cards.sql in Supabase."
@@ -299,12 +327,14 @@ export async function PATCH(
   const { data: existing } = await supabase
     .from("inventory_items")
     .select("status, inventory_type, manual_card_name, manual_card_number, manual_set_code, item_nickname, certification_number")
+    .eq("game_id", game.id)
     .eq("id", params.id)
     .single();
 
   const { data, error } = await supabase
     .from("inventory_items")
     .update(updates)
+    .eq("game_id", game.id)
     .eq("id", params.id)
     .select("id, card_id, custom_card_id, manual_card_name, manual_card_number, manual_set_code, catalog_match_status, pending_card_match, status, graded_rating, certification_number, custom_image_front_url, custom_image_back_url")
     .single();
@@ -334,6 +364,7 @@ export async function PATCH(
       rawSetHint: existingItem.manual_set_code,
       sourceType,
       cardId: updates.card_id,
+      gameId: game.id,
     });
   }
 
@@ -341,10 +372,31 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: { id: string } }
 ) {
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request));
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
+
+  const { data: scopedItem, error: scopedError } = await supabase
+    .from("inventory_items")
+    .select("id")
+    .eq("game_id", game.id)
+    .eq("id", params.id)
+    .maybeSingle();
+
+  if (scopedError) {
+    return NextResponse.json({ error: scopedError.message }, { status: 500 });
+  }
+  if (!scopedItem) {
+    return NextResponse.json({ error: "Inventory item not found for this game" }, { status: 404 });
+  }
+
   const { error: orderLinkError } = await supabase
     .from("customer_order_items")
     .delete()
@@ -366,6 +418,7 @@ export async function DELETE(
   const { error } = await supabase
     .from("inventory_items")
     .delete()
+    .eq("game_id", game.id)
     .eq("id", params.id);
 
   if (error) {

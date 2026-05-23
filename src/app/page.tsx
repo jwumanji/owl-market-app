@@ -2,6 +2,8 @@ import Link from "next/link";
 import OwlMark from "@/components/brand/OwlMark";
 import Wordmark from "@/components/brand/Wordmark";
 import HomeTeaserTable, { type TeaserCard } from "@/components/home/HomeTeaserTable";
+import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG, resolveGameScope } from "@/lib/game-scope";
+import { gamePath } from "@/lib/game-routes";
 import { createServiceClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +15,7 @@ export const metadata = {
 };
 
 const GAMES = [
-  { name: "One Piece TCG", href: "/markets", enabled: true, emoji: "🏴‍☠️" },
+  { name: "One Piece TCG", href: gamePath(DEFAULT_PUBLIC_GAME_ROUTE_SLUG, "/markets"), enabled: true, emoji: "🏴‍☠️" },
   { name: "Pokémon TCG", href: null, enabled: false, emoji: "⚡" },
   { name: "Magic: The Gathering", href: null, enabled: false, emoji: "🧙" },
   { name: "Riftbound", href: null, enabled: false, emoji: "🌀" },
@@ -23,13 +25,20 @@ const GAMES = [
 async function fetchTopCards(): Promise<TeaserCard[]> {
   try {
     const supabase = createServiceClient();
+    const gameResult = await resolveGameScope(supabase, DEFAULT_PUBLIC_GAME_ROUTE_SLUG, {
+      defaultToOnePiece: true,
+      publicOnly: true,
+    });
+    if (gameResult.error) return [];
+
     const { data, error } = await supabase
       .from("cards")
       .select(
-        `id, card_number, name, rarity, image_url_small,
+        `id, card_image_id, card_number, name, rarity, image_url_small,
          price_stats (market_avg, chg_1d),
          sets (code, name)`,
       )
+      .eq("game_id", gameResult.game.id)
       .not("price_stats", "is", null)
       .order("market_avg", { referencedTable: "price_stats", ascending: false })
       .limit(5);
@@ -41,6 +50,7 @@ async function fetchTopCards(): Promise<TeaserCard[]> {
       const set = row.sets as { code: string | null; name: string | null } | null;
       return {
         id: row.id as string,
+        card_image_id: (row.card_image_id as string | null) ?? null,
         name: row.name as string,
         rarity: (row.rarity as string | null) ?? null,
         image_url_small: (row.image_url_small as string | null) ?? null,
@@ -58,6 +68,7 @@ async function fetchTopCards(): Promise<TeaserCard[]> {
 
 export default async function Home() {
   const topCards = await fetchTopCards();
+  const marketHref = gamePath(DEFAULT_PUBLIC_GAME_ROUTE_SLUG, "/markets");
 
   return (
     <main className="c-home-main">
@@ -111,11 +122,11 @@ export default async function Home() {
             <h2 className="c-preview-title">
               Top of market — <em>live</em>
             </h2>
-            <Link href="/markets" className="c-preview-link">
+            <Link href={marketHref} className="c-preview-link">
               See full market →
             </Link>
           </div>
-          <HomeTeaserTable cards={topCards} />
+          <HomeTeaserTable cards={topCards} gameRouteSlug={DEFAULT_PUBLIC_GAME_ROUTE_SLUG} />
         </section>
 
         {/* FEATURES TRIO */}
@@ -144,7 +155,7 @@ export default async function Home() {
                 Real-time pricing from TCGPlayer, eBay sold listings, and Limitless. Updated every
                 minute, ranked by volume and movement.
               </p>
-              <Link href="/markets" className="c-feature-link">
+              <Link href={marketHref} className="c-feature-link">
                 Explore markets →
               </Link>
             </article>
@@ -213,7 +224,7 @@ export default async function Home() {
             <div className="c-cta-text">
               Track every card. <em>One market.</em>
             </div>
-            <Link href="/markets" className="c-cta-btn">
+            <Link href={marketHref} className="c-cta-btn">
               View live markets →
             </Link>
           </div>

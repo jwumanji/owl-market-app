@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import OwlMark from "@/components/brand/OwlMark";
 import Wordmark from "@/components/brand/Wordmark";
+import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
+import { gamePath } from "@/lib/game-routes";
 import Ticker from "./Ticker";
 
 type NavVariant = "public" | "admin";
@@ -14,14 +16,14 @@ type NavProps = {
 
 const PUBLIC_LINKS = [
   { label: "Home", href: "/" },
-  { label: "Markets", href: "/markets" },
-  { label: "Rarities", href: "/rarities" },
-  { label: "Sets", href: "/sets" },
-  { label: "Characters", href: "/characters" },
+  { label: "Markets", href: gamePath(DEFAULT_PUBLIC_GAME_ROUTE_SLUG, "/markets") },
+  { label: "Rarities", href: gamePath(DEFAULT_PUBLIC_GAME_ROUTE_SLUG, "/rarities") },
+  { label: "Sets", href: gamePath(DEFAULT_PUBLIC_GAME_ROUTE_SLUG, "/sets") },
+  { label: "Characters", href: gamePath(DEFAULT_PUBLIC_GAME_ROUTE_SLUG, "/characters") },
 ];
 
 const ADMIN_LINKS = [
-  { label: "Inventory", href: "/admin/inventory" },
+  { label: "Inventory", href: "/admin/inventory?game=one_piece" },
   { label: "Bundles", href: "/admin/bundles" },
   { label: "Orders", href: "/admin/orders" },
   { label: "Lens", href: "/admin/lens" },
@@ -29,8 +31,9 @@ const ADMIN_LINKS = [
 ];
 
 function isActivePath(pathname: string, href: string) {
-  if (href === "/") return pathname === href;
-  return pathname === href || pathname.startsWith(`${href}/`);
+  const hrefPath = href.split("?")[0];
+  if (hrefPath === "/") return pathname === hrefPath;
+  return pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
 }
 
 export default function Nav({ variant }: NavProps) {
@@ -43,12 +46,14 @@ export default function Nav({ variant }: NavProps) {
   return (
     <nav className="c-topnav" aria-label="Primary">
       <div className={`c-topnav-inner${isAdmin ? " is-admin" : ""}`}>
-        <Link href="/" className="c-lockup">
-          <OwlMark size={36} />
-          <Wordmark />
-        </Link>
+        <div className="c-nav-left">
+          <Link href="/" className="c-lockup">
+            <OwlMark size={36} />
+            <Wordmark />
+          </Link>
 
-        {isAdmin ? <span className="c-internal-chip">INTERNAL</span> : null}
+          {isAdmin ? <span className="c-internal-chip">INTERNAL</span> : null}
+        </div>
 
         <ul className="c-nav-links">
           {links.map((link) => (

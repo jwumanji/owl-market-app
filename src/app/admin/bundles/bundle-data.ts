@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase-server";
 import { getCurrentAdminUser } from "@/lib/admin-user";
+import { resolveGameScope } from "@/lib/game-scope";
 import {
   isMissingPrivateCustomCardsError,
   loadPrivateCustomCardsByIds,
@@ -73,6 +74,12 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unknown error";
 }
 
+async function resolveDefaultGameId(supabase: ReturnType<typeof createServiceClient>, game?: string | null) {
+  const gameResult = await resolveGameScope(supabase, game, { defaultToOnePiece: true });
+  if (gameResult.error) throw new Error(gameResult.error.message);
+  return gameResult.game.id;
+}
+
 function toBundleFormValue(bundle: BundleRow, inventoryItemIds: string[]): InventoryBundleFormValue {
   return {
     id: bundle.id,
@@ -119,7 +126,7 @@ function toInventoryItem(
   };
 }
 
-async function hydrateInventoryRows(rows: InventoryQueryRow[]): Promise<BundleInventoryItem[]> {
+async function hydrateInventoryRows(rows: InventoryQueryRow[], gameId: string): Promise<BundleInventoryItem[]> {
   const cardIds = Array.from(new Set(rows.map((row) => row.card_id).filter(Boolean))) as string[];
   const customCardIds = Array.from(new Set(rows.map((row) => row.custom_card_id).filter(Boolean))) as string[];
   const supabase = createServiceClient();
@@ -133,6 +140,7 @@ async function hydrateInventoryRows(rows: InventoryQueryRow[]): Promise<BundleIn
         id, name, image_url, image_url_small, card_number,
         sets (code)
       `)
+      .eq("game_id", gameId)
       .in("id", cardIds);
 
     if (cardsRes.error) {
@@ -144,7 +152,7 @@ async function hydrateInventoryRows(rows: InventoryQueryRow[]): Promise<BundleIn
 
   if (customCardIds.length > 0) {
     const currentUser = await getCurrentAdminUser();
-    const customCardsRes = await loadPrivateCustomCardsByIds(supabase, currentUser?.id ?? null, customCardIds);
+    const customCardsRes = await loadPrivateCustomCardsByIds(supabase, currentUser?.id ?? null, customCardIds, gameId);
     if (customCardsRes.error && !isMissingPrivateCustomCardsError(customCardsRes.error)) {
       throw new Error(customCardsRes.error.message);
     }
@@ -154,9 +162,10 @@ async function hydrateInventoryRows(rows: InventoryQueryRow[]): Promise<BundleIn
   return rows.map((row) => toInventoryItem(row, cardMap, customCardMap));
 }
 
-export async function loadBundleInventory(currentBundleId?: string): Promise<LoadResult<BundleInventoryItem[]>> {
+export async function loadBundleInventory(currentBundleId?: string, game?: string | null): Promise<LoadResult<BundleInventoryItem[]>> {
   try {
     const supabase = createServiceClient();
+    const gameId = await resolveDefaultGameId(supabase, game);
     const assignedRes = await supabase
       .from("inventory_bundle_items")
       .select("bundle_id, inventory_item_id");
@@ -176,6 +185,7 @@ export async function loadBundleInventory(currentBundleId?: string): Promise<Loa
     const inventoryRes = await supabase
       .from("inventory_items")
       .select(INVENTORY_SELECT)
+      .eq("game_id", gameId)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false });
 
@@ -188,7 +198,7 @@ export async function loadBundleInventory(currentBundleId?: string): Promise<Loa
       if (currentBundleItemIds.has(row.id)) return true;
       return row.status !== "sold";
     });
-    const items = await hydrateInventoryRows(rows);
+    const items = await hydrateInventoryRows(rows, gameId);
 
     return { data: items, error: null };
   } catch (error) {
@@ -196,9 +206,10 @@ export async function loadBundleInventory(currentBundleId?: string): Promise<Loa
   }
 }
 
-export async function loadBundleSummaries(): Promise<LoadResult<InventoryBundleSummary[]>> {
+export async function loadBundleSummaries(game?: string | null): Promise<LoadResult<InventoryBundleSummary[]>> {
   try {
     const supabase = createServiceClient();
+    const gameId = await resolveDefaultGameId(supabase, game);
     const bundlesRes = await supabase
       .from("inventory_bundles")
       .select(BUNDLE_SELECT)
@@ -232,13 +243,14 @@ export async function loadBundleSummaries(): Promise<LoadResult<InventoryBundleS
       const inventoryRes = await supabase
         .from("inventory_items")
         .select(INVENTORY_SELECT)
+        .eq("game_id", gameId)
         .in("id", inventoryIds);
 
       if (inventoryRes.error) {
         return { data: [], error: inventoryRes.error.message };
       }
 
-      inventoryItems = await hydrateInventoryRows((inventoryRes.data ?? []) as InventoryQueryRow[]);
+      inventoryItems = await hydrateInventoryRows((inventoryRes.data ?? []) as InventoryQueryRow[], gameId);
     }
 
     const inventoryMap = new Map(inventoryItems.map((item) => [item.id, item]));
@@ -266,13 +278,15 @@ export async function loadBundleSummaries(): Promise<LoadResult<InventoryBundleS
   }
 }
 
-export async function loadBundleForEdit(bundleId: string): Promise<LoadResult<InventoryBundleFormValue | null>> {
+export async function loadBundleForEdit(bundleId: string, game?: string | null): Promise<LoadResult<InventoryBundleFormValue | null>> {
   try {
     const supabase = createServiceClient();
+    const gameId = await resolveDefaultGameId(supabase, game);
     const bundleRes = await supabase
       .from("inventory_bundles")
       .select(BUNDLE_SELECT)
       .eq("id", bundleId)
+      .eq("game_id", gameId)
       .single();
 
     if (bundleRes.error) {
@@ -282,7 +296,8 @@ export async function loadBundleForEdit(bundleId: string): Promise<LoadResult<In
     const linksRes = await supabase
       .from("inventory_bundle_items")
       .select("inventory_item_id")
-      .eq("bundle_id", bundleId);
+      .eq("bundle_id", bundleId)
+      .eq("game_id", gameId);
 
     if (linksRes.error) {
       return { data: null, error: linksRes.error.message };

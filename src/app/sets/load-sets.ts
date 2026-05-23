@@ -1,4 +1,10 @@
 import { createServiceClient } from "@/lib/supabase-server";
+import { withOnePiecePayloadFallbacks } from "@/lib/game-payload";
+import {
+  gameResponsePayload,
+  resolveGameScope,
+  type GameScope,
+} from "@/lib/game-scope";
 
 // ---------------------------------------------------------------------------
 // loadSets() — groups cards by cards.printed_set_code so EB04, OP14, OP15 etc
@@ -84,15 +90,26 @@ const TYPE_COLOR: Record<string, string> = {
 export type LoadedSets = {
   sets: Array<Record<string, unknown>>;
   extraSets: Array<Record<string, unknown>>;
+  game: ReturnType<typeof gameResponsePayload>;
 };
 
-export async function loadSets(): Promise<LoadedSets> {
+export async function loadSets(options: { game?: string | null; publicOnly?: boolean } = {}): Promise<LoadedSets> {
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, options.game, {
+    defaultToOnePiece: true,
+    publicOnly: options.publicOnly ?? true,
+  });
+
+  if (gameResult.error) {
+    throw new Error(gameResult.error.message);
+  }
+  const game: GameScope = gameResult.game;
 
   // 1. All sets meta (for name / year / color lookup keyed by code)
   const { data: allSets, error: setsErr } = await supabase
     .from("sets")
     .select("id, slug, code, name, year, color, card_count")
+    .eq("game_id", game.id)
     .order("code");
 
   if (setsErr) throw new Error(setsErr.message);
@@ -123,6 +140,7 @@ export async function loadSets(): Promise<LoadedSets> {
         id,
         set_id,
         printed_set_code,
+        game_payload,
         name,
         card_number,
         card_image_id,
@@ -141,6 +159,7 @@ export async function loadSets(): Promise<LoadedSets> {
           atl
         )
       `)
+      .eq("game_id", game.id)
       .order("id", { ascending: true })
       .range(from, from + pageSize - 1);
 
@@ -175,7 +194,8 @@ export async function loadSets(): Promise<LoadedSets> {
   const cardsByCode: Record<string, CardCore[]> = {};
   const totalRowsByCode: Record<string, number> = {};
 
-  for (const card of allCards) {
+  for (const cardRow of allCards) {
+    const card = withOnePiecePayloadFallbacks(cardRow);
     const rawCode = (card.printed_set_code as string | null) ?? null;
     if (!rawCode) continue;
     const code = normalizeCode(rawCode);
@@ -254,6 +274,7 @@ export async function loadSets(): Promise<LoadedSets> {
       const { data: history } = await supabase
         .from("price_history")
         .select("card_id, tcg_market, recorded_at")
+        .eq("game_id", game.id)
         .in("card_id", chunk)
         .gte("recorded_at", sinceIso)
         .order("recorded_at", { ascending: true });
@@ -387,5 +408,5 @@ export async function loadSets(): Promise<LoadedSets> {
     return String(a.code).localeCompare(String(b.code));
   });
 
-  return { sets, extraSets };
+  return { sets, extraSets, game: gameResponsePayload(game) };
 }

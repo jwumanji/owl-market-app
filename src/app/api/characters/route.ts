@@ -1,17 +1,28 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { gameParamFromRequest, resolveGameScope } from "@/lib/game-scope";
 
 // ---------------------------------------------------------------------------
 // GET /api/characters — returns character index data with top cards + prices
 // ---------------------------------------------------------------------------
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
+    defaultToOnePiece: true,
+    publicOnly: true,
+  });
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
 
   // 1. Fetch all characters
   const { data: characters, error: charErr } = await supabase
     .from("characters")
     .select("id, slug, name, subtitle, faction, tier, type_tag")
+    .eq("game_id", game.id)
     .order("tier")
     .order("name");
 
@@ -26,6 +37,7 @@ export async function GET() {
       const { count } = await supabase
         .from("cards")
         .select("id", { count: "exact", head: true })
+        .eq("game_id", game.id)
         .eq("character_id", char.id);
 
       // Get top 5 cards by price
@@ -41,6 +53,7 @@ export async function GET() {
             ath, atl
           )
         `)
+        .eq("game_id", game.id)
         .eq("character_id", char.id)
         .not("price_stats.tcg_market", "is", null)
         .order("price_stats(tcg_market)", { ascending: false })
@@ -52,6 +65,7 @@ export async function GET() {
         ? await supabase
             .from("price_history")
             .select("card_id, tcg_market, recorded_at")
+            .eq("game_id", game.id)
             .in("card_id", topCardIds)
             .order("recorded_at", { ascending: false })
             .limit(topCardIds.length * 9)
@@ -70,6 +84,7 @@ export async function GET() {
       const { data: allPrices } = await supabase
         .from("cards")
         .select("price_stats (tcg_market, chg_7d, chg_30d)")
+        .eq("game_id", game.id)
         .eq("character_id", char.id)
         .not("price_stats.tcg_market", "is", null);
 

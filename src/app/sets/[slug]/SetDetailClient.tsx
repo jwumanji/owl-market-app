@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { gamePath } from "@/lib/game-routes";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -118,9 +119,11 @@ function chgCell(v: number) {
 export default function SetDetailClient({
   set,
   allSets,
+  gameRouteSlug,
 }: {
   set: SetData;
   allSets: SetData[];
+  gameRouteSlug?: string | null;
 }) {
   const router = useRouter();
   const [range, setRange] = useState<RangeKey>("1m");
@@ -209,7 +212,7 @@ export default function SetDetailClient({
     const arrow = s.chg30d > 0 ? "▲" : s.chg30d < 0 ? "▼" : "·";
     const arrowCls = s.chg30d > 0 ? "up" : s.chg30d < 0 ? "dn" : "";
     return (
-      <Link key={s.slug} href={`/sets/${s.slug}`} className={`setd-chip${isActive ? " active" : ""}`}>
+      <Link key={s.slug} href={gamePath(gameRouteSlug, `/sets/${s.slug}`)} className={`setd-chip${isActive ? " active" : ""}`}>
         <span>{s.code}</span>
         <span className={`setd-chip-arrow ${arrowCls}`}>{arrow}</span>
       </Link>
@@ -226,14 +229,14 @@ export default function SetDetailClient({
       <div className="setd-breadcrumb">
         <Link href="/">OWL Market</Link>
         <span className="bsep">›</span>
-        <Link href="/sets">Sets</Link>
+        <Link href={gamePath(gameRouteSlug, "/sets")}>Sets</Link>
         <span className="bsep">›</span>
         <span className="here">{set.code}</span>
       </div>
 
       <div className="setd-nav">
         <div className="setd-nav-left">
-          <Link href="/sets" className="setd-back">
+          <Link href={gamePath(gameRouteSlug, "/sets")} className="setd-back">
             <span className="setd-back-arrow">←</span>
             <span className="setd-back-meta">
               <b>All Sets</b>
@@ -387,7 +390,7 @@ export default function SetDetailClient({
               {set.topCards.length} of {set.cards} cards · sorted by average market price
             </div>
           </div>
-          <Link href={`/markets?set=${set.slug}`} className="setd-tc-link">
+          <Link href={`${gamePath(gameRouteSlug, "/markets")}?set=${set.slug}`} className="setd-tc-link">
             View all {set.cards} in markets →
           </Link>
         </div>
@@ -426,7 +429,7 @@ export default function SetDetailClient({
                   return (
                     <tr
                       key={cardId ?? i}
-                      onClick={() => cardId && router.push(`/card/${cardId}`)}
+                      onClick={() => cardId && router.push(gamePath(gameRouteSlug, `/card/${cardId}`))}
                       style={{ cursor: cardId ? "pointer" : "default" }}
                     >
                       <td className="setd-tc-rank">{i + 1}</td>

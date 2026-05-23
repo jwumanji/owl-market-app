@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { gamePath } from "@/lib/game-routes";
 import type { SetData } from "./sets-data";
 import SetThumb from "./SetThumb";
 import "./sets.css";
@@ -72,11 +73,13 @@ function HeadlineCard({
   label,
   icon,
   metric,
+  gameRouteSlug,
 }: {
   set: SetData;
   label: string;
   icon: string;
   metric: "30d" | "val" | "year";
+  gameRouteSlug?: string | null;
 }) {
   const colorD = set.color + "22";
   let footer: React.ReactNode;
@@ -97,7 +100,7 @@ function HeadlineCard({
   }
   const style = { ["--hl-color" as string]: set.color, ["--hl-color-d" as string]: colorD } as React.CSSProperties;
   return (
-    <Link href={`/sets/${set.slug}`} className="sets-v2-hl" style={style}>
+    <Link href={gamePath(gameRouteSlug, `/sets/${set.slug}`)} className="sets-v2-hl" style={style}>
       <div className="sets-v2-hl-glow" />
       <div className="sets-v2-hl-head">
         <span className="sets-v2-hl-label">{label}</span>
@@ -122,7 +125,13 @@ function HeadlineCard({
   );
 }
 
-export default function SetsClient({ initialSets }: { initialSets: SetData[] }) {
+export default function SetsClient({
+  initialSets,
+  gameRouteSlug,
+}: {
+  initialSets: SetData[];
+  gameRouteSlug?: string | null;
+}) {
   const router = useRouter();
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [yearFilter, setYearFilter] = useState<string>("all");
@@ -222,9 +231,9 @@ export default function SetsClient({ initialSets }: { initialSets: SetData[] }) 
 
       {headlineCards && (
         <div className="sets-v2-hl-row">
-          <HeadlineCard set={headlineCards.bigMover} label="Biggest Mover · 30D" icon="📈" metric="30d" />
-          <HeadlineCard set={headlineCards.mostValuable} label="Highest Index Value" icon="💎" metric="val" />
-          <HeadlineCard set={headlineCards.newest} label="Newest Release" icon="🆕" metric="year" />
+          <HeadlineCard set={headlineCards.bigMover} label="Biggest Mover · 30D" icon="📈" metric="30d" gameRouteSlug={gameRouteSlug} />
+          <HeadlineCard set={headlineCards.mostValuable} label="Highest Index Value" icon="💎" metric="val" gameRouteSlug={gameRouteSlug} />
+          <HeadlineCard set={headlineCards.newest} label="Newest Release" icon="🆕" metric="year" gameRouteSlug={gameRouteSlug} />
         </div>
       )}
 
@@ -320,7 +329,7 @@ export default function SetsClient({ initialSets }: { initialSets: SetData[] }) 
               sorted.map((s, i) => {
                 const empty = s.comingSoon || s.cards === 0;
                 return (
-                  <tr key={s.code} onClick={() => router.push(`/sets/${s.slug}`)}>
+                  <tr key={s.code} onClick={() => router.push(gamePath(gameRouteSlug, `/sets/${s.slug}`))}>
                     <td className="sv2-rank">{i + 1}</td>
                     <td className="sv2-thumb-cell">
                       <SetThumb slug={s.slug} code={s.code} color={s.color} variant="table" />

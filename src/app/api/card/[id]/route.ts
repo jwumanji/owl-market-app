@@ -1,12 +1,27 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { withOnePiecePayloadFallbacks } from "@/lib/game-payload";
+import {
+  gameParamFromRequest,
+  gameResponsePayload,
+  resolveGameScope,
+} from "@/lib/game-scope";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: { id: string } }
 ) {
   const { id } = params;
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
+    defaultToOnePiece: true,
+    publicOnly: true,
+  });
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
 
   // 1. Fetch card with price_stats and set info
   const { data: card, error: cardErr } = await supabase
@@ -21,6 +36,7 @@ export async function GET(
       rarity,
       card_type,
       color,
+      game_payload,
       image_url,
       image_url_small,
       price_stats (
@@ -49,6 +65,7 @@ export async function GET(
         year
       )
     `)
+    .eq("game_id", game.id)
     .eq("card_image_id", id)
     .limit(1)
     .single();
@@ -64,11 +81,13 @@ export async function GET(
   const set = Array.isArray(card.sets)
     ? card.sets[0] ?? null
     : card.sets ?? null;
+  const payloadCard = withOnePiecePayloadFallbacks(card as Record<string, unknown>);
 
   // 2. Fetch price history
   const { data: priceHistory } = await supabase
     .from("price_history")
     .select("tcg_market, market_avg, recorded_at")
+    .eq("game_id", game.id)
     .eq("card_id", card.id)
     .order("recorded_at", { ascending: true });
 
@@ -87,6 +106,7 @@ export async function GET(
   }
 
   return NextResponse.json({
+    game: gameResponsePayload(game),
     card: {
       id: card.id,
       card_image_id: card.card_image_id,
@@ -95,8 +115,8 @@ export async function GET(
       name_base: card.name_base,
       variant_label: card.variant_label,
       rarity: card.rarity,
-      card_type: card.card_type,
-      color: card.color,
+      card_type: payloadCard.card_type,
+      color: payloadCard.color,
       image_url: card.image_url,
       image_url_small: card.image_url_small,
     },
