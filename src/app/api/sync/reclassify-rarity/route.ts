@@ -6,8 +6,8 @@ import {
   buildJustTcgCodeToSlugs,
   classifyRarity,
   onePieceGame,
-  resolveOnePieceGame,
 } from "@/lib/games/one-piece";
+import { resolveOnePieceSyncGame } from "@/lib/games/one-piece/sync-scope";
 
 export const maxDuration = 60;
 
@@ -53,7 +53,11 @@ export async function GET(request: Request) {
   }
 
   const supabase = createServiceClient();
-  const game = await resolveOnePieceGame(supabase);
+  const gameResult = await resolveOnePieceSyncGame(supabase, request);
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
   const client = new JustTCG();
 
   // 1. Fetch all DB sets

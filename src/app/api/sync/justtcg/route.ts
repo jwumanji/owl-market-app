@@ -7,10 +7,10 @@ import {
   buildPrimaryJustTcgSlugByCode,
   catalogImageUrlForOnePieceCard,
   onePieceGame,
-  resolveOnePieceGame,
   extractVariantLabel,
   classifyRarity,
 } from "@/lib/games/one-piece";
+import { resolveOnePieceSyncGame } from "@/lib/games/one-piece/sync-scope";
 
 // Vercel Hobby: 10s default, this raises it to 60s
 export const maxDuration = 60;
@@ -49,7 +49,11 @@ async function syncPrices(request: Request) {
   }
 
   const supabase = createServiceClient();
-  const game = await resolveOnePieceGame(supabase);
+  const gameResult = await resolveOnePieceSyncGame(supabase, request);
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
 
   // Fetch all sets from DB
   const { data: dbSets, error: setsErr } = await supabase
@@ -141,7 +145,11 @@ async function syncByIndex(
   const dbSet = syncableSets[index];
   const client = new JustTCG();
   const supabase = createServiceClient();
-  const game = await resolveOnePieceGame(supabase);
+  const gameResult = await resolveOnePieceSyncGame(supabase, request);
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
 
   // Build prefix → set_id map so new cards land in their correct physical set.
   const { data: allSets } = await supabase
