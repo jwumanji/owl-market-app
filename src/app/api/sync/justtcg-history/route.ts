@@ -5,8 +5,8 @@ import {
   buildJustTcgCodeToSlugs,
   extractVariantLabel,
   onePieceGame,
-  resolveOnePieceGame,
 } from "@/lib/games/one-piece";
+import { resolveOnePieceSyncGame } from "@/lib/games/one-piece/sync-scope";
 
 export const maxDuration = 60;
 
@@ -120,7 +120,11 @@ async function syncHistory(request: Request) {
     .filter(Boolean);
 
   const supabase = createServiceClient();
-  const game = await resolveOnePieceGame(supabase);
+  const gameResult = await resolveOnePieceSyncGame(supabase, request);
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
   const { data: dbSets, error: setsError } = await supabase
     .from("sets")
     .select("id, game_id, code, name")
