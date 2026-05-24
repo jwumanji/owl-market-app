@@ -6,6 +6,10 @@ import {
   resolveGameScope,
   type GameScope,
 } from "@/lib/game-scope";
+import {
+  catalogCardDomains,
+  catalogCardType,
+} from "@/lib/catalog-card-fields";
 import "./game-overview.css";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +39,10 @@ type CardSampleRow = {
   name: string;
   rarity: string | null;
   variant_label: string | null;
+  card_type: string | null;
+  color: string[] | string | null;
+  cost: number | string | null;
+  types: string[] | string | null;
   game_payload: Record<string, unknown> | null;
   sets: { slug: string | null; code: string | null; name: string | null } | Array<{ slug: string | null; code: string | null; name: string | null }> | null;
 };
@@ -94,26 +102,6 @@ function metadataText(metadata: Record<string, unknown>, key: string, fallback =
 function joinedSet(row: CardSampleRow) {
   if (Array.isArray(row.sets)) return row.sets[0] ?? null;
   return row.sets;
-}
-
-function cardPayload(row: CardSampleRow) {
-  const payloadCard = row.game_payload?.card;
-  return payloadCard && typeof payloadCard === "object"
-    ? payloadCard as Record<string, unknown>
-    : {};
-}
-
-function cardType(row: CardSampleRow) {
-  const payload = cardPayload(row);
-  return asText(payload.type) ?? asText(payload.supertype) ?? "Catalog card";
-}
-
-function cardDomains(row: CardSampleRow) {
-  const payload = cardPayload(row);
-  const domains = payload.domains;
-  if (!Array.isArray(domains)) return null;
-  const clean = domains.map(asText).filter(Boolean);
-  return clean.length > 0 ? clean.join(", ") : null;
 }
 
 async function loadGameOverview(gameRouteSlug: string): Promise<OverviewData> {
@@ -181,6 +169,10 @@ async function loadGameOverview(gameRouteSlug: string): Promise<OverviewData> {
           name,
           rarity,
           variant_label,
+          card_type,
+          color,
+          cost,
+          types,
           game_payload,
           sets (slug, code, name)
         `)
@@ -440,7 +432,7 @@ export default async function GameOverviewPage({
                 <span>{set?.code ?? "No set"}</span>
                 <span>{card.rarity ?? "Unknown"}</span>
                 <span>{card.variant_label ?? "Base"}</span>
-                <span>{cardDomains(card) ?? cardType(card)}</span>
+                <span>{catalogCardDomains(card) ?? catalogCardType(card)}</span>
               </Link>
             );
           })}

@@ -7,6 +7,13 @@ import {
   resolveGameScope,
   type GameScope,
 } from "@/lib/game-scope";
+import {
+  catalogCardCost,
+  catalogCardDomains,
+  catalogCardPayload,
+  catalogCardType,
+  catalogSourcePayload,
+} from "@/lib/catalog-card-fields";
 import "../catalog.css";
 
 export const dynamic = "force-dynamic";
@@ -58,10 +65,6 @@ type DetailData =
       status?: number;
     };
 
-function asText(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
@@ -69,40 +72,6 @@ function isUuid(value: string) {
 function joinedSet(row: CardRow) {
   if (Array.isArray(row.sets)) return row.sets[0] ?? null;
   return row.sets;
-}
-
-function cardPayload(row: CardRow) {
-  const payloadCard = row.game_payload?.card;
-  return payloadCard && typeof payloadCard === "object"
-    ? payloadCard as Record<string, unknown>
-    : {};
-}
-
-function sourcePayload(row: CardRow) {
-  const payloadSource = row.game_payload?.source;
-  return payloadSource && typeof payloadSource === "object"
-    ? payloadSource as Record<string, unknown>
-    : {};
-}
-
-function cardType(row: CardRow) {
-  const payload = cardPayload(row);
-  return asText(payload.type) ?? asText(payload.supertype) ?? row.card_type ?? "Catalog card";
-}
-
-function cardDomains(row: CardRow) {
-  const payload = cardPayload(row);
-  const domains = payload.domains;
-  if (!Array.isArray(domains)) return null;
-  const clean = domains.map(asText).filter(Boolean);
-  return clean.length > 0 ? clean.join(", ") : null;
-}
-
-function cardCost(row: CardRow) {
-  const payload = cardPayload(row);
-  const cost = payload.cost;
-  if (typeof cost === "number") return String(cost);
-  return asText(cost) ?? "—";
 }
 
 function readableValue(value: unknown): string {
@@ -227,8 +196,8 @@ export default async function GameCatalogCardPage({
 
   const { game, card } = data;
   const set = joinedSet(card);
-  const cardInfo = cardPayload(card);
-  const sourceInfo = sourcePayload(card);
+  const cardInfo = catalogCardPayload(card);
+  const sourceInfo = catalogSourcePayload(card);
   const details = payloadRows(cardInfo);
   const sourceDetails = payloadRows(sourceInfo);
 
@@ -274,9 +243,9 @@ export default async function GameCatalogCardPage({
             <h2>Core fields</h2>
           </div>
           <DetailLine label="Set" value={set?.name ? `${set.code ?? ""} ${set.name}`.trim() : "No set"} />
-          <DetailLine label="Type" value={cardType(card)} />
-          <DetailLine label="Domain" value={cardDomains(card) ?? "—"} />
-          <DetailLine label="Cost" value={cardCost(card)} />
+          <DetailLine label="Type" value={catalogCardType(card)} />
+          <DetailLine label="Domain" value={catalogCardDomains(card) ?? "—"} />
+          <DetailLine label="Cost" value={catalogCardCost(card)} />
           <DetailLine label="Rarity" value={card.rarity ?? "Unknown"} />
           <DetailLine label="Variant" value={card.variant_label ?? "Base"} />
         </section>

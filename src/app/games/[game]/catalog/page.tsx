@@ -6,6 +6,11 @@ import {
   resolveGameScope,
   type GameScope,
 } from "@/lib/game-scope";
+import {
+  catalogCardCost,
+  catalogCardDomains,
+  catalogCardType,
+} from "@/lib/catalog-card-fields";
 import "./catalog.css";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +49,10 @@ type CardRow = {
   variant_label: string | null;
   variant_id: string | null;
   rarity_id: string | null;
+  card_type: string | null;
+  color: string[] | string | null;
+  cost: number | string | null;
+  types: string[] | string | null;
   game_payload: Record<string, unknown> | null;
   sets: { slug: string | null; code: string | null; name: string | null } | Array<{ slug: string | null; code: string | null; name: string | null }> | null;
 };
@@ -70,10 +79,6 @@ type CatalogData =
       message: string;
     };
 
-function asText(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
 function formatNumber(value: number) {
   return value.toLocaleString("en-US");
 }
@@ -90,33 +95,6 @@ function pageIndex(value: string | undefined) {
 function joinedSet(row: CardRow) {
   if (Array.isArray(row.sets)) return row.sets[0] ?? null;
   return row.sets;
-}
-
-function cardPayload(row: CardRow) {
-  const payloadCard = row.game_payload?.card;
-  return payloadCard && typeof payloadCard === "object"
-    ? payloadCard as Record<string, unknown>
-    : {};
-}
-
-function cardType(row: CardRow) {
-  const payload = cardPayload(row);
-  return asText(payload.type) ?? asText(payload.supertype) ?? "Catalog card";
-}
-
-function cardDomains(row: CardRow) {
-  const payload = cardPayload(row);
-  const domains = payload.domains;
-  if (!Array.isArray(domains)) return null;
-  const clean = domains.map(asText).filter(Boolean);
-  return clean.length > 0 ? clean.join(", ") : null;
-}
-
-function cardCost(row: CardRow) {
-  const payload = cardPayload(row);
-  const cost = payload.cost;
-  if (typeof cost === "number") return String(cost);
-  return asText(cost) ?? "—";
 }
 
 function hrefFor(gameRouteSlug: string, params: CatalogSearchParams) {
@@ -185,6 +163,10 @@ async function loadCatalog(gameRouteSlug: string, searchParams: CatalogSearchPar
         variant_label,
         variant_id,
         rarity_id,
+        card_type,
+        color,
+        cost,
+        types,
         game_payload,
         sets (slug, code, name)
       `, { count: "exact" })
@@ -360,9 +342,9 @@ export default async function GameCatalogPage({
                 <span>{set?.code ?? "No set"}</span>
                 <span>{card.rarity ?? "Unknown"}</span>
                 <span>{card.variant_label ?? "Base"}</span>
-                <span>{cardCost(card)}</span>
-                <span>{cardType(card)}</span>
-                <span>{cardDomains(card) ?? "—"}</span>
+                <span>{catalogCardCost(card)}</span>
+                <span>{catalogCardType(card)}</span>
+                <span>{catalogCardDomains(card) ?? "—"}</span>
               </Link>
             );
           })
