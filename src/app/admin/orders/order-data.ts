@@ -178,7 +178,8 @@ export async function loadOrderInventory(currentOrderId?: string, game?: string 
     const gameId = await resolveDefaultGameId(supabase, game);
     const assignedRes = await supabase
       .from("customer_order_items")
-      .select("order_id, inventory_item_id");
+      .select("order_id, inventory_item_id")
+      .eq("game_id", gameId);
 
     if (assignedRes.error) {
       return { data: [], error: assignedRes.error.message };
@@ -223,6 +224,7 @@ export async function loadOrderSummaries(game?: string | null): Promise<LoadResu
     const ordersRes = await supabase
       .from("customer_orders")
       .select(ORDER_SELECT)
+      .eq("game_id", gameId)
       .order("created_at", { ascending: false });
     let orderRows = ordersRes.data as OrderRow[] | null;
     let orderError = ordersRes.error;
@@ -231,6 +233,7 @@ export async function loadOrderSummaries(game?: string | null): Promise<LoadResu
       const legacyOrdersRes = await supabase
         .from("customer_orders")
         .select(LEGACY_ORDER_SELECT)
+        .eq("game_id", gameId)
         .order("created_at", { ascending: false });
       orderRows = legacyOrdersRes.data as OrderRow[] | null;
       orderError = legacyOrdersRes.error;
@@ -249,6 +252,7 @@ export async function loadOrderSummaries(game?: string | null): Promise<LoadResu
     const linksRes = await supabase
       .from("customer_order_items")
       .select("order_id, inventory_item_id")
+      .eq("game_id", gameId)
       .in("order_id", orderIds);
 
     if (linksRes.error) {

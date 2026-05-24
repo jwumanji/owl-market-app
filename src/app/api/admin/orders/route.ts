@@ -130,6 +130,7 @@ async function validateInventoryItems(
   const assignedRes = await supabase
     .from("customer_order_items")
     .select("inventory_item_id")
+    .eq("game_id", gameId)
     .in("inventory_item_id", ids);
 
   if (assignedRes.error) {
@@ -188,6 +189,7 @@ export async function POST(request: Request) {
   const orderId = await nextOrderId(supabase);
 
   const orderInsert = {
+    game_id: game.id,
     id: orderId,
     nickname: nullableStringValue(requestBody, "nickname"),
     customer_name: customerName,
@@ -208,6 +210,7 @@ export async function POST(request: Request) {
 
   if (missingOrderSaleColumns(orderRes.error)) {
     const legacyOrderInsert = {
+      game_id: orderInsert.game_id,
       id: orderInsert.id,
       nickname: orderInsert.nickname,
       customer_name: orderInsert.customer_name,
@@ -228,13 +231,14 @@ export async function POST(request: Request) {
   }
 
   const linkRows = ids.map((inventoryItemId) => ({
+    game_id: game.id,
     order_id: orderId,
     inventory_item_id: inventoryItemId,
   }));
   const { error: linkError } = await supabase.from("customer_order_items").insert(linkRows);
 
   if (linkError) {
-    await supabase.from("customer_orders").delete().eq("id", orderId);
+    await supabase.from("customer_orders").delete().eq("game_id", game.id).eq("id", orderId);
     return NextResponse.json({ error: linkError.message }, { status: 500 });
   }
 
