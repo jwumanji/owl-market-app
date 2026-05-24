@@ -511,6 +511,7 @@ async function syncOneSet(
           const { error: rarErr } = await supabase
             .from("cards")
             .update({ rarity })
+            .eq("game_id", gameId)
             .in("id", ids);
           if (rarErr) setErrors.push(`rarity update ${rarity}: ${rarErr.message}`);
         }

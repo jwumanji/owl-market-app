@@ -11,6 +11,7 @@ import fs from "node:fs";
 
 const OPT_BASE = "https://optcgapi.com/api";
 const OPT_IMAGE_BASE = "https://optcgapi.com/media/static/Card_Images";
+const ONE_PIECE_DB_SLUG = "one_piece";
 const REPORT_PATH = "optcg-catalog-cleanup-report.md";
 const APPLY = process.argv.includes("--apply");
 
@@ -119,6 +120,18 @@ async function sbUpsert(table, rows, onConflict, chunkSize = 500) {
       throw new Error(`Supabase upsert ${table} failed: ${res.status} ${await res.text()}`);
     }
   }
+}
+
+async function loadOnePieceGame() {
+  const rows = await sbFetchAll(
+    `games?select=id,slug,name&slug=eq.${encodeURIComponent(ONE_PIECE_DB_SLUG)}`,
+    1
+  );
+  const game = rows[0] ?? null;
+  if (!game?.id) {
+    throw new Error("One Piece game row is missing. Run the multi-TCG game migration before syncing optcgapi.");
+  }
+  return game;
 }
 
 async function optJson(path, attempt = 0) {
@@ -317,7 +330,7 @@ function arrayText(value) {
   return value.filter(Boolean).map(String).join(" ");
 }
 
-function expectedRow(rawCard, source, setByCode) {
+function expectedRow(rawCard, source, setByCode, gameId) {
   const cardNumber = nullIfNullStr(rawCard.card_set_id);
   const sourceImageId =
     nullIfNullStr(rawCard.card_image_id) ??
@@ -336,6 +349,7 @@ function expectedRow(rawCard, source, setByCode) {
   const override = bandaiBaseOverride(rawCard);
 
   return {
+    game_id: gameId,
     card_image_id: sourceImageId,
     card_number: cardNumber,
     name: normText(rawCard.card_name),
@@ -430,10 +444,14 @@ function sample(rows, count = 100) {
 }
 
 async function main() {
-  console.log("Loading Supabase sets/cards...");
+  console.log("Loading Supabase One Piece game scope...");
+  const game = await loadOnePieceGame();
+  const gameFilter = `game_id=eq.${encodeURIComponent(game.id)}`;
+
+  console.log("Loading Supabase One Piece sets/cards...");
   const [dbSets, dbCards] = await Promise.all([
-    sbFetchAll("sets?select=id,slug,code,name,card_count,series"),
-    sbFetchAll("cards?select=id,card_image_id,card_number,name,name_base,variant_label,set_id,rarity,card_type,color,power,counter,life,cost,attribute,types,effect,trigger,image_url,tcg_product_id,image_url_small"),
+    sbFetchAll(`sets?select=id,game_id,slug,code,name,card_count,series&${gameFilter}`),
+    sbFetchAll(`cards?select=id,game_id,card_image_id,card_number,name,name_base,variant_label,set_id,rarity,card_type,color,power,counter,life,cost,attribute,types,effect,trigger,image_url,tcg_product_id,image_url_small&${gameFilter}`),
   ]);
 
   const setByCode = new Map();
@@ -507,7 +525,7 @@ async function main() {
 
     let candidates = 0;
     for (const rawCard of cards) {
-      const expected = expectedRow(rawCard, source, setByCode);
+      const expected = expectedRow(rawCard, source, setByCode, game.id);
       if (!expected) {
         skipped.push([source.kind, source.apiId, rawCard.card_image_id ?? "", rawCard.card_set_id ?? "", rawCard.card_name ?? "", "unroutable"]);
         continue;
