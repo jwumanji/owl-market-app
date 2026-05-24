@@ -14,13 +14,15 @@ type NavProps = {
   variant?: NavVariant;
 };
 
-const PUBLIC_LINKS = [
-  { label: "Home", href: "/" },
-  { label: "Markets", href: gamePath(DEFAULT_PUBLIC_GAME_ROUTE_SLUG, "/markets") },
-  { label: "Rarities", href: gamePath(DEFAULT_PUBLIC_GAME_ROUTE_SLUG, "/rarities") },
-  { label: "Sets", href: gamePath(DEFAULT_PUBLIC_GAME_ROUTE_SLUG, "/sets") },
-  { label: "Characters", href: gamePath(DEFAULT_PUBLIC_GAME_ROUTE_SLUG, "/characters") },
-];
+function publicLinks(gameRouteSlug: string) {
+  return [
+    { label: "Home", href: "/" },
+    { label: "Markets", href: gamePath(gameRouteSlug, "/markets") },
+    { label: "Rarities", href: gamePath(gameRouteSlug, "/rarities") },
+    { label: "Sets", href: gamePath(gameRouteSlug, "/sets") },
+    { label: "Characters", href: gamePath(gameRouteSlug, "/characters") },
+  ];
+}
 
 const ADMIN_LINKS = [
   { label: "Inventory", href: "/admin/inventory?game=one_piece" },
@@ -36,12 +38,25 @@ function isActivePath(pathname: string, href: string) {
   return pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
 }
 
+function gameRouteSlugFromPath(pathname: string) {
+  const [, root, game] = pathname.split("/");
+  if (root !== "games" || !game) return DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
+
+  try {
+    return decodeURIComponent(game);
+  } catch {
+    return game;
+  }
+}
+
 export default function Nav({ variant }: NavProps) {
   const pathname = usePathname();
   const resolvedVariant: NavVariant =
     variant ?? (pathname.startsWith("/admin") ? "admin" : "public");
   const isAdmin = resolvedVariant === "admin";
-  const links = isAdmin ? ADMIN_LINKS : PUBLIC_LINKS;
+  const activeGameRouteSlug = gameRouteSlugFromPath(pathname);
+  const isDefaultPublicGame = activeGameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
+  const links = isAdmin ? ADMIN_LINKS : publicLinks(activeGameRouteSlug);
 
   return (
     <nav className="c-topnav" aria-label="Primary">
@@ -82,7 +97,7 @@ export default function Nav({ variant }: NavProps) {
             <>
               <span className="c-live-chip">
                 <span className="c-live-dot" />
-                LIVE
+                {isDefaultPublicGame ? "LIVE" : "CATALOG"}
               </span>
               <Link href="/login" className="c-signin-btn">
                 Sign in
@@ -92,7 +107,7 @@ export default function Nav({ variant }: NavProps) {
         </div>
       </div>
 
-      {!isAdmin && <Ticker />}
+      {!isAdmin && isDefaultPublicGame && <Ticker />}
     </nav>
   );
 }
