@@ -345,6 +345,7 @@ export async function PATCH(
 
   if (updates.status && existing?.status !== updates.status) {
     await supabase.from("inventory_status_history").insert({
+      game_id: game.id,
       inventory_item_id: params.id,
       from_status: existing?.status ?? null,
       to_status: updates.status,
@@ -400,6 +401,7 @@ export async function DELETE(
   const { error: orderLinkError } = await supabase
     .from("customer_order_items")
     .delete()
+    .eq("game_id", game.id)
     .eq("inventory_item_id", params.id);
 
   if (orderLinkError) {
@@ -409,6 +411,7 @@ export async function DELETE(
   const { error: psaLinkError } = await supabase
     .from("psa_submission_items")
     .update({ inventory_item_id: null })
+    .eq("game_id", game.id)
     .eq("inventory_item_id", params.id);
 
   if (psaLinkError) {
