@@ -6,8 +6,199 @@
 
 BEGIN;
 
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.games WHERE slug = 'one_piece') THEN
+    RAISE EXCEPTION 'games.slug = one_piece is required before running v40';
+  END IF;
+END $$;
+
+ALTER TABLE public.inventory_bundles
+  ADD COLUMN IF NOT EXISTS game_id uuid REFERENCES public.games(id) ON DELETE RESTRICT;
+
+ALTER TABLE public.inventory_bundle_items
+  ADD COLUMN IF NOT EXISTS game_id uuid REFERENCES public.games(id) ON DELETE RESTRICT;
+
 ALTER TABLE public.inventory_status_history
   ADD COLUMN IF NOT EXISTS game_id uuid REFERENCES public.games(id) ON DELETE RESTRICT;
+
+ALTER TABLE public.customer_orders
+  ADD COLUMN IF NOT EXISTS game_id uuid REFERENCES public.games(id) ON DELETE RESTRICT;
+
+ALTER TABLE public.customer_order_items
+  ADD COLUMN IF NOT EXISTS game_id uuid REFERENCES public.games(id) ON DELETE RESTRICT;
+
+WITH one_piece AS (
+  SELECT id AS game_id FROM public.games WHERE slug = 'one_piece'
+)
+UPDATE public.sets
+SET game_id = (SELECT game_id FROM one_piece)
+WHERE game_id IS NULL;
+
+UPDATE public.cards AS cards
+SET game_id = sets.game_id
+FROM public.sets AS sets
+WHERE cards.set_id = sets.id
+  AND cards.game_id IS NULL
+  AND sets.game_id IS NOT NULL;
+
+WITH one_piece AS (
+  SELECT id AS game_id FROM public.games WHERE slug = 'one_piece'
+)
+UPDATE public.cards
+SET game_id = (SELECT game_id FROM one_piece)
+WHERE game_id IS NULL;
+
+UPDATE public.price_stats AS price_stats
+SET game_id = cards.game_id
+FROM public.cards AS cards
+WHERE price_stats.card_id = cards.id
+  AND price_stats.game_id IS NULL
+  AND cards.game_id IS NOT NULL;
+
+UPDATE public.price_history AS price_history
+SET game_id = cards.game_id
+FROM public.cards AS cards
+WHERE price_history.card_id = cards.id
+  AND price_history.game_id IS NULL
+  AND cards.game_id IS NOT NULL;
+
+WITH one_piece AS (
+  SELECT id AS game_id FROM public.games WHERE slug = 'one_piece'
+)
+UPDATE public.custom_cards
+SET game_id = (SELECT game_id FROM one_piece)
+WHERE game_id IS NULL;
+
+UPDATE public.inventory_items AS inventory_items
+SET game_id = cards.game_id
+FROM public.cards AS cards
+WHERE inventory_items.card_id = cards.id
+  AND inventory_items.game_id IS NULL
+  AND cards.game_id IS NOT NULL;
+
+UPDATE public.inventory_items AS inventory_items
+SET game_id = custom_cards.game_id
+FROM public.custom_cards AS custom_cards
+WHERE inventory_items.custom_card_id = custom_cards.id
+  AND inventory_items.game_id IS NULL
+  AND custom_cards.game_id IS NOT NULL;
+
+WITH one_piece AS (
+  SELECT id AS game_id FROM public.games WHERE slug = 'one_piece'
+)
+UPDATE public.inventory_items
+SET game_id = (SELECT game_id FROM one_piece)
+WHERE game_id IS NULL;
+
+UPDATE public.card_match_aliases AS aliases
+SET game_id = cards.game_id
+FROM public.cards AS cards
+WHERE aliases.card_id = cards.id
+  AND aliases.game_id IS NULL
+  AND cards.game_id IS NOT NULL;
+
+WITH one_piece AS (
+  SELECT id AS game_id FROM public.games WHERE slug = 'one_piece'
+)
+UPDATE public.card_match_aliases
+SET game_id = (SELECT game_id FROM one_piece)
+WHERE game_id IS NULL;
+
+WITH one_piece AS (
+  SELECT id AS game_id FROM public.games WHERE slug = 'one_piece'
+)
+UPDATE public.characters
+SET game_id = (SELECT game_id FROM one_piece)
+WHERE game_id IS NULL;
+
+UPDATE public.sealed_products AS sealed_products
+SET game_id = sets.game_id
+FROM public.sets AS sets
+WHERE sealed_products.set_id = sets.id
+  AND sealed_products.game_id IS NULL
+  AND sets.game_id IS NOT NULL;
+
+WITH one_piece AS (
+  SELECT id AS game_id FROM public.games WHERE slug = 'one_piece'
+)
+UPDATE public.sealed_products
+SET game_id = (SELECT game_id FROM one_piece)
+WHERE game_id IS NULL;
+
+UPDATE public.portfolio_items AS portfolio_items
+SET game_id = cards.game_id
+FROM public.cards AS cards
+WHERE portfolio_items.card_id = cards.id
+  AND portfolio_items.game_id IS NULL
+  AND cards.game_id IS NOT NULL;
+
+WITH one_piece AS (
+  SELECT id AS game_id FROM public.games WHERE slug = 'one_piece'
+)
+UPDATE public.portfolio_items
+SET game_id = (SELECT game_id FROM one_piece)
+WHERE game_id IS NULL;
+
+UPDATE public.ebay_sales AS ebay_sales
+SET game_id = cards.game_id
+FROM public.cards AS cards
+WHERE ebay_sales.card_id = cards.id
+  AND ebay_sales.game_id IS NULL
+  AND cards.game_id IS NOT NULL;
+
+WITH one_piece AS (
+  SELECT id AS game_id FROM public.games WHERE slug = 'one_piece'
+)
+UPDATE public.ebay_sales
+SET game_id = (SELECT game_id FROM one_piece)
+WHERE game_id IS NULL;
+
+WITH bundle_scope AS (
+  SELECT bundle_id, min(game_id::text)::uuid AS game_id
+  FROM public.inventory_bundle_items
+  WHERE game_id IS NOT NULL
+  GROUP BY bundle_id
+)
+UPDATE public.inventory_bundles AS bundles
+SET game_id = bundle_scope.game_id
+FROM bundle_scope
+WHERE bundles.id = bundle_scope.bundle_id
+  AND bundles.game_id IS NULL;
+
+WITH bundle_scope AS (
+  SELECT bundle_items.bundle_id, min(inventory_items.game_id::text)::uuid AS game_id
+  FROM public.inventory_bundle_items AS bundle_items
+  JOIN public.inventory_items AS inventory_items ON inventory_items.id = bundle_items.inventory_item_id
+  WHERE inventory_items.game_id IS NOT NULL
+  GROUP BY bundle_items.bundle_id
+)
+UPDATE public.inventory_bundles AS bundles
+SET game_id = bundle_scope.game_id
+FROM bundle_scope
+WHERE bundles.id = bundle_scope.bundle_id
+  AND bundles.game_id IS NULL;
+
+WITH one_piece AS (
+  SELECT id AS game_id FROM public.games WHERE slug = 'one_piece'
+)
+UPDATE public.inventory_bundles
+SET game_id = (SELECT game_id FROM one_piece)
+WHERE game_id IS NULL;
+
+UPDATE public.inventory_bundle_items AS bundle_items
+SET game_id = inventory_items.game_id
+FROM public.inventory_items AS inventory_items
+WHERE bundle_items.inventory_item_id = inventory_items.id
+  AND bundle_items.game_id IS NULL
+  AND inventory_items.game_id IS NOT NULL;
+
+UPDATE public.inventory_bundle_items AS bundle_items
+SET game_id = bundles.game_id
+FROM public.inventory_bundles AS bundles
+WHERE bundle_items.bundle_id = bundles.id
+  AND bundle_items.game_id IS NULL
+  AND bundles.game_id IS NOT NULL;
 
 UPDATE public.inventory_status_history AS history
 SET game_id = inventory_items.game_id
@@ -15,6 +206,108 @@ FROM public.inventory_items AS inventory_items
 WHERE history.inventory_item_id = inventory_items.id
   AND history.game_id IS NULL
   AND inventory_items.game_id IS NOT NULL;
+
+WITH one_piece AS (
+  SELECT id AS game_id FROM public.games WHERE slug = 'one_piece'
+)
+UPDATE public.inventory_status_history
+SET game_id = (SELECT game_id FROM one_piece)
+WHERE game_id IS NULL;
+
+WITH order_scope AS (
+  SELECT order_id, min(game_id::text)::uuid AS game_id
+  FROM public.customer_order_items
+  WHERE game_id IS NOT NULL
+  GROUP BY order_id
+)
+UPDATE public.customer_orders AS orders
+SET game_id = order_scope.game_id
+FROM order_scope
+WHERE orders.id = order_scope.order_id
+  AND orders.game_id IS NULL;
+
+WITH order_scope AS (
+  SELECT order_items.order_id, min(inventory_items.game_id::text)::uuid AS game_id
+  FROM public.customer_order_items AS order_items
+  JOIN public.inventory_items AS inventory_items ON inventory_items.id = order_items.inventory_item_id
+  WHERE inventory_items.game_id IS NOT NULL
+  GROUP BY order_items.order_id
+)
+UPDATE public.customer_orders AS orders
+SET game_id = order_scope.game_id
+FROM order_scope
+WHERE orders.id = order_scope.order_id
+  AND orders.game_id IS NULL;
+
+WITH one_piece AS (
+  SELECT id AS game_id FROM public.games WHERE slug = 'one_piece'
+)
+UPDATE public.customer_orders
+SET game_id = (SELECT game_id FROM one_piece)
+WHERE game_id IS NULL;
+
+UPDATE public.customer_order_items AS order_items
+SET game_id = inventory_items.game_id
+FROM public.inventory_items AS inventory_items
+WHERE order_items.inventory_item_id = inventory_items.id
+  AND order_items.game_id IS NULL
+  AND inventory_items.game_id IS NOT NULL;
+
+UPDATE public.customer_order_items AS order_items
+SET game_id = orders.game_id
+FROM public.customer_orders AS orders
+WHERE order_items.order_id = orders.id
+  AND order_items.game_id IS NULL
+  AND orders.game_id IS NOT NULL;
+
+WITH one_piece AS (
+  SELECT id AS game_id FROM public.games WHERE slug = 'one_piece'
+)
+UPDATE public.psa_submissions
+SET game_id = (SELECT game_id FROM one_piece)
+WHERE game_id IS NULL;
+
+UPDATE public.psa_submission_items AS items
+SET game_id = submissions.game_id
+FROM public.psa_submissions AS submissions
+WHERE items.submission_id = submissions.id
+  AND items.game_id IS NULL
+  AND submissions.game_id IS NOT NULL;
+
+UPDATE public.psa_submission_items AS items
+SET game_id = inventory_items.game_id
+FROM public.inventory_items AS inventory_items
+WHERE items.inventory_item_id = inventory_items.id
+  AND items.game_id IS NULL
+  AND inventory_items.game_id IS NOT NULL;
+
+UPDATE public.centering_measurements AS measurements
+SET game_id = inventory_items.game_id
+FROM public.inventory_items AS inventory_items
+WHERE measurements.inventory_item_id = inventory_items.id
+  AND measurements.game_id IS NULL
+  AND inventory_items.game_id IS NOT NULL;
+
+WITH one_piece AS (
+  SELECT id AS game_id FROM public.games WHERE slug = 'one_piece'
+)
+UPDATE public.centering_measurements
+SET game_id = (SELECT game_id FROM one_piece)
+WHERE game_id IS NULL;
+
+UPDATE public.card_external_ids AS external_ids
+SET game_id = cards.game_id
+FROM public.cards AS cards
+WHERE external_ids.card_id = cards.id
+  AND external_ids.game_id IS NULL
+  AND cards.game_id IS NOT NULL;
+
+UPDATE public.set_external_ids AS external_ids
+SET game_id = sets.game_id
+FROM public.sets AS sets
+WHERE external_ids.set_id = sets.id
+  AND external_ids.game_id IS NULL
+  AND sets.game_id IS NOT NULL;
 
 DO $$
 BEGIN
