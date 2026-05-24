@@ -56,9 +56,7 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServiceClient();
-  const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
-    defaultToOnePiece: true,
-  });
+  const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request));
 
   if (gameResult.error) {
     return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });

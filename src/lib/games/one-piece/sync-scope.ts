@@ -14,9 +14,7 @@ export async function resolveOnePieceSyncGame(
   supabase: SupabaseClient,
   request: Request
 ): Promise<ResolveOnePieceSyncGameResult> {
-  const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
-    defaultToOnePiece: true,
-  });
+  const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request));
 
   if (gameResult.error) return gameResult;
 
