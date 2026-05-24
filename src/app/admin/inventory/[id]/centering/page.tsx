@@ -152,6 +152,7 @@ async function loadInventoryItem(id: string, measurementPage: number, gameSlug: 
       { count: "exact" }
     )
     .eq("inventory_item_id", id)
+    .eq("game_id", game.id)
     .order("created_at", { ascending: false })
     .range(from, to);
 
@@ -314,6 +315,7 @@ export default async function InventoryCenteringPage({
       </div>
 
       <CenteringWorkspace
+        gameSlug={gameSlug}
         inventoryItemId={item.id}
         preloadImageUrl={item.custom_image_front_url}
         cardIdentity={{
