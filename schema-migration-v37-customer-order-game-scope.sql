@@ -56,7 +56,7 @@ BEGIN
 END $$;
 
 WITH order_scope AS (
-  SELECT order_id, min(game_id) AS game_id
+  SELECT order_id, min(game_id::text)::uuid AS game_id
   FROM public.customer_order_items
   WHERE game_id IS NOT NULL
   GROUP BY order_id

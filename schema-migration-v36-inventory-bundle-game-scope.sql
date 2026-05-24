@@ -56,7 +56,7 @@ BEGIN
 END $$;
 
 WITH bundle_scope AS (
-  SELECT bundle_id, min(game_id) AS game_id
+  SELECT bundle_id, min(game_id::text)::uuid AS game_id
   FROM public.inventory_bundle_items
   WHERE game_id IS NOT NULL
   GROUP BY bundle_id
