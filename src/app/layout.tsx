@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import {
   Inter,
   IBM_Plex_Mono,
@@ -61,7 +62,9 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${ibmPlexMono.variable} ${spaceGrotesk.variable} ${caveat.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
-        <Nav />
+        <Suspense fallback={null}>
+          <Nav />
+        </Suspense>
         <main>{children}</main>
       </body>
     </html>

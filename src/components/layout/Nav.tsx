@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import OwlMark from "@/components/brand/OwlMark";
 import Wordmark from "@/components/brand/Wordmark";
-import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
+import { DEFAULT_PUBLIC_GAME_DB_SLUG, DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
 import Ticker from "./Ticker";
 
@@ -33,13 +33,17 @@ function publicLinks(gameRouteSlug: string): NavLink[] {
   ];
 }
 
-const ADMIN_LINKS: NavLink[] = [
-  { label: "Inventory", href: "/admin/inventory?game=one_piece" },
-  { label: "Bundles", href: "/admin/bundles" },
-  { label: "Orders", href: "/admin/orders" },
-  { label: "Lens", href: "/admin/lens" },
-  { label: "PSA", href: "/admin/psa-submissions" },
-];
+function adminLinks(gameSlug: string): NavLink[] {
+  const game = encodeURIComponent(gameSlug || DEFAULT_PUBLIC_GAME_DB_SLUG);
+
+  return [
+    { label: "Inventory", href: `/admin/inventory?game=${game}` },
+    { label: "Bundles", href: `/admin/bundles?game=${game}` },
+    { label: "Orders", href: `/admin/orders?game=${game}` },
+    { label: "Lens", href: "/admin/lens" },
+    { label: "PSA", href: `/admin/psa-submissions?game=${game}` },
+  ];
+}
 
 function isActivePath(pathname: string, href: string, exact = false) {
   const hrefPath = href.split("?")[0];
@@ -58,14 +62,28 @@ function gameRouteSlugFromPath(pathname: string) {
   }
 }
 
+function adminGameSlugFromSearchParams(searchParams: { get(name: string): string | null }) {
+  return searchParams.get("game")?.trim() || DEFAULT_PUBLIC_GAME_DB_SLUG;
+}
+
+function gameRouteSlugFromAdminGame(gameSlug: string) {
+  return gameSlug.replace(/_/g, "-");
+}
+
 export default function Nav({ variant }: NavProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const resolvedVariant: NavVariant =
     variant ?? (pathname.startsWith("/admin") ? "admin" : "public");
   const isAdmin = resolvedVariant === "admin";
+  const activeAdminGameSlug = adminGameSlugFromSearchParams(searchParams);
+  const activeAdminGameRouteSlug = gameRouteSlugFromAdminGame(activeAdminGameSlug);
   const activeGameRouteSlug = gameRouteSlugFromPath(pathname);
   const isDefaultPublicGame = activeGameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
-  const links = isAdmin ? ADMIN_LINKS : publicLinks(activeGameRouteSlug);
+  const links = isAdmin ? adminLinks(activeAdminGameSlug) : publicLinks(activeGameRouteSlug);
+  const viewSiteHref = activeAdminGameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG
+    ? "/"
+    : gamePath(activeAdminGameRouteSlug);
 
   return (
     <nav className="c-topnav" aria-label="Primary">
@@ -95,7 +113,7 @@ export default function Nav({ variant }: NavProps) {
         <div className="c-nav-right">
           {isAdmin ? (
             <>
-              <Link href="/" className="c-nav-view">
+              <Link href={viewSiteHref} className="c-nav-view">
                 View site ↗
               </Link>
               <Link href="/logout" className="c-signin-btn">
