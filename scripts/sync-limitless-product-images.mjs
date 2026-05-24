@@ -5,6 +5,7 @@
 // exactly one deterministic Limitless product-page image candidate.
 
 import fs from "node:fs";
+import { loadGameScope, scriptGameSlug, withGameFilter } from "./lib/supabase-game-scope.mjs";
 
 const LIMITLESS_BASE = "https://onepiece.limitlesstcg.com";
 const LIMITLESS_PROMO_INDEX = `${LIMITLESS_BASE}/cards/promos`;
@@ -28,6 +29,7 @@ loadEnvFile();
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const GAME_SLUG = scriptGameSlug();
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
@@ -59,8 +61,8 @@ async function sbFetchAll(path, pageSize = 1000) {
   return rows;
 }
 
-async function patchCardImage(cardId, imageUrl) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/cards?id=eq.${encodeURIComponent(cardId)}`, {
+async function patchCardImage(cardId, gameId, imageUrl) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/cards?id=eq.${encodeURIComponent(cardId)}&game_id=eq.${encodeURIComponent(gameId)}`, {
     method: "PATCH",
     headers: restHeaders({
       "Content-Type": "application/json",
@@ -243,11 +245,12 @@ async function main() {
   const products = await loadLimitlessProducts();
   const productsWithImages = products.filter((product) => product.images.size > 0);
 
-  console.log("Loading Supabase cards...");
+  const game = await loadGameScope({ supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_KEY, gameSlug: GAME_SLUG });
+  console.log(`Loading Supabase cards for game scope: ${game.slug}...`);
   const select = encodeURIComponent(
     "id,name,card_number,rarity,image_url,image_url_small,variant_label,promo_segment,sets(code,name)"
   );
-  const cards = await sbFetchAll(`cards?select=${select}&order=card_number.asc`);
+  const cards = await sbFetchAll(withGameFilter(`cards?select=${select}&order=card_number.asc`, game.id));
 
   const updates = [];
   const noOps = [];
@@ -306,6 +309,7 @@ async function main() {
   report.push("# Limitless Product Image Sync Report");
   report.push("");
   report.push(`Generated: ${new Date().toISOString()}`);
+  report.push(`Game: ${game.name ?? game.slug} (${game.slug})`);
   report.push(`Mode: ${APPLY ? "apply" : "dry-run"}`);
   report.push("");
   report.push("## Summary");
@@ -383,7 +387,7 @@ async function main() {
 
   for (let index = 0; index < updates.length; index += 1) {
     const update = updates[index];
-    await patchCardImage(update.card.id, update.expectedImage);
+    await patchCardImage(update.card.id, game.id, update.expectedImage);
     if ((index + 1) % 25 === 0 || index + 1 === updates.length) {
       console.log(`Patched ${index + 1}/${updates.length}`);
     }

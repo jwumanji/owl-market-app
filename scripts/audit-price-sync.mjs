@@ -1,4 +1,6 @@
 // Audit price sync gaps: per-rarity unpriced + suspiciously-low samples.
+import { loadGameScope, scriptGameSlug, withGameFilter } from "./lib/supabase-game-scope.mjs";
+
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://kiquytaevufssveqmqix.supabase.co";
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!KEY) {
@@ -6,6 +8,7 @@ if (!KEY) {
   process.exit(1);
 }
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}` };
+const GAME_SLUG = scriptGameSlug();
 
 async function fetchAll(path) {
   const out = []; const pageSize = 1000; let offset = 0;
@@ -21,11 +24,14 @@ async function fetchAll(path) {
   return out;
 }
 
-const sets = await fetchAll("sets?select=id,code,slug");
+const GAME = await loadGameScope({ supabaseUrl: URL, supabaseKey: KEY, gameSlug: GAME_SLUG });
+console.log(`Using game scope: ${GAME.slug}`);
+
+const sets = await fetchAll(withGameFilter("sets?select=id,code,slug", GAME.id));
 const setIdToCode = new Map(sets.map(s => [s.id, (s.code ?? "").toUpperCase()]));
 const promoSetId = sets.find(s => s.slug === "promo")?.id ?? null;
 
-const cards = await fetchAll("cards?select=id,set_id,name,card_number,variant_label,rarity,price_stats(tcg_market,market_avg,tcg_low,updated_at)");
+const cards = await fetchAll(withGameFilter("cards?select=id,set_id,name,card_number,variant_label,rarity,price_stats(tcg_market,market_avg,tcg_low,updated_at)", GAME.id));
 console.log(`cards=${cards.length}`);
 
 const FOCUS = ["SR","L","R","SEC","TR","UC","C"];
