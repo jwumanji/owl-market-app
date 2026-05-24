@@ -1962,6 +1962,41 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   margin-top: 2px;
 }
 
+.admin-game-switcher {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+}
+
+.admin-game-switcher span {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.admin-game-switcher select {
+  height: 40px;
+  min-width: 220px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  color: var(--ink);
+  padding: 0 34px 0 12px;
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.admin-game-switcher select:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 73, 54, 0.14);
+}
+
 /* Selectable status card (mockup `.scard`) — used as filter chip row. */
 .admin-scard {
   background: var(--bg-2);

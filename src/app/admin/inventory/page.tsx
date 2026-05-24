@@ -1,4 +1,5 @@
 import InventoryShell from "./InventoryShell";
+import AdminGameSwitcher from "../AdminGameSwitcher";
 import type { CenteringCeiling, InventoryRow } from "./InventoryTabs";
 import { loadBundleSummaries } from "../bundles/bundle-data";
 import { loadOrderSummaries } from "../orders/order-data";
@@ -9,6 +10,7 @@ import {
   type PrivateCustomCardRow,
 } from "@/lib/private-custom-cards";
 import { resolveGameScope } from "@/lib/game-scope";
+import { loadAdminGameOptions, type AdminGameOption } from "@/lib/admin-games";
 import { createServiceClient } from "@/lib/supabase-server";
 import { CATALOG_MATCH_STATUSES, type CatalogMatchStatus, type GradedRating } from "@/lib/inventory-options";
 
@@ -234,9 +236,14 @@ export default async function AdminInventoryPage({
   let gameScopeError: string | null = null;
   let gameId: string | null = null;
   let gameSlug: string | null = null;
+  let gameOptions: AdminGameOption[] = [];
 
   if (supabase) {
-    const gameResult = await resolveGameScope(supabase, initialGame, { defaultToOnePiece: true });
+    const [gameResult, gamesResult] = await Promise.all([
+      resolveGameScope(supabase, initialGame, { defaultToOnePiece: true }),
+      loadAdminGameOptions(supabase).catch(() => [] as AdminGameOption[]),
+    ]);
+    gameOptions = gamesResult;
     if (gameResult.error) {
       gameScopeError = gameResult.error.message;
     } else {
@@ -372,6 +379,12 @@ export default async function AdminInventoryPage({
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-3">
+          {gameSlug && (
+            <AdminGameSwitcher
+              activeGameSlug={gameSlug}
+              games={gameOptions}
+            />
+          )}
           <div className="admin-stat-card">
             <div className="lbl">Total Quantity</div>
             <div className="val">{totalQuantity}</div>
