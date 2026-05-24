@@ -11,6 +11,7 @@ import {
   catalogCardDomains,
   catalogCardType,
 } from "@/lib/catalog-card-fields";
+import { catalogPageDescription } from "@/lib/game-catalog-copy";
 import "./catalog.css";
 
 export const dynamic = "force-dynamic";
@@ -262,10 +263,7 @@ export default async function GameCatalogPage({
         <div>
           <div className="catalog-kicker">Catalog cards</div>
           <h1>{data.game.name}</h1>
-          <p>
-            Imported card rows from the game-scoped catalog schema. This view is intentionally
-            catalog-only until pricing and image asset review are enabled.
-          </p>
+          <p>{catalogPageDescription(data.game)}</p>
         </div>
         <div className="catalog-count">
           <span>{formatNumber(data.totalCards)}</span>

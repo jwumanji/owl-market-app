@@ -14,6 +14,7 @@ import {
   catalogCardType,
   catalogSourcePayload,
 } from "@/lib/catalog-card-fields";
+import { catalogCardDescription } from "@/lib/game-catalog-copy";
 import "../catalog.css";
 
 export const dynamic = "force-dynamic";
@@ -229,10 +230,7 @@ export default async function GameCatalogCardPage({
             <span>{card.rarity ?? "Unknown rarity"}</span>
             <span>{card.variant_label ?? "Base"}</span>
           </div>
-          <p>
-            Catalog metadata imported for {game.name}. Pricing is intentionally absent until a
-            provider is enabled for this game.
-          </p>
+          <p>{catalogCardDescription(game)}</p>
         </div>
       </div>
 
