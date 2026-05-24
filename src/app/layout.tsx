@@ -48,7 +48,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "OWL Market — See What Others Miss",
   description:
-    "Market intelligence platform for the One Piece TCG. Real-time pricing, trends, and portfolio tracking.",
+    "TCG market intelligence platform for pricing, trends, catalog data, and portfolio tracking.",
 };
 
 export default function RootLayout({

@@ -255,7 +255,7 @@ export default async function GameOverviewPage({
     return (
       <section className="game-overview-page">
         <div className="game-overview-error">
-          <div className="game-kicker">Catalog smoke test</div>
+          <div className="game-kicker">Game catalog</div>
           <h1>{data.gameName}</h1>
           <p>{data.message}</p>
         </div>
@@ -293,11 +293,11 @@ export default async function GameOverviewPage({
     <section className="game-overview-page">
       <div className="game-overview-hero">
         <div>
-          <div className="game-kicker">Catalog smoke test</div>
+          <div className="game-kicker">Game catalog</div>
           <h1>{game.name}</h1>
           <p>
-            Private game view backed by the multi-TCG schema. This page reads imported catalog rows,
-            taxonomies, raw source records, and provider mapping status without assuming price data.
+            Imported catalog view backed by the multi-TCG schema. This page reads game-scoped sets,
+            taxonomies, raw source records, and provider mapping status without assuming pricing is live.
           </p>
         </div>
         <div className="game-status-stack" aria-label="Catalog status">
@@ -308,9 +308,11 @@ export default async function GameOverviewPage({
       </div>
 
       <div className="game-actions">
-        <Link href={gamePath(game.routeSlug, "/sets")}>Open set index</Link>
         <Link href={gamePath(game.routeSlug, "/catalog")}>Open card catalog</Link>
-        <Link href={gamePath(game.routeSlug, "/markets")}>Open market route</Link>
+        <Link href={gamePath(game.routeSlug, "/sets")}>Open set index</Link>
+        <Link href={gamePath(game.routeSlug, "/rarities")}>Open rarities</Link>
+        <Link href={gamePath(game.routeSlug, "/markets")}>Open market status</Link>
+        <Link href={gamePath(game.routeSlug, "/characters")}>Open characters</Link>
       </div>
 
       <div className="game-stat-grid">
@@ -345,7 +347,7 @@ export default async function GameOverviewPage({
         <div className="game-band-head">
           <div>
             <div className="game-kicker">Catalog sets</div>
-            <h2>Riftbound set rows</h2>
+            <h2>Catalog set rows</h2>
           </div>
           <span>{formatNumber(data.sets.reduce((sum, set) => sum + (set.card_count ?? 0), 0))} set-declared cards</span>
         </div>
@@ -430,7 +432,7 @@ export default async function GameOverviewPage({
           {data.sampleCards.map((card) => {
             const set = joinedSet(card);
             return (
-              <div className="game-card-row" key={card.id}>
+              <Link className="game-card-row" key={card.id} href={gamePath(game.routeSlug, `/catalog/${card.id}`)}>
                 <span>
                   <b>{card.card_number ?? card.card_image_id ?? "No number"}</b>
                   {card.name}
@@ -439,7 +441,7 @@ export default async function GameOverviewPage({
                 <span>{card.rarity ?? "Unknown"}</span>
                 <span>{card.variant_label ?? "Base"}</span>
                 <span>{cardDomains(card) ?? cardType(card)}</span>
-              </div>
+              </Link>
             );
           })}
         </div>

@@ -14,17 +14,26 @@ type NavProps = {
   variant?: NavVariant;
 };
 
-function publicLinks(gameRouteSlug: string) {
+type NavLink = {
+  label: string;
+  href: string;
+  exact?: boolean;
+};
+
+function publicLinks(gameRouteSlug: string): NavLink[] {
+  const isDefaultPublicGame = gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
+
   return [
-    { label: "Home", href: "/" },
+    { label: "Home", href: isDefaultPublicGame ? "/" : gamePath(gameRouteSlug), exact: true },
     { label: "Markets", href: gamePath(gameRouteSlug, "/markets") },
+    { label: "Catalog", href: gamePath(gameRouteSlug, "/catalog") },
     { label: "Rarities", href: gamePath(gameRouteSlug, "/rarities") },
     { label: "Sets", href: gamePath(gameRouteSlug, "/sets") },
     { label: "Characters", href: gamePath(gameRouteSlug, "/characters") },
   ];
 }
 
-const ADMIN_LINKS = [
+const ADMIN_LINKS: NavLink[] = [
   { label: "Inventory", href: "/admin/inventory?game=one_piece" },
   { label: "Bundles", href: "/admin/bundles" },
   { label: "Orders", href: "/admin/orders" },
@@ -32,9 +41,9 @@ const ADMIN_LINKS = [
   { label: "PSA", href: "/admin/psa-submissions" },
 ];
 
-function isActivePath(pathname: string, href: string) {
+function isActivePath(pathname: string, href: string, exact = false) {
   const hrefPath = href.split("?")[0];
-  if (hrefPath === "/") return pathname === hrefPath;
+  if (exact || hrefPath === "/") return pathname === hrefPath;
   return pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
 }
 
@@ -75,7 +84,7 @@ export default function Nav({ variant }: NavProps) {
             <li key={link.href}>
               <Link
                 href={link.href}
-                className={`c-nav-link${isActivePath(pathname, link.href) ? " active" : ""}`}
+                className={`c-nav-link${isActivePath(pathname, link.href, link.exact) ? " active" : ""}`}
               >
                 {link.label}
               </Link>

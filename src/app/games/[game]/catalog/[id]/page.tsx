@@ -63,7 +63,7 @@ function asText(value: unknown): string | null {
 }
 
 function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(value);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function joinedSet(row: CardRow) {
@@ -305,7 +305,7 @@ export default async function GameCatalogCardPage({
       <section className="catalog-detail-panel">
         <div className="catalog-panel-head">
           <div className="catalog-kicker">Game payload</div>
-          <h2>Riftbound metadata</h2>
+          <h2>{game.name} metadata</h2>
         </div>
         <div className="catalog-payload-grid">
           {details.length === 0 ? (
