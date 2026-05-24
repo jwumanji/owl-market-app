@@ -57,7 +57,7 @@ function isCard(value) {
   return Boolean(
     value &&
       typeof value === "object" &&
-      ("riftbound_id" in value || "collector_number" in value || "tcgplayer_id" in value)
+      ("riftbound_id" in value || "collector_number" in value)
   );
 }
 
