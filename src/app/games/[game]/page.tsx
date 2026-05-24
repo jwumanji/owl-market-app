@@ -309,6 +309,7 @@ export default async function GameOverviewPage({
 
       <div className="game-actions">
         <Link href={gamePath(game.routeSlug, "/sets")}>Open set index</Link>
+        <Link href={gamePath(game.routeSlug, "/catalog")}>Open card catalog</Link>
         <Link href={gamePath(game.routeSlug, "/markets")}>Open market route</Link>
       </div>
 

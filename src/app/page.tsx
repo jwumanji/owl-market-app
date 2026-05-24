@@ -26,6 +26,34 @@ const GAMES = [
   { name: "Dragon Ball Z", href: null, enabled: false, status: "Soon", emoji: "🐉" },
 ] as const;
 
+async function fetchRiftboundTileState() {
+  const privatePreview = allowsPrivateGamePreview();
+  try {
+    const supabase = createServiceClient();
+    const gameResult = await resolveGameScope(supabase, "riftbound", {
+      defaultToOnePiece: false,
+      publicOnly: false,
+    });
+
+    if (gameResult.error) {
+      return { enabled: privatePreview, status: "Preview" };
+    }
+
+    const { game } = gameResult;
+    if (!game.isActive) return { enabled: false, status: "Soon" };
+
+    const pricingStatus = typeof game.metadata.pricing_status === "string"
+      ? game.metadata.pricing_status
+      : null;
+    const status = pricingStatus === "deferred" ? "Catalog" : "Live";
+
+    if (game.isPublic) return { enabled: true, status };
+    return { enabled: privatePreview, status: "Preview" };
+  } catch {
+    return { enabled: privatePreview, status: "Preview" };
+  }
+}
+
 async function fetchTopCards(): Promise<TeaserCard[]> {
   try {
     const supabase = createServiceClient();
@@ -71,12 +99,14 @@ async function fetchTopCards(): Promise<TeaserCard[]> {
 }
 
 export default async function Home() {
-  const topCards = await fetchTopCards();
+  const [topCards, riftboundTile] = await Promise.all([
+    fetchTopCards(),
+    fetchRiftboundTileState(),
+  ]);
   const marketHref = gamePath(DEFAULT_PUBLIC_GAME_ROUTE_SLUG, "/markets");
-  const showPrivatePreview = allowsPrivateGamePreview();
   const games = GAMES.map((game) =>
-    game.name === "Riftbound" && showPrivatePreview
-      ? { ...game, enabled: true }
+    game.name === "Riftbound"
+      ? { ...game, enabled: riftboundTile.enabled, status: riftboundTile.status }
       : game,
   );
 
