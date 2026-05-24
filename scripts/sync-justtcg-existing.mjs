@@ -16,6 +16,7 @@ import fs from "node:fs";
 
 const JUSTTCG_BASE = "https://api.justtcg.com/v1";
 const JUSTTCG_GAME = "one-piece-card-game";
+const ONE_PIECE_DB_SLUG = "one_piece";
 const REPORT_PATH = "justtcg-existing-match-report.md";
 const APPLY = process.argv.includes("--apply");
 const WRITE_HISTORY = process.argv.includes("--history");
@@ -26,6 +27,7 @@ const SETS_FILTER = readArg("--sets")
   ?.split(",")
   .map((s) => s.trim().toUpperCase())
   .filter(Boolean);
+const PRICE_STATS_UPSERT_CONFLICT = "game_id,card_id";
 
 if (BACKFILL_HISTORY && !HISTORY_DURATIONS.has(HISTORY_DURATION)) {
   throw new Error(`Unsupported --history-duration=${HISTORY_DURATION}`);
@@ -114,6 +116,18 @@ async function upsertRows(table, rows, onConflict, chunkSize = 500) {
       { Prefer: "resolution=merge-duplicates,return=minimal" }
     );
   }
+}
+
+async function loadOnePieceGame() {
+  const rows = await sbFetchAll(
+    `games?select=id,slug,name&slug=eq.${encodeURIComponent(ONE_PIECE_DB_SLUG)}`,
+    1
+  );
+  const game = rows[0] ?? null;
+  if (!game?.id) {
+    throw new Error("One Piece game row is missing. Run the multi-TCG game migration before syncing JustTCG.");
+  }
+  return game;
 }
 
 async function insertRows(table, rows, chunkSize = 500) {
@@ -407,10 +421,11 @@ function findExistingMatch(jtCard, setCode, indexes, setById) {
   return { card: best.card, reason: "set_number_variant", score: best.score };
 }
 
-function makePriceUpsert(cardId, variant) {
+function makePriceUpsert(gameId, cardId, variant) {
   const now = new Date().toISOString();
   const price = numeric(variant.price);
   return {
+    game_id: gameId,
     card_id: cardId,
     tcg_market: price,
     tcg_low: numeric(variant.minPrice30d) ?? numeric(variant.minPrice7d),
@@ -435,13 +450,14 @@ function utcDay(value) {
   return date.toISOString().slice(0, 10);
 }
 
-function historyDayKey(cardId, recordedAt) {
+function historyDayKey(gameId, cardId, recordedAt) {
   const day = utcDay(recordedAt);
-  return day ? `${cardId}|${day}` : null;
+  return day ? `${gameId}|${cardId}|${day}` : null;
 }
 
-function makeCurrentHistoryInsert(cardId, match) {
+function makeCurrentHistoryInsert(gameId, cardId, match) {
   return {
+    game_id: gameId,
     card_id: cardId,
     tcg_market: match.jtPrice,
     market_avg: numeric(match.variant.avgPrice30d) ?? numeric(match.variant.avgPrice) ?? match.jtPrice,
@@ -449,7 +465,7 @@ function makeCurrentHistoryInsert(cardId, match) {
   };
 }
 
-function historyRowsForVariant(cardId, variant) {
+function historyRowsForVariant(gameId, cardId, variant) {
   const points = Array.isArray(variant.priceHistory)
     ? variant.priceHistory
     : Array.isArray(variant.priceHistory30d)
@@ -461,6 +477,7 @@ function historyRowsForVariant(cardId, variant) {
     const timestamp = numeric(point?.t);
     if (price === null || price <= 0 || timestamp === null) continue;
     rows.push({
+      game_id: gameId,
       card_id: cardId,
       tcg_market: price,
       market_avg: price,
@@ -473,7 +490,7 @@ function historyRowsForVariant(cardId, variant) {
 function dedupeHistoryRows(rows) {
   const byCardDay = new Map();
   for (const row of rows) {
-    const key = historyDayKey(row.card_id, row.recorded_at);
+    const key = historyDayKey(row.game_id, row.card_id, row.recorded_at);
     if (!key) continue;
     const existing = byCardDay.get(key);
     if (!existing || new Date(row.recorded_at).getTime() >= new Date(existing.recorded_at).getTime()) {
@@ -485,17 +502,17 @@ function dedupeHistoryRows(rows) {
   );
 }
 
-async function fetchExistingHistoryDayKeys(cardIds, chunkSize = 100) {
+async function fetchExistingHistoryDayKeys(gameId, cardIds, chunkSize = 100) {
   const keys = new Set();
   const uniqueIds = Array.from(new Set(cardIds.filter(Boolean)));
   for (let i = 0; i < uniqueIds.length; i += chunkSize) {
     const chunk = uniqueIds.slice(i, i + chunkSize);
     const rows = await sbFetchAll(
-      `price_history?select=card_id,recorded_at&card_id=in.(${chunk.join(",")})`,
+      `price_history?select=game_id,card_id,recorded_at&game_id=eq.${encodeURIComponent(gameId)}&card_id=in.(${chunk.join(",")})`,
       1000
     );
     for (const row of rows) {
-      const key = historyDayKey(row.card_id, row.recorded_at);
+      const key = historyDayKey(row.game_id, row.card_id, row.recorded_at);
       if (key) keys.add(key);
     }
   }
@@ -517,10 +534,14 @@ function sample(rows, count = 100) {
 }
 
 async function main() {
-  console.log("Loading Supabase sets/cards...");
+  console.log("Loading Supabase One Piece game scope...");
+  const game = await loadOnePieceGame();
+  const gameFilter = `game_id=eq.${encodeURIComponent(game.id)}`;
+
+  console.log("Loading Supabase One Piece sets/cards...");
   const [dbSets, dbCards] = await Promise.all([
-    sbFetchAll("sets?select=id,slug,code,name,card_count,series"),
-    sbFetchAll("cards?select=id,card_image_id,card_number,name,name_base,variant_label,set_id,rarity,tcg_product_id,price_stats(tcg_market,market_avg,updated_at)"),
+    sbFetchAll(`sets?select=id,game_id,slug,code,name,card_count,series&${gameFilter}`),
+    sbFetchAll(`cards?select=id,game_id,card_image_id,card_number,name,name_base,variant_label,set_id,rarity,tcg_product_id,price_stats(tcg_market,market_avg,updated_at)&${gameFilter}`),
   ]);
 
   const setById = new Map(dbSets.map((set) => [set.id, set]));
@@ -672,22 +693,22 @@ async function main() {
     duplicateConflicts.push(group);
   }
 
-  const priceUpserts = safeMatches.map((match) => makePriceUpsert(match.dbCard.id, match.variant));
+  const priceUpserts = safeMatches.map((match) => makePriceUpsert(game.id, match.dbCard.id, match.variant));
   const currentHistoryRows = WRITE_HISTORY
-    ? safeMatches.map((match) => makeCurrentHistoryInsert(match.dbCard.id, match))
+    ? safeMatches.map((match) => makeCurrentHistoryInsert(game.id, match.dbCard.id, match))
     : [];
   const backfillHistoryRows = BACKFILL_HISTORY
-    ? safeMatches.flatMap((match) => historyRowsForVariant(match.dbCard.id, match.variant))
+    ? safeMatches.flatMap((match) => historyRowsForVariant(game.id, match.dbCard.id, match.variant))
     : [];
   let historyInserts = dedupeHistoryRows([...backfillHistoryRows, ...currentHistoryRows]);
   let existingHistoryRowsSkipped = 0;
 
   if (historyInserts.length > 0) {
     console.log("Checking existing price_history days...");
-    const existingHistoryDays = await fetchExistingHistoryDayKeys(historyInserts.map((row) => row.card_id));
+    const existingHistoryDays = await fetchExistingHistoryDayKeys(game.id, historyInserts.map((row) => row.card_id));
     const before = historyInserts.length;
     historyInserts = historyInserts.filter((row) => {
-      const key = historyDayKey(row.card_id, row.recorded_at);
+      const key = historyDayKey(row.game_id, row.card_id, row.recorded_at);
       return key && !existingHistoryDays.has(key);
     });
     existingHistoryRowsSkipped = before - historyInserts.length;
@@ -700,6 +721,7 @@ async function main() {
     if (!existing && match.jtId) {
       cardIdFills.push({
         id: match.dbCard.id,
+        game_id: match.dbCard.game_id,
         card_image_id: match.dbCard.card_image_id,
         card_number: match.dbCard.card_number,
         set_id: match.dbCard.set_id,
@@ -816,7 +838,7 @@ async function main() {
   }
 
   console.log("Applying price_stats upserts...");
-  await upsertRows("price_stats", priceUpserts, "card_id");
+  await upsertRows("price_stats", priceUpserts, PRICE_STATS_UPSERT_CONFLICT);
 
   if (cardIdFills.length > 0) {
     console.log("Filling missing cards.tcg_product_id values...");

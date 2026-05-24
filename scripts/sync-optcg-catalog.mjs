@@ -14,6 +14,7 @@ const OPT_IMAGE_BASE = "https://optcgapi.com/media/static/Card_Images";
 const ONE_PIECE_DB_SLUG = "one_piece";
 const REPORT_PATH = "optcg-catalog-cleanup-report.md";
 const APPLY = process.argv.includes("--apply");
+const CARD_UPSERT_CONFLICT = "game_id,card_image_id";
 
 const BANDAI_BASE_OVERRIDES = new Map([
   ["OP05-001", { rarity: "L", variantLabel: null }],
@@ -708,7 +709,7 @@ async function main() {
   }
 
   console.log("Applying optcg catalog upserts...");
-  await sbUpsert("cards", safeRows, "card_image_id");
+  await sbUpsert("cards", safeRows, CARD_UPSERT_CONFLICT);
   console.log("Apply complete.");
 }
 
