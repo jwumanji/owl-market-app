@@ -1,4 +1,9 @@
 import { createServiceClient } from "@/lib/supabase-server";
+import {
+  catalogCardCost,
+  catalogCardDomains,
+  catalogCardType,
+} from "@/lib/catalog-card-fields";
 import { withOnePiecePayloadFallbacks } from "@/lib/game-payload";
 import {
   allowsPrivateGamePreview,
@@ -113,41 +118,14 @@ type CatalogCardRow = {
   name: string;
   rarity: string | null;
   variant_label: string | null;
+  card_type: string | null;
+  color: string[] | string | null;
+  cost: number | string | null;
+  types: string[] | string | null;
   image_url: string | null;
   image_url_small: string | null;
   game_payload: Record<string, unknown> | null;
 };
-
-function asText(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function catalogCardPayload(row: CatalogCardRow) {
-  const payloadCard = row.game_payload?.card;
-  return payloadCard && typeof payloadCard === "object"
-    ? payloadCard as Record<string, unknown>
-    : {};
-}
-
-function catalogCardType(row: CatalogCardRow) {
-  const payload = catalogCardPayload(row);
-  return asText(payload.type) ?? asText(payload.supertype) ?? "Catalog card";
-}
-
-function catalogCardDomains(row: CatalogCardRow) {
-  const payload = catalogCardPayload(row);
-  const domains = payload.domains;
-  if (!Array.isArray(domains)) return null;
-  const clean = domains.map(asText).filter((value): value is string => Boolean(value));
-  return clean.length > 0 ? clean.join(", ") : null;
-}
-
-function catalogCardCost(row: CatalogCardRow) {
-  const payload = catalogCardPayload(row);
-  const cost = payload.cost;
-  if (typeof cost === "number") return String(cost);
-  return asText(cost);
-}
 
 function toCatalogSetCard(row: CatalogCardRow): CatalogSetCard {
   return {
@@ -232,6 +210,10 @@ async function loadCatalogOnlySets(
           name,
           rarity,
           variant_label,
+          card_type,
+          color,
+          cost,
+          types,
           image_url,
           image_url_small,
           game_payload
