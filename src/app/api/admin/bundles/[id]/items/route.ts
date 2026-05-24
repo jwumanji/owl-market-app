@@ -40,6 +40,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const bundleRes = await supabase
     .from("inventory_bundles")
     .select("id, status, sale_channel, sold_date")
+    .eq("game_id", game.id)
     .eq("id", params.id)
     .single();
 
@@ -61,6 +62,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const assignedRes = await supabase
     .from("inventory_bundle_items")
     .select("bundle_id")
+    .eq("game_id", game.id)
     .eq("inventory_item_id", itemId);
 
   if (assignedRes.error) {
@@ -76,6 +78,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const positionRes = await supabase
       .from("inventory_bundle_items")
       .select("id", { count: "exact", head: true })
+      .eq("game_id", game.id)
       .eq("bundle_id", params.id);
 
     if (positionRes.error) {
@@ -85,6 +88,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const { error: linkError } = await supabase
       .from("inventory_bundle_items")
       .insert({
+        game_id: game.id,
         bundle_id: params.id,
         inventory_item_id: itemId,
         position: positionRes.count ?? 0,
