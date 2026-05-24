@@ -352,7 +352,7 @@ export default async function GameCatalogPage({
           data.cards.map((card) => {
             const set = joinedSet(card);
             return (
-              <div className="catalog-row" key={card.id}>
+              <Link className="catalog-row" key={card.id} href={gamePath(data.game.routeSlug, `/catalog/${card.id}`)}>
                 <span className="catalog-card-name">
                   <b>{card.card_number ?? card.card_image_id ?? "No number"}</b>
                   {card.name}
@@ -363,7 +363,7 @@ export default async function GameCatalogPage({
                 <span>{cardCost(card)}</span>
                 <span>{cardType(card)}</span>
                 <span>{cardDomains(card) ?? "—"}</span>
-              </div>
+              </Link>
             );
           })
         )}
