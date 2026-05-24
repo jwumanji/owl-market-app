@@ -16,7 +16,7 @@ import {
   type ChartOptions,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
-import type { SetData, TopCard } from "../sets-data";
+import type { CatalogSetCard, SetData, TopCard } from "../sets-data";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip);
 
@@ -217,6 +217,7 @@ export default function SetDetailClient({
   const judges = allSets.filter((s) => (s.type ?? "") === "judge");
 
   const catalogOnly = isCatalogOnly(set);
+  const catalogCards = set.catalogCards ?? [];
   const cardCount = setCardCount(set);
   const isLive = !catalogOnly && !set.comingSoon && set.cards > 0;
   const deltaClass = set.chg30d === 0 ? "flat" : set.chg30d > 0 ? "up" : "dn";
@@ -426,15 +427,19 @@ export default function SetDetailClient({
         <div className="setd-tc-head">
           <div>
             <div className="setd-tc-eyebrow">Holdings</div>
-            <div className="setd-tc-title">Top Cards in <span>{set.code}</span></div>
+            <div className="setd-tc-title">
+              {catalogOnly ? "Catalog Cards" : "Top Cards"} in <span>{set.code}</span>
+            </div>
             <div className="setd-tc-sub">
               {catalogOnly
-                ? `${cardCount.toLocaleString()} catalog cards imported · pricing not enabled`
+                ? `${catalogCards.length.toLocaleString()} preview cards · ${cardCount.toLocaleString()} total imported`
                 : `${set.topCards.length} of ${cardCount.toLocaleString()} cards · sorted by average market price`}
             </div>
           </div>
           {catalogOnly ? (
-            <span className="setd-tc-link">Catalog only</span>
+            <Link href={`${gamePath(gameRouteSlug, "/catalog")}?set=${set.slug}`} className="setd-tc-link">
+              View all {cardCount.toLocaleString()} in catalog →
+            </Link>
           ) : (
             <Link href={`${gamePath(gameRouteSlug, "/markets")}?set=${set.slug}`} className="setd-tc-link">
               View all {cardCount.toLocaleString()} in markets →
@@ -442,7 +447,9 @@ export default function SetDetailClient({
           )}
         </div>
         <div className="setd-tc-wrap">
-          {set.topCards.length === 0 ? (
+          {catalogOnly ? (
+            <CatalogCardsTable cards={catalogCards} gameRouteSlug={gameRouteSlug} setCode={set.code} />
+          ) : set.topCards.length === 0 ? (
             <div className="setd-empty-state">No priced cards in this set yet.</div>
           ) : (
             <table className="setd-tc-table">
@@ -518,6 +525,79 @@ export default function SetDetailClient({
         </div>
       </div>
     </section>
+  );
+}
+
+function CatalogCardsTable({
+  cards,
+  gameRouteSlug,
+  setCode,
+}: {
+  cards: CatalogSetCard[];
+  gameRouteSlug?: string | null;
+  setCode: string;
+}) {
+  if (cards.length === 0) {
+    return <div className="setd-empty-state">No catalog cards imported for this set yet.</div>;
+  }
+
+  return (
+    <table className="setd-tc-table setd-catalog-table">
+      <colgroup>
+        <col className="c-rank" />
+        <col className="c-card" />
+        <col className="c-rar" />
+        <col className="c-variant" />
+        <col className="c-type" />
+        <col className="c-cost" />
+        <col className="c-domain" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th className="r">#</th>
+          <th>Card</th>
+          <th>Rarity</th>
+          <th>Variant</th>
+          <th>Type</th>
+          <th className="r">Cost</th>
+          <th>Domain</th>
+        </tr>
+      </thead>
+      <tbody>
+        {cards.map((card, index) => (
+          <tr key={card.id}>
+            <td className="setd-tc-rank">{index + 1}</td>
+            <td>
+              <Link href={gamePath(gameRouteSlug, `/catalog/${card.id}`)} className="setd-catalog-card-link">
+                <div className="setd-tc-card-cell">
+                  <div className="setd-tc-card-art">
+                    {card.img ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={card.img} alt={card.name} loading="lazy" />
+                    ) : (
+                      setCode
+                    )}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="setd-tc-card-name">{card.name}</div>
+                    <div className="setd-tc-tag-row">
+                      <span className="setd-tc-set-tag">{card.number ?? card.cardImageId ?? setCode}</span>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            </td>
+            <td>
+              <span className={`setd-rb ${rarityClass(card.rarity ?? "")}`}>{card.rarity ?? "Unknown"}</span>
+            </td>
+            <td className="setd-catalog-muted">{card.variant ?? "Base"}</td>
+            <td className="setd-catalog-muted">{card.type ?? "Catalog card"}</td>
+            <td className="setd-tc-price">{card.cost ?? "—"}</td>
+            <td className="setd-catalog-muted">{card.domains ?? "—"}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 

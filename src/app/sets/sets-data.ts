@@ -23,8 +23,22 @@ export interface SetData {
   perf: { h1: string; h24: string; d7: string; m1: string; y1: string; max: string };
   perfUp: boolean[];
   topCards: TopCard[];
+  catalogCards?: CatalogSetCard[];
   comingSoon?: boolean;
   pricingStatus?: "priced" | "catalog_only";
+}
+
+export interface CatalogSetCard {
+  id: string;
+  cardImageId?: string | null;
+  number?: string | null;
+  name: string;
+  rarity?: string | null;
+  variant?: string | null;
+  type?: string | null;
+  cost?: string | null;
+  domains?: string | null;
+  img?: string | null;
 }
 
 export interface TopCard {

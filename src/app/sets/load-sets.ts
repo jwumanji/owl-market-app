@@ -7,6 +7,7 @@ import {
   type GameScope,
 } from "@/lib/game-scope";
 import { ONE_PIECE_DB_SLUG } from "@/lib/games/one-piece";
+import type { CatalogSetCard } from "./sets-data";
 
 // ---------------------------------------------------------------------------
 // loadSets() — groups cards by cards.printed_set_code so EB04, OP14, OP15 etc
@@ -102,6 +103,66 @@ const CATALOG_TYPE_COLOR: Record<string, string> = {
   organized: "#E8A020",
   judge: "#9B72FF",
 };
+const CATALOG_SET_CARD_LIMIT = 24;
+
+type CatalogCardRow = {
+  id: string;
+  set_id: string | null;
+  card_image_id: string | null;
+  card_number: string | null;
+  name: string;
+  rarity: string | null;
+  variant_label: string | null;
+  image_url: string | null;
+  image_url_small: string | null;
+  game_payload: Record<string, unknown> | null;
+};
+
+function asText(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function catalogCardPayload(row: CatalogCardRow) {
+  const payloadCard = row.game_payload?.card;
+  return payloadCard && typeof payloadCard === "object"
+    ? payloadCard as Record<string, unknown>
+    : {};
+}
+
+function catalogCardType(row: CatalogCardRow) {
+  const payload = catalogCardPayload(row);
+  return asText(payload.type) ?? asText(payload.supertype) ?? "Catalog card";
+}
+
+function catalogCardDomains(row: CatalogCardRow) {
+  const payload = catalogCardPayload(row);
+  const domains = payload.domains;
+  if (!Array.isArray(domains)) return null;
+  const clean = domains.map(asText).filter((value): value is string => Boolean(value));
+  return clean.length > 0 ? clean.join(", ") : null;
+}
+
+function catalogCardCost(row: CatalogCardRow) {
+  const payload = catalogCardPayload(row);
+  const cost = payload.cost;
+  if (typeof cost === "number") return String(cost);
+  return asText(cost);
+}
+
+function toCatalogSetCard(row: CatalogCardRow): CatalogSetCard {
+  return {
+    id: row.id,
+    cardImageId: row.card_image_id,
+    number: row.card_number,
+    name: row.name,
+    rarity: row.rarity,
+    variant: row.variant_label,
+    type: catalogCardType(row),
+    cost: catalogCardCost(row),
+    domains: catalogCardDomains(row),
+    img: row.image_url_small ?? row.image_url,
+  };
+}
 
 function classifyCatalogType(code: string | null | undefined, setTypeCode: string | null | undefined) {
   const type = (setTypeCode ?? "").toUpperCase();
@@ -119,7 +180,11 @@ function classifyCatalogType(code: string | null | undefined, setTypeCode: strin
   return "promo";
 }
 
-async function loadCatalogOnlySets(supabase: ReturnType<typeof createServiceClient>, game: GameScope): Promise<LoadedSets> {
+async function loadCatalogOnlySets(
+  supabase: ReturnType<typeof createServiceClient>,
+  game: GameScope,
+  options: { includeCatalogCards?: boolean } = {}
+): Promise<LoadedSets> {
   const { data: setRows, error: setsErr } = await supabase
     .from("sets")
     .select("id, slug, code, name, year, color, card_count, set_type_id")
@@ -139,7 +204,7 @@ async function loadCatalogOnlySets(supabase: ReturnType<typeof createServiceClie
     ((setTypeRows ?? []) as Array<{ id: string; code: string | null; name: string | null }>).map((row) => [row.id, row])
   );
 
-  const sets = ((setRows ?? []) as Array<{
+  const normalizedSetRows = (setRows ?? []) as Array<{
     id: string;
     slug: string;
     code: string | null;
@@ -148,7 +213,53 @@ async function loadCatalogOnlySets(supabase: ReturnType<typeof createServiceClie
     color: string | null;
     card_count: number | null;
     set_type_id: string | null;
-  }>).map((set) => {
+  }>;
+  const setIds = normalizedSetRows.map((set) => set.id);
+  const cardsBySetId = new Map<string, CatalogSetCard[]>();
+
+  if (options.includeCatalogCards && setIds.length > 0) {
+    const pageSize = 1000;
+    let from = 0;
+
+    while (true) {
+      const { data: cardRows, error: cardsErr } = await supabase
+        .from("cards")
+        .select(`
+          id,
+          set_id,
+          card_image_id,
+          card_number,
+          name,
+          rarity,
+          variant_label,
+          image_url,
+          image_url_small,
+          game_payload
+        `)
+        .eq("game_id", game.id)
+        .in("set_id", setIds)
+        .order("set_id")
+        .order("card_number")
+        .range(from, from + pageSize - 1);
+
+      if (cardsErr) throw new Error(cardsErr.message);
+      if (!cardRows || cardRows.length === 0) break;
+
+      for (const cardRow of cardRows as unknown as CatalogCardRow[]) {
+        if (!cardRow.set_id) continue;
+        const cards = cardsBySetId.get(cardRow.set_id) ?? [];
+        if (cards.length < CATALOG_SET_CARD_LIMIT) {
+          cards.push(toCatalogSetCard(cardRow));
+          cardsBySetId.set(cardRow.set_id, cards);
+        }
+      }
+
+      if (cardRows.length < pageSize) break;
+      from += pageSize;
+    }
+  }
+
+  const sets = normalizedSetRows.map((set) => {
     const setType = set.set_type_id ? setTypeById.get(set.set_type_id) : null;
     const type = classifyCatalogType(set.code, setType?.code);
     const color = set.color || CATALOG_TYPE_COLOR[type] || DEFAULT_COLOR;
@@ -178,6 +289,7 @@ async function loadCatalogOnlySets(supabase: ReturnType<typeof createServiceClie
       perf: { h1: "0%", h24: "0%", d7: "0%", m1: "0%", y1: "0%", max: "0%" },
       perfUp: [true, true, true, true, true, true],
       topCards: [],
+      catalogCards: cardsBySetId.get(set.id) ?? [],
       comingSoon: false,
       pricingStatus: "catalog_only",
     };
@@ -186,7 +298,11 @@ async function loadCatalogOnlySets(supabase: ReturnType<typeof createServiceClie
   return { sets, extraSets: [], game: gameResponsePayload(game) };
 }
 
-export async function loadSets(options: { game?: string | null; publicOnly?: boolean } = {}): Promise<LoadedSets> {
+export async function loadSets(options: {
+  game?: string | null;
+  publicOnly?: boolean;
+  includeCatalogCards?: boolean;
+} = {}): Promise<LoadedSets> {
   const supabase = createServiceClient();
   const gameResult = await resolveGameScope(supabase, options.game, {
     defaultToOnePiece: true,
@@ -199,7 +315,7 @@ export async function loadSets(options: { game?: string | null; publicOnly?: boo
   const game: GameScope = gameResult.game;
 
   if (game.slug !== ONE_PIECE_DB_SLUG) {
-    return loadCatalogOnlySets(supabase, game);
+    return loadCatalogOnlySets(supabase, game, { includeCatalogCards: options.includeCatalogCards });
   }
 
   // 1. All sets meta (for name / year / color lookup keyed by code)
