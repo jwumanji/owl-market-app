@@ -13,9 +13,9 @@
 // - P-prefixed promos                    → skipped            (owned by import-promos.mjs)
 // - garbled / empty rows                 → skipped
 //
-// Backfill semantics match import-set.mjs: insert new rows on card_image_id;
-// for existing rows, fill only NULL fields and re-route set_id to the routed
-// destination set (distribution wins over origin).
+// Backfill semantics match import-set.mjs: insert new rows on
+// game_id,card_image_id; for existing rows, fill only NULL fields and
+// re-route set_id to the routed destination set (distribution wins over origin).
 
 const BUNDLE = process.argv[2];
 const DRY_RUN = process.argv.includes("--dry-run");
@@ -44,6 +44,9 @@ const SB_HEADERS = {
 
 const OPT_BASE = "https://optcgapi.com/api";
 const OPT_IMAGE_BASE = "https://optcgapi.com/media/static/Card_Images";
+const ONE_PIECE_DB_SLUG = "one_piece";
+const SET_UPSERT_CONFLICT = "game_id,slug";
+const CARD_UPSERT_CONFLICT = "game_id,card_image_id";
 
 // Hand-curated names — the bundle endpoint only exposes the bundle name
 // (e.g. "Adventure on Kami's Island"), not per-half names.
@@ -130,7 +133,7 @@ async function sbGet(path) {
 async function sbUpsert(table, rows, onConflict) {
   if (rows.length === 0) return true;
   const r = await fetch(
-    `${SUPABASE_URL}/rest/v1/${table}?on_conflict=${onConflict}`,
+    `${SUPABASE_URL}/rest/v1/${table}?on_conflict=${encodeURIComponent(onConflict)}`,
     {
       method: "POST",
       headers: { ...SB_HEADERS, Prefer: "resolution=merge-duplicates,return=minimal" },
@@ -142,6 +145,17 @@ async function sbUpsert(table, rows, onConflict) {
     return false;
   }
   return true;
+}
+
+async function loadOnePieceGame() {
+  const data = await sbGet(
+    `games?select=id,slug,name&slug=eq.${encodeURIComponent(ONE_PIECE_DB_SLUG)}`
+  );
+  const game = data[0] ?? null;
+  if (!game?.id) {
+    throw new Error("One Piece game row is missing. Run the multi-TCG game migration before importing cards.");
+  }
+  return game;
 }
 
 async function sbPatch(table, filter, body) {
@@ -157,18 +171,20 @@ async function sbPatch(table, filter, body) {
   return true;
 }
 
-async function getSetUuid(setCode) {
-  const data = await sbGet(`sets?code=eq.${setCode}&select=id`);
+async function getSetUuid(setCode, gameId) {
+  const data = await sbGet(
+    `sets?game_id=eq.${encodeURIComponent(gameId)}&code=eq.${encodeURIComponent(setCode)}&select=id`
+  );
   return data[0]?.id ?? null;
 }
 
-async function loadAllExistingCards() {
+async function loadAllExistingCards(gameId) {
   const all = [];
   const PAGE = 1000;
   let offset = 0;
   while (true) {
     const r = await fetch(
-      `${SUPABASE_URL}/rest/v1/cards?select=id,card_image_id,set_id,rarity,card_type,power,counter,life,cost,attribute,effect,color,types,image_url&limit=${PAGE}&offset=${offset}`,
+      `${SUPABASE_URL}/rest/v1/cards?select=id,game_id,card_image_id,set_id,rarity,card_type,power,counter,life,cost,attribute,effect,color,types,image_url&game_id=eq.${encodeURIComponent(gameId)}&limit=${PAGE}&offset=${offset}`,
       { headers: SB_HEADERS },
     );
     if (!r.ok) throw new Error(`load existing cards: ${r.status} ${await r.text()}`);
@@ -184,9 +200,10 @@ async function loadAllExistingCards() {
 // Card transform
 // ---------------------------------------------------------------------------
 
-function buildInsertRow(c, setUuid) {
+function buildInsertRow(c, setUuid, gameId) {
   const color = nullIfNullStr(c.card_color);
   return {
+    game_id: gameId,
     card_image_id: c.card_image_id,
     card_number: c.card_set_id,
     name: c.card_name,
@@ -245,7 +262,7 @@ function buildBackfillPatch(c, existing, setUuid) {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  console.log(`Importing bundle ${BUNDLE} → splitting into ${OP_HALF} + ${EB_HALF}${DRY_RUN ? "  [DRY RUN]" : ""}`);
+  console.log(`Importing bundle ${BUNDLE} -> splitting into ${OP_HALF} + ${EB_HALF}${DRY_RUN ? "  [DRY RUN]" : ""}`);
   console.log(`Source: ${OPT_BASE}/sets/${BUNDLE}/`);
 
   const cards = await fetchJson(`${OPT_BASE}/sets/${BUNDLE}/`);
@@ -287,19 +304,22 @@ async function main() {
     return;
   }
 
+  const game = await loadOnePieceGame();
+  console.log(`Using game scope: ${game.slug}`);
+
   // 1. Ensure destination set rows exist. Look up by `code` first; only
   //    upsert when the code isn't already present, to avoid creating a
   //    duplicate row with a different slug format.
   const setUuids = {};
   for (const code of [OP_HALF, EB_HALF]) {
-    let id = await getSetUuid(code);
+    let id = await getSetUuid(code, game.id);
     if (!id) {
       await sbUpsert(
         "sets",
-        [{ slug: code.toLowerCase(), code, name: SET_NAMES[code] ?? code }],
-        "slug",
+        [{ game_id: game.id, slug: code.toLowerCase(), code, name: SET_NAMES[code] ?? code }],
+        SET_UPSERT_CONFLICT,
       );
-      id = await getSetUuid(code);
+      id = await getSetUuid(code, game.id);
     }
     if (!id) { console.error(`Set ${code} missing after upsert — aborting`); process.exit(1); }
     setUuids[code] = id;
@@ -307,7 +327,7 @@ async function main() {
 
   // 2. Pre-load existing cards for insert-vs-patch decisions.
   console.log("Loading existing cards (paged)...");
-  const existing = await loadAllExistingCards();
+  const existing = await loadAllExistingCards(game.id);
   console.log(`Loaded ${existing.length} existing rows.\n`);
   const byCardImageId = new Map();
   for (const row of existing) if (row.card_image_id) byCardImageId.set(row.card_image_id, row);
@@ -325,13 +345,13 @@ async function main() {
       if (match) {
         const patch = buildBackfillPatch(c, match, setUuid);
         if (patch) {
-          const ok = await sbPatch("cards", `id=eq.${match.id}`, patch);
+          const ok = await sbPatch("cards", `id=eq.${match.id}&game_id=eq.${encodeURIComponent(game.id)}`, patch);
           if (ok) patches++;
         } else {
           noOps++;
         }
       } else {
-        insertBatches[code].set(c.card_image_id, buildInsertRow(c, setUuid));
+        insertBatches[code].set(c.card_image_id, buildInsertRow(c, setUuid, game.id));
       }
     }
   }
@@ -344,7 +364,7 @@ async function main() {
     const CHUNK = 200;
     for (let i = 0; i < rows.length; i += CHUNK) {
       const slice = rows.slice(i, i + CHUNK);
-      const ok = await sbUpsert("cards", slice, "card_image_id");
+      const ok = await sbUpsert("cards", slice, CARD_UPSERT_CONFLICT);
       if (ok) inserts[code] += slice.length;
     }
   }
