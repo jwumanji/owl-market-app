@@ -11,7 +11,9 @@ type DbError = { message: string };
 type LoadRouteOptions = {
   user?: MockUser;
   inventoryFound?: boolean;
+  inventoryGameId?: string;
   cvResponse?: Response;
+  cvError?: Error | null;
   insertError?: DbError | null;
 };
 
@@ -23,6 +25,17 @@ const onePieceGame = {
   is_public: true,
   metadata: { route_slug: "one-piece" },
 };
+
+const pokemonGame = {
+  id: "game-pokemon",
+  slug: "pokemon",
+  name: "Pokemon TCG",
+  is_active: true,
+  is_public: false,
+  metadata: { route_slug: "pokemon" },
+};
+
+const games = [onePieceGame, pokemonGame];
 
 const requireFromTest = createRequire(import.meta.url);
 const routePath = path.resolve("src/app/api/centering/measure/route.ts");
@@ -91,12 +104,14 @@ function measurementResponse() {
   };
 }
 
-function measurementRequest(inventoryItemId = "inventory-1", game = "one_piece") {
+function measurementRequest(inventoryItemId: string | null = "inventory-1", game: string | null = "one_piece") {
   const formData = new FormData();
   if (inventoryItemId) {
     formData.set("inventoryItemId", inventoryItemId);
   }
-  formData.set("game", game);
+  if (game !== null) {
+    formData.set("game", game);
+  }
   formData.set("file", new File(["fake image"], "card.jpg", { type: "image/jpeg" }));
 
   return new Request("http://localhost/api/centering/measure", {
@@ -105,10 +120,48 @@ function measurementRequest(inventoryItemId = "inventory-1", game = "one_piece")
   });
 }
 
+function toGameScope(game: typeof onePieceGame) {
+  return {
+    id: game.id,
+    slug: game.slug,
+    routeSlug: game.metadata.route_slug,
+    name: game.name,
+    isActive: game.is_active,
+    isPublic: game.is_public,
+    metadata: game.metadata,
+  };
+}
+
+function resolveMockGame(rawGame: string | null | undefined) {
+  const requested = rawGame?.trim();
+  if (!requested) {
+    return { game: null, error: { message: "game is required", status: 400 } };
+  }
+
+  const slugCandidates = new Set([
+    requested,
+    requested.replace(/-/g, "_"),
+    requested.replace(/_/g, "-"),
+  ]);
+  const row = games.find((game) => (
+    slugCandidates.has(game.slug) ||
+    slugCandidates.has(game.metadata.route_slug) ||
+    game.id === requested
+  ));
+
+  if (!row) {
+    return { game: null, error: { message: "Game not found", status: 404 } };
+  }
+
+  return { game: toGameScope(row), error: null };
+}
+
 function loadRoute({
   user = { email: "admin@example.com" },
   inventoryFound = true,
+  inventoryGameId = onePieceGame.id,
   cvResponse = Response.json(measurementResponse()),
+  cvError = null,
   insertError = null,
 }: LoadRouteOptions = {}) {
   const insertedRows: Record<string, unknown>[] = [];
@@ -118,33 +171,6 @@ function loadRoute({
 
   const supabase = {
     from(table: string) {
-      if (table === "games") {
-        let matched = true;
-        const query = {
-          select(_columns: string) {
-            return query;
-          },
-          eq(column: string, value: string | boolean) {
-            if (column === "slug") {
-              matched = value === onePieceGame.slug;
-            } else if (column === "id") {
-              matched = value === onePieceGame.id;
-            }
-            return query;
-          },
-          filter(column: string, _operator: string, value: string) {
-            if (column === "metadata->>route_slug") {
-              matched = value === onePieceGame.metadata.route_slug;
-            }
-            return query;
-          },
-          maybeSingle() {
-            return Promise.resolve({ data: matched ? onePieceGame : null, error: null });
-          },
-        };
-        return query;
-      }
-
       if (table === "inventory_items") {
         let selectedId = "";
         let selectedGameId = "";
@@ -162,7 +188,7 @@ function loadRoute({
           },
           async single() {
             inventoryLookups.push(selectedId);
-            if (!inventoryFound || selectedGameId !== onePieceGame.id) {
+            if (!inventoryFound || selectedGameId !== inventoryGameId) {
               return { data: null, error: { message: "not found" } };
             }
 
@@ -222,6 +248,11 @@ function loadRoute({
         return email === "admin@example.com";
       },
     },
+    "@/lib/game-scope": {
+      resolveGameScope(_supabase: unknown, rawGame: string | null | undefined) {
+        return Promise.resolve(resolveMockGame(rawGame));
+      },
+    },
     "@/lib/inventory-scans": {
       isUploadFile(value: FormDataEntryValue | null) {
         return value instanceof File && value.size > 0;
@@ -256,6 +287,9 @@ function loadRoute({
     exports: moduleStub.exports,
     fetch(input: string | URL | Request, init?: RequestInit) {
       cvCalls.push({ url: String(input), init: init ?? {} });
+      if (cvError) {
+        return Promise.reject(cvError);
+      }
       return Promise.resolve(cvResponse);
     },
     File,
@@ -299,6 +333,18 @@ test("anonymous request returns 401 without DB write or CV call", async () => {
   assert.equal(route.insertedRows.length, 0);
 });
 
+test("request without game scope returns 400 before inventory or CV work", async () => {
+  const route = loadRoute();
+
+  const response = await route.POST(measurementRequest("inventory-1", null));
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "game is required" });
+  assert.deepEqual(route.inventoryLookups, []);
+  assert.equal(route.cvCalls.length, 0);
+  assert.equal(route.insertedRows.length, 0);
+});
+
 test("authenticated request with invalid inventoryItemId returns 404", async () => {
   const route = loadRoute({ inventoryFound: false });
 
@@ -306,6 +352,18 @@ test("authenticated request with invalid inventoryItemId returns 404", async () 
 
   assert.equal(response.status, 404);
   assert.deepEqual(await response.json(), { error: "Inventory item not found" });
+  assert.equal(route.cvCalls.length, 0);
+  assert.equal(route.insertedRows.length, 0);
+});
+
+test("inventory-linked request cannot attach across games", async () => {
+  const route = loadRoute({ inventoryGameId: pokemonGame.id });
+
+  const response = await route.POST(measurementRequest("inventory-1", "one_piece"));
+
+  assert.equal(response.status, 404);
+  assert.deepEqual(await response.json(), { error: "Inventory item not found" });
+  assert.deepEqual(route.inventoryLookups, ["inventory-1"]);
   assert.equal(route.cvCalls.length, 0);
   assert.equal(route.insertedRows.length, 0);
 });
@@ -327,6 +385,7 @@ test("happy path forwards CV response and inserts centering measurement", async 
   assert.equal(await response.text(), cvText);
   assert.equal(route.cvCalls.length, 1);
   assert.equal(route.cvCalls[0].url, "https://owl-lens.example/measure");
+  assert.equal((route.cvCalls[0].init.headers as Record<string, string>).accept, "application/json");
   assert.deepEqual(route.inventoryLookups, ["inventory-1"]);
   assert.equal(route.insertedRows.length, 1);
   assert.deepEqual(JSON.parse(JSON.stringify(route.insertedRows[0])), {
@@ -348,6 +407,10 @@ test("happy path forwards CV response and inserts centering measurement", async 
     image_height_px: 1428,
     overlay: cvBody.overlay,
   });
+  assert.equal(Object.hasOwn(route.insertedRows[0], "image"), false);
+  assert.equal(Object.hasOwn(route.insertedRows[0], "file"), false);
+  assert.equal(Object.hasOwn(route.insertedRows[0], "image_base64"), false);
+  assert.equal(Object.hasOwn(route.insertedRows[0], "image_bytes"), false);
 });
 
 test("standalone request without inventoryItemId persists a null inventory link", async () => {
@@ -394,6 +457,65 @@ test("CV 422 response is forwarded without inserting a row", async () => {
   assert.equal(response.status, 422);
   assert.equal(response.headers.get("content-type"), "application/json");
   assert.equal(await response.text(), errorText);
+  assert.equal(route.cvCalls.length, 1);
+  assert.equal(route.insertedRows.length, 0);
+});
+
+test("CV 5xx response returns deterministic proxy error without inserting a row", async () => {
+  const route = loadRoute({
+    cvResponse: new Response("upstream unavailable", {
+      status: 503,
+      headers: { "content-type": "text/plain" },
+    }),
+  });
+
+  const response = await route.POST(measurementRequest());
+
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), {
+    error: "Owl Lens CV service failed",
+    upstreamStatus: 503,
+  });
+  assert.equal(route.cvCalls.length, 1);
+  assert.equal(route.insertedRows.length, 0);
+});
+
+test("CV network failure returns unavailable proxy error without inserting a row", async () => {
+  const route = loadRoute({ cvError: new Error("connection refused") });
+
+  const response = await route.POST(measurementRequest());
+
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), { error: "Owl Lens CV service is unavailable" });
+  assert.equal(route.cvCalls.length, 1);
+  assert.equal(route.insertedRows.length, 0);
+});
+
+test("CV invalid JSON response returns proxy error without inserting a row", async () => {
+  const route = loadRoute({
+    cvResponse: new Response("not-json", {
+      status: 200,
+      headers: { "content-type": "text/plain" },
+    }),
+  });
+
+  const response = await route.POST(measurementRequest());
+
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), { error: "Owl Lens CV service returned invalid JSON" });
+  assert.equal(route.cvCalls.length, 1);
+  assert.equal(route.insertedRows.length, 0);
+});
+
+test("CV invalid measurement shape returns proxy error without inserting a row", async () => {
+  const route = loadRoute({
+    cvResponse: Response.json({ ok: true }),
+  });
+
+  const response = await route.POST(measurementRequest());
+
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), { error: "Owl Lens CV service returned an invalid measurement response" });
   assert.equal(route.cvCalls.length, 1);
   assert.equal(route.insertedRows.length, 0);
 });
