@@ -10,20 +10,20 @@ do $$
 begin
   if not exists (
     select 1
-    from pg_attribute
-    where attrelid = 'public.sets'::regclass
-      and attname = 'game_id'
-      and not attisdropped
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'sets'
+      and column_name = 'game_id'
   ) then
     raise exception 'sets.game_id is required before running OWL-22 scoped constraints';
   end if;
 
   if not exists (
     select 1
-    from pg_attribute
-    where attrelid = 'public.cards'::regclass
-      and attname = 'game_id'
-      and not attisdropped
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'cards'
+      and column_name = 'game_id'
   ) then
     raise exception 'cards.game_id is required before running OWL-22 scoped constraints';
   end if;
