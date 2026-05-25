@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { JustTCG } from "justtcg-js";
+import { refreshPublicGameSummaries } from "@/lib/public-page-summaries";
 import {
   ONE_PIECE_JUSTTCG_GAME_SLUG,
   buildJustTcgCodeToSlugs,
@@ -116,12 +117,14 @@ async function syncPrices(request: Request) {
 
   const totalUpdated = results.reduce((sum, r) => sum + r.updated, 0);
   const totalErrors = results.reduce((sum, r) => sum + r.errors.length, 0);
+  const summaries = await tryRefreshPublicSummaries(supabase, game.id);
 
   return NextResponse.json({
     game: game.slug,
     provider: "justtcg",
     synced: totalUpdated,
     errors: totalErrors,
+    summaries,
     sets: results,
   });
 }
@@ -173,6 +176,10 @@ async function syncByIndex(
 
   // Trigger next set in the chain (fire-and-forget)
   const nextIndex = index + 1;
+  const summaries = nextIndex >= syncableSets.length
+    ? await tryRefreshPublicSummaries(supabase, game.id)
+    : { refreshed: false, deferred: true };
+
   if (nextIndex < syncableSets.length) {
     const baseUrl = new URL(request.url);
     baseUrl.searchParams.set("_index", String(nextIndex));
@@ -190,8 +197,21 @@ async function syncByIndex(
     provider: "justtcg",
     current: `${index + 1}/${syncableSets.length}`,
     ...result,
+    summaries,
     next: nextIndex < syncableSets.length ? syncableSets[nextIndex]?.code : null,
   });
+}
+
+async function tryRefreshPublicSummaries(supabase: ReturnType<typeof createServiceClient>, gameId: string) {
+  try {
+    await refreshPublicGameSummaries(supabase, gameId);
+    return { refreshed: true };
+  } catch (error) {
+    return {
+      refreshed: false,
+      error: error instanceof Error ? error.message : "Failed to refresh public summaries.",
+    };
+  }
 }
 
 // ---------------------------------------------------------------------------

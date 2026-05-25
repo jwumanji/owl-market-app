@@ -3,6 +3,7 @@ import { RARITY_META } from "@/app/rarities/rarities-data";
 import { gameParamFromRequest, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
 import { ONE_PIECE_DB_SLUG } from "@/lib/games/one-piece";
 import { cachedPublicData, PUBLIC_DATA_CACHE_HEADERS, publicDataCacheKey } from "@/lib/public-data-cache";
+import { loadPublicRaritySummaryRows, type PublicRaritySummaryRow } from "@/lib/public-page-summaries";
 import { firstRelation } from "@/lib/supabase-relations";
 import { createServiceClient } from "@/lib/supabase-server";
 
@@ -78,6 +79,105 @@ function slugify(value: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function numeric(value: number | string | null | undefined) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function stringValue(value: unknown, fallback = "") {
+  return typeof value === "string" && value.length > 0 ? value : fallback;
+}
+
+function summaryTopCards(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter((card): card is Record<string, unknown> => card != null && typeof card === "object" && !Array.isArray(card))
+    .map((card) => ({
+      cardId: stringValue(card.cardId),
+      name: stringValue(card.name),
+      set: stringValue(card.set),
+      rarity: stringValue(card.rarity),
+      tcg: numeric(card.tcg as number | string | null | undefined),
+      avg: numeric(card.avg as number | string | null | undefined),
+      chg1d: numeric(card.chg1d as number | string | null | undefined),
+      chg7d: numeric(card.chg7d as number | string | null | undefined),
+      chg30d: numeric(card.chg30d as number | string | null | undefined),
+      spark: Array.isArray(card.spark) ? card.spark.map((point) => numeric(point as number | string | null | undefined)) : [0, 0],
+      cardImageId: stringValue(card.cardImageId),
+      imageSmall: typeof card.imageSmall === "string" ? card.imageSmall : null,
+    }));
+}
+
+function mapOnePieceRaritySummary(row: PublicRaritySummaryRow) {
+  const code = row.rarity_code.toUpperCase();
+  const meta = RARITY_META[code];
+  if (!meta) return null;
+  const indexValue = numeric(row.index_value);
+  const pricedCount = row.priced_count ?? 0;
+
+  return {
+    slug: code.toLowerCase(),
+    name: meta.name,
+    code,
+    subtitle: meta.subtitle,
+    color: meta.color,
+    colorD: meta.colorD,
+    colorBd: meta.colorBd,
+    indexValue,
+    cardCount: row.card_count ?? 0,
+    avgCardPrice: pricedCount > 0 ? numeric(row.avg_card_price) : 0,
+    chg7d: numeric(row.chg_7d),
+    chg30d: numeric(row.chg_30d),
+    up: numeric(row.chg_7d) >= 0,
+    topCards: summaryTopCards(row.top_cards),
+  };
+}
+
+function mapCatalogRaritySummary(row: PublicRaritySummaryRow, index: number) {
+  const color = CATALOG_RARITY_COLORS[index % CATALOG_RARITY_COLORS.length];
+  const code = row.rarity_code || row.rarity_name || "Unknown";
+  const name = row.rarity_name || row.rarity_code || "Unknown";
+  const indexValue = numeric(row.index_value);
+  const pricedCount = row.priced_count ?? 0;
+
+  return {
+    slug: slugify(code || name),
+    name,
+    code,
+    subtitle: "Catalog taxonomy imported for this game. Pricing is not enabled yet.",
+    color: color.color,
+    colorD: color.colorD,
+    colorBd: color.colorBd,
+    indexValue,
+    cardCount: row.card_count ?? 0,
+    avgCardPrice: pricedCount > 0 ? numeric(row.avg_card_price) : 0,
+    chg7d: numeric(row.chg_7d),
+    chg30d: numeric(row.chg_30d),
+    up: numeric(row.chg_7d) >= 0,
+    spark: [10, 10],
+    pricingStatus: pricedCount > 0 ? "priced" as const : "catalog_only" as const,
+    topCards: summaryTopCards(row.top_cards),
+  };
+}
+
+async function loadRaritySummaries(supabase: SupabaseServiceClient, gameId: string, gameSlug: string) {
+  const rows = await loadPublicRaritySummaryRows(supabase, gameId);
+  if (!rows) return null;
+
+  if (gameSlug === ONE_PIECE_DB_SLUG) {
+    return rows
+      .map(mapOnePieceRaritySummary)
+      .filter((rarity): rarity is NonNullable<typeof rarity> => rarity != null && (rarity.indexValue > 0 || rarity.cardCount > 0))
+      .sort((a, b) => b.indexValue - a.indexValue);
+  }
+
+  return rows
+    .map(mapCatalogRaritySummary)
+    .filter((rarity) => rarity.cardCount > 0)
+    .sort((a, b) => b.cardCount - a.cardCount);
 }
 
 async function fetchPaged<T>(loadPage: (from: number, to: number) => QueryResult<T>, pageSize = 1000) {
@@ -364,13 +464,19 @@ export async function GET(request: Request) {
   const { game } = gameResult;
 
   if (game.slug !== ONE_PIECE_DB_SLUG) {
+    const summaryRows = await loadRaritySummaries(supabase, game.id, game.slug);
+    if (summaryRows) {
+      return NextResponse.json(summaryRows, { headers: PUBLIC_DATA_CACHE_HEADERS });
+    }
+
     return loadCatalogOnlyRarities(supabase, game.id);
   }
 
   try {
-    const withCards = await cachedPublicData(publicDataCacheKey("api-rarities-v4", game.id), () =>
-      loadOnePieceRarityIndex(supabase, game.id)
-    );
+    const withCards = await cachedPublicData(publicDataCacheKey("api-rarities-v5", game.id), async () => {
+      const summaryRows = await loadRaritySummaries(supabase, game.id, game.slug);
+      return summaryRows ?? loadOnePieceRarityIndex(supabase, game.id);
+    });
 
     return NextResponse.json(withCards, {
       headers: PUBLIC_DATA_CACHE_HEADERS,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { gameParamFromRequest, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
 import { cachedPublicData, PUBLIC_DATA_CACHE_HEADERS, publicDataCacheKey } from "@/lib/public-data-cache";
+import { loadPublicCharacterSummaryRows, type PublicCharacterSummaryRow } from "@/lib/public-page-summaries";
 import { createServiceClient } from "@/lib/supabase-server";
 import { firstRelation } from "@/lib/supabase-relations";
 
@@ -9,6 +10,66 @@ import { firstRelation } from "@/lib/supabase-relations";
 // ---------------------------------------------------------------------------
 
 type QueryResult<T> = PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
+
+function numeric(value: number | string | null | undefined) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function stringValue(value: unknown, fallback = "") {
+  return typeof value === "string" && value.length > 0 ? value : fallback;
+}
+
+function summaryTopCards(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter((card): card is Record<string, unknown> => card != null && typeof card === "object" && !Array.isArray(card))
+    .map((card) => ({
+      name: stringValue(card.name),
+      set: stringValue(card.set),
+      rarity: stringValue(card.rarity),
+      tcg: numeric(card.tcg as number | string | null | undefined),
+      avg: numeric(card.avg as number | string | null | undefined),
+      chg1d: numeric(card.chg1d as number | string | null | undefined),
+      chg7d: numeric(card.chg7d as number | string | null | undefined),
+      chg30d: numeric(card.chg30d as number | string | null | undefined),
+      spark: Array.isArray(card.spark) ? card.spark.map((point) => numeric(point as number | string | null | undefined)) : [0, 0],
+      imageUrl: typeof card.imageUrl === "string" ? card.imageUrl : null,
+      imageUrlSmall: typeof card.imageUrlSmall === "string" ? card.imageUrlSmall : null,
+      cardImageId: typeof card.cardImageId === "string" ? card.cardImageId : null,
+    }));
+}
+
+function mapCharacterSummary(row: PublicCharacterSummaryRow) {
+  const indexValue = numeric(row.index_value);
+  const chg7d = numeric(row.chg_7d);
+
+  return {
+    slug: row.slug,
+    name: row.name,
+    subtitle: row.subtitle ?? "",
+    faction: row.faction ?? "",
+    tier: row.tier ?? 3,
+    indexValue,
+    cardCount: row.card_count ?? 0,
+    chg7d,
+    chg30d: numeric(row.chg_30d),
+    up: chg7d >= 0,
+    topCards: summaryTopCards(row.top_cards),
+  };
+}
+
+async function loadCharacterSummaries(gameId: string) {
+  const supabase = createServiceClient();
+  const rows = await loadPublicCharacterSummaryRows(supabase, gameId);
+  if (!rows) return null;
+
+  return rows
+    .map(mapCharacterSummary)
+    .filter((character) => character.indexValue > 0)
+    .sort((a, b) => b.indexValue - a.indexValue);
+}
 
 async function fetchPaged<T>(loadPage: (from: number, to: number) => QueryResult<T>, pageSize = 1000) {
   const rows: T[] = [];
@@ -230,8 +291,11 @@ export async function GET(request: Request) {
 
   try {
     const withCards = await cachedPublicData(
-      publicDataCacheKey("api-characters-v4", gameResult.game.id),
-      () => loadCharacterIndex(gameResult.game.id)
+      publicDataCacheKey("api-characters-v5", gameResult.game.id),
+      async () => {
+        const summaryRows = await loadCharacterSummaries(gameResult.game.id);
+        return summaryRows ?? loadCharacterIndex(gameResult.game.id);
+      }
     );
     return NextResponse.json(withCards, { headers: PUBLIC_DATA_CACHE_HEADERS });
   } catch (error) {
