@@ -1,11 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  ONE_PIECE_DB_SLUG,
-  ONE_PIECE_ROUTE_SLUG,
-} from "@/lib/games/one-piece";
+import { DEFAULT_PUBLIC_GAME } from "@/lib/games/registry";
 
-export const DEFAULT_PUBLIC_GAME_DB_SLUG = ONE_PIECE_DB_SLUG;
-export const DEFAULT_PUBLIC_GAME_ROUTE_SLUG = ONE_PIECE_ROUTE_SLUG;
+export const DEFAULT_PUBLIC_GAME_DB_SLUG = DEFAULT_PUBLIC_GAME.dbSlug;
+export const DEFAULT_PUBLIC_GAME_ROUTE_SLUG = DEFAULT_PUBLIC_GAME.routeSlug;
 
 export type GameScope = {
   id: string;
