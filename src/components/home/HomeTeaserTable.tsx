@@ -1,10 +1,13 @@
 import Link from "next/link";
 import RarityBadge from "@/components/ui/RarityBadge";
 import CardHoverZoom from "@/components/ui/CardHoverZoom";
+import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
+import { gamePath } from "@/lib/game-routes";
 import { formatPct } from "@/lib/utils";
 
 export type TeaserCard = {
   id: string;
+  card_image_id: string | null;
   name: string;
   rarity: string | null;
   image_url_small: string | null;
@@ -65,9 +68,13 @@ function CardThumb({ card }: { card: TeaserCard }) {
 
 type Props = {
   cards: TeaserCard[];
+  gameRouteSlug?: string | null;
 };
 
-export default function HomeTeaserTable({ cards }: Props) {
+export default function HomeTeaserTable({
+  cards,
+  gameRouteSlug = DEFAULT_PUBLIC_GAME_ROUTE_SLUG,
+}: Props) {
   return (
     <div className="c-teaser-table">
       <div className="c-teaser-thead">
@@ -88,7 +95,7 @@ export default function HomeTeaserTable({ cards }: Props) {
           return (
             <Link
               key={card.id}
-              href={`/card/${card.id}`}
+              href={gamePath(gameRouteSlug, `/card/${card.card_image_id ?? card.id}`)}
               className="c-teaser-row"
             >
               <span className="c-teaser-rank">{String(i + 1).padStart(2, "0")}</span>

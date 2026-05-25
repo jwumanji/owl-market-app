@@ -15,6 +15,8 @@ import {
 import { Line } from "react-chartjs-2";
 import { formatPrice, formatPct, pctColor, timeAgo } from "@/lib/utils";
 import RarityBadge from "@/components/ui/RarityBadge";
+import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
+import { gamePath, gameQueryValue } from "@/lib/game-routes";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip);
 
@@ -68,6 +70,10 @@ interface PricePoint {
 const PERIODS = ["7d", "1m", "3m", "1y", "max"] as const;
 type Period = (typeof PERIODS)[number];
 
+function routeParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 function filterByPeriod(history: PricePoint[], period: Period): PricePoint[] {
   if (period === "max") return history;
   const now = Date.now();
@@ -96,8 +102,9 @@ function formatAthDate(dateStr: string | null): string {
 }
 
 export default function CardDetailPage() {
-  const params = useParams();
-  const id = params.id as string;
+  const params = useParams<{ id?: string | string[]; game?: string | string[] }>();
+  const id = routeParam(params.id) ?? "";
+  const gameRouteSlug = routeParam(params.game) ?? DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
 
   const [card, setCard] = useState<CardData | null>(null);
   const [set, setSet] = useState<SetData | null>(null);
@@ -113,7 +120,8 @@ export default function CardDetailPage() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/card/${id}`);
+        const query = new URLSearchParams({ game: gameQueryValue(gameRouteSlug) });
+        const res = await fetch(`/api/card/${id}?${query}`);
         if (!res.ok) {
           setError(res.status === 404 ? "Card not found" : "Failed to load card");
           return;
@@ -131,7 +139,7 @@ export default function CardDetailPage() {
       }
     }
     fetchData();
-  }, [id]);
+  }, [id, gameRouteSlug]);
 
   if (loading) {
     return (
@@ -145,7 +153,7 @@ export default function CardDetailPage() {
     return (
       <section className="card-page max-w-[1180px] mx-auto px-8 py-8">
         <p className="text-loss-2 text-sm font-mono-2">{error ?? "Card not found"}</p>
-        <Link href="/sets" className="text-coral text-sm mt-4 inline-block hover:underline">
+        <Link href={gamePath(gameRouteSlug, "/sets")} className="text-coral text-sm mt-4 inline-block hover:underline">
           &larr; Back to Sets
         </Link>
       </section>
@@ -165,14 +173,14 @@ export default function CardDetailPage() {
     <section className="card-page max-w-[1180px] mx-auto px-8 pt-8 pb-24 text-ink">
       {/* Breadcrumb */}
       <div className="mb-8 font-mono-2 font-semibold text-[12px] tracking-[0.04em] flex items-center flex-wrap">
-        <Link href="/sets" className="text-ink-3 hover:text-ink transition-colors">
+        <Link href={gamePath(gameRouteSlug, "/sets")} className="text-ink-3 hover:text-ink transition-colors">
           Sets
         </Link>
         {set && (
           <>
             <span className="mx-2 text-ink-3">/</span>
             <Link
-              href={`/sets/${set.slug}`}
+              href={gamePath(gameRouteSlug, `/sets/${set.slug}`)}
               className="text-ink-3 hover:text-ink transition-colors"
             >
               {set.code} {set.name}
@@ -195,7 +203,7 @@ export default function CardDetailPage() {
               <span className="font-mono-2 font-semibold text-[12.5px] text-ink-2">
                 {set ? (
                   <Link
-                    href={`/sets/${set.slug}`}
+                    href={gamePath(gameRouteSlug, `/sets/${set.slug}`)}
                     className="hover:text-ink transition-colors"
                   >
                     {set.code} {set.name}

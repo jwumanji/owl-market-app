@@ -1,6 +1,7 @@
 import Link from "next/link";
 import BundleForm from "../BundleForm";
 import { loadBundleForEdit, loadBundleInventory } from "../bundle-data";
+import { DEFAULT_PUBLIC_GAME_DB_SLUG } from "@/lib/game-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -8,10 +9,28 @@ export const metadata = {
   title: "Bundle Details - OWL Market",
 };
 
-export default async function InventoryBundleDetailPage({ params }: { params: { id: string } }) {
+type BundleDetailSearchParams = {
+  game?: string | string[];
+};
+
+function getInitialGame(searchParams?: BundleDetailSearchParams) {
+  const game = Array.isArray(searchParams?.game) ? searchParams?.game[0] : searchParams?.game;
+  return game?.trim() || DEFAULT_PUBLIC_GAME_DB_SLUG;
+}
+
+export default async function InventoryBundleDetailPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams?: BundleDetailSearchParams | Promise<BundleDetailSearchParams>;
+}) {
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const gameSlug = getInitialGame(resolvedSearchParams);
+  const encodedGameSlug = encodeURIComponent(gameSlug);
   const [bundleResult, inventoryResult] = await Promise.all([
-    loadBundleForEdit(params.id),
-    loadBundleInventory(params.id),
+    loadBundleForEdit(params.id, gameSlug),
+    loadBundleInventory(params.id, gameSlug),
   ]);
 
   return (
@@ -25,10 +44,10 @@ export default async function InventoryBundleDetailPage({ params }: { params: { 
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/admin/bundles" className="admin-btn admin-btn-ghost">
+          <Link href={`/admin/bundles?game=${encodedGameSlug}`} className="admin-btn admin-btn-ghost">
             Back to Bundles
           </Link>
-          <Link href="/admin/bundles/new" className="admin-btn admin-btn-primary">
+          <Link href={`/admin/bundles/new?game=${encodedGameSlug}`} className="admin-btn admin-btn-primary">
             Create Bundle
           </Link>
         </div>
@@ -44,7 +63,7 @@ export default async function InventoryBundleDetailPage({ params }: { params: { 
           </div>
         </div>
       ) : (
-        <BundleForm inventoryItems={inventoryResult.data} initialBundle={bundleResult.data} />
+        <BundleForm inventoryItems={inventoryResult.data} initialBundle={bundleResult.data} gameSlug={gameSlug} />
       )}
     </section>
   );

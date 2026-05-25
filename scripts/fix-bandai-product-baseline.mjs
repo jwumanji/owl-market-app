@@ -10,6 +10,7 @@
 // - Missing base-row inserts are applied only with --apply --include-inserts.
 
 import fs from "node:fs";
+import { loadGameScope, scriptGameSlug, withGameFilter } from "./lib/supabase-game-scope.mjs";
 
 const REPORT_PATH = "bandai-product-baseline-fix-report.md";
 const BANDAI_BASE = "https://en.onepiece-cardgame.com";
@@ -50,6 +51,7 @@ loadEnvFile();
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const GAME_SLUG = scriptGameSlug();
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
 }
@@ -80,8 +82,8 @@ async function sbFetchAll(path, pageSize = 1000) {
   return rows;
 }
 
-async function patchCard(id, updates) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/cards?id=eq.${encodeURIComponent(id)}`, {
+async function patchCard(id, gameId, updates) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/cards?id=eq.${encodeURIComponent(id)}&game_id=eq.${encodeURIComponent(gameId)}`, {
     method: "PATCH",
     headers: restHeaders({
       "Content-Type": "application/json",
@@ -94,14 +96,14 @@ async function patchCard(id, updates) {
   }
 }
 
-async function insertCard(row) {
+async function insertCard(gameId, row) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/cards`, {
     method: "POST",
     headers: restHeaders({
       "Content-Type": "application/json",
       Prefer: "return=minimal",
     }),
-    body: JSON.stringify(row),
+    body: JSON.stringify({ ...row, game_id: row.game_id ?? gameId }),
   });
   if (!res.ok) {
     throw new Error(`Supabase card insert failed: ${res.status} ${await res.text()}`);
@@ -302,11 +304,12 @@ function mdTable(headers, rows) {
 
 const expectedCodeSet = new Set(EXPECTED.map((row) => row.code));
 
-console.log("Loading Supabase sets/cards...");
+const GAME = await loadGameScope({ supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_KEY, gameSlug: GAME_SLUG });
+console.log(`Loading Supabase sets/cards for game scope: ${GAME.slug}...`);
 const [sets, cards] = await Promise.all([
-  sbFetchAll("sets?select=id,code,name"),
+  sbFetchAll(withGameFilter("sets?select=id,code,name", GAME.id)),
   sbFetchAll(
-    "cards?select=id,set_id,card_image_id,card_number,name,name_base,rarity,variant_label,card_type,color,power,counter,life,cost,attribute,types,effect,trigger,image_url,image_url_small,promo_segment"
+    withGameFilter("cards?select=id,game_id,set_id,card_image_id,card_number,name,name_base,rarity,variant_label,card_type,color,power,counter,life,cost,attribute,types,effect,trigger,image_url,image_url_small,promo_segment", GAME.id)
   ),
 ]);
 
@@ -431,7 +434,7 @@ const applied = {
 if (APPLY) {
   console.log("Applying base field fixes...");
   for (const fix of baseFieldFixes) {
-    await patchCard(fix.row.id, fix.updates);
+    await patchCard(fix.row.id, GAME.id, fix.updates);
     applied.baseFieldFixes++;
   }
 
@@ -439,10 +442,10 @@ if (APPLY) {
     console.log("Applying set-owner fixes...");
     for (const fix of setMoveFixes) {
       if (!fix.syntheticExists) {
-        await insertCard(cloneForReprint({ current: fix.current, syntheticId: fix.syntheticId }));
+        await insertCard(GAME.id, cloneForReprint({ current: fix.current, syntheticId: fix.syntheticId }));
         applied.reprintInserts++;
       }
-      await patchCard(fix.current.id, {
+      await patchCard(fix.current.id, GAME.id, {
         set_id: fix.targetSet.id,
         rarity: fix.card.rarity,
         variant_label: null,
@@ -454,7 +457,7 @@ if (APPLY) {
   if (INCLUDE_INSERTS) {
     console.log("Applying missing base-row inserts...");
     for (const fix of insertFixes) {
-      await insertCard(fix.row);
+      await insertCard(GAME.id, fix.row);
       applied.baseInserts++;
     }
   }
@@ -464,6 +467,7 @@ const report = [];
 report.push("# Bandai Product Baseline Fix Report");
 report.push("");
 report.push(`Generated: ${new Date().toISOString()}`);
+report.push(`Game: ${GAME.name ?? GAME.slug} (${GAME.slug})`);
 report.push(`Mode: ${APPLY ? "apply" : "dry-run"}`);
 report.push("");
 report.push("## Summary");

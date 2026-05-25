@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import {
+  gameParamFromBody,
+  gameParamFromRequest,
+  resolveGameScope,
+} from "@/lib/game-scope";
 
 type RequestBody = Record<string, unknown>;
 
@@ -24,9 +29,20 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(
+    supabase,
+    gameParamFromBody(body as RequestBody) ?? gameParamFromRequest(request)
+  );
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
+
   const { data, error } = await supabase
     .from("psa_submissions")
     .update({ name })
+    .eq("game_id", game.id)
     .eq("id", params.id)
     .select("id, name")
     .single();

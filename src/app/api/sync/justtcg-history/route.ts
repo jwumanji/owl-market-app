@@ -1,31 +1,35 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
-import { SET_SLUG_MAP, extractVariantLabel } from "@/lib/justtcg-match";
+import {
+  ONE_PIECE_JUSTTCG_GAME_SLUG,
+  buildJustTcgCodeToSlugs,
+  extractVariantLabel,
+  onePieceGame,
+} from "@/lib/games/one-piece";
+import { resolveOnePieceSyncGame } from "@/lib/games/one-piece/sync-scope";
 
 export const maxDuration = 60;
 
 const JUSTTCG_BASE = "https://api.justtcg.com/v1";
-const GAME = "one-piece-card-game";
+const GAME = ONE_PIECE_JUSTTCG_GAME_SLUG;
 const LOCK_TTL_MS = 55 * 60 * 1000;
 const DEFAULT_MAX_SETS = 1;
 const VALID_DURATIONS = new Set(["7d", "30d", "90d", "180d", "1y"]);
 
-const CODE_TO_SLUGS: Record<string, string[]> = {};
-for (const [slug, code] of Object.entries(SET_SLUG_MAP)) {
-  if (!CODE_TO_SLUGS[code]) CODE_TO_SLUGS[code] = [];
-  CODE_TO_SLUGS[code].push(slug);
-}
+const CODE_TO_SLUGS = buildJustTcgCodeToSlugs(onePieceGame.justTcgSetSlugMap);
 
 type Duration = "7d" | "30d" | "90d" | "180d" | "1y";
 
 interface DbSet {
   id: string;
+  game_id: string;
   code: string | null;
   name: string | null;
 }
 
 interface DbCard {
   id: string;
+  game_id: string;
   card_image_id: string | null;
   card_number: string | null;
   name: string | null;
@@ -57,6 +61,7 @@ interface PriceHistoryPoint {
 }
 
 interface HistoryInsert {
+  game_id: string;
   card_id: string;
   tcg_market: number;
   market_avg: number;
@@ -115,9 +120,15 @@ async function syncHistory(request: Request) {
     .filter(Boolean);
 
   const supabase = createServiceClient();
+  const gameResult = await resolveOnePieceSyncGame(supabase, request);
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
   const { data: dbSets, error: setsError } = await supabase
     .from("sets")
-    .select("id, code, name")
+    .select("id, game_id, code, name")
+    .eq("game_id", game.id)
     .order("code");
 
   if (setsError) {
@@ -165,7 +176,7 @@ async function syncHistory(request: Request) {
   try {
     for (const dbSet of setsToProcess) {
       try {
-        const result = await syncOneSetHistory(supabase, dbSet, historyDuration);
+        const result = await syncOneSetHistory(supabase, game.id, dbSet, historyDuration);
         results.push(result);
         processedForCursor++;
       } catch (error) {
@@ -193,6 +204,8 @@ async function syncHistory(request: Request) {
   const inserted = results.reduce((sum, result) => sum + result.inserted, 0);
   const response = {
     mode: manualCodes?.length ? "manual" : "cursor",
+    game: game.slug,
+    provider: "justtcg",
     historyDuration,
     maxSets,
     startIndex: manualCodes?.length ? null : startIndex,
@@ -215,6 +228,7 @@ async function syncHistory(request: Request) {
 async function syncOneSetHistory(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
+  gameId: string,
   dbSet: DbSet,
   historyDuration: Duration
 ): Promise<SetResult> {
@@ -242,7 +256,8 @@ async function syncOneSetHistory(
 
   const { data: dbCards, error: cardsError } = await supabase
     .from("cards")
-    .select("id,card_image_id,card_number,name,name_base,variant_label,set_id,tcg_product_id")
+    .select("id,game_id,card_image_id,card_number,name,name_base,variant_label,set_id,tcg_product_id")
+    .eq("game_id", gameId)
     .eq("set_id", dbSet.id);
 
   if (cardsError) {
@@ -274,7 +289,7 @@ async function syncOneSetHistory(
           continue;
         }
 
-        const rows = historyRowsForVariant(match.card.id, variant);
+        const rows = historyRowsForVariant(gameId, match.card.id, variant);
         if (rows.length === 0) {
           result.skipped.no_history++;
           continue;
@@ -293,12 +308,13 @@ async function syncOneSetHistory(
   const dedupedRows = dedupeHistoryRows(historyRows);
   const existingKeys = await fetchExistingHistoryDayKeys(
     supabase,
+    gameId,
     dedupedRows.map((row) => row.card_id),
     earliestIsoForDuration(historyDuration)
   );
 
   const rowsToInsert = dedupedRows.filter((row) => {
-    const key = historyDayKey(row.card_id, row.recorded_at);
+    const key = historyDayKey(row.game_id, row.card_id, row.recorded_at);
     return key && !existingKeys.has(key);
   });
   result.existingRowsSkipped = dedupedRows.length - rowsToInsert.length;
@@ -475,7 +491,7 @@ function chooseVariant(jtCard: JTCard, isVariantCard: boolean): JTVariant | null
   return isVariantCard ? foil ?? normal ?? nearMint[0] ?? null : normal ?? foil ?? nearMint[0] ?? null;
 }
 
-function historyRowsForVariant(cardId: string, variant: JTVariant): HistoryInsert[] {
+function historyRowsForVariant(gameId: string, cardId: string, variant: JTVariant): HistoryInsert[] {
   const points = Array.isArray(variant.priceHistory)
     ? variant.priceHistory
     : Array.isArray(variant.priceHistory30d)
@@ -489,6 +505,7 @@ function historyRowsForVariant(cardId: string, variant: JTVariant): HistoryInser
     if (price === null || price <= 0 || timestamp === null) continue;
     const ms = timestamp > 1_000_000_000_000 ? timestamp : timestamp * 1000;
     rows.push({
+      game_id: gameId,
       card_id: cardId,
       tcg_market: price,
       market_avg: price,
@@ -501,7 +518,7 @@ function historyRowsForVariant(cardId: string, variant: JTVariant): HistoryInser
 function dedupeHistoryRows(rows: HistoryInsert[]): HistoryInsert[] {
   const byCardDay = new Map<string, HistoryInsert>();
   for (const row of rows) {
-    const key = historyDayKey(row.card_id, row.recorded_at);
+    const key = historyDayKey(row.game_id, row.card_id, row.recorded_at);
     if (!key) continue;
     const existing = byCardDay.get(key);
     if (!existing || new Date(row.recorded_at).getTime() >= new Date(existing.recorded_at).getTime()) {
@@ -514,6 +531,7 @@ function dedupeHistoryRows(rows: HistoryInsert[]): HistoryInsert[] {
 async function fetchExistingHistoryDayKeys(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
+  gameId: string,
   cardIds: string[],
   minRecordedAt: string
 ): Promise<Set<string>> {
@@ -528,7 +546,8 @@ async function fetchExistingHistoryDayKeys(
     while (true) {
       const { data, error } = await supabase
         .from("price_history")
-        .select("card_id, recorded_at")
+        .select("game_id, card_id, recorded_at")
+        .eq("game_id", gameId)
         .in("card_id", chunk)
         .gte("recorded_at", minRecordedAt)
         .order("recorded_at", { ascending: true })
@@ -536,7 +555,7 @@ async function fetchExistingHistoryDayKeys(
 
       if (error) throw new Error(`price_history lookup failed: ${error.message}`);
       for (const row of data ?? []) {
-        const key = historyDayKey(row.card_id, row.recorded_at);
+        const key = historyDayKey(row.game_id, row.card_id, row.recorded_at);
         if (key) keys.add(key);
       }
       if (!data || data.length < pageSize) break;
@@ -743,9 +762,9 @@ function allowsCardNumberInSet(setCode: string, cardNumber: string | null | unde
   return prefix === setCode;
 }
 
-function historyDayKey(cardId: string, recordedAt: string): string | null {
+function historyDayKey(gameId: string, cardId: string, recordedAt: string): string | null {
   const day = utcDay(recordedAt);
-  return day ? `${cardId}|${day}` : null;
+  return day ? `${gameId}|${cardId}|${day}` : null;
 }
 
 function utcDay(value: string | null | undefined): string | null {

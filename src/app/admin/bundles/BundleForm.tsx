@@ -2,6 +2,7 @@
 
 import { type FormEvent, type MouseEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { DEFAULT_PUBLIC_GAME_DB_SLUG } from "@/lib/game-scope";
 import { INVENTORY_STATUSES, type InventoryStatus } from "@/lib/inventory-options";
 import { SALE_CHANNEL_LABELS, SALE_CHANNELS, type SaleChannel } from "@/lib/sale-options";
 import type { BundleInventoryItem, InventoryBundleFormValue } from "./bundle-types";
@@ -25,6 +26,7 @@ type Props = {
   inventoryItems: BundleInventoryItem[];
   initialBundle?: InventoryBundleFormValue | null;
   initialSelectedIds?: string[];
+  gameSlug?: string;
 };
 
 type HoverPreview = {
@@ -89,7 +91,12 @@ function todayDateString() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function BundleForm({ inventoryItems, initialBundle, initialSelectedIds = [] }: Props) {
+export default function BundleForm({
+  inventoryItems,
+  initialBundle,
+  initialSelectedIds = [],
+  gameSlug = DEFAULT_PUBLIC_GAME_DB_SLUG,
+}: Props) {
   const router = useRouter();
   const availableItemIds = useMemo(() => new Set(inventoryItems.map((item) => item.id)), [inventoryItems]);
   const startingSelectedIds = useMemo(() => {
@@ -181,10 +188,14 @@ export default function BundleForm({ inventoryItems, initialBundle, initialSelec
     }
 
     setSaving(true);
-    const res = await fetch(initialBundle ? `/api/admin/bundles/${initialBundle.id}` : "/api/admin/bundles", {
+    const endpoint = initialBundle
+      ? `/api/admin/bundles/${initialBundle.id}?game=${encodeURIComponent(gameSlug)}`
+      : "/api/admin/bundles";
+    const res = await fetch(endpoint, {
       method: initialBundle ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        game: gameSlug,
         name,
         notes,
         status,
@@ -204,9 +215,9 @@ export default function BundleForm({ inventoryItems, initialBundle, initialSelec
     }
 
     if (initialBundle) {
-      router.push(`/admin/bundles/${payload.id}`);
+      router.push(`/admin/bundles/${payload.id}?game=${encodeURIComponent(gameSlug)}`);
     } else {
-      router.push(`/admin/bundles?created=${encodeURIComponent(name.trim())}`);
+      router.push(`/admin/bundles?game=${encodeURIComponent(gameSlug)}&created=${encodeURIComponent(name.trim())}`);
     }
     router.refresh();
   }
@@ -216,7 +227,7 @@ export default function BundleForm({ inventoryItems, initialBundle, initialSelec
 
     setDeleting(true);
     setError(null);
-    const res = await fetch(`/api/admin/bundles/${initialBundle.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/admin/bundles/${initialBundle.id}?game=${encodeURIComponent(gameSlug)}`, { method: "DELETE" });
     const payload = await res.json().catch(() => null);
     setDeleting(false);
 
@@ -225,7 +236,7 @@ export default function BundleForm({ inventoryItems, initialBundle, initialSelec
       return;
     }
 
-    router.push("/admin/bundles");
+    router.push(`/admin/bundles?game=${encodeURIComponent(gameSlug)}`);
     router.refresh();
   }
 

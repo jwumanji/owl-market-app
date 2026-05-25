@@ -321,17 +321,22 @@ function humanNameFromSlug(slug: string): string {
 export async function ensureSetExists(
   supabase: SupabaseClient,
   justTcgSlug: string,
-  setCode: string
+  setCode: string,
+  gameId?: string | null
 ): Promise<string | null> {
   const slug = setCode.toLowerCase();
 
   // Check if set already exists
-  const { data: existing } = await supabase
+  let existingQuery = supabase
     .from("sets")
     .select("id")
-    .eq("slug", slug)
-    .limit(1)
-    .single();
+    .eq("slug", slug);
+
+  if (gameId) {
+    existingQuery = existingQuery.eq("game_id", gameId);
+  }
+
+  const { data: existing } = await existingQuery.limit(1).single();
 
   if (existing) return existing.id;
 
@@ -339,6 +344,7 @@ export async function ensureSetExists(
   const { data: inserted, error } = await supabase
     .from("sets")
     .insert({
+      ...(gameId ? { game_id: gameId } : {}),
       slug,
       code: setCode,
       name: humanNameFromSlug(justTcgSlug),
@@ -351,12 +357,14 @@ export async function ensureSetExists(
 
   // Conflict (race condition) — re-query
   if (error?.code === "23505") {
-    const { data: raced } = await supabase
+    let racedQuery = supabase
       .from("sets")
       .select("id")
-      .eq("slug", slug)
-      .limit(1)
-      .single();
+      .eq("slug", slug);
+    if (gameId) {
+      racedQuery = racedQuery.eq("game_id", gameId);
+    }
+    const { data: raced } = await racedQuery.limit(1).single();
     return raced?.id ?? null;
   }
 

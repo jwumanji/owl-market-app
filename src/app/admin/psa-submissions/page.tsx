@@ -1,5 +1,8 @@
 import Link from "next/link";
+import AdminGameSwitcher from "../AdminGameSwitcher";
 import PsaSubmissionsClient, { type PsaSubmissionView } from "./PsaSubmissionsClient";
+import { loadAdminGameOptions, type AdminGameOption } from "@/lib/admin-games";
+import { resolveGameScope } from "@/lib/game-scope";
 import { createServiceClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -49,24 +52,47 @@ type CardImageRow = {
   image_url_small: string | null;
 };
 
-async function loadSubmissions() {
+type PsaSubmissionsSearchParams = {
+  game?: string | string[];
+};
+
+function getInitialGame(searchParams?: PsaSubmissionsSearchParams) {
+  const game = Array.isArray(searchParams?.game) ? searchParams?.game[0] : searchParams?.game;
+  return game?.trim() || null;
+}
+
+async function loadGameOptions() {
+  try {
+    return await loadAdminGameOptions(createServiceClient());
+  } catch {
+    return [] as AdminGameOption[];
+  }
+}
+
+async function loadSubmissions(requestedGame?: string | null) {
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, requestedGame, { defaultToOnePiece: true });
+  if (gameResult.error) {
+    return { submissions: [] as PsaSubmissionView[], error: gameResult.error.message, gameSlug: null as string | null };
+  }
+  const { game } = gameResult;
   const submissionsRes = await supabase
     .from("psa_submissions")
     .select(
       "id, name, source_filename, submitted_at, total_rows, imported_count, matched_count, pending_match_count, skipped_duplicate_count, created_at"
     )
+    .eq("game_id", game.id)
     .order("submitted_at", { ascending: false })
     .order("created_at", { ascending: false });
 
   if (submissionsRes.error) {
-    return { submissions: [] as PsaSubmissionView[], error: submissionsRes.error.message };
+    return { submissions: [] as PsaSubmissionView[], error: submissionsRes.error.message, gameSlug: game.slug };
   }
 
   const submissions = (submissionsRes.data ?? []) as PsaSubmissionRow[];
   const submissionIds = submissions.map((submission) => submission.id);
   if (submissionIds.length === 0) {
-    return { submissions: [] as PsaSubmissionView[], error: null };
+    return { submissions: [] as PsaSubmissionView[], error: null, gameSlug: game.slug };
   }
 
   const itemsRes = await supabase
@@ -74,11 +100,12 @@ async function loadSubmissions() {
     .select(
       "submission_id, row_number, inventory_item_id, certification_number, graded_rating, card_name, card_number, set_code, matched, skipped_duplicate, image_status, result_status"
     )
+    .eq("game_id", game.id)
     .in("submission_id", submissionIds)
     .order("row_number", { ascending: true });
 
   if (itemsRes.error) {
-    return { submissions: [] as PsaSubmissionView[], error: itemsRes.error.message };
+    return { submissions: [] as PsaSubmissionView[], error: itemsRes.error.message, gameSlug: game.slug };
   }
 
   const itemRows = (itemsRes.data ?? []) as PsaSubmissionItemRow[];
@@ -90,10 +117,11 @@ async function loadSubmissions() {
     const inventoryRes = await supabase
       .from("inventory_items")
       .select("id, card_id, custom_image_front_url, custom_image_back_url")
-      .in("id", inventoryIds);
+      .in("id", inventoryIds)
+      .eq("game_id", game.id);
 
     if (inventoryRes.error) {
-      return { submissions: [] as PsaSubmissionView[], error: inventoryRes.error.message };
+      return { submissions: [] as PsaSubmissionView[], error: inventoryRes.error.message, gameSlug: game.slug };
     }
 
     const inventoryRows = (inventoryRes.data ?? []) as InventoryImageRow[];
@@ -104,10 +132,11 @@ async function loadSubmissions() {
       const cardsRes = await supabase
         .from("cards")
         .select("id, image_url, image_url_small")
-        .in("id", cardIds);
+        .in("id", cardIds)
+        .eq("game_id", game.id);
 
       if (cardsRes.error) {
-        return { submissions: [] as PsaSubmissionView[], error: cardsRes.error.message };
+        return { submissions: [] as PsaSubmissionView[], error: cardsRes.error.message, gameSlug: game.slug };
       }
 
       ((cardsRes.data ?? []) as CardImageRow[]).forEach((row) => cardMap.set(row.id, row));
@@ -146,11 +175,22 @@ async function loadSubmissions() {
       items: itemsBySubmission.get(submission.id) ?? [],
     })),
     error: null,
+    gameSlug: game.slug,
   };
 }
 
-export default async function PsaSubmissionsPage() {
-  const { submissions, error } = await loadSubmissions();
+export default async function PsaSubmissionsPage({
+  searchParams,
+}: {
+  searchParams?: PsaSubmissionsSearchParams | Promise<PsaSubmissionsSearchParams>;
+}) {
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const requestedGame = getInitialGame(resolvedSearchParams);
+  const [{ submissions, error, gameSlug }, gameOptions] = await Promise.all([
+    loadSubmissions(requestedGame),
+    loadGameOptions(),
+  ]);
+  const encodedGameSlug = encodeURIComponent(gameSlug ?? requestedGame ?? "one_piece");
 
   return (
     <section className="mx-auto max-w-[1480px] px-4 py-8">
@@ -162,11 +202,12 @@ export default async function PsaSubmissionsPage() {
             Review submissions by date, card count, grade results, and open the itemized card list only when needed.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/admin/inventory" className="admin-btn admin-btn-ghost">
+        <div className="flex flex-wrap items-end gap-2">
+          <AdminGameSwitcher activeGameSlug={gameSlug ?? requestedGame ?? "one_piece"} games={gameOptions} />
+          <Link href={`/admin/inventory?game=${encodedGameSlug}`} className="admin-btn admin-btn-ghost">
             Back to Inventory
           </Link>
-          <Link href="/admin/inventory/import/psa" className="admin-btn admin-btn-primary">
+          <Link href={`/admin/inventory/import/psa?game=${encodedGameSlug}`} className="admin-btn admin-btn-primary">
             PSA Import
           </Link>
         </div>
@@ -187,7 +228,7 @@ export default async function PsaSubmissionsPage() {
         </div>
       )}
 
-      {!error && submissions.length > 0 && <PsaSubmissionsClient initialSubmissions={submissions} />}
+      {!error && submissions.length > 0 && <PsaSubmissionsClient initialSubmissions={submissions} gameSlug={gameSlug ?? undefined} />}
     </section>
   );
 }

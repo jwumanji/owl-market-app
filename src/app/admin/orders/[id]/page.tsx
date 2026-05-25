@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { displayCustomerOrderNumber } from "@/lib/customer-orders";
+import { DEFAULT_PUBLIC_GAME_DB_SLUG } from "@/lib/game-scope";
 import OrderForm from "../OrderForm";
 import { loadOrderForEdit, loadOrderInventory } from "../order-data";
 
@@ -10,10 +11,27 @@ export const metadata = {
   title: "Order - OWL Market",
 };
 
-export default async function EditOrderPage({ params }: { params: { id: string } }) {
+type EditOrderSearchParams = {
+  game?: string | string[];
+};
+
+function getInitialGame(searchParams?: EditOrderSearchParams) {
+  const game = Array.isArray(searchParams?.game) ? searchParams?.game[0] : searchParams?.game;
+  return game?.trim() || DEFAULT_PUBLIC_GAME_DB_SLUG;
+}
+
+export default async function EditOrderPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams?: EditOrderSearchParams | Promise<EditOrderSearchParams>;
+}) {
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const gameSlug = getInitialGame(resolvedSearchParams);
   const [orderResult, inventoryResult] = await Promise.all([
-    loadOrderForEdit(params.id),
-    loadOrderInventory(params.id),
+    loadOrderForEdit(params.id, gameSlug),
+    loadOrderInventory(params.id, gameSlug),
   ]);
 
   if (!orderResult.error && !orderResult.data) {
@@ -23,6 +41,7 @@ export default async function EditOrderPage({ params }: { params: { id: string }
   const error = orderResult.error ?? inventoryResult.error;
   const orderTitle = orderResult.data?.nickname?.trim() || orderResult.data?.customer_name || "Customer Order";
   const orderNumber = displayCustomerOrderNumber(orderResult.data?.id ?? params.id);
+  const encodedGameSlug = encodeURIComponent(gameSlug);
 
   return (
     <section className="mx-auto max-w-[1600px] px-5 py-8 sm:px-7 lg:px-10 xl:px-12">
@@ -38,10 +57,10 @@ export default async function EditOrderPage({ params }: { params: { id: string }
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/admin/inventory?status=ship" className="admin-btn admin-btn-ghost">
+          <Link href={`/admin/inventory?game=${encodedGameSlug}&status=ship`} className="admin-btn admin-btn-ghost">
             Back to Inventory
           </Link>
-          <Link href="/admin/orders/new" className="admin-btn admin-btn-primary">
+          <Link href={`/admin/orders/new?game=${encodedGameSlug}`} className="admin-btn admin-btn-primary">
             Add Order
           </Link>
         </div>
@@ -49,10 +68,11 @@ export default async function EditOrderPage({ params }: { params: { id: string }
 
       {error || !orderResult.data ? (
         <div className="rounded-c-md border-[1.5px] border-coral bg-[#FFE2DD] px-4 py-3 font-grotesk text-sm text-ink">
-          Order query failed: {error ?? "Order not found"}
+          Order query failed: {error ?? "Order not found"}. If the error mentions game_id, run{" "}
+          schema-migration-v37-customer-order-game-scope.sql in Supabase.
         </div>
       ) : (
-        <OrderForm inventoryItems={inventoryResult.data} initialOrder={orderResult.data} />
+        <OrderForm inventoryItems={inventoryResult.data} initialOrder={orderResult.data} gameSlug={gameSlug} />
       )}
     </section>
   );

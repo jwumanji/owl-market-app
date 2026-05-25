@@ -1,5 +1,8 @@
 import Link from "next/link";
+import AdminGameSwitcher from "../../AdminGameSwitcher";
 import CenteringWorkspace from "@/components/centering/CenteringWorkspace";
+import { loadAdminGameOptions, type AdminGameOption } from "@/lib/admin-games";
+import { DEFAULT_PUBLIC_GAME_DB_SLUG, resolveGameScope } from "@/lib/game-scope";
 import { createServiceClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +26,7 @@ type CenteringMeasurementRow = {
 };
 
 type HistoryPage = {
+  gameSlug: string;
   rows: CenteringMeasurementRow[];
   count: number;
   page: number;
@@ -32,10 +36,23 @@ type HistoryPage = {
   error: string | null;
 };
 
-function pageFromSearchParams(searchParams?: { page?: string | string[] }) {
+type PregradeSearchParams = {
+  page?: string | string[];
+  game?: string | string[];
+};
+
+function searchParamValue(value?: string | string[]) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function pageFromSearchParams(searchParams?: PregradeSearchParams) {
   const raw = Array.isArray(searchParams?.page) ? searchParams?.page[0] : searchParams?.page;
   const page = Number(raw ?? 1);
   return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function gameFromSearchParams(searchParams?: PregradeSearchParams) {
+  return searchParamValue(searchParams?.game)?.trim() || DEFAULT_PUBLIC_GAME_DB_SLUG;
 }
 
 function formatPercent(value: string | number | null | undefined) {
@@ -60,8 +77,30 @@ function ceilingClassName(ceiling: CenteringMeasurementRow["psa_ceiling"]) {
   return "border-coral bg-[#FFE2DD] text-coral";
 }
 
-async function loadPregradeHistory(page: number): Promise<HistoryPage> {
+async function loadGameOptions() {
+  try {
+    return await loadAdminGameOptions(createServiceClient());
+  } catch {
+    return [] as AdminGameOption[];
+  }
+}
+
+async function loadPregradeHistory(page: number, requestedGame: string): Promise<HistoryPage> {
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, requestedGame, { defaultToOnePiece: true });
+  if (gameResult.error) {
+    return {
+      gameSlug: requestedGame,
+      rows: [],
+      count: 0,
+      page: 1,
+      pageCount: 1,
+      hasPrevious: false,
+      hasNext: false,
+      error: gameResult.error.message,
+    };
+  }
+  const { game } = gameResult;
   const from = (page - 1) * HISTORY_PAGE_SIZE;
   const to = from + HISTORY_PAGE_SIZE - 1;
   const measurementRes = await supabase
@@ -71,6 +110,7 @@ async function loadPregradeHistory(page: number): Promise<HistoryPage> {
       { count: "exact" }
     )
     .is("inventory_item_id", null)
+    .eq("game_id", game.id)
     .order("created_at", { ascending: false })
     .range(from, to);
 
@@ -79,6 +119,7 @@ async function loadPregradeHistory(page: number): Promise<HistoryPage> {
   const clampedPage = Math.min(page, pageCount);
 
   return {
+    gameSlug: game.slug,
     rows: (measurementRes.error ? [] : measurementRes.data ?? []) as CenteringMeasurementRow[],
     count,
     page: clampedPage,
@@ -89,8 +130,9 @@ async function loadPregradeHistory(page: number): Promise<HistoryPage> {
   };
 }
 
-function historyHref(page: number) {
-  return `/admin/lens/pregrade?page=${page}`;
+function historyHref(page: number, gameSlug: string) {
+  const params = new URLSearchParams({ game: gameSlug, page: String(page) });
+  return `/admin/lens/pregrade?${params}`;
 }
 
 function PregradeHistory({ history }: { history: HistoryPage }) {
@@ -170,14 +212,14 @@ function PregradeHistory({ history }: { history: HistoryPage }) {
 
         <div className="mt-4 flex items-center justify-between gap-3">
           {history.hasPrevious ? (
-            <Link href={historyHref(history.page - 1)} className="admin-btn admin-btn-ghost">
+            <Link href={historyHref(history.page - 1, history.gameSlug)} className="admin-btn admin-btn-ghost">
               Previous pre-grades
             </Link>
           ) : (
             <span />
           )}
           {history.hasNext ? (
-            <Link href={historyHref(history.page + 1)} className="admin-btn admin-btn-ghost">
+            <Link href={historyHref(history.page + 1, history.gameSlug)} className="admin-btn admin-btn-ghost">
               Next pre-grades
             </Link>
           ) : (
@@ -192,10 +234,14 @@ function PregradeHistory({ history }: { history: HistoryPage }) {
 export default async function PregradePage({
   searchParams,
 }: {
-  searchParams?: { page?: string | string[] };
+  searchParams?: PregradeSearchParams;
 }) {
   const page = pageFromSearchParams(searchParams);
-  const history = await loadPregradeHistory(page);
+  const requestedGame = gameFromSearchParams(searchParams);
+  const [history, gameOptions] = await Promise.all([
+    loadPregradeHistory(page, requestedGame),
+    loadGameOptions(),
+  ]);
 
   return (
     <section className="mx-auto max-w-[1280px] px-4 py-8">
@@ -207,12 +253,16 @@ export default async function PregradePage({
             Measure centering before the card becomes inventory. Results are stored without image bytes or an inventory link.
           </p>
         </div>
-        <Link href="/admin/lens" className="admin-btn admin-btn-ghost">
-          Back to Owl Lens
-        </Link>
+        <div className="flex flex-wrap items-end gap-2">
+          <AdminGameSwitcher activeGameSlug={history.gameSlug} games={gameOptions} />
+          <Link href="/admin/lens" className="admin-btn admin-btn-ghost">
+            Back to Owl Lens
+          </Link>
+        </div>
       </div>
 
       <CenteringWorkspace
+        gameSlug={history.gameSlug}
         cardIdentity={{
           name: "Standalone pre-grade",
         }}

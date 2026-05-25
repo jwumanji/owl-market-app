@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DEFAULT_PUBLIC_GAME_DB_SLUG } from "@/lib/game-scope";
 
 type PsaImportResult = {
   count: number;
@@ -32,7 +33,11 @@ function defaultSubmissionName(file: File | null) {
   return file.name.replace(/\.[^.]+$/, "").trim();
 }
 
-export default function PsaImportForm() {
+export default function PsaImportForm({
+  gameSlug = DEFAULT_PUBLIC_GAME_DB_SLUG,
+}: {
+  gameSlug?: string;
+}) {
   const [psaFile, setPsaFile] = useState<File | null>(null);
   const [submissionName, setSubmissionName] = useState("");
   const [submittedAt, setSubmittedAt] = useState(todayDateString);
@@ -46,6 +51,7 @@ export default function PsaImportForm() {
     if (!psaFile || importing) return;
 
     const formData = new FormData();
+    formData.append("game", gameSlug);
     formData.append("psa_file", psaFile);
     formData.append("submission_name", submissionName || defaultSubmissionName(psaFile) || "PSA Submission");
     formData.append("submitted_at", submittedAt);
@@ -175,7 +181,7 @@ export default function PsaImportForm() {
               <span>Needs Match {result.pending_match}</span>
               {result.pending_match > 0 && (
                 <a
-                  href="/admin/inventory?review=needs-match"
+                  href={`/admin/inventory?game=${encodeURIComponent(gameSlug)}&review=needs-match`}
                   className="rounded border-[1.5px] border-coral bg-bg-2 px-2 py-1 font-mono text-xs font-bold uppercase tracking-wider text-coral transition-colors hover:bg-[#FFE2DD]"
                 >
                   Review
@@ -186,7 +192,7 @@ export default function PsaImportForm() {
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {result.submission_id && (
               <a
-                href={`/admin/psa-submissions#submission-${result.submission_id}`}
+                href={`/admin/psa-submissions?game=${encodeURIComponent(gameSlug)}#submission-${result.submission_id}`}
                 className="rounded border-[1.5px] border-select bg-bg-2 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-select transition-colors hover:bg-[#F2F5FB]"
               >
                 View Submission
@@ -199,7 +205,7 @@ export default function PsaImportForm() {
             )}
             {result.bundle_id && (
               <a
-                href={`/admin/bundles/${result.bundle_id}`}
+                href={`/admin/bundles/${result.bundle_id}?game=${encodeURIComponent(gameSlug)}`}
                 className="rounded border-[1.5px] border-ink bg-bg-2 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-ink transition-colors hover:bg-bg-3"
               >
                 View Bundle

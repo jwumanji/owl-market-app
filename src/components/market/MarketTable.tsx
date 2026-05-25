@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { CardRow, SetInfo, SortKey } from "@/lib/types";
+import { gamePath, gameQueryValue } from "@/lib/game-routes";
 import { formatPrice } from "@/lib/utils";
 import FilterBar from "./FilterBar";
 import RarityBadge from "../ui/RarityBadge";
@@ -12,9 +13,10 @@ import CardHoverZoom from "../ui/CardHoverZoom";
 interface MarketTableProps {
   cards: CardRow[];
   sets: SetInfo[];
+  gameRouteSlug?: string | null;
 }
 
-export default function MarketTable({ cards: initialCards, sets }: MarketTableProps) {
+export default function MarketTable({ cards: initialCards, sets, gameRouteSlug }: MarketTableProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [selectedSet, setSelectedSet] = useState("all");
@@ -26,7 +28,7 @@ export default function MarketTable({ cards: initialCards, sets }: MarketTablePr
   const fetchCards = useCallback(async (set: string, sort: SortKey) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ set, sort, limit: "20" });
+      const params = new URLSearchParams({ set, sort, limit: "20", game: gameQueryValue(gameRouteSlug) });
       const res = await fetch(`/api/markets?${params}`);
       if (res.ok) {
         const data = await res.json();
@@ -35,7 +37,7 @@ export default function MarketTable({ cards: initialCards, sets }: MarketTablePr
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [gameRouteSlug]);
 
   useEffect(() => {
     fetchCards(selectedSet, sortBy);
@@ -89,7 +91,7 @@ export default function MarketTable({ cards: initialCards, sets }: MarketTablePr
             {filtered.map((card, i) => (
               <tr
                 key={card.id}
-                onClick={() => router.push(`/card/${card.card_image_id}`)}
+                onClick={() => router.push(gamePath(gameRouteSlug, `/card/${card.card_image_id}`))}
                 className="border-t border-bg-3 hover:bg-bg-3 cursor-pointer transition-colors duration-100"
               >
                 {/* Rank */}

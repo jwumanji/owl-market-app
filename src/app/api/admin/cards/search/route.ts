@@ -6,6 +6,7 @@ import {
   isMissingPrivateCustomCardsError,
   type PrivateCustomCardRow,
 } from "@/lib/private-custom-cards";
+import { gameParamFromRequest, resolveGameScope } from "@/lib/game-scope";
 import { createServiceClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -106,11 +107,17 @@ export async function GET(request: Request) {
   }
 
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request));
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
   const currentUser = await getCurrentAdminUser();
   const tokens = searchTokens(query);
   const candidates = new Map<string, CardSearchRow>();
   const aliasBoosts = new Map<string, number>();
-  const aliasResult = await loadCardMatchAliases(supabase);
+  const aliasResult = await loadCardMatchAliases(supabase, game.id);
   const aliasMatches = findCardAliasMatches({ rawName: query, sourceType: "psa_import" }, aliasResult.aliases, 60).slice(0, 12);
   const aliasCardIds = Array.from(new Set(aliasMatches.map(({ alias }) => alias.card_id)));
 
@@ -118,6 +125,7 @@ export async function GET(request: Request) {
     const { data, error } = await supabase
       .from("cards")
       .select(SEARCH_SELECT)
+      .eq("game_id", game.id)
       .in("id", aliasCardIds);
 
     if (error) {
@@ -138,6 +146,7 @@ export async function GET(request: Request) {
     const { data, error } = await supabase
       .from("cards")
       .select(SEARCH_SELECT)
+      .eq("game_id", game.id)
       .or(`name.ilike.%${token}%,card_number.ilike.%${token}%`)
       .limit(60);
 
@@ -155,6 +164,7 @@ export async function GET(request: Request) {
     const { data: sets, error: setsError } = await supabase
       .from("sets")
       .select("id")
+      .eq("game_id", game.id)
       .or(`name.ilike.%${token}%,code.ilike.%${token}%`)
       .limit(20);
 
@@ -168,6 +178,7 @@ export async function GET(request: Request) {
     const { data, error } = await supabase
       .from("cards")
       .select(SEARCH_SELECT)
+      .eq("game_id", game.id)
       .in("set_id", setIds)
       .limit(80);
 
@@ -187,6 +198,7 @@ export async function GET(request: Request) {
         .from("custom_cards")
         .select(PRIVATE_CUSTOM_CARD_SELECT)
         .eq("user_id", currentUser.id)
+        .eq("game_id", game.id)
         .or(`name.ilike.%${token}%,card_number.ilike.%${token}%,set_code.ilike.%${token}%`)
         .limit(60);
 

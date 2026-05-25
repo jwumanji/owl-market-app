@@ -27,6 +27,8 @@ export interface CardRow {
   rarity: string | null;
   card_type: string | null;
   color: string[];
+  game_payload?: Record<string, unknown> | null;
+  printed_set_code?: string | null;
   image_url: string | null;
   image_url_small: string | null;
   price_stats: PriceStats | null;
