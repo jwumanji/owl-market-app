@@ -199,6 +199,11 @@ function loadPage(rows = [
         return Promise.resolve({ data: [], error: null });
       },
     },
+    "../bundles/bundle-data": {
+      loadBundleSummaries() {
+        return Promise.resolve({ data: [], error: null });
+      },
+    },
     "@/lib/inventory-options": {
       CATALOG_MATCH_STATUSES: ["matched", "needs_match", "custom_verified"],
     },
