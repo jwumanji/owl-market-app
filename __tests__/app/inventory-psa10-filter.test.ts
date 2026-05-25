@@ -199,6 +199,40 @@ function loadPage(rows = [
         return Promise.resolve({ data: [], error: null });
       },
     },
+    "../bundles/bundle-data": {
+      loadBundleSummaries() {
+        return Promise.resolve({ data: [], error: null });
+      },
+    },
+    "@/lib/admin-user": {
+      getCurrentAdminUser() {
+        return Promise.resolve(null);
+      },
+    },
+    "@/lib/game-scope": {
+      resolveGameScope() {
+        return Promise.resolve({
+          game: {
+            id: "game-one-piece",
+            slug: "one_piece",
+            routeSlug: "one-piece",
+            name: "One Piece Card Game",
+            isActive: true,
+            isPublic: true,
+            metadata: { route_slug: "one-piece" },
+          },
+          error: null,
+        });
+      },
+    },
+    "@/lib/private-custom-cards": {
+      isMissingPrivateCustomCardsError() {
+        return false;
+      },
+      loadPrivateCustomCardsByIds() {
+        return Promise.resolve({ cards: new Map(), error: null });
+      },
+    },
     "@/lib/inventory-options": {
       CATALOG_MATCH_STATUSES: ["matched", "needs_match", "custom_verified"],
     },
@@ -295,6 +329,7 @@ test("inventory page leaves PSA 10 candidate filter off and attaches latest cent
     "unmeasured:none",
   ]);
   assert.ok(calls.some((call) => call.columns?.includes("inventory_centering_latest(psa_ceiling)")));
+  assert.ok(calls.some((call) => call.column === "game_id" && call.value === "game-one-piece"));
   assert.ok(!calls.some((call) => call.column === "inventory_centering_latest.psa_ceiling"));
 });
 
