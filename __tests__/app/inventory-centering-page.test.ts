@@ -66,6 +66,15 @@ function baseCard() {
   };
 }
 
+const onePieceGame = {
+  id: "game-one-piece",
+  slug: "one_piece",
+  name: "One Piece Card Game",
+  is_active: true,
+  is_public: true,
+  metadata: { route_slug: "one-piece" },
+};
+
 function measurement(overrides: Partial<MeasurementRow> = {}): MeasurementRow {
   return {
     id: "measurement-1",
@@ -100,18 +109,52 @@ function loadPage({
 
   const supabase = {
     from(table: string) {
-      if (table === "inventory_items") {
-        let selectedId = "";
+      if (table === "games") {
+        let matched = true;
         const query = {
           select(_columns: string) {
             return query;
           },
-          eq(_column: string, value: string) {
-            selectedId = value;
+          eq(column: string, value: string) {
+            if (column === "slug") {
+              matched = value === onePieceGame.slug;
+            } else if (column === "id") {
+              matched = value === onePieceGame.id;
+            }
+            return query;
+          },
+          filter(column: string, _operator: string, value: string) {
+            if (column === "metadata->>route_slug") {
+              matched = value === onePieceGame.metadata.route_slug;
+            }
+            return query;
+          },
+          maybeSingle() {
+            return Promise.resolve({ data: matched ? onePieceGame : null, error: null });
+          },
+        };
+        return query;
+      }
+
+      if (table === "inventory_items") {
+        let selectedId = "";
+        let selectedGameId = "";
+        const query = {
+          select(_columns: string) {
+            return query;
+          },
+          eq(column: string, value: string) {
+            if (column === "id") {
+              selectedId = value;
+            } else if (column === "game_id") {
+              selectedGameId = value;
+            }
             return query;
           },
           async single() {
-            return selectedId === item.id ? { data: item, error: null } : { data: null, error: { message: "not found" } };
+            return selectedId === item.id && selectedGameId === onePieceGame.id
+              ? { data: item, error: null }
+              : { data: null, error: { message: "not found" } };
           },
         };
         return query;
@@ -162,11 +205,17 @@ function loadPage({
   const mocks: Record<string, unknown> = {
     "@/components/centering/CenteringWorkspace": {
       __esModule: true,
-      default(props: { inventoryItemId: string; preloadImageUrl?: string | null; cardIdentity: { name: string } }) {
+      default(props: {
+        gameSlug?: string;
+        inventoryItemId: string;
+        preloadImageUrl?: string | null;
+        cardIdentity: { name: string };
+      }) {
         return React.createElement(
           "div",
           {
             "data-card": props.cardIdentity.name,
+            "data-game": props.gameSlug ?? "",
             "data-item": props.inventoryItemId,
             "data-preload": props.preloadImageUrl ?? "",
             "data-testid": "centering-workspace",
@@ -216,6 +265,7 @@ function loadPage({
     module: moduleStub,
     process,
     require: localRequire,
+    URLSearchParams,
   });
 
   vm.runInContext(pageJavaScript, context, { filename: pagePath });
