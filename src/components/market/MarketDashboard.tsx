@@ -1,12 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import DashboardWidget from "./DashboardWidget";
 import RarityBadge from "@/components/ui/RarityBadge";
-import CardHoverZoom from "@/components/ui/CardHoverZoom";
 import { gamePath } from "@/lib/game-routes";
 import { formatPrice, formatPct, pctColor } from "@/lib/utils";
+import MarketCardImage from "./MarketCardImage";
 import type {
   DashboardData,
   DashboardCard,
@@ -28,22 +27,16 @@ function CardRow({ card, rank, gameRouteSlug }: { card: DashboardCard; rank: num
   return (
     <Row href={gamePath(gameRouteSlug, `/card/${card.card_image_id}`)}>
       <span className="c-drank">{rank}</span>
-      {card.image_url_small ? (
-        <CardHoverZoom src={card.image_url_small} alt={card.name}>
-          <Image
-            src={card.image_url_small}
-            alt={card.name}
-            width={42}
-            height={59}
-            className="c-dthumb"
-            unoptimized
-          />
-        </CardHoverZoom>
-      ) : (
-        <span className="c-dthumb" aria-hidden="true">
-          {card.name.charAt(0).toUpperCase()}
-        </span>
-      )}
+      <MarketCardImage
+        alt={card.name}
+        className="c-dthumb"
+        fallbackTimeoutMs={0}
+        height={59}
+        imageUrl={card.image_url}
+        imageUrlSmall={card.image_url_small}
+        loading="eager"
+        width={42}
+      />
       <span className="c-dinfo">
         <span className="c-dname">{card.name}</span>
         <span className="c-dmeta">

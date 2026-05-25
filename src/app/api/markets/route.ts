@@ -75,7 +75,7 @@ export async function GET(request: Request) {
 
   try {
     const sorted = await cachedPublicData(
-      publicDataCacheKey("api-markets", game.id, setId ?? "all", sort, limit),
+      publicDataCacheKey("api-markets-v2", game.id, setId ?? "all", sort, limit),
       async () => {
         const { data, error } = await query;
 

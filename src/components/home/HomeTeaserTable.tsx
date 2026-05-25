@@ -10,6 +10,7 @@ export type TeaserCard = {
   card_image_id: string | null;
   name: string;
   rarity: string | null;
+  image_url: string | null;
   image_url_small: string | null;
   set_code: string | null;
   set_name: string | null;
@@ -41,12 +42,13 @@ function deltaState(chg: number | null | undefined): "up" | "down" | "flat" {
 }
 
 function CardThumb({ card }: { card: TeaserCard }) {
-  if (card.image_url_small) {
+  const imageSrc = card.image_url ?? card.image_url_small;
+  if (imageSrc) {
     return (
-      <CardHoverZoom src={card.image_url_small} alt={card.name}>
+      <CardHoverZoom src={imageSrc} alt={card.name}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={card.image_url_small}
+          src={imageSrc}
           alt=""
           className="c-teaser-thumb"
           loading="lazy"

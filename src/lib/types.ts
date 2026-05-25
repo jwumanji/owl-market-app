@@ -46,6 +46,7 @@ export interface DashboardCard {
   card_image_id: string;
   name: string;
   rarity: string | null;
+  image_url: string | null;
   image_url_small: string | null;
   set_code: string | null;
   market_avg: number | null;

@@ -8,7 +8,7 @@ import { formatPrice } from "@/lib/utils";
 import FilterBar from "./FilterBar";
 import RarityBadge from "../ui/RarityBadge";
 import ChangeCell from "../ui/ChangeCell";
-import CardHoverZoom from "../ui/CardHoverZoom";
+import MarketCardImage from "./MarketCardImage";
 
 interface MarketTableProps {
   cards: CardRow[];
@@ -93,12 +93,13 @@ export default function MarketTable({ cards: initialCards, sets, gameRouteSlug }
             </tr>
           </thead>
           <tbody className={loading ? "opacity-50 transition-opacity" : "transition-opacity"}>
-            {filtered.map((card, i) => (
-              <tr
-                key={card.id}
-                onClick={() => router.push(gamePath(gameRouteSlug, `/card/${card.card_image_id}`))}
-                className="border-t border-bg-3 hover:bg-bg-3 cursor-pointer transition-colors duration-100"
-              >
+            {filtered.map((card, i) => {
+              return (
+                <tr
+                  key={card.id}
+                  onClick={() => router.push(gamePath(gameRouteSlug, `/card/${card.card_image_id}`))}
+                  className="border-t border-bg-3 hover:bg-bg-3 cursor-pointer transition-colors duration-100"
+                >
                 {/* Rank */}
                 <td className="py-3 px-3 text-center text-ink-2 font-mono-2 text-[12px] font-semibold">
                   {i + 1}
@@ -106,24 +107,15 @@ export default function MarketTable({ cards: initialCards, sets, gameRouteSlug }
 
                 {/* Thumbnail */}
                 <td className="py-2 px-1">
-                  {card.image_url ? (
-                    <CardHoverZoom
-                      src={card.image_url ?? card.image_url_small ?? null}
-                      alt={card.name ?? ""}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={card.image_url_small ?? card.image_url}
-                        alt={card.name ?? ""}
-                        width={52}
-                        height={73}
-                        loading="lazy"
-                        className="rounded-[4px] border-[1.5px] border-ink object-cover w-[52px] h-[73px]"
-                      />
-                    </CardHoverZoom>
-                  ) : (
-                    <div className="w-[52px] h-[73px] rounded-[4px] border-[1.5px] border-ink bg-bg-3" />
-                  )}
+                  <MarketCardImage
+                    alt={card.name ?? ""}
+                    className="h-[73px] w-[52px] rounded-[4px] border-[1.5px] border-ink object-cover"
+                    height={73}
+                    imageUrl={card.image_url}
+                    imageUrlSmall={card.image_url_small}
+                    loading="eager"
+                    width={52}
+                  />
                 </td>
 
                 {/* Card name + set + rarity */}
@@ -163,7 +155,8 @@ export default function MarketTable({ cards: initialCards, sets, gameRouteSlug }
                   {formatPrice(card.price_stats?.ebay_avg)}
                 </td>
               </tr>
-            ))}
+              );
+            })}
 
             {filtered.length === 0 && (
               <tr>

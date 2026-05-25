@@ -24,6 +24,7 @@ export default function MarketGrid({
       {cards.map((card, i) => {
         const ps = card.price_stats;
         const rank = String(i + 1).padStart(2, "0");
+        const imageSrc = card.image_url ?? card.image_url_small;
         return (
           <Link
             key={card.id}
@@ -35,9 +36,9 @@ export default function MarketGrid({
               <span className="mgrid-rar">
                 <RarityBadge rarity={card.rarity} />
               </span>
-              {card.image_url ? (
+              {imageSrc ? (
                 <img
-                  src={card.image_url}
+                  src={imageSrc}
                   alt={card.name}
                   loading="lazy"
                 />
