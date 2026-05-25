@@ -174,7 +174,7 @@ async function loadCatalog(gameRouteSlug: string, searchParams: CatalogSearchPar
       .eq("game_id", game.id);
 
     if (selectedSet) cardsQuery = cardsQuery.eq("set_id", selectedSet.id);
-    if (selectedRarity?.code) cardsQuery = cardsQuery.eq("rarity", selectedRarity.code);
+    if (selectedRarity?.id) cardsQuery = cardsQuery.eq("rarity_id", selectedRarity.id);
     if (selectedVariant?.id) cardsQuery = cardsQuery.eq("variant_id", selectedVariant.id);
     if (query) cardsQuery = cardsQuery.or(`name.ilike.%${query}%,card_number.ilike.%${query}%`);
 
