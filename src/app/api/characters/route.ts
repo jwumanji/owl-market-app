@@ -2,11 +2,78 @@ import { NextResponse } from "next/server";
 import { gameParamFromRequest, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
 import { cachedPublicData, PUBLIC_DATA_CACHE_HEADERS, publicDataCacheKey } from "@/lib/public-data-cache";
 import { createServiceClient } from "@/lib/supabase-server";
-import { firstRelation, flattenPriceStatsCardRow } from "@/lib/supabase-relations";
+import { firstRelation } from "@/lib/supabase-relations";
 
 // ---------------------------------------------------------------------------
 // GET /api/characters - returns character index data with top cards + prices
 // ---------------------------------------------------------------------------
+
+type QueryResult<T> = PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
+
+async function fetchPaged<T>(loadPage: (from: number, to: number) => QueryResult<T>, pageSize = 1000) {
+  const rows: T[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await loadPage(from, from + pageSize - 1);
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+    rows.push(...data);
+    if (data.length < pageSize) break;
+  }
+  return rows;
+}
+
+type CharacterRow = {
+  id: string;
+  slug: string;
+  name: string;
+  subtitle: string;
+  faction: string;
+  tier: number;
+  type_tag: string | null;
+};
+
+type PriceStatsRelation = {
+  tcg_market: number | null;
+  market_avg: number | null;
+  chg_1d: number | null;
+  chg_7d: number | null;
+  chg_30d: number | null;
+  ath?: number | null;
+  atl?: number | null;
+};
+
+type SetRelation = {
+  code: string | null;
+  name: string | null;
+};
+
+type PricedCharacterCardRow = {
+  id: string;
+  character_id: string | null;
+  name: string;
+  card_number: string | null;
+  variant_label: string | null;
+  rarity: string | null;
+  set_id: string | null;
+  image_url: string | null;
+  image_url_small: string | null;
+  card_image_id: string | null;
+  sets: SetRelation | SetRelation[] | null;
+  price_stats: PriceStatsRelation | PriceStatsRelation[] | null;
+};
+
+function trendSpark(stats: PriceStatsRelation | null) {
+  const current = stats?.tcg_market ?? stats?.market_avg ?? 0;
+  if (current <= 0) return [0, 0];
+
+  const change = (stats?.chg_7d ?? stats?.chg_30d ?? 0) / 100;
+  const start = current / Math.max(0.1, 1 + change);
+
+  return Array.from({ length: 9 }, (_, index) => {
+    const t = index / 8;
+    return +(start + (current - start) * t).toFixed(2);
+  });
+}
 
 async function loadCharacterIndex(gameId: string) {
   const supabase = createServiceClient();
@@ -22,131 +89,128 @@ async function loadCharacterIndex(gameId: string) {
     throw new Error(charErr.message);
   }
 
-  const results = await Promise.all(
-    (characters ?? []).map(async (char) => {
-      const { count } = await supabase
+  const [cardCountRows, pricedCards] = await Promise.all([
+    fetchPaged<{ character_id: string | null }>((from, to) =>
+      supabase
         .from("cards")
-        .select("id", { count: "exact", head: true })
+        .select("character_id")
         .eq("game_id", gameId)
-        .eq("character_id", char.id);
-
-      const { data: topCards } = await supabase
-        .from("price_stats")
+        .not("character_id", "is", null)
+        .order("id")
+        .range(from, to)
+    ),
+    fetchPaged<PricedCharacterCardRow>((from, to) =>
+      supabase
+        .from("cards")
         .select(`
-          tcg_market, market_avg,
-          chg_1d, chg_7d, chg_30d,
-          ath, atl,
-          cards!price_stats_card_game_fk!inner (
-            id, name, card_number, variant_label, rarity,
-            set_id, image_url, image_url_small, card_image_id,
-            sets!cards_set_game_fk (code, name)
+          id,
+          character_id,
+          name,
+          card_number,
+          variant_label,
+          rarity,
+          set_id,
+          image_url,
+          image_url_small,
+          card_image_id,
+          sets!cards_set_game_fk (code, name),
+          price_stats!price_stats_card_game_fk!inner (
+            tcg_market,
+            market_avg,
+            chg_1d,
+            chg_7d,
+            chg_30d,
+            ath,
+            atl
           )
         `)
         .eq("game_id", gameId)
-        .eq("cards.character_id", char.id)
-        .not("tcg_market", "is", null)
-        .order("tcg_market", { ascending: false })
-        .limit(10);
+        .not("character_id", "is", null)
+        .not("price_stats.tcg_market", "is", null)
+        .order("id")
+        .range(from, to)
+    ),
+  ]);
 
-      const normalizedTopCards = ((topCards ?? []) as Record<string, unknown>[])
-        .map(flattenPriceStatsCardRow)
-        .filter((row): row is Record<string, unknown> => row != null);
-      const topCardIds = normalizedTopCards.map((c) => c.id as string);
-      const { data: history } = topCardIds.length
-        ? await supabase
-            .from("price_history")
-            .select("card_id, tcg_market, recorded_at")
-            .eq("game_id", gameId)
-            .in("card_id", topCardIds)
-            .order("recorded_at", { ascending: false })
-            .limit(topCardIds.length * 9)
-        : { data: [] };
+  const cardCounts = new Map<string, number>();
+  for (const card of cardCountRows) {
+    if (card.character_id) {
+      cardCounts.set(card.character_id, (cardCounts.get(card.character_id) ?? 0) + 1);
+    }
+  }
 
-      const historyMap: Record<string, number[]> = {};
-      for (const row of history ?? []) {
-        if (!historyMap[row.card_id]) historyMap[row.card_id] = [];
-        if (historyMap[row.card_id].length < 9) {
-          historyMap[row.card_id].unshift(row.tcg_market ?? 0);
-        }
-      }
+  const cardsByCharacter = new Map<string, PricedCharacterCardRow[]>();
+  const totalsByCharacter = new Map<string, { indexValue: number; totalChg7d: number; totalChg30d: number; pricedCount: number }>();
 
-      const { data: allPrices } = await supabase
-        .from("cards")
-        .select("price_stats!price_stats_card_game_fk!inner (tcg_market, chg_7d, chg_30d)")
-        .eq("game_id", gameId)
-        .eq("character_id", char.id)
-        .not("price_stats.tcg_market", "is", null);
+  for (const card of pricedCards) {
+    if (!card.character_id) continue;
+    const ps = firstRelation(card.price_stats);
+    if (ps?.tcg_market == null) continue;
 
-      let indexValue = 0;
-      let totalChg7d = 0;
-      let totalChg30d = 0;
-      let pricedCount = 0;
+    const cards = cardsByCharacter.get(card.character_id) ?? [];
+    cards.push(card);
+    cardsByCharacter.set(card.character_id, cards);
 
-      for (const card of allPrices ?? []) {
-        const ps = firstRelation(card.price_stats as unknown as {
-          tcg_market: number | null;
-          chg_7d: number | null;
-          chg_30d: number | null;
-        } | Array<{
-          tcg_market: number | null;
-          chg_7d: number | null;
-          chg_30d: number | null;
-        }> | null);
-        if (ps?.tcg_market) {
-          indexValue += ps.tcg_market;
-          totalChg7d += ps.chg_7d ?? 0;
-          totalChg30d += ps.chg_30d ?? 0;
-          pricedCount++;
-        }
-      }
+    const totals = totalsByCharacter.get(card.character_id) ?? {
+      indexValue: 0,
+      totalChg7d: 0,
+      totalChg30d: 0,
+      pricedCount: 0,
+    };
+    totals.indexValue += ps.tcg_market;
+    totals.totalChg7d += ps.chg_7d ?? 0;
+    totals.totalChg30d += ps.chg_30d ?? 0;
+    totals.pricedCount++;
+    totalsByCharacter.set(card.character_id, totals);
+  }
 
-      const avgChg7d = pricedCount > 0 ? +(totalChg7d / pricedCount).toFixed(1) : 0;
-      const avgChg30d = pricedCount > 0 ? +(totalChg30d / pricedCount).toFixed(1) : 0;
+  const topCardsByCharacter = new Map<string, PricedCharacterCardRow[]>();
 
-      return {
-        slug: char.slug,
-        name: char.name,
-        subtitle: char.subtitle,
-        faction: char.faction,
-        tier: char.tier,
-        indexValue: +indexValue.toFixed(2),
-        cardCount: count ?? 0,
-        chg7d: avgChg7d,
-        chg30d: avgChg30d,
-        up: avgChg7d >= 0,
-        topCards: normalizedTopCards.map((c) => {
-          const ps = firstRelation(c.price_stats as unknown as {
-            tcg_market: number;
-            market_avg: number;
-            chg_1d: number;
-            chg_7d: number;
-            chg_30d: number;
-          } | Array<{
-            tcg_market: number;
-            market_avg: number;
-            chg_1d: number;
-            chg_7d: number;
-            chg_30d: number;
-          }> | null);
-          const setInfo = firstRelation(c.sets as unknown as { code: string; name: string } | Array<{ code: string; name: string }> | null);
-          return {
-            name: c.name,
-            set: setInfo?.code ?? "",
-            rarity: c.rarity ?? "",
-            tcg: ps?.tcg_market ?? 0,
-            avg: ps?.market_avg ?? 0,
-            chg1d: ps?.chg_1d ?? 0,
-            chg7d: ps?.chg_7d ?? 0,
-            chg30d: ps?.chg_30d ?? 0,
-            spark: historyMap[c.id as string] ?? [ps?.tcg_market ?? 0, ps?.tcg_market ?? 0],
-            imageUrl: c.image_url ?? null,
-            imageUrlSmall: c.image_url_small ?? null,
-            cardImageId: c.card_image_id ?? null,
-          };
-        }),
-      };
-    })
-  );
+  for (const [characterId, cards] of Array.from(cardsByCharacter.entries())) {
+    const topCards = [...cards]
+      .sort((a, b) => (firstRelation(b.price_stats)?.tcg_market ?? 0) - (firstRelation(a.price_stats)?.tcg_market ?? 0))
+      .slice(0, 10);
+    topCardsByCharacter.set(characterId, topCards);
+  }
+
+  const results = ((characters ?? []) as CharacterRow[]).map((char) => {
+    const totals = totalsByCharacter.get(char.id);
+    const pricedCount = totals?.pricedCount ?? 0;
+    const indexValue = totals?.indexValue ?? 0;
+    const avgChg7d = pricedCount > 0 ? +((totals?.totalChg7d ?? 0) / pricedCount).toFixed(1) : 0;
+    const avgChg30d = pricedCount > 0 ? +((totals?.totalChg30d ?? 0) / pricedCount).toFixed(1) : 0;
+
+    return {
+      slug: char.slug,
+      name: char.name,
+      subtitle: char.subtitle,
+      faction: char.faction,
+      tier: char.tier,
+      indexValue: +indexValue.toFixed(2),
+      cardCount: cardCounts.get(char.id) ?? 0,
+      chg7d: avgChg7d,
+      chg30d: avgChg30d,
+      up: avgChg7d >= 0,
+      topCards: (topCardsByCharacter.get(char.id) ?? []).map((card) => {
+        const ps = firstRelation(card.price_stats);
+        const setInfo = firstRelation(card.sets);
+        return {
+          name: card.name,
+          set: setInfo?.code ?? "",
+          rarity: card.rarity ?? "",
+          tcg: ps?.tcg_market ?? 0,
+          avg: ps?.market_avg ?? 0,
+          chg1d: ps?.chg_1d ?? 0,
+          chg7d: ps?.chg_7d ?? 0,
+          chg30d: ps?.chg_30d ?? 0,
+          spark: trendSpark(ps),
+          imageUrl: card.image_url ?? null,
+          imageUrlSmall: card.image_url_small ?? null,
+          cardImageId: card.card_image_id ?? null,
+        };
+      }),
+    };
+  });
 
   return results
     .filter((r) => r.indexValue > 0)
@@ -166,7 +230,7 @@ export async function GET(request: Request) {
 
   try {
     const withCards = await cachedPublicData(
-      publicDataCacheKey("api-characters", gameResult.game.id),
+      publicDataCacheKey("api-characters-v4", gameResult.game.id),
       () => loadCharacterIndex(gameResult.game.id)
     );
     return NextResponse.json(withCards, { headers: PUBLIC_DATA_CACHE_HEADERS });

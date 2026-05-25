@@ -273,13 +273,20 @@ export default function RaritiesPage() {
   const params = useParams<{ game?: string | string[] }>();
   const gameRouteSlug = routeParam(params.game) ?? DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
   const isDefaultGame = gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
-  const [allRarities, setAllRarities] = useState<RarityData[]>([]);
+  const [allRarities, setAllRarities] = useState<RarityData[]>(() => isDefaultGame ? FALLBACK_RARITIES : []);
   const [activeRarity, setActiveRarity] = useState<string>(TOP_5_SLUGS[0]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (isDefaultGame) {
+      setAllRarities(FALLBACK_RARITIES);
+      setActiveRarity(TOP_5_SLUGS[0]);
+    } else {
+      setAllRarities([]);
+    }
+    setLoading(true);
     const query = new URLSearchParams({ game: gameQueryValue(gameRouteSlug) });
-    fetch(`/api/rarities?${query}`, { cache: "no-store" })
+    fetch(`/api/rarities?${query}`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
@@ -293,7 +300,7 @@ export default function RaritiesPage() {
 
   const { top5, tier2, all } = buildTieredRarities(allRarities, FALLBACK_RARITIES, isDefaultGame);
   const r = all.find((x) => x.slug === activeRarity) || top5[0];
-  const showSkeleton = loading || (isDefaultGame && (allRarities.length === 0 || !r));
+  const showSkeleton = !isDefaultGame && (loading || allRarities.length === 0 || !r);
   const showEmpty = !loading && !isDefaultGame && all.length === 0;
 
   const selectRarity = useCallback((slug: string) => {
