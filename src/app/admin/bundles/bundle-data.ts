@@ -168,7 +168,8 @@ export async function loadBundleInventory(currentBundleId?: string, game?: strin
     const gameId = await resolveDefaultGameId(supabase, game);
     const assignedRes = await supabase
       .from("inventory_bundle_items")
-      .select("bundle_id, inventory_item_id");
+      .select("bundle_id, inventory_item_id")
+      .eq("game_id", gameId);
 
     if (assignedRes.error) {
       return { data: [], error: assignedRes.error.message };
@@ -213,6 +214,7 @@ export async function loadBundleSummaries(game?: string | null): Promise<LoadRes
     const bundlesRes = await supabase
       .from("inventory_bundles")
       .select(BUNDLE_SELECT)
+      .eq("game_id", gameId)
       .order("updated_at", { ascending: false })
       .order("created_at", { ascending: false });
 
@@ -229,6 +231,7 @@ export async function loadBundleSummaries(game?: string | null): Promise<LoadRes
     const linksRes = await supabase
       .from("inventory_bundle_items")
       .select("bundle_id, inventory_item_id")
+      .eq("game_id", gameId)
       .in("bundle_id", bundleIds);
 
     if (linksRes.error) {

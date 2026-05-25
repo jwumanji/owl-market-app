@@ -68,7 +68,8 @@ export default async function EditOrderPage({
 
       {error || !orderResult.data ? (
         <div className="rounded-c-md border-[1.5px] border-coral bg-[#FFE2DD] px-4 py-3 font-grotesk text-sm text-ink">
-          Order query failed: {error ?? "Order not found"}
+          Order query failed: {error ?? "Order not found"}. If the error mentions game_id, run{" "}
+          schema-migration-v37-customer-order-game-scope.sql in Supabase.
         </div>
       ) : (
         <OrderForm inventoryItems={inventoryResult.data} initialOrder={orderResult.data} gameSlug={gameSlug} />

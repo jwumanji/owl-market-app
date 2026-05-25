@@ -1,10 +1,12 @@
+import Link from "next/link";
 import { createServiceClient } from "@/lib/supabase-server";
 import { CardRow, SetInfo, DashboardData, DashboardCard, RarityRankItem, CharacterRankItem, SealedRankItem, EbaySaleItem } from "@/lib/types";
 import MarketTable from "@/components/market/MarketTable";
 import MarketDashboard from "@/components/market/MarketDashboard";
 import { RARITY_META } from "@/app/rarities/rarities-data";
 import { withOnePiecePayloadFallbacksList } from "@/lib/game-payload";
-import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG, resolveGameScope } from "@/lib/game-scope";
+import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
+import { gamePath } from "@/lib/game-routes";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +47,7 @@ export async function MarketsPageContent({
   const supabase = createServiceClient();
   const gameResult = await resolveGameScope(supabase, gameRouteSlug, {
     defaultToOnePiece: true,
-    publicOnly: true,
+    publicOnly: publicOnlyForCatalogPreview(),
   });
 
   if (gameResult.error) {
@@ -63,6 +65,7 @@ export async function MarketsPageContent({
     charsRes,
     sealedRes,
     ebayRes,
+    catalogCountRes,
   ] = await Promise.all([
     // Existing: top 20 by market value
     supabase
@@ -144,6 +147,11 @@ export async function MarketsPageContent({
       .not("sale_price", "is", null)
       .order("sold_at", { ascending: false })
       .limit(5),
+
+    supabase
+      .from("cards")
+      .select("id", { count: "exact", head: true })
+      .eq("game_id", game.id),
   ]);
 
   // ── Existing table data ──
@@ -167,6 +175,59 @@ export async function MarketsPageContent({
     if (oa !== ob) return oa - ob;
     return pa.num - pb.num;
   });
+  const catalogCardCount = catalogCountRes.count ?? 0;
+
+  if (cards.length === 0 && catalogCardCount > 0) {
+    return (
+      <main className="bg-bg text-ink min-h-screen pt-8 pb-24">
+        <section className="max-w-[1280px] mx-auto px-7">
+          <header className="mb-6">
+            <div className="font-mono-2 font-semibold text-[12px] text-ink-2 tracking-[0.14em] uppercase mb-3">
+              TCG · Catalog preview · Pricing pending
+            </div>
+            <h1 className="font-grotesk font-bold text-[44px] leading-none tracking-[-0.025em] text-ink">
+              Markets &mdash;{" "}
+              <em
+                className="font-script not-italic bg-grad-brand bg-clip-text text-transparent inline-block"
+                style={{ fontSize: "56px", paddingRight: "12px", paddingBottom: "4px" }}
+              >
+                pending
+              </em>
+            </h1>
+            <p className="mt-3 font-mono-2 font-semibold text-[13px] text-ink-2">
+              {game.name}
+              <span className="text-coral mx-1.5">·</span>
+              {catalogCardCount.toLocaleString()} catalog cards loaded
+              <span className="text-coral mx-1.5">·</span>
+              Pricing provider not enabled
+            </p>
+          </header>
+
+          <div className="rounded-c-md border-[1.5px] border-ink bg-bg-2 p-8">
+            <div className="font-mono-2 text-[11px] uppercase tracking-[0.14em] text-ink-3 font-semibold mb-3">
+              Catalog-only game
+            </div>
+            <h2 className="font-grotesk text-[28px] leading-tight font-bold text-ink mb-3">
+              Market pricing is not live for {game.name} yet.
+            </h2>
+            <p className="font-mono-2 text-[13px] leading-6 font-semibold text-ink-2 max-w-[720px]">
+              The catalog schema is loaded and scoped to this game, but market tables stay empty until
+              a pricing provider is mapped for this game. Use the catalog and set index for smoke
+              testing card data now.
+            </p>
+            <div className="flex flex-wrap gap-3 mt-6">
+              <Link href={gamePath(game.routeSlug, "/catalog")} className="rounded-c-sm border-[1.5px] border-ink bg-ink text-bg px-4 py-2 font-mono-2 text-[11px] font-bold uppercase tracking-[0.08em] no-underline">
+                Open catalog
+              </Link>
+              <Link href={gamePath(game.routeSlug, "/sets")} className="rounded-c-sm border-[1.5px] border-ink bg-bg text-ink px-4 py-2 font-mono-2 text-[11px] font-bold uppercase tracking-[0.08em] no-underline">
+                View sets
+              </Link>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   // ── Dashboard: Trending / Gainers / Losers ──
   const trending = ((trendingRes.data ?? []) as Record<string, unknown>[])

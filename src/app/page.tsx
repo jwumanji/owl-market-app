@@ -2,7 +2,11 @@ import Link from "next/link";
 import OwlMark from "@/components/brand/OwlMark";
 import Wordmark from "@/components/brand/Wordmark";
 import HomeTeaserTable, { type TeaserCard } from "@/components/home/HomeTeaserTable";
-import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG, resolveGameScope } from "@/lib/game-scope";
+import {
+  allowsPrivateGamePreview,
+  DEFAULT_PUBLIC_GAME_ROUTE_SLUG,
+  resolveGameScope,
+} from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
 import { createServiceClient } from "@/lib/supabase-server";
 
@@ -15,12 +19,40 @@ export const metadata = {
 };
 
 const GAMES = [
-  { name: "One Piece TCG", href: gamePath(DEFAULT_PUBLIC_GAME_ROUTE_SLUG, "/markets"), enabled: true, emoji: "🏴‍☠️" },
-  { name: "Pokémon TCG", href: null, enabled: false, emoji: "⚡" },
-  { name: "Magic: The Gathering", href: null, enabled: false, emoji: "🧙" },
-  { name: "Riftbound", href: null, enabled: false, emoji: "🌀" },
-  { name: "Dragon Ball Z", href: null, enabled: false, emoji: "🐉" },
+  { name: "One Piece TCG", href: gamePath(DEFAULT_PUBLIC_GAME_ROUTE_SLUG, "/markets"), enabled: true, status: "Live", emoji: "🏴‍☠️" },
+  { name: "Pokémon TCG", href: null, enabled: false, status: "Soon", emoji: "⚡" },
+  { name: "Magic: The Gathering", href: null, enabled: false, status: "Soon", emoji: "🧙" },
+  { name: "Riftbound", href: gamePath("riftbound"), enabled: false, status: "Preview", emoji: "🌀" },
+  { name: "Dragon Ball Z", href: null, enabled: false, status: "Soon", emoji: "🐉" },
 ] as const;
+
+async function fetchRiftboundTileState() {
+  const privatePreview = allowsPrivateGamePreview();
+  try {
+    const supabase = createServiceClient();
+    const gameResult = await resolveGameScope(supabase, "riftbound", {
+      defaultToOnePiece: false,
+      publicOnly: false,
+    });
+
+    if (gameResult.error) {
+      return { enabled: privatePreview, status: "Preview" };
+    }
+
+    const { game } = gameResult;
+    if (!game.isActive) return { enabled: false, status: "Soon" };
+
+    const pricingStatus = typeof game.metadata.pricing_status === "string"
+      ? game.metadata.pricing_status
+      : null;
+    const status = pricingStatus === "deferred" ? "Catalog" : "Live";
+
+    if (game.isPublic) return { enabled: true, status };
+    return { enabled: privatePreview, status: "Preview" };
+  } catch {
+    return { enabled: privatePreview, status: "Preview" };
+  }
+}
 
 async function fetchTopCards(): Promise<TeaserCard[]> {
   try {
@@ -67,8 +99,16 @@ async function fetchTopCards(): Promise<TeaserCard[]> {
 }
 
 export default async function Home() {
-  const topCards = await fetchTopCards();
+  const [topCards, riftboundTile] = await Promise.all([
+    fetchTopCards(),
+    fetchRiftboundTileState(),
+  ]);
   const marketHref = gamePath(DEFAULT_PUBLIC_GAME_ROUTE_SLUG, "/markets");
+  const games = GAMES.map((game) =>
+    game.name === "Riftbound"
+      ? { ...game, enabled: riftboundTile.enabled, status: riftboundTile.status }
+      : game,
+  );
 
   return (
     <main className="c-home-main">
@@ -94,22 +134,22 @@ export default async function Home() {
         <section className="c-games-section">
           <div className="c-section-label">Pick your game</div>
           <div className="c-games-grid">
-            {GAMES.map((game) =>
+            {games.map((game) =>
               game.enabled ? (
                 <Link
                   key={game.name}
-                  href={game.href!}
+                  href={game.href ?? "#"}
                   className="c-game-card active featured"
                 >
                   <span className="c-game-emoji">{game.emoji}</span>
                   <span className="c-game-name">{game.name}</span>
-                  <span className="c-game-status">Live</span>
+                  <span className="c-game-status">{game.status}</span>
                 </Link>
               ) : (
                 <div key={game.name} className="c-game-card disabled" aria-disabled="true">
                   <span className="c-game-emoji">{game.emoji}</span>
                   <span className="c-game-name">{game.name}</span>
-                  <span className="c-game-status">Soon</span>
+                  <span className="c-game-status">{game.status}</span>
                 </div>
               ),
             )}

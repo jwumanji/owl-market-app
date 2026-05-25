@@ -21,6 +21,8 @@ const CODE_TO_SLUGS = buildJustTcgCodeToSlugs(onePieceGame.justTcgSetSlugMap);
 const CODE_TO_SLUG = buildPrimaryJustTcgSlugByCode(CODE_TO_SLUGS);
 
 const GAME = ONE_PIECE_JUSTTCG_GAME_SLUG;
+const CARD_UPSERT_CONFLICT = "game_id,card_image_id";
+const PRICE_STATS_UPSERT_CONFLICT = "game_id,card_id";
 
 // ---------------------------------------------------------------------------
 // GET|POST /api/sync/justtcg?sets=OP01  (ONE set per request)
@@ -435,13 +437,13 @@ async function syncOneSet(
         // twice with "command cannot affect row a second time". Keep the
         // first occurrence since later duplicates carry the same metadata.
         const dedupedNewCards = Array.from(
-          new Map(newCards.map((c) => [c.card_image_id, c])).values(),
+          new Map(newCards.map((c) => [`${c.game_id}:${c.card_image_id}`, c])).values(),
         );
 
         if (dedupedNewCards.length > 0) {
           const { data: inserted, error: insErr } = await supabase
             .from("cards")
-            .upsert(dedupedNewCards, { onConflict: "card_image_id" })
+            .upsert(dedupedNewCards, { onConflict: CARD_UPSERT_CONFLICT })
             .select("id, game_id, card_number, name, variant_label, rarity, set_id");
 
           if (insErr) {
@@ -476,7 +478,7 @@ async function syncOneSet(
 
       // Deduplicate by card_id (keep last entry — higher price variant wins)
       const dedupedPrices = Array.from(
-        new Map(priceUpserts.map((p) => [p.card_id, p])).values()
+        new Map(priceUpserts.map((p) => [`${p.game_id}:${p.card_id}`, p])).values()
       );
       const dedupedHistory = await filterNewHistoryRowsForToday(
         supabase,
@@ -487,7 +489,7 @@ async function syncOneSet(
       if (dedupedPrices.length > 0) {
         const { error: upErr } = await supabase
           .from("price_stats")
-          .upsert(dedupedPrices, { onConflict: "card_id" });
+          .upsert(dedupedPrices, { onConflict: PRICE_STATS_UPSERT_CONFLICT });
         if (upErr) setErrors.push(`price_stats batch: ${upErr.message}`);
         else updatedCount += dedupedPrices.length;
       }
@@ -511,6 +513,7 @@ async function syncOneSet(
           const { error: rarErr } = await supabase
             .from("cards")
             .update({ rarity })
+            .eq("game_id", gameId)
             .in("id", ids);
           if (rarErr) setErrors.push(`rarity update ${rarity}: ${rarErr.message}`);
         }
@@ -536,15 +539,15 @@ function utcDay(value: string | null | undefined): string | null {
   return date.toISOString().slice(0, 10);
 }
 
-function historyDayKey(cardId: string, recordedAt: string): string | null {
+function historyDayKey(gameId: string, cardId: string, recordedAt: string): string | null {
   const day = utcDay(recordedAt);
-  return day ? `${cardId}|${day}` : null;
+  return day ? `${gameId}|${cardId}|${day}` : null;
 }
 
 function dedupeHistoryRows(rows: HistoryInsert[]): HistoryInsert[] {
   const byCardDay = new Map<string, HistoryInsert>();
   for (const row of rows) {
-    const key = historyDayKey(row.card_id, row.recorded_at);
+    const key = historyDayKey(row.game_id, row.card_id, row.recorded_at);
     if (!key) continue;
     const existing = byCardDay.get(key);
     if (!existing || new Date(row.recorded_at).getTime() >= new Date(existing.recorded_at).getTime()) {
@@ -563,36 +566,42 @@ async function filterNewHistoryRowsForToday(
   if (rows.length === 0) return rows;
 
   const existing = new Set<string>();
-  const ids = Array.from(new Set(rows.map((row) => row.card_id))).filter(Boolean);
-  const days = Array.from(new Set(rows.map((row) => utcDay(row.recorded_at)).filter(Boolean))) as string[];
+  const gameIds = Array.from(new Set(rows.map((row) => row.game_id))).filter(Boolean);
   const chunkSize = 100;
 
-  for (const day of days) {
-    const start = `${day}T00:00:00.000Z`;
-    const end = new Date(Date.parse(start) + 24 * 60 * 60 * 1000).toISOString();
-    for (let i = 0; i < ids.length; i += chunkSize) {
-      const chunk = ids.slice(i, i + chunkSize);
-      const { data, error } = await supabase
-        .from("price_history")
-        .select("card_id, recorded_at")
-        .in("card_id", chunk)
-        .gte("recorded_at", start)
-        .lt("recorded_at", end);
+  for (const gameId of gameIds) {
+    const gameRows = rows.filter((row) => row.game_id === gameId);
+    const ids = Array.from(new Set(gameRows.map((row) => row.card_id))).filter(Boolean);
+    const days = Array.from(new Set(gameRows.map((row) => utcDay(row.recorded_at)).filter(Boolean))) as string[];
 
-      if (error) {
-        setErrors.push(`price_history dedupe precheck: ${error.message}`);
-        return rows;
-      }
+    for (const day of days) {
+      const start = `${day}T00:00:00.000Z`;
+      const end = new Date(Date.parse(start) + 24 * 60 * 60 * 1000).toISOString();
+      for (let i = 0; i < ids.length; i += chunkSize) {
+        const chunk = ids.slice(i, i + chunkSize);
+        const { data, error } = await supabase
+          .from("price_history")
+          .select("game_id, card_id, recorded_at")
+          .eq("game_id", gameId)
+          .in("card_id", chunk)
+          .gte("recorded_at", start)
+          .lt("recorded_at", end);
 
-      for (const row of data ?? []) {
-        const key = historyDayKey(row.card_id, row.recorded_at);
-        if (key) existing.add(key);
+        if (error) {
+          setErrors.push(`price_history dedupe precheck: ${error.message}`);
+          return rows;
+        }
+
+        for (const row of data ?? []) {
+          const key = historyDayKey(row.game_id, row.card_id, row.recorded_at);
+          if (key) existing.add(key);
+        }
       }
     }
   }
 
   return rows.filter((row) => {
-    const key = historyDayKey(row.card_id, row.recorded_at);
+    const key = historyDayKey(row.game_id, row.card_id, row.recorded_at);
     return key && !existing.has(key);
   });
 }

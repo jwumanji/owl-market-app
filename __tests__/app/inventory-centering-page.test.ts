@@ -206,7 +206,7 @@ function loadPage({
     "@/components/centering/CenteringWorkspace": {
       __esModule: true,
       default(props: {
-        gameSlug?: string;
+        gameSlug: string;
         inventoryItemId: string;
         preloadImageUrl?: string | null;
         cardIdentity: { name: string };
@@ -215,7 +215,7 @@ function loadPage({
           "div",
           {
             "data-card": props.cardIdentity.name,
-            "data-game": props.gameSlug ?? "",
+            "data-game": props.gameSlug,
             "data-item": props.inventoryItemId,
             "data-preload": props.preloadImageUrl ?? "",
             "data-testid": "centering-workspace",
@@ -284,6 +284,7 @@ test("inventory centering page renders workspace and empty history", async () =>
 
   assert.match(html, /Card Centering Measurement/);
   assert.match(html, /Workspace Nami/);
+  assert.match(html, /data-game="one_piece"/);
   assert.match(html, /data-item="item-1"/);
   assert.match(html, /data-preload="https:\/\/cdn.example\/front.jpg"/);
   assert.match(html, /No centering measurements yet/);

@@ -421,6 +421,7 @@ async function createInventoryBundleFromPsaRows({
   const assignedRes = await supabase
     .from("inventory_bundle_items")
     .select("inventory_item_id")
+    .eq("game_id", gameId)
     .in("inventory_item_id", inventoryIds);
 
   if (assignedRes.error) {
@@ -437,6 +438,7 @@ async function createInventoryBundleFromPsaRows({
   const { data: bundle, error: bundleError } = await supabase
     .from("inventory_bundles")
     .insert({
+      game_id: gameId,
       name: bundleName,
       status: "new",
       sale_channel: "not_sold",
@@ -453,6 +455,7 @@ async function createInventoryBundleFromPsaRows({
 
   const bundleId = (bundle as { id: string }).id;
   const linkRows = inventoryIds.map((inventoryItemId, index) => ({
+    game_id: gameId,
     bundle_id: bundleId,
     inventory_item_id: inventoryItemId,
     position: index,
@@ -460,7 +463,7 @@ async function createInventoryBundleFromPsaRows({
 
   const { error: linkError } = await supabase.from("inventory_bundle_items").insert(linkRows);
   if (linkError) {
-    await supabase.from("inventory_bundles").delete().eq("id", bundleId);
+    await supabase.from("inventory_bundles").delete().eq("game_id", gameId).eq("id", bundleId);
     return { bundleId: null, warning: linkError.message };
   }
 

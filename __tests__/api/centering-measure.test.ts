@@ -15,6 +15,15 @@ type LoadRouteOptions = {
   insertError?: DbError | null;
 };
 
+const onePieceGame = {
+  id: "game-one-piece",
+  slug: "one_piece",
+  name: "One Piece Card Game",
+  is_active: true,
+  is_public: true,
+  metadata: { route_slug: "one-piece" },
+};
+
 const requireFromTest = createRequire(import.meta.url);
 const routePath = path.resolve("src/app/api/centering/measure/route.ts");
 const routeSource = fs.readFileSync(routePath, "utf8");
@@ -82,11 +91,12 @@ function measurementResponse() {
   };
 }
 
-function measurementRequest(inventoryItemId = "inventory-1") {
+function measurementRequest(inventoryItemId = "inventory-1", game = "one_piece") {
   const formData = new FormData();
   if (inventoryItemId) {
     formData.set("inventoryItemId", inventoryItemId);
   }
+  formData.set("game", game);
   formData.set("file", new File(["fake image"], "card.jpg", { type: "image/jpeg" }));
 
   return new Request("http://localhost/api/centering/measure", {
@@ -108,23 +118,55 @@ function loadRoute({
 
   const supabase = {
     from(table: string) {
-      if (table === "inventory_items") {
-        let selectedId = "";
+      if (table === "games") {
+        let matched = true;
         const query = {
           select(_columns: string) {
             return query;
           },
-          eq(_column: string, value: string) {
-            selectedId = value;
+          eq(column: string, value: string | boolean) {
+            if (column === "slug") {
+              matched = value === onePieceGame.slug;
+            } else if (column === "id") {
+              matched = value === onePieceGame.id;
+            }
+            return query;
+          },
+          filter(column: string, _operator: string, value: string) {
+            if (column === "metadata->>route_slug") {
+              matched = value === onePieceGame.metadata.route_slug;
+            }
+            return query;
+          },
+          maybeSingle() {
+            return Promise.resolve({ data: matched ? onePieceGame : null, error: null });
+          },
+        };
+        return query;
+      }
+
+      if (table === "inventory_items") {
+        let selectedId = "";
+        let selectedGameId = "";
+        const query = {
+          select(_columns: string) {
+            return query;
+          },
+          eq(column: string, value: string) {
+            if (column === "id") {
+              selectedId = value;
+            } else if (column === "game_id") {
+              selectedGameId = value;
+            }
             return query;
           },
           async single() {
             inventoryLookups.push(selectedId);
-            if (!inventoryFound) {
+            if (!inventoryFound || selectedGameId !== onePieceGame.id) {
               return { data: null, error: { message: "not found" } };
             }
 
-            return { data: { id: selectedId }, error: null };
+            return { data: { id: selectedId, game_id: selectedGameId }, error: null };
           },
         };
 
@@ -288,6 +330,7 @@ test("happy path forwards CV response and inserts centering measurement", async 
   assert.deepEqual(route.inventoryLookups, ["inventory-1"]);
   assert.equal(route.insertedRows.length, 1);
   assert.deepEqual(JSON.parse(JSON.stringify(route.insertedRows[0])), {
+    game_id: "game-one-piece",
     inventory_item_id: "inventory-1",
     request_id: "00000000-0000-4000-8000-000000000001",
     left_pct: 52,
@@ -325,6 +368,7 @@ test("standalone request without inventoryItemId persists a null inventory link"
   assert.deepEqual(route.inventoryLookups, []);
   assert.equal(route.cvCalls.length, 1);
   assert.equal(route.insertedRows.length, 1);
+  assert.equal(route.insertedRows[0].game_id, "game-one-piece");
   assert.equal(route.insertedRows[0].inventory_item_id, null);
   assert.equal(route.insertedRows[0].psa_ceiling, "PSA_10");
 });

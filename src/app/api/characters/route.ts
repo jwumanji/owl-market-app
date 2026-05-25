@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
-import { gameParamFromRequest, resolveGameScope } from "@/lib/game-scope";
+import { gameParamFromRequest, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
 
 // ---------------------------------------------------------------------------
 // GET /api/characters — returns character index data with top cards + prices
@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   const supabase = createServiceClient();
   const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
     defaultToOnePiece: true,
-    publicOnly: true,
+    publicOnly: publicOnlyForCatalogPreview(),
   });
 
   if (gameResult.error) {

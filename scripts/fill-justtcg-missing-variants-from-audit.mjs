@@ -13,6 +13,7 @@ import fs from "node:fs";
 
 const REPORT_PATH = "catalog-audit-report.md";
 const APPLY = process.argv.includes("--apply");
+const ONE_PIECE_DB_SLUG = "one_piece";
 
 function loadEnvFile(path = ".env.local") {
   if (!fs.existsSync(path)) return;
@@ -85,8 +86,19 @@ async function sbFetch(path) {
   return res.json();
 }
 
-async function patchVariantLabel(id, variantLabel) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/cards?id=eq.${encodeURIComponent(id)}&variant_label=is.null`, {
+async function loadOnePieceGame() {
+  const rows = await sbFetch(
+    `games?select=id,slug,name&slug=eq.${encodeURIComponent(ONE_PIECE_DB_SLUG)}`
+  );
+  const game = rows[0] ?? null;
+  if (!game?.id) {
+    throw new Error("One Piece game row is missing. Run the multi-TCG game migration before filling variants.");
+  }
+  return game;
+}
+
+async function patchVariantLabel(id, gameId, variantLabel) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/cards?id=eq.${encodeURIComponent(id)}&game_id=eq.${encodeURIComponent(gameId)}&variant_label=is.null`, {
     method: "PATCH",
     headers: restHeaders({
       "Content-Type": "application/json",
@@ -110,6 +122,7 @@ function mdTable(headers, rows) {
 }
 
 async function main() {
+  const game = await loadOnePieceGame();
   const rows = readMissingVariantRows();
   const byImageId = new Map();
   for (const row of rows) {
@@ -135,7 +148,7 @@ async function main() {
   const existing = [];
   for (const row of desired) {
     const cards = await sbFetch(
-      `cards?select=id,card_image_id,card_number,name,variant_label,rarity&card_image_id=eq.${encodeURIComponent(row.cardImageId)}`
+      `cards?select=id,game_id,card_image_id,card_number,name,variant_label,rarity&game_id=eq.${encodeURIComponent(game.id)}&card_image_id=eq.${encodeURIComponent(row.cardImageId)}`
     );
     if (cards.length === 1) {
       existing.push({ audit: row, card: cards[0] });
@@ -194,7 +207,7 @@ async function main() {
   }
 
   for (const { audit, card } of updates) {
-    await patchVariantLabel(card.id, audit.variantLabel);
+    await patchVariantLabel(card.id, game.id, audit.variantLabel);
   }
   console.log("Apply complete.");
 }

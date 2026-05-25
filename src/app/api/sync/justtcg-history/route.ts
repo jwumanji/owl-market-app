@@ -308,12 +308,13 @@ async function syncOneSetHistory(
   const dedupedRows = dedupeHistoryRows(historyRows);
   const existingKeys = await fetchExistingHistoryDayKeys(
     supabase,
+    gameId,
     dedupedRows.map((row) => row.card_id),
     earliestIsoForDuration(historyDuration)
   );
 
   const rowsToInsert = dedupedRows.filter((row) => {
-    const key = historyDayKey(row.card_id, row.recorded_at);
+    const key = historyDayKey(row.game_id, row.card_id, row.recorded_at);
     return key && !existingKeys.has(key);
   });
   result.existingRowsSkipped = dedupedRows.length - rowsToInsert.length;
@@ -517,7 +518,7 @@ function historyRowsForVariant(gameId: string, cardId: string, variant: JTVarian
 function dedupeHistoryRows(rows: HistoryInsert[]): HistoryInsert[] {
   const byCardDay = new Map<string, HistoryInsert>();
   for (const row of rows) {
-    const key = historyDayKey(row.card_id, row.recorded_at);
+    const key = historyDayKey(row.game_id, row.card_id, row.recorded_at);
     if (!key) continue;
     const existing = byCardDay.get(key);
     if (!existing || new Date(row.recorded_at).getTime() >= new Date(existing.recorded_at).getTime()) {
@@ -530,6 +531,7 @@ function dedupeHistoryRows(rows: HistoryInsert[]): HistoryInsert[] {
 async function fetchExistingHistoryDayKeys(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
+  gameId: string,
   cardIds: string[],
   minRecordedAt: string
 ): Promise<Set<string>> {
@@ -544,7 +546,8 @@ async function fetchExistingHistoryDayKeys(
     while (true) {
       const { data, error } = await supabase
         .from("price_history")
-        .select("card_id, recorded_at")
+        .select("game_id, card_id, recorded_at")
+        .eq("game_id", gameId)
         .in("card_id", chunk)
         .gte("recorded_at", minRecordedAt)
         .order("recorded_at", { ascending: true })
@@ -552,7 +555,7 @@ async function fetchExistingHistoryDayKeys(
 
       if (error) throw new Error(`price_history lookup failed: ${error.message}`);
       for (const row of data ?? []) {
-        const key = historyDayKey(row.card_id, row.recorded_at);
+        const key = historyDayKey(row.game_id, row.card_id, row.recorded_at);
         if (key) keys.add(key);
       }
       if (!data || data.length < pageSize) break;
@@ -759,9 +762,9 @@ function allowsCardNumberInSet(setCode: string, cardNumber: string | null | unde
   return prefix === setCode;
 }
 
-function historyDayKey(cardId: string, recordedAt: string): string | null {
+function historyDayKey(gameId: string, cardId: string, recordedAt: string): string | null {
   const day = utcDay(recordedAt);
-  return day ? `${cardId}|${day}` : null;
+  return day ? `${gameId}|${cardId}|${day}` : null;
 }
 
 function utcDay(value: string | null | undefined): string | null {

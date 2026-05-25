@@ -1,10 +1,128 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { RARITY_META } from "@/app/rarities/rarities-data";
-import { gameParamFromRequest, resolveGameScope } from "@/lib/game-scope";
+import { gameParamFromRequest, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
+import { ONE_PIECE_DB_SLUG } from "@/lib/games/one-piece";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
+
+const CATALOG_RARITY_COLORS = [
+  { color: "#4F8EF7", colorD: "rgba(79,142,247,0.14)", colorBd: "rgba(79,142,247,0.3)" },
+  { color: "#00D68F", colorD: "rgba(0,214,143,0.14)", colorBd: "rgba(0,214,143,0.3)" },
+  { color: "#E8A020", colorD: "rgba(232,160,32,0.18)", colorBd: "rgba(232,160,32,0.38)" },
+  { color: "#9B72FF", colorD: "rgba(155,114,255,0.14)", colorBd: "rgba(155,114,255,0.3)" },
+  { color: "#FF4560", colorD: "rgba(255,69,96,0.14)", colorBd: "rgba(255,69,96,0.3)" },
+  { color: "#20C9B0", colorD: "rgba(32,201,176,0.18)", colorBd: "rgba(32,201,176,0.38)" },
+];
+
+function slugify(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+async function loadCatalogOnlyRarities(supabase: ReturnType<typeof createServiceClient>, gameId: string) {
+  const { data: rarityRows, error } = await supabase
+    .from("game_rarities")
+    .select("id, code, name, sort_order")
+    .eq("game_id", gameId)
+    .order("sort_order")
+    .order("code");
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  const rows = (rarityRows ?? []) as Array<{
+    id: string;
+    code: string | null;
+    name: string | null;
+    sort_order: number | null;
+  }>;
+
+  const results = await Promise.all(
+    rows.map(async (rarity, index) => {
+      const { count } = await supabase
+        .from("cards")
+        .select("id", { count: "exact", head: true })
+        .eq("game_id", gameId)
+        .eq("rarity_id", rarity.id);
+
+      const { data: cards } = await supabase
+        .from("cards")
+        .select(`
+          id,
+          card_image_id,
+          card_number,
+          name,
+          rarity,
+          image_url,
+          image_url_small,
+          sets (code, name)
+        `)
+        .eq("game_id", gameId)
+        .eq("rarity_id", rarity.id)
+        .order("card_number")
+        .limit(10);
+
+      const color = CATALOG_RARITY_COLORS[index % CATALOG_RARITY_COLORS.length];
+      const code = rarity.code ?? rarity.name ?? "Unknown";
+      const name = rarity.name ?? rarity.code ?? "Unknown";
+
+      return {
+        slug: slugify(code || name),
+        name,
+        code,
+        subtitle: "Catalog taxonomy imported for this game. Pricing is not enabled yet.",
+        color: color.color,
+        colorD: color.colorD,
+        colorBd: color.colorBd,
+        indexValue: 0,
+        cardCount: count ?? 0,
+        avgCardPrice: 0,
+        chg7d: 0,
+        chg30d: 0,
+        up: true,
+        spark: [10, 10],
+        pricingStatus: "catalog_only" as const,
+        topCards: ((cards ?? []) as Array<{
+          id: string;
+          card_image_id: string | null;
+          card_number: string | null;
+          name: string;
+          rarity: string | null;
+          image_url: string | null;
+          image_url_small: string | null;
+          sets: { code: string | null; name: string | null } | Array<{ code: string | null; name: string | null }> | null;
+        }>).map((card) => {
+          const set = Array.isArray(card.sets) ? card.sets[0] : card.sets;
+          return {
+            cardId: card.id,
+            cardImageId: card.card_image_id ?? undefined,
+            name: card.name,
+            set: set?.code ?? "",
+            rarity: card.rarity ?? name,
+            tcg: 0,
+            avg: 0,
+            chg1d: 0,
+            chg7d: 0,
+            chg30d: 0,
+            spark: [10, 10],
+            imageSmall: card.image_url_small ?? card.image_url ?? null,
+          };
+        }),
+      };
+    })
+  );
+
+  return NextResponse.json(
+    results.filter((rarity) => rarity.cardCount > 0).sort((a, b) => b.cardCount - a.cardCount),
+    { headers: { "Cache-Control": "no-store, max-age=0" } }
+  );
+}
 
 // ---------------------------------------------------------------------------
 // GET /api/rarities — returns rarity index data with top cards + prices
@@ -14,13 +132,17 @@ export async function GET(request: Request) {
   const supabase = createServiceClient();
   const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
     defaultToOnePiece: true,
-    publicOnly: true,
+    publicOnly: publicOnlyForCatalogPreview(),
   });
 
   if (gameResult.error) {
     return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
   }
   const { game } = gameResult;
+
+  if (game.slug !== ONE_PIECE_DB_SLUG) {
+    return loadCatalogOnlyRarities(supabase, game.id);
+  }
 
   const distinctRarities = Object.keys(RARITY_META).filter((k) => k !== "SEALED");
   const nonPromoRarities = distinctRarities.filter((k) => k !== "PROMO");

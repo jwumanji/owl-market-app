@@ -4,6 +4,7 @@ import { withOnePiecePayloadFallbacksList } from "@/lib/game-payload";
 import {
   gameParamFromRequest,
   gameResponsePayload,
+  publicOnlyForCatalogPreview,
   resolveGameScope,
 } from "@/lib/game-scope";
 
@@ -15,7 +16,7 @@ export async function GET(
   const supabase = createServiceClient();
   const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
     defaultToOnePiece: true,
-    publicOnly: true,
+    publicOnly: publicOnlyForCatalogPreview(),
   });
 
   if (gameResult.error) {

@@ -180,6 +180,12 @@ function loadPage(rows = [
   };
 
   const mocks: Record<string, unknown> = {
+    "../AdminGameSwitcher": {
+      __esModule: true,
+      default() {
+        return React.createElement("div", { "data-testid": "admin-game-switcher" });
+      },
+    },
     "./InventoryShell": {
       __esModule: true,
       default(props: InventoryShellProps) {
@@ -202,6 +208,11 @@ function loadPage(rows = [
     "../bundles/bundle-data": {
       loadBundleSummaries() {
         return Promise.resolve({ data: [], error: null });
+      },
+    },
+    "@/lib/admin-games": {
+      loadAdminGameOptions() {
+        return Promise.resolve([{ slug: "one_piece", name: "One Piece Card Game", isPublic: true }]);
       },
     },
     "@/lib/admin-user": {

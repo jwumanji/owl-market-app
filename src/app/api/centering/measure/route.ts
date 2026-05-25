@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { isAllowedAdminEmail } from "@/lib/admin-auth";
+import { resolveGameScope } from "@/lib/game-scope";
 import { isUploadFile } from "@/lib/inventory-scans";
 import { createServiceClient } from "@/lib/supabase-server";
 import type { operations } from "@/lib/owl-lens/openapi.generated";
@@ -62,8 +63,9 @@ function passthroughHeaders(response: Response) {
   return headers;
 }
 
-function measurementRow(inventoryItemId: string | null, response: MeasurementResponse) {
+function measurementRow(gameId: string, inventoryItemId: string | null, response: MeasurementResponse) {
   return {
+    game_id: gameId,
     inventory_item_id: inventoryItemId,
     request_id: crypto.randomUUID(),
     left_pct: response.centering.leftRight.leftPercent,
@@ -106,6 +108,8 @@ export async function POST(request: Request) {
     typeof inventoryItemIdEntry === "string" && inventoryItemIdEntry.trim()
       ? inventoryItemIdEntry.trim()
       : null;
+  const gameEntry = formData.get("game");
+  const requestedGame = typeof gameEntry === "string" && gameEntry.trim() ? gameEntry.trim() : null;
 
   const file = formData.get("file");
   if (!isUploadFile(file)) {
@@ -113,11 +117,18 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, requestedGame);
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
+
   if (inventoryItemId) {
     const { data: inventoryItem, error: inventoryError } = await supabase
       .from("inventory_items")
-      .select("id")
+      .select("id, game_id")
       .eq("id", inventoryItemId)
+      .eq("game_id", game.id)
       .single();
 
     if (inventoryError || !inventoryItem) {
@@ -166,7 +177,7 @@ export async function POST(request: Request) {
 
   const { error: insertError } = await supabase
     .from("centering_measurements")
-    .insert(measurementRow(inventoryItemId, measurement));
+    .insert(measurementRow(game.id, inventoryItemId, measurement));
 
   if (insertError) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });

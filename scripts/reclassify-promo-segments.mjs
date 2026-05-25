@@ -9,6 +9,7 @@
 //   SUPABASE_SERVICE_ROLE_KEY=... node scripts/reclassify-promo-segments.mjs --apply
 
 import { classifySegment } from "./import-promos.mjs";
+import { loadGameScope, scriptGameSlug, withGameFilter } from "./lib/supabase-game-scope.mjs";
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://kiquytaevufssveqmqix.supabase.co";
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -18,6 +19,7 @@ if (!KEY) {
 }
 const APPLY = process.argv.includes("--apply");
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" };
+const GAME_SLUG = scriptGameSlug();
 
 async function fetchAll(path) {
   const all = [];
@@ -35,8 +37,8 @@ async function fetchAll(path) {
   return all;
 }
 
-async function patch(id, body) {
-  const r = await fetch(`${SB_URL}/rest/v1/cards?id=eq.${id}`, {
+async function patch(id, gameId, body) {
+  const r = await fetch(`${SB_URL}/rest/v1/cards?id=eq.${id}&game_id=eq.${encodeURIComponent(gameId)}`, {
     method: "PATCH",
     headers: { ...H, Prefer: "return=minimal" },
     body: JSON.stringify(body),
@@ -50,7 +52,10 @@ async function patch(id, body) {
 
 // Only consider cards that already have a promo_segment value — re-classifying
 // a non-promo card row would erroneously stamp a segment on it.
-const cards = await fetchAll("cards?select=id,name,card_number,promo_segment&promo_segment=not.is.null");
+const GAME = await loadGameScope({ supabaseUrl: SB_URL, supabaseKey: KEY, gameSlug: GAME_SLUG });
+console.log(`Using game scope: ${GAME.slug}`);
+
+const cards = await fetchAll(withGameFilter("cards?select=id,name,card_number,promo_segment&promo_segment=not.is.null", GAME.id));
 console.log(`Loaded ${cards.length} cards with a promo_segment.`);
 
 // Conservative direction: only promote rows currently sitting in "Other" to
@@ -101,7 +106,7 @@ let ok = 0;
 let fail = 0;
 for (let i = 0; i < diffs.length; i += CHUNK) {
   const slice = diffs.slice(i, i + CHUNK);
-  const results = await Promise.all(slice.map((d) => patch(d.id, { promo_segment: d.should })));
+  const results = await Promise.all(slice.map((d) => patch(d.id, GAME.id, { promo_segment: d.should })));
   for (const r of results) (r ? ok++ : fail++);
 }
 console.log(`\nPatched: ${ok}   Failed: ${fail}`);

@@ -47,7 +47,8 @@ export default async function NewOrderPage({
 
       {error ? (
         <div className="rounded-c-md border-[1.5px] border-coral bg-[#FFE2DD] px-4 py-3 font-grotesk text-sm text-ink">
-          Orders are not ready yet: {error}. Run schema-migration-v18-customer-orders.sql in Supabase.
+          Orders are not ready yet: {error}. Run schema-migration-v18-customer-orders.sql and{" "}
+          schema-migration-v37-customer-order-game-scope.sql in Supabase.
         </div>
       ) : (
         <OrderForm inventoryItems={inventoryItems} gameSlug={gameSlug} />
