@@ -183,8 +183,7 @@ function CharAvatar({ src, name, size = 28 }: { src: string | null; name: string
 }
 
 /* ── Card Image with Hover Preview ── */
-function CardImageCell({ card, gameRouteSlug }: { card: CharacterCard; gameRouteSlug: string }) {
-  const router = useRouter();
+function CardImageCell({ card }: { card: CharacterCard }) {
   const [showPreview, setShowPreview] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -195,12 +194,6 @@ function CardImageCell({ card, gameRouteSlug }: { card: CharacterCard; gameRoute
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     setShowPreview(false);
   };
-  const handleClick = () => {
-    if (card.cardImageId) {
-      router.push(gamePath(gameRouteSlug, `/card/${card.cardImageId}`));
-    }
-  };
-
   const imgSrc = card.imageUrlSmall ?? card.imageUrl;
   const fullSrc = card.imageUrl ?? card.imageUrlSmall;
 
@@ -209,8 +202,6 @@ function CardImageCell({ card, gameRouteSlug }: { card: CharacterCard; gameRoute
       className="ch-card-img-cell"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      onClick={handleClick}
-      style={{ cursor: card.cardImageId ? "pointer" : undefined }}
     >
       {imgSrc ? (
         <img src={imgSrc} alt={card.name} width={32} height={45} loading="lazy" className="ch-card-thumb" />
@@ -408,6 +399,17 @@ function CharacterDetail({ c }: { c: CharacterData }) {
 
 /* ── Character Cards Table ── */
 function CharacterCards({ c, gameRouteSlug }: { c: CharacterData; gameRouteSlug: string }) {
+  const router = useRouter();
+
+  const openCard = useCallback(
+    (card: CharacterCard) => {
+      if (card.cardImageId) {
+        router.push(gamePath(gameRouteSlug, `/card/${card.cardImageId}`));
+      }
+    },
+    [gameRouteSlug, router]
+  );
+
   return (
     <div className="ch-cards-section">
       <div className="section-header">
@@ -432,10 +434,26 @@ function CharacterCards({ c, gameRouteSlug }: { c: CharacterData; gameRouteSlug:
           </thead>
           <tbody>
             {c.topCards.map((card, i) => (
-              <tr key={i} className={card.cardImageId ? "ch-card-clickable" : ""}>
+              <tr
+                key={i}
+                className={card.cardImageId ? "ch-card-clickable" : ""}
+                onClick={card.cardImageId ? () => openCard(card) : undefined}
+                onKeyDown={
+                  card.cardImageId
+                    ? (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          openCard(card);
+                        }
+                      }
+                    : undefined
+                }
+                role={card.cardImageId ? "link" : undefined}
+                tabIndex={card.cardImageId ? 0 : undefined}
+              >
                 <td className="rank-n">{i + 1}</td>
                 <td className="ch-card-img-td">
-                  <CardImageCell card={card} gameRouteSlug={gameRouteSlug} />
+                  <CardImageCell card={card} />
                 </td>
                 <td>
                   <div className="card-cell">

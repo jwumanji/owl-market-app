@@ -186,6 +186,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .cards-table-wrap { background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-md); overflow: hidden; }
 .cards-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .cards-table col.c0 { width: 44px; }
+.cards-table col.c-img { width: 48px; }
 .cards-table col.c1 { width: 240px; }
 .cards-table col.c2 { width: 100px; }
 .cards-table col.c3 { width: 95px; }
