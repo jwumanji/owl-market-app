@@ -70,11 +70,13 @@ function isRecord(value: unknown): value is JsonRecord {
 }
 
 function hasNumber(record: JsonRecord, key: string) {
-  return typeof record[key] === "number" && Number.isFinite(record[key]);
+  const value = record[key];
+  return typeof value === "number" && Number.isFinite(value);
 }
 
 function hasString(record: JsonRecord, key: string) {
-  return typeof record[key] === "string" && record[key].length > 0;
+  const value = record[key];
+  return typeof value === "string" && value.length > 0;
 }
 
 function isMeasurementResponse(value: unknown): value is MeasurementResponse {
