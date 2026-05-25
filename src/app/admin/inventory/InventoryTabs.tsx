@@ -2,6 +2,7 @@
 
 import { Fragment, type MouseEvent, type SelectHTMLAttributes, useCallback, useEffect, useMemo, useState } from "react";
 import { displayCustomerOrderNumber } from "@/lib/customer-orders";
+import { DEFAULT_PUBLIC_GAME_DB_SLUG } from "@/lib/game-scope";
 import { GRADED_RATINGS, type CatalogMatchStatus, type GradedRating, type InventoryStatus, type InventoryType } from "@/lib/inventory-options";
 import type { BundleInventoryItem, InventoryBundleSummary } from "../bundles/bundle-types";
 import type { CustomerOrderSummary } from "../orders/order-types";
@@ -527,6 +528,7 @@ export default function InventoryTabs({
   statusFilter = "all",
   onStatusFilterChange,
   psa10CandidatesOnly = false,
+  gameSlug = DEFAULT_PUBLIC_GAME_DB_SLUG,
 }: {
   items: InventoryRow[];
   orders?: CustomerOrderSummary[];
@@ -539,6 +541,7 @@ export default function InventoryTabs({
   statusFilter?: StatusFilter;
   onStatusFilterChange?: (status: StatusFilter) => void;
   psa10CandidatesOnly?: boolean;
+  gameSlug?: string;
 }) {
   const [activeTab, setActiveTab] = useState<InventoryTabId>("all");
   const [gradedFilter, setGradedFilter] = useState<GradedFilter>("all");
@@ -819,10 +822,11 @@ export default function InventoryTabs({
     [selectedItemIds]
   );
   const selectedCount = selectedIds.length;
+  const encodedGameSlug = encodeURIComponent(gameSlug);
   const createBundleHref =
     selectedIds.length > 0
-      ? `/admin/bundles/new?items=${selectedIds.map((id) => encodeURIComponent(id)).join(",")}`
-      : "/admin/bundles/new";
+      ? `/admin/bundles/new?game=${encodedGameSlug}&items=${selectedIds.map((id) => encodeURIComponent(id)).join(",")}`
+      : `/admin/bundles/new?game=${encodedGameSlug}`;
   const hasBulkEditDraft = Boolean(bulkStatusDraft || bulkConditionDraft);
   const visibleSelectedCount = visibleRows.reduce((sum, item) => sum + (selectedItemIds[item.id] ? 1 : 0), 0);
   const allVisibleSelected = visibleRows.length > 0 && visibleSelectedCount === visibleRows.length;
@@ -950,7 +954,7 @@ export default function InventoryTabs({
       return;
     }
 
-    const res = await fetch(`/api/admin/inventory/${id}`, {
+    const res = await fetch(`/api/admin/inventory/${id}?game=${encodeURIComponent(gameSlug)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(normalizedUpdates),
@@ -992,10 +996,10 @@ export default function InventoryTabs({
 
     setActionError(null);
     setAttachingBundleItemIds((current) => ({ ...current, [item.id]: true }));
-    const res = await fetch(`/api/admin/bundles/${bundle.id}/items`, {
+    const res = await fetch(`/api/admin/bundles/${bundle.id}/items?game=${encodeURIComponent(gameSlug)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inventory_item_id: item.id }),
+      body: JSON.stringify({ inventory_item_id: item.id, game: gameSlug }),
     });
     const payload = await res.json().catch(() => null);
     setAttachingBundleItemIds((current) => ({ ...current, [item.id]: false }));
@@ -1133,10 +1137,11 @@ export default function InventoryTabs({
     );
 
     try {
-      const res = await fetch(`/api/admin/orders/${order.id}`, {
+      const res = await fetch(`/api/admin/orders/${order.id}?game=${encodeURIComponent(gameSlug)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          game: gameSlug,
           nickname: order.nickname ?? "",
           customer_name: customerName,
           shipping_label: shippingLabel,
@@ -1195,7 +1200,8 @@ export default function InventoryTabs({
     setSearchingMatchIds((current) => ({ ...current, [item.id]: true }));
 
     try {
-      const res = await fetch(`/api/admin/cards/search?q=${encodeURIComponent(query)}`);
+      const params = new URLSearchParams({ q: query, game: gameSlug });
+      const res = await fetch(`/api/admin/cards/search?${params}`);
       if (!res.ok) {
         throw new Error("Search failed");
       }
@@ -1250,7 +1256,7 @@ export default function InventoryTabs({
     }
 
     try {
-      const res = await fetch(`/api/admin/inventory/${item.id}`, {
+      const res = await fetch(`/api/admin/inventory/${item.id}?game=${encodeURIComponent(gameSlug)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
@@ -1359,7 +1365,7 @@ export default function InventoryTabs({
       const res = await fetch("/api/admin/inventory", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source_id: source.id }),
+        body: JSON.stringify({ source_id: source.id, game: gameSlug }),
       });
 
       if (!res.ok) {
@@ -1429,7 +1435,7 @@ export default function InventoryTabs({
     }
 
     try {
-      const res = await fetch(`/api/admin/inventory/${item.id}`, {
+      const res = await fetch(`/api/admin/inventory/${item.id}?game=${encodeURIComponent(gameSlug)}`, {
         method: "DELETE",
       });
       const payload = await res.json().catch(() => null);
@@ -1558,7 +1564,7 @@ export default function InventoryTabs({
         const res = await fetch("/api/admin/inventory", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ids: persistedIds }),
+          body: JSON.stringify({ ids: persistedIds, game: gameSlug }),
         });
         const payload = await res.json().catch(() => null);
         if (!res.ok) throw new Error(payload?.error ?? "Failed to delete selected inventory items");
@@ -1616,10 +1622,10 @@ export default function InventoryTabs({
     try {
       await Promise.all(
         persistedIds.map(async (id) => {
-          const res = await fetch(`/api/admin/inventory/${id}`, {
+          const res = await fetch(`/api/admin/inventory/${id}?game=${encodeURIComponent(gameSlug)}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(updates),
+            body: JSON.stringify({ ...updates, game: gameSlug }),
           });
 
           if (!res.ok) {
@@ -1858,7 +1864,7 @@ export default function InventoryTabs({
             ) : (
               <div className="flex min-w-[330px] gap-2">
                 <a
-                  href={`/admin/inventory/${item.id}/centering`}
+                  href={`/admin/inventory/${item.id}/centering?game=${encodedGameSlug}`}
                   onClick={() => setOpenActionMenuKey(null)}
                   className="flex-1 rounded-md px-3 py-2 text-center font-mono text-xs font-bold uppercase tracking-wider text-coral transition-colors hover:bg-bg-3"
                 >
@@ -1967,10 +1973,11 @@ export default function InventoryTabs({
       )
     );
 
-    const res = await fetch(`/api/admin/bundles/${bundle.id}`, {
+    const res = await fetch(`/api/admin/bundles/${bundle.id}?game=${encodeURIComponent(gameSlug)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        game: gameSlug,
         name: nextBundle.name,
         notes: nextBundle.notes ?? "",
         status: nextBundle.status,
@@ -2882,7 +2889,7 @@ export default function InventoryTabs({
             </span>
           </div>
           <a
-            href={`/admin/bundles/${currentBundle.id}`}
+            href={`/admin/bundles/${currentBundle.id}?game=${encodedGameSlug}`}
             className="mt-3 inline-flex items-center justify-center rounded-md border border-coral bg-ink px-3 py-2 font-mono text-xs font-extrabold uppercase tracking-wider text-bg transition-colors hover:bg-[#2E1C10]"
           >
             View Bundle
@@ -2903,7 +2910,7 @@ export default function InventoryTabs({
         ) : attachableBundles.length === 0 ? (
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-ink-2">
             <span>No available bundles yet.</span>
-            <a href="/admin/bundles/new" className="font-mono text-xs font-bold uppercase tracking-wider text-coral">
+            <a href={`/admin/bundles/new?game=${encodedGameSlug}`} className="font-mono text-xs font-bold uppercase tracking-wider text-coral">
               Create Bundle
             </a>
           </div>
@@ -2977,7 +2984,7 @@ export default function InventoryTabs({
               {renderCardImage(item, "modal")}
               {renderScanImages(item)}
               <a
-                href={`/admin/inventory/${item.id}/centering`}
+                href={`/admin/inventory/${item.id}/centering?game=${encodedGameSlug}`}
                 className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-coral bg-bg-3 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-coral transition-colors hover:bg-bg-3"
               >
                 Measure Centering
@@ -3013,7 +3020,7 @@ export default function InventoryTabs({
                           Customer: <span className="text-ink">{order.customer_name}</span>
                         </div>
                         <a
-                          href={`/admin/orders/${order.id}`}
+                          href={`/admin/orders/${order.id}?game=${encodedGameSlug}`}
                           className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-coral bg-ink px-3 py-2 font-mono text-xs font-extrabold uppercase tracking-wider text-bg transition-colors hover:bg-[#2E1C10]"
                         >
                           View Order
@@ -3366,7 +3373,7 @@ export default function InventoryTabs({
                   <tr key={bundle.id} className="border-b border-ink last:border-b-0">
                     <td className="px-4 py-4 align-top">
                       <a
-                        href={`/admin/bundles/${bundle.id}`}
+                        href={`/admin/bundles/${bundle.id}?game=${encodedGameSlug}`}
                         className="block text-lg font-black leading-tight text-coral underline-offset-2 transition-colors hover:text-ink hover:underline"
                       >
                         {bundle.name}
@@ -3424,7 +3431,7 @@ export default function InventoryTabs({
                     </td>
                     <td className="px-4 py-4 align-top">
                       <a
-                        href={`/admin/bundles/${bundle.id}`}
+                        href={`/admin/bundles/${bundle.id}?game=${encodedGameSlug}`}
                         className="inline-flex rounded-md border border-ink bg-bg-3 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-ink transition-colors hover:border-ink-3 hover:text-coral"
                       >
                         Edit Bundle
@@ -3518,7 +3525,7 @@ export default function InventoryTabs({
                 <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
                     <a
-                      href={`/admin/orders/${order.id}`}
+                      href={`/admin/orders/${order.id}?game=${encodedGameSlug}`}
                       className="block truncate text-2xl font-black leading-tight text-coral underline-offset-2 transition-colors hover:text-ink hover:underline"
                     >
                       {orderTitle}
@@ -3546,7 +3553,7 @@ export default function InventoryTabs({
                       {formatOrderDate(order.updated_at ?? order.created_at)}
                     </span>
                     <a
-                      href={`/admin/orders/${order.id}`}
+                      href={`/admin/orders/${order.id}?game=${encodedGameSlug}`}
                       className="rounded-md border border-ink-3 bg-bg-2 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-ink transition-colors hover:border-coral hover:text-coral sm:text-sm"
                     >
                       View Order
@@ -3783,7 +3790,7 @@ export default function InventoryTabs({
                   <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div className="min-w-0">
                       <a
-                        href={`/admin/bundles/${bundle.id}`}
+                        href={`/admin/bundles/${bundle.id}?game=${encodedGameSlug}`}
                         className="block truncate text-2xl font-black leading-tight text-coral underline-offset-2 transition-colors hover:text-ink hover:underline"
                       >
                         {bundle.name}
@@ -3810,7 +3817,7 @@ export default function InventoryTabs({
                         </span>
                       )}
                       <a
-                        href={`/admin/bundles/${bundle.id}`}
+                        href={`/admin/bundles/${bundle.id}?game=${encodedGameSlug}`}
                         className="rounded-md border border-ink-3 bg-bg-2 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-ink transition-colors hover:border-coral hover:text-coral sm:text-sm"
                       >
                         View Bundle
@@ -3956,26 +3963,26 @@ export default function InventoryTabs({
             </summary>
             <div className="absolute right-0 top-12 z-40 grid min-w-[200px] gap-0.5 rounded-c-md border-[1.5px] border-ink bg-bg-2 p-1.5 shadow-[0_12px_32px_rgba(26,15,8,0.14)]">
               <a
-                href="/admin/psa-submissions"
+                href={`/admin/psa-submissions?game=${encodedGameSlug}`}
                 className="rounded-c-sm px-3 py-2.5 font-mono-2 text-xs font-semibold uppercase tracking-wider text-ink-2 transition-colors hover:bg-bg-3 hover:text-ink"
               >
                 PSA Submissions
               </a>
               <a
-                href="/admin/inventory/import/psa"
+                href={`/admin/inventory/import/psa?game=${encodedGameSlug}`}
                 className="rounded-c-sm px-3 py-2.5 font-mono-2 text-xs font-semibold uppercase tracking-wider text-ink-2 transition-colors hover:bg-bg-3 hover:text-ink"
               >
                 PSA Import
               </a>
             </div>
           </details>
-          <a href="/admin/orders/new" className="admin-btn admin-btn-ghost">
+          <a href={`/admin/orders/new?game=${encodedGameSlug}`} className="admin-btn admin-btn-ghost">
             Add Order
           </a>
           <a href={createBundleHref} className="admin-btn admin-btn-ghost">
             {selectedCount > 0 ? `Bundle Selected ${selectedCount}` : "Create Bundle"}
           </a>
-          <a href="/admin/inventory/new" className="admin-btn admin-btn-primary">
+          <a href={`/admin/inventory/new?game=${encodedGameSlug}`} className="admin-btn admin-btn-primary">
             Add Inventory
           </a>
         </div>

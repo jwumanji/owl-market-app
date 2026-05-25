@@ -4,6 +4,7 @@
 // - raw DB rarity values that do not match the app's canonical buckets
 
 import fs from "node:fs";
+import { loadGameScope, scriptGameSlug, withGameFilter } from "./lib/supabase-game-scope.mjs";
 
 const REPORT_PATH = "rarity-integrity-report.md";
 
@@ -30,6 +31,7 @@ if (!KEY) {
 }
 
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}` };
+const GAME_SLUG = scriptGameSlug();
 
 const RARITY_ORDER = [
   "MR",
@@ -209,9 +211,12 @@ function compareSetCodes(a, b) {
   return 0;
 }
 
-const sets = await fetchAll("sets?select=id,code,slug,name");
+const GAME = await loadGameScope({ supabaseUrl: URL, supabaseKey: KEY, gameSlug: GAME_SLUG });
+console.log(`Using game scope: ${GAME.slug}`);
+
+const sets = await fetchAll(withGameFilter("sets?select=id,code,slug,name", GAME.id));
 const cards = await fetchAll(
-  "cards?select=id,set_id,card_image_id,card_number,name,variant_label,rarity,price_stats(tcg_market,market_avg)"
+  withGameFilter("cards?select=id,set_id,card_image_id,card_number,name,variant_label,rarity,price_stats(tcg_market,market_avg)", GAME.id)
 );
 
 const setById = new Map(sets.map((s) => [s.id, s]));
@@ -271,6 +276,7 @@ const report = [];
 report.push("# Rarity Integrity Report");
 report.push("");
 report.push(`Generated: ${generated}`);
+report.push(`Game: ${GAME.name ?? GAME.slug} (${GAME.slug})`);
 report.push("");
 report.push("## Summary");
 report.push("");

@@ -7,6 +7,7 @@
 // product rows are excluded from the base-product comparison.
 
 import fs from "node:fs";
+import { loadGameScope, scriptGameSlug, withGameFilter } from "./lib/supabase-game-scope.mjs";
 
 const REPORT_PATH = "bandai-product-baseline-comparison.md";
 const BANDai_BASE = "https://en.onepiece-cardgame.com";
@@ -29,6 +30,7 @@ loadEnvFile();
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const GAME_SLUG = scriptGameSlug();
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
 }
@@ -214,8 +216,11 @@ function summarizeDbRows(rows) {
     .join("; ");
 }
 
-const sets = await sbFetchAll("sets?select=id,code,name");
-const cards = await sbFetchAll("cards?select=id,set_id,card_image_id,card_number,name,rarity,variant_label");
+const GAME = await loadGameScope({ supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_KEY, gameSlug: GAME_SLUG });
+console.log(`Using game scope: ${GAME.slug}`);
+
+const sets = await sbFetchAll(withGameFilter("sets?select=id,code,name", GAME.id));
+const cards = await sbFetchAll(withGameFilter("cards?select=id,set_id,card_image_id,card_number,name,rarity,variant_label", GAME.id));
 const setById = new Map(sets.map((set) => [set.id, set]));
 const dbByImageId = new Map();
 const dbBySetAndCardNumber = new Map();
@@ -356,6 +361,7 @@ const report = [];
 report.push("# Bandai Product Baseline Comparison");
 report.push("");
 report.push(`Generated: ${new Date().toISOString()}`);
+report.push(`Game: ${GAME.name ?? GAME.slug} (${GAME.slug})`);
 report.push("");
 report.push("## Scope");
 report.push("");

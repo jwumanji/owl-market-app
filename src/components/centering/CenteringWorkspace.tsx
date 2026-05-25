@@ -38,6 +38,7 @@ export type CardIdentity = {
 };
 
 export type CenteringWorkspaceProps = {
+  gameSlug?: string | null;
   inventoryItemId?: string | null;
   preloadImageUrl?: string | null;
   cardIdentity: CardIdentity;
@@ -224,15 +225,20 @@ export function moveManualCorner({
 }
 
 export function buildMeasurementFormData({
+  gameSlug,
   inventoryItemId,
   file,
   manualOverlay,
 }: {
+  gameSlug?: string | null;
   inventoryItemId?: string | null;
   file: File;
   manualOverlay?: MeasurementOverlay | null;
 }) {
   const formData = new FormData();
+  if (gameSlug) {
+    formData.set("game", gameSlug);
+  }
   if (inventoryItemId) {
     formData.set("inventoryItemId", inventoryItemId);
   }
@@ -346,11 +352,13 @@ export async function fetchPreloadedImageFile({
 }
 
 export async function submitMeasurementRequest({
+  gameSlug,
   inventoryItemId,
   file,
   manualOverlay,
   fetchImpl = fetch,
 }: {
+  gameSlug?: string | null;
   inventoryItemId?: string | null;
   file: File;
   manualOverlay?: MeasurementOverlay | null;
@@ -359,6 +367,7 @@ export async function submitMeasurementRequest({
   const response = await fetchImpl("/api/centering/measure", {
     method: "POST",
     body: buildMeasurementFormData({
+      gameSlug,
       inventoryItemId,
       file,
       manualOverlay,
@@ -385,6 +394,7 @@ export async function submitMeasurementRequest({
 
 export async function measurePreloadedImage({
   imageUrl,
+  gameSlug,
   inventoryItemId,
   dispatchAction,
   onFile,
@@ -392,6 +402,7 @@ export async function measurePreloadedImage({
   wait = delay,
 }: {
   imageUrl: string;
+  gameSlug?: string | null;
   inventoryItemId?: string | null;
   dispatchAction: (action: WorkspaceAction) => void;
   onFile: (file: File) => void;
@@ -420,6 +431,7 @@ export async function measurePreloadedImage({
   dispatchAction({ type: "startProcessing" });
 
   const outcome = await submitMeasurementRequest({
+    gameSlug,
     inventoryItemId,
     file,
     fetchImpl,
@@ -971,6 +983,7 @@ function FailurePanel({
 }
 
 export default function CenteringWorkspace({
+  gameSlug = null,
   inventoryItemId,
   preloadImageUrl = null,
   cardIdentity,
@@ -1022,6 +1035,7 @@ export default function CenteringWorkspace({
       dispatch({ type: "startProcessing" });
 
       const outcome = await submitMeasurementRequest({
+        gameSlug,
         inventoryItemId,
         file,
         manualOverlay: overlay,
@@ -1034,7 +1048,7 @@ export default function CenteringWorkspace({
 
       dispatch({ type: "success", result: outcome.result });
     },
-    [inventoryItemId]
+    [gameSlug, inventoryItemId]
   );
 
   const measureFile = useCallback(
@@ -1053,6 +1067,7 @@ export default function CenteringWorkspace({
     void measurePreloadedImage({
       imageUrl: preloadImageSrc,
       inventoryItemId,
+      gameSlug,
       dispatchAction: dispatch,
       onFile: setSelectedFile,
     }).then((outcome) => {
@@ -1061,7 +1076,7 @@ export default function CenteringWorkspace({
         setShowUploadZone(true);
       }
     });
-  }, [inventoryItemId, preloadImageSrc]);
+  }, [gameSlug, inventoryItemId, preloadImageSrc]);
 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {

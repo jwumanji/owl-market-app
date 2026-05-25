@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { CardRow } from "@/lib/types";
+import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
+import { gamePath } from "@/lib/game-routes";
 import { formatPrice, formatPct } from "@/lib/utils";
 import RarityBadge from "@/components/ui/RarityBadge";
 
@@ -10,7 +12,13 @@ function changeVariant(pct: number | null | undefined): "up" | "down" | "flat" {
   return pct > 0 ? "up" : "down";
 }
 
-export default function MarketGrid({ cards }: { cards: CardRow[] }) {
+export default function MarketGrid({
+  cards,
+  gameRouteSlug = DEFAULT_PUBLIC_GAME_ROUTE_SLUG,
+}: {
+  cards: CardRow[];
+  gameRouteSlug?: string | null;
+}) {
   return (
     <div className="mgrid">
       {cards.map((card, i) => {
@@ -19,7 +27,7 @@ export default function MarketGrid({ cards }: { cards: CardRow[] }) {
         return (
           <Link
             key={card.id}
-            href={`/card/${card.card_image_id}`}
+            href={gamePath(gameRouteSlug, `/card/${card.card_image_id}`)}
             className="mgrid-card"
           >
             <div className="mgrid-img">

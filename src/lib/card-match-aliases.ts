@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase-server";
 export type CardMatchAliasSource = "psa_import" | "manual_inventory" | "other";
 
 export type CardMatchAliasInput = {
+  gameId?: string | null | undefined;
   rawName: string | null | undefined;
   rawCardNumber?: string | null | undefined;
   rawSetHint?: string | null | undefined;
@@ -12,6 +13,7 @@ export type CardMatchAliasInput = {
 
 export type CardMatchAliasRow = {
   id: string;
+  game_id: string;
   raw_name: string;
   normalized_name: string;
   raw_card_number: string | null;
@@ -89,9 +91,10 @@ function aliasKey(input: CardMatchAliasInput) {
 export async function saveCardMatchAlias(supabase: SupabaseServiceClient, input: CardMatchAliasInput) {
   const rawName = input.rawName?.trim();
   const cardId = input.cardId?.trim();
+  const gameId = input.gameId?.trim();
   const key = aliasKey(input);
 
-  if (!rawName || !cardId || key.normalizedName.length < 2) {
+  if (!rawName || !cardId || !gameId || key.normalizedName.length < 2) {
     return { warning: null };
   }
 
@@ -99,6 +102,7 @@ export async function saveCardMatchAlias(supabase: SupabaseServiceClient, input:
   const existingRes = await supabase
     .from("card_match_aliases")
     .select("id, times_used")
+    .eq("game_id", gameId)
     .eq("source_type", key.sourceType)
     .eq("normalized_name", key.normalizedName)
     .eq("normalized_card_number", key.normalizedCardNumber)
@@ -128,6 +132,7 @@ export async function saveCardMatchAlias(supabase: SupabaseServiceClient, input:
 
   const { error } = await supabase.from("card_match_aliases").insert({
     raw_name: rawName,
+    game_id: gameId,
     normalized_name: key.normalizedName,
     raw_card_number: input.rawCardNumber?.trim() || null,
     normalized_card_number: key.normalizedCardNumber,
@@ -143,14 +148,20 @@ export async function saveCardMatchAlias(supabase: SupabaseServiceClient, input:
   return { warning: error && !isMissingAliasTableError(error) ? error.message : null };
 }
 
-export async function loadCardMatchAliases(supabase: SupabaseServiceClient) {
-  const { data, error } = await supabase
+export async function loadCardMatchAliases(supabase: SupabaseServiceClient, gameId?: string | null) {
+  let query = supabase
     .from("card_match_aliases")
     .select(
-      "id, raw_name, normalized_name, raw_card_number, normalized_card_number, raw_set_hint, normalized_set_hint, source_type, card_id, times_used, last_used_at"
+      "id, game_id, raw_name, normalized_name, raw_card_number, normalized_card_number, raw_set_hint, normalized_set_hint, source_type, card_id, times_used, last_used_at"
     )
     .order("times_used", { ascending: false })
     .limit(50000);
+
+  if (gameId) {
+    query = query.eq("game_id", gameId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     return { aliases: [] as CardMatchAliasRow[], warning: isMissingAliasTableError(error) ? null : error.message };

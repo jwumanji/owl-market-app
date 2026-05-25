@@ -7,6 +7,7 @@ import {
   loadPrivateCustomCardsForUser,
   type PrivateCustomCardRow,
 } from "@/lib/private-custom-cards";
+import { resolveGameScope } from "@/lib/game-scope";
 import { createServiceClient } from "@/lib/supabase-server";
 import { isUploadFile, uploadInventoryScan } from "@/lib/inventory-scans";
 import {
@@ -103,6 +104,7 @@ type PsaImportSummaryRow = {
 
 type ExistingCertificationItem = {
   id: string;
+  game_id: string | null;
   certification_number: string | null;
   card_id: string | null;
   custom_card_id: string | null;
@@ -301,14 +303,17 @@ function submittedAtValue(value: string) {
 
 async function findExistingPsaSubmissionByOrderNumber({
   supabase,
+  gameId,
   orderNumber,
 }: {
   supabase: ReturnType<typeof createServiceClient>;
+  gameId: string;
   orderNumber: string;
 }) {
   const { data, error } = await supabase
     .from("psa_submissions")
     .select("id, name, source_filename, submitted_at, created_at")
+    .eq("game_id", gameId)
     .not("source_filename", "is", null)
     .limit(50000);
 
@@ -325,12 +330,14 @@ async function findExistingPsaSubmissionByOrderNumber({
 
 async function recordPsaSubmission({
   supabase,
+  gameId,
   submissionName,
   sourceFilename,
   submittedAt,
   summaryRows,
 }: {
   supabase: ReturnType<typeof createServiceClient>;
+  gameId: string;
   submissionName: string;
   sourceFilename: string;
   submittedAt: string;
@@ -344,6 +351,7 @@ async function recordPsaSubmission({
   const { data: submission, error: submissionError } = await supabase
     .from("psa_submissions")
     .insert({
+      game_id: gameId,
       name: submissionName,
       source_filename: sourceFilename,
       submitted_at: submittedAt,
@@ -362,6 +370,7 @@ async function recordPsaSubmission({
 
   const submissionId = (submission as { id: string }).id;
   const itemRows = summaryRows.map((row, index) => ({
+    game_id: gameId,
     submission_id: submissionId,
     inventory_item_id: row.inventory_item_id,
     row_number: index + 1,
@@ -392,10 +401,12 @@ async function recordPsaSubmission({
 
 async function createInventoryBundleFromPsaRows({
   supabase,
+  gameId,
   bundleName,
   summaryRows,
 }: {
   supabase: ReturnType<typeof createServiceClient>;
+  gameId: string;
   bundleName: string;
   summaryRows: PsaImportSummaryRow[];
 }) {
@@ -410,6 +421,7 @@ async function createInventoryBundleFromPsaRows({
   const assignedRes = await supabase
     .from("inventory_bundle_items")
     .select("inventory_item_id")
+    .eq("game_id", gameId)
     .in("inventory_item_id", inventoryIds);
 
   if (assignedRes.error) {
@@ -426,6 +438,7 @@ async function createInventoryBundleFromPsaRows({
   const { data: bundle, error: bundleError } = await supabase
     .from("inventory_bundles")
     .insert({
+      game_id: gameId,
       name: bundleName,
       status: "new",
       sale_channel: "not_sold",
@@ -442,6 +455,7 @@ async function createInventoryBundleFromPsaRows({
 
   const bundleId = (bundle as { id: string }).id;
   const linkRows = inventoryIds.map((inventoryItemId, index) => ({
+    game_id: gameId,
     bundle_id: bundleId,
     inventory_item_id: inventoryItemId,
     position: index,
@@ -449,7 +463,7 @@ async function createInventoryBundleFromPsaRows({
 
   const { error: linkError } = await supabase.from("inventory_bundle_items").insert(linkRows);
   if (linkError) {
-    await supabase.from("inventory_bundles").delete().eq("id", bundleId);
+    await supabase.from("inventory_bundles").delete().eq("game_id", gameId).eq("id", bundleId);
     return { bundleId: null, warning: linkError.message };
   }
 
@@ -460,6 +474,7 @@ async function createInventoryBundleFromPsaRows({
       sale_channel: "not_sold",
       sold_date: null,
     })
+    .eq("game_id", gameId)
     .in("id", inventoryIds);
 
   if (inventoryError) {
@@ -485,12 +500,23 @@ export async function POST(request: Request) {
   const shouldCreateBundle = formBooleanValue(formData, "create_bundle");
   const bundleName = formStringValue(formData, "bundle_name") || submissionName;
   const supabase = createServiceClient();
+  const requestedGame =
+    formStringValue(formData, "game") ||
+    formStringValue(formData, "game_slug") ||
+    formStringValue(formData, "game_id");
+  const gameResult = await resolveGameScope(supabase, requestedGame);
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
   const currentUser = await getCurrentAdminUser();
   const psaOrderNumber = psaOrderNumberFromFilename(psaFile.name);
 
   if (psaOrderNumber) {
     const duplicateResult = await findExistingPsaSubmissionByOrderNumber({
       supabase,
+      gameId: game.id,
       orderNumber: psaOrderNumber,
     });
 
@@ -534,9 +560,10 @@ export async function POST(request: Request) {
     const { data: existingCertData, error: existingCertError } = await supabase
       .from("inventory_items")
       .select(`
-        id, certification_number, card_id, custom_card_id, manual_card_name, manual_card_number, manual_set_code, graded_rating,
+        id, game_id, certification_number, card_id, custom_card_id, manual_card_name, manual_card_number, manual_set_code, graded_rating,
         custom_image_front_url, custom_image_back_url, catalog_match_status
       `)
+      .eq("game_id", game.id)
       .not("certification_number", "is", null)
       .limit(50000);
 
@@ -556,6 +583,7 @@ export async function POST(request: Request) {
       id, name, card_number,
       sets (code)
     `)
+    .eq("game_id", game.id)
     .limit(10000);
 
   if (cardsError) {
@@ -566,14 +594,14 @@ export async function POST(request: Request) {
   let customCards: CardLookupForImport[] = [];
   let customCardImageMap = new Map<string, PrivateCustomCardRow>();
   if (currentUser) {
-    const customCardsResult = await loadPrivateCustomCardsForUser(supabase, currentUser.id);
+    const customCardsResult = await loadPrivateCustomCardsForUser(supabase, currentUser.id, game.id);
     if (customCardsResult.error && !isMissingPrivateCustomCardsError(customCardsResult.error)) {
       return NextResponse.json({ error: customCardsResult.error.message }, { status: 500 });
     }
     customCardImageMap = new Map(customCardsResult.cards.map((card) => [card.id, card]));
     customCards = customCardsResult.cards.map(customCardForImport);
   }
-  const aliasResult = await loadCardMatchAliases(supabase);
+  const aliasResult = await loadCardMatchAliases(supabase, game.id);
   const aliases = aliasResult.aliases;
   const importRows = [];
   const importSummaryIndexes: number[] = [];
@@ -644,6 +672,7 @@ export async function POST(request: Request) {
     }
 
     importRows.push({
+      game_id: game.id,
       card_id: matchResult?.source === "catalog" ? matchResult.card.id : null,
       custom_card_id: matchResult?.source === "custom" ? matchResult.card.id : null,
       manual_card_name: matchResult?.source === "catalog" ? null : match?.name ?? row.cardName,
@@ -695,13 +724,14 @@ export async function POST(request: Request) {
   if (importRows.length === 0) {
     const submissionResult = await recordPsaSubmission({
       supabase,
+      gameId: game.id,
       submissionName,
       sourceFilename: psaFile.name,
       submittedAt,
       summaryRows,
     });
     const bundleResult = shouldCreateBundle
-      ? await createInventoryBundleFromPsaRows({ supabase, bundleName, summaryRows })
+      ? await createInventoryBundleFromPsaRows({ supabase, gameId: game.id, bundleName, summaryRows })
       : { bundleId: null, warning: null };
 
     return NextResponse.json({
@@ -735,13 +765,14 @@ export async function POST(request: Request) {
 
   const submissionResult = await recordPsaSubmission({
     supabase,
+    gameId: game.id,
     submissionName,
     sourceFilename: psaFile.name,
     submittedAt,
     summaryRows,
   });
   const bundleResult = shouldCreateBundle
-    ? await createInventoryBundleFromPsaRows({ supabase, bundleName, summaryRows })
+    ? await createInventoryBundleFromPsaRows({ supabase, gameId: game.id, bundleName, summaryRows })
     : { bundleId: null, warning: null };
 
   return NextResponse.json({

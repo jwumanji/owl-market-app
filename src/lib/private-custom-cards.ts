@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type PrivateCustomCardRow = {
   id: string;
+  game_id: string | null;
   user_id: string;
   name: string;
   card_number: string | null;
@@ -23,7 +24,7 @@ export type PrivateCustomCardInput = {
 };
 
 export const PRIVATE_CUSTOM_CARD_SELECT =
-  "id, user_id, name, card_number, set_code, image_url, image_url_small, notes, created_at, updated_at";
+  "id, game_id, user_id, name, card_number, set_code, image_url, image_url_small, notes, created_at, updated_at";
 
 export function isMissingPrivateCustomCardsError(error: { message?: string } | null | undefined) {
   const message = error?.message?.toLowerCase() ?? "";
@@ -46,6 +47,7 @@ function normalizeName(value: string) {
 async function findExistingPrivateCustomCard(
   supabase: SupabaseClient,
   userId: string,
+  gameId: string | null | undefined,
   input: Required<Pick<PrivateCustomCardInput, "name">> & PrivateCustomCardInput
 ) {
   let query = supabase
@@ -53,6 +55,10 @@ async function findExistingPrivateCustomCard(
     .select(PRIVATE_CUSTOM_CARD_SELECT)
     .eq("user_id", userId)
     .ilike("name", input.name);
+
+  if (gameId) {
+    query = query.eq("game_id", gameId);
+  }
 
   const setCode = normalizeString(input.set_code);
   const cardNumber = normalizeString(input.card_number);
@@ -71,14 +77,20 @@ async function findExistingPrivateCustomCard(
 export async function getPrivateCustomCard(
   supabase: SupabaseClient,
   userId: string,
-  customCardId: string
+  customCardId: string,
+  gameId?: string | null
 ) {
-  const { data, error } = await supabase
+  let query = supabase
     .from("custom_cards")
     .select(PRIVATE_CUSTOM_CARD_SELECT)
     .eq("user_id", userId)
-    .eq("id", customCardId)
-    .single();
+    .eq("id", customCardId);
+
+  if (gameId) {
+    query = query.eq("game_id", gameId);
+  }
+
+  const { data, error } = await query.single();
 
   if (error) {
     return { card: null, error };
@@ -90,17 +102,24 @@ export async function getPrivateCustomCard(
 export async function loadPrivateCustomCardsByIds(
   supabase: SupabaseClient,
   userId: string | null,
-  customCardIds: string[]
+  customCardIds: string[],
+  gameId?: string | null
 ) {
   if (!userId || customCardIds.length === 0) {
     return { cards: new Map<string, PrivateCustomCardRow>(), error: null };
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("custom_cards")
     .select(PRIVATE_CUSTOM_CARD_SELECT)
     .eq("user_id", userId)
     .in("id", customCardIds);
+
+  if (gameId) {
+    query = query.eq("game_id", gameId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     return { cards: new Map<string, PrivateCustomCardRow>(), error };
@@ -112,15 +131,25 @@ export async function loadPrivateCustomCardsByIds(
   };
 }
 
-export async function loadPrivateCustomCardsForUser(supabase: SupabaseClient, userId: string | null) {
+export async function loadPrivateCustomCardsForUser(
+  supabase: SupabaseClient,
+  userId: string | null,
+  gameId?: string | null
+) {
   if (!userId) return { cards: [] as PrivateCustomCardRow[], error: null };
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("custom_cards")
     .select(PRIVATE_CUSTOM_CARD_SELECT)
     .eq("user_id", userId)
     .order("updated_at", { ascending: false })
     .limit(5000);
+
+  if (gameId) {
+    query = query.eq("game_id", gameId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     return { cards: [] as PrivateCustomCardRow[], error };
@@ -132,7 +161,8 @@ export async function loadPrivateCustomCardsForUser(supabase: SupabaseClient, us
 export async function findOrCreatePrivateCustomCard(
   supabase: SupabaseClient,
   userId: string,
-  input: PrivateCustomCardInput
+  input: PrivateCustomCardInput,
+  gameId?: string | null
 ) {
   const name = normalizeString(input.name);
   if (!name) {
@@ -148,7 +178,7 @@ export async function findOrCreatePrivateCustomCard(
     notes: normalizeString(input.notes),
   };
 
-  const existing = await findExistingPrivateCustomCard(supabase, userId, normalizedInput);
+  const existing = await findExistingPrivateCustomCard(supabase, userId, gameId, normalizedInput);
   if (existing.error) {
     return { card: null, error: existing.error };
   }
@@ -161,11 +191,17 @@ export async function findOrCreatePrivateCustomCard(
     }
 
     if (Object.keys(imageUpdates).length > 0) {
-      const { data, error } = await supabase
+      let updateQuery = supabase
         .from("custom_cards")
         .update({ ...imageUpdates, updated_at: new Date().toISOString() })
         .eq("id", existing.card.id)
-        .eq("user_id", userId)
+        .eq("user_id", userId);
+
+      if (gameId) {
+        updateQuery = updateQuery.eq("game_id", gameId);
+      }
+
+      const { data, error } = await updateQuery
         .select(PRIVATE_CUSTOM_CARD_SELECT)
         .single();
 
@@ -180,6 +216,7 @@ export async function findOrCreatePrivateCustomCard(
     .from("custom_cards")
     .insert({
       user_id: userId,
+      ...(gameId ? { game_id: gameId } : {}),
       name: normalizedInput.name,
       card_number: normalizedInput.card_number,
       set_code: normalizedInput.set_code,
@@ -192,7 +229,7 @@ export async function findOrCreatePrivateCustomCard(
     .single();
 
   if (error) {
-    const duplicate = await findExistingPrivateCustomCard(supabase, userId, normalizedInput);
+    const duplicate = await findExistingPrivateCustomCard(supabase, userId, gameId, normalizedInput);
     if (duplicate.card) return { card: duplicate.card, error: null };
     return { card: null, error };
   }
@@ -205,18 +242,25 @@ export async function updatePrivateCustomCardImages(
   userId: string,
   customCardId: string,
   imageUrl: string | null,
-  imageUrlSmall?: string | null
+  imageUrlSmall?: string | null,
+  gameId?: string | null
 ) {
   const updates: Record<string, string> = {};
   if (imageUrl) updates.image_url = imageUrl;
   if (imageUrlSmall) updates.image_url_small = imageUrlSmall;
   if (Object.keys(updates).length === 0) return { error: null };
 
-  const { error } = await supabase
+  let query = supabase
     .from("custom_cards")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", customCardId)
     .eq("user_id", userId);
+
+  if (gameId) {
+    query = query.eq("game_id", gameId);
+  }
+
+  const { error } = await query;
 
   return { error };
 }

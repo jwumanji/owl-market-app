@@ -2,6 +2,7 @@
 
 import { type MouseEvent, useState } from "react";
 import Link from "next/link";
+import { DEFAULT_PUBLIC_GAME_DB_SLUG } from "@/lib/game-scope";
 import { SALE_CHANNEL_LABELS } from "@/lib/sale-options";
 import type { BundleInventoryItem, InventoryBundleSummary } from "./bundle-types";
 
@@ -62,10 +63,12 @@ function sampleThumbnails(items: BundleInventoryItem[]) {
 
 function BundleCard({
   bundle,
+  gameSlug,
   onPreview,
   onClearPreview,
 }: {
   bundle: InventoryBundleSummary;
+  gameSlug: string;
   onPreview: (item: BundleInventoryItem, event: MouseEvent<HTMLElement>) => void;
   onClearPreview: () => void;
 }) {
@@ -168,7 +171,7 @@ function BundleCard({
               </div>
             )}
           </div>
-          <Link href={`/admin/bundles/${bundle.id}`} className="admin-btn admin-btn-ghost">
+          <Link href={`/admin/bundles/${bundle.id}?game=${encodeURIComponent(gameSlug)}`} className="admin-btn admin-btn-ghost">
             View Bundle
           </Link>
         </div>
@@ -177,7 +180,13 @@ function BundleCard({
   );
 }
 
-export function BundlesList({ bundles }: { bundles: InventoryBundleSummary[] }) {
+export function BundlesList({
+  bundles,
+  gameSlug = DEFAULT_PUBLIC_GAME_DB_SLUG,
+}: {
+  bundles: InventoryBundleSummary[];
+  gameSlug?: string;
+}) {
   const [hoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
 
   function updateHoverPreview(item: BundleInventoryItem, event: MouseEvent<HTMLElement>) {
@@ -222,6 +231,7 @@ export function BundlesList({ bundles }: { bundles: InventoryBundleSummary[] }) 
           <BundleCard
             key={bundle.id}
             bundle={bundle}
+            gameSlug={gameSlug}
             onPreview={updateHoverPreview}
             onClearPreview={() => setHoverPreview(null)}
           />

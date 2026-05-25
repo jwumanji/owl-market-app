@@ -1,18 +1,20 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { JustTCG } from "justtcg-js";
-import { classifyRarity, SET_SLUG_MAP } from "@/lib/justtcg-match";
+import {
+  ONE_PIECE_JUSTTCG_GAME_SLUG,
+  buildJustTcgCodeToSlugs,
+  classifyRarity,
+  onePieceGame,
+} from "@/lib/games/one-piece";
+import { resolveOnePieceSyncGame } from "@/lib/games/one-piece/sync-scope";
 
 export const maxDuration = 60;
 
 // Reverse map: internal code → all JustTCG set slugs.
 // Some internal sets have multiple JustTCG aliases, especially PRB/promo
 // collections, so using only the first slug leaves variants unvisited.
-const CODE_TO_SLUGS: Record<string, string[]> = {};
-for (const [slug, code] of Object.entries(SET_SLUG_MAP)) {
-  if (!CODE_TO_SLUGS[code]) CODE_TO_SLUGS[code] = [];
-  CODE_TO_SLUGS[code].push(slug);
-}
+const CODE_TO_SLUGS = buildJustTcgCodeToSlugs(onePieceGame.justTcgSetSlugMap);
 
 // ---------------------------------------------------------------------------
 // GET /api/sync/reclassify-rarity
@@ -27,6 +29,7 @@ for (const [slug, code] of Object.entries(SET_SLUG_MAP)) {
 
 interface DbCard {
   id: string;
+  game_id: string;
   card_number: string | null;
   name: string;
   variant_label: string | null;
@@ -50,12 +53,18 @@ export async function GET(request: Request) {
   }
 
   const supabase = createServiceClient();
+  const gameResult = await resolveOnePieceSyncGame(supabase, request);
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
   const client = new JustTCG();
 
   // 1. Fetch all DB sets
   const { data: dbSets, error: setsErr } = await supabase
     .from("sets")
     .select("id, code")
+    .eq("game_id", game.id)
     .order("code");
 
   if (setsErr) {
@@ -83,7 +92,8 @@ export async function GET(request: Request) {
     while (true) {
       const { data: page } = await supabase
         .from("cards")
-        .select("id, card_number, name, variant_label, rarity, set_id")
+        .select("id, game_id, card_number, name, variant_label, rarity, set_id")
+        .eq("game_id", game.id)
         .eq("set_id", dbSet.id)
         .not("rarity", "is", null)
         .range(from, from + pageSize - 1);
@@ -111,7 +121,7 @@ export async function GET(request: Request) {
         let offset = 0;
         while (true) {
           const response = await client.v1.cards.get({
-            game: "one-piece-card-game",
+            game: ONE_PIECE_JUSTTCG_GAME_SLUG,
             set: jtSlug,
             include_null_prices: false,
             limit: 100,
@@ -210,6 +220,8 @@ export async function GET(request: Request) {
   if (dryRun) {
     return NextResponse.json({
       dryRun: true,
+      game: game.slug,
+      provider: "justtcg",
       setsScanned: syncableSets.length,
       totalChanges: changes.length,
       summary: bySummary,
@@ -236,6 +248,7 @@ export async function GET(request: Request) {
       const { error: upErr } = await supabase
         .from("cards")
         .update({ rarity })
+        .eq("game_id", game.id)
         .in("id", batch);
 
       if (upErr) {
@@ -247,6 +260,8 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({
+    game: game.slug,
+    provider: "justtcg",
     setsScanned: syncableSets.length,
     updated,
     errors,

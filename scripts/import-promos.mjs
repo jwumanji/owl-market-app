@@ -34,6 +34,8 @@ const OPT_PROMO_CANDIDATES = [
   "https://optcgapi.com/api/sets/P/",
 ];
 const OPT_IMAGE_BASE = "https://optcgapi.com/media/static/Card_Images";
+const ONE_PIECE_DB_SLUG = "one_piece";
+const CARD_UPSERT_CONFLICT = "game_id,card_image_id";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -199,7 +201,7 @@ async function sbGet(path) {
 async function sbUpsert(table, rows, onConflict) {
   if (rows.length === 0) return true;
   const r = await fetch(
-    `${SUPABASE_URL}/rest/v1/${table}?on_conflict=${onConflict}`,
+    `${SUPABASE_URL}/rest/v1/${table}?on_conflict=${encodeURIComponent(onConflict)}`,
     {
       method: "POST",
       headers: { ...SB_HEADERS, Prefer: "resolution=merge-duplicates,return=minimal" },
@@ -211,6 +213,17 @@ async function sbUpsert(table, rows, onConflict) {
     return false;
   }
   return true;
+}
+
+async function loadOnePieceGame() {
+  const data = await sbGet(
+    `games?select=id,slug,name&slug=eq.${encodeURIComponent(ONE_PIECE_DB_SLUG)}`
+  );
+  const game = data[0] ?? null;
+  if (!game?.id) {
+    throw new Error("One Piece game row is missing. Run the multi-TCG game migration before importing promos.");
+  }
+  return game;
 }
 
 async function sbPatch(table, filter, body) {
@@ -227,8 +240,10 @@ async function sbPatch(table, filter, body) {
 }
 
 // Build {prefix → set_id (uuid)} map once.
-async function buildPrefixMap() {
-  const sets = await sbGet("sets?select=id,code");
+async function buildPrefixMap(gameId) {
+  const sets = await sbGet(
+    `sets?select=id,code&game_id=eq.${encodeURIComponent(gameId)}`
+  );
   const map = {};
   for (const s of sets) if (s.code) map[s.code.toUpperCase()] = s.id;
   return map;
@@ -243,13 +258,14 @@ function buildSyntheticId(cardSetId, segment) {
 }
 
 // Build the column set for an INSERT (new rows).
-function buildInsertRow(c, setUuid, segment, syntheticId) {
+function buildInsertRow(c, setUuid, segment, syntheticId, gameId) {
   const color = nullIfNullStr(c.card_color);
   const subs = nullIfNullStr(c.sub_types);
   const name = c.card_name ?? null;
   const nameBase = name ? name.replace(/\s*\([^)]*\)\s*/g, " ").replace(/\s+/g, " ").trim() : null;
 
   return {
+    game_id: gameId,
     card_image_id: syntheticId,
     card_number: c.card_set_id,
     name,
@@ -314,18 +330,19 @@ function buildBackfillPatch(c, existing, segment) {
 // ---------------------------------------------------------------------------
 
 async function main() {
+  const game = await loadOnePieceGame();
   console.log("Fetching promo cards from optcgapi (trying candidate URLs)...");
   const cards = await fetchPromos();
   console.log(`Fetched ${cards.length} promo records.`);
 
   console.log("Building prefix → set_id map...");
-  const prefixMap = await buildPrefixMap();
+  const prefixMap = await buildPrefixMap(game.id);
 
   // Pre-load all existing card_image_ids and the columns we may backfill,
   // so we can decide insert vs patch without per-row queries.
   console.log("Loading existing cards (this may take a moment)...");
   const existingCards = await sbGet(
-    "cards?select=id,card_image_id,card_number,rarity,card_type,power,counter,life,cost,attribute,effect,color,types,image_url,promo_segment&limit=20000",
+    `cards?select=id,game_id,card_image_id,card_number,rarity,card_type,power,counter,life,cost,attribute,effect,color,types,image_url,promo_segment&game_id=eq.${encodeURIComponent(game.id)}&limit=20000`,
   );
   const byCardImageId = new Map();
   for (const row of existingCards) {
@@ -372,7 +389,7 @@ async function main() {
     if (existing) {
       const patch = buildBackfillPatch(c, existing, segment);
       if (patch) {
-        const ok = await sbPatch("cards", `id=eq.${existing.id}`, patch);
+        const ok = await sbPatch("cards", `id=eq.${existing.id}&game_id=eq.${encodeURIComponent(game.id)}`, patch);
         if (ok) patches++;
       } else {
         noOps++;
@@ -380,7 +397,7 @@ async function main() {
     } else {
       // Queue for batch insert. Dedupe within the run so the same synthetic ID
       // (e.g. duplicate "Brook Premium Card Collection" rows) doesn't ON CONFLICT-twice.
-      insertBatch.set(syntheticId, buildInsertRow(c, setUuid, segment, syntheticId));
+      insertBatch.set(syntheticId, buildInsertRow(c, setUuid, segment, syntheticId, game.id));
     }
   }
 
@@ -391,7 +408,7 @@ async function main() {
     const CHUNK = 200;
     for (let i = 0; i < rows.length; i += CHUNK) {
       const slice = rows.slice(i, i + CHUNK);
-      const ok = await sbUpsert("cards", slice, "card_image_id");
+      const ok = await sbUpsert("cards", slice, CARD_UPSERT_CONFLICT);
       if (ok) inserts += slice.length;
     }
   }

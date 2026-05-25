@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import CenteringWorkspace from "@/components/centering/CenteringWorkspace";
+import { resolveGameScope } from "@/lib/game-scope";
 import { createServiceClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -66,12 +67,22 @@ function firstRelation<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
 }
 
-function measurementPageFromSearchParams(searchParams?: { measurementPage?: string | string[] }) {
+type CenteringSearchParams = {
+  measurementPage?: string | string[];
+  game?: string | string[];
+};
+
+function measurementPageFromSearchParams(searchParams?: CenteringSearchParams) {
   const raw = Array.isArray(searchParams?.measurementPage)
     ? searchParams?.measurementPage[0]
     : searchParams?.measurementPage;
   const page = Number(raw ?? 1);
   return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function gameFromSearchParams(searchParams?: CenteringSearchParams) {
+  const game = Array.isArray(searchParams?.game) ? searchParams?.game[0] : searchParams?.game;
+  return game?.trim() || null;
 }
 
 function formatPercent(value: string | number | null | undefined) {
@@ -96,14 +107,20 @@ function ceilingClassName(ceiling: CenteringMeasurementRow["psa_ceiling"]) {
   return "border-loss-2/50 bg-[#FBE3E3] text-loss-2";
 }
 
-async function loadInventoryItem(id: string, measurementPage: number) {
+async function loadInventoryItem(id: string, measurementPage: number, gameSlug: string | null) {
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, gameSlug, { defaultToOnePiece: true });
+  if (gameResult.error) {
+    notFound();
+  }
+  const { game } = gameResult;
   const itemRes = await supabase
     .from("inventory_items")
     .select(
       "id, card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, inventory_type, status, quantity, graded_rating, certification_number, custom_image_front_url, custom_image_back_url"
     )
     .eq("id", id)
+    .eq("game_id", game.id)
     .single();
 
   if (itemRes.error || !itemRes.data) {
@@ -118,6 +135,7 @@ async function loadInventoryItem(id: string, measurementPage: number) {
       .from("cards")
       .select("id, name, card_number, rarity, image_url, image_url_small, sets (code, name)")
       .eq("id", item.card_id)
+      .eq("game_id", game.id)
       .single();
 
     if (!cardRes.error && cardRes.data) {
@@ -134,6 +152,7 @@ async function loadInventoryItem(id: string, measurementPage: number) {
       { count: "exact" }
     )
     .eq("inventory_item_id", id)
+    .eq("game_id", game.id)
     .order("created_at", { ascending: false })
     .range(from, to);
 
@@ -144,6 +163,7 @@ async function loadInventoryItem(id: string, measurementPage: number) {
   return {
     item,
     card,
+    gameSlug: game.slug,
     measurements: {
       rows: (measurementRes.error ? [] : measurementRes.data ?? []) as CenteringMeasurementRow[],
       count,
@@ -155,16 +175,19 @@ async function loadInventoryItem(id: string, measurementPage: number) {
   };
 }
 
-function measurementHref(itemId: string, page: number) {
-  return `/admin/inventory/${itemId}/centering?measurementPage=${page}`;
+function measurementHref(itemId: string, page: number, gameSlug: string) {
+  const params = new URLSearchParams({ game: gameSlug, measurementPage: String(page) });
+  return `/admin/inventory/${itemId}/centering?${params}`;
 }
 
 function MeasurementHistory({
   itemId,
   measurements,
+  gameSlug,
 }: {
   itemId: string;
   measurements: MeasurementPage;
+  gameSlug: string;
 }) {
   return (
     <section className="admin-card mt-6 p-5">
@@ -241,14 +264,14 @@ function MeasurementHistory({
 
       <div className="mt-4 flex items-center justify-between gap-3">
         {measurements.hasPrevious ? (
-          <Link href={measurementHref(itemId, measurements.page - 1)} className="admin-btn admin-btn-ghost">
+          <Link href={measurementHref(itemId, measurements.page - 1, gameSlug)} className="admin-btn admin-btn-ghost">
             Previous measurements
           </Link>
         ) : (
           <span />
         )}
         {measurements.hasNext ? (
-          <Link href={measurementHref(itemId, measurements.page + 1)} className="admin-btn admin-btn-ghost">
+          <Link href={measurementHref(itemId, measurements.page + 1, gameSlug)} className="admin-btn admin-btn-ghost">
             Next measurements
           </Link>
         ) : (
@@ -264,10 +287,11 @@ export default async function InventoryCenteringPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams?: { measurementPage?: string | string[] };
+  searchParams?: CenteringSearchParams;
 }) {
   const measurementPage = measurementPageFromSearchParams(searchParams);
-  const { item, card, measurements } = await loadInventoryItem(params.id, measurementPage);
+  const requestedGame = gameFromSearchParams(searchParams);
+  const { item, card, measurements, gameSlug } = await loadInventoryItem(params.id, measurementPage, requestedGame);
   const set = firstRelation(card?.sets);
   const cardName = card?.name ?? item.manual_card_name ?? "Unknown Card";
   const cardNumber = card?.card_number ?? item.manual_card_number;
@@ -285,12 +309,13 @@ export default async function InventoryCenteringPage({
             to this inventory item.
           </p>
         </div>
-        <Link href="/admin/inventory" className="admin-btn admin-btn-ghost">
+        <Link href={`/admin/inventory?game=${encodeURIComponent(gameSlug)}`} className="admin-btn admin-btn-ghost">
           Back to Inventory
         </Link>
       </div>
 
       <CenteringWorkspace
+        gameSlug={gameSlug}
         inventoryItemId={item.id}
         preloadImageUrl={item.custom_image_front_url}
         cardIdentity={{
@@ -301,7 +326,7 @@ export default async function InventoryCenteringPage({
         }}
       />
 
-      <MeasurementHistory itemId={item.id} measurements={measurements} />
+      <MeasurementHistory itemId={item.id} measurements={measurements} gameSlug={gameSlug} />
     </section>
   );
 }

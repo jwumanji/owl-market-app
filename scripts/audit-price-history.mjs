@@ -4,6 +4,7 @@
 // so price sync and chart gaps can be reviewed before changing any sync jobs.
 
 import fs from "node:fs";
+import { loadGameScope, scriptGameSlug, withGameFilter } from "./lib/supabase-game-scope.mjs";
 
 const REPORT_PATH = "price-history-audit-report.md";
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -41,6 +42,7 @@ loadEnvFile();
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const GAME_SLUG = scriptGameSlug();
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
@@ -336,13 +338,14 @@ async function main() {
   const nowMs = now.getTime();
   const freshMs = FRESH_HOURS * 60 * 60 * 1000;
 
-  console.log("Loading Supabase sets, cards, and price history...");
+  const game = await loadGameScope({ supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_KEY, gameSlug: GAME_SLUG });
+  console.log(`Loading Supabase sets, cards, and price history for game scope: ${game.slug}...`);
   const [sets, cards, historyRows, syncState] = await Promise.all([
-    sbFetchAll("sets?select=id,code,slug,name"),
+    sbFetchAll(withGameFilter("sets?select=id,code,slug,name", game.id)),
     sbFetchAll(
-      "cards?select=id,set_id,card_image_id,card_number,name,name_base,variant_label,rarity,tcg_product_id,price_stats(tcg_market,market_avg,tcg_low,tcg_mid,tcg_high,chg_1d,chg_7d,chg_30d,updated_at)"
+      withGameFilter("cards?select=id,set_id,card_image_id,card_number,name,name_base,variant_label,rarity,tcg_product_id,price_stats(tcg_market,market_avg,tcg_low,tcg_mid,tcg_high,chg_1d,chg_7d,chg_30d,updated_at)", game.id)
     ),
-    sbFetchAll("price_history?select=id,card_id,tcg_market,market_avg,recorded_at&order=recorded_at.asc,id.asc"),
+    sbFetchAll(withGameFilter("price_history?select=id,card_id,tcg_market,market_avg,recorded_at&order=recorded_at.asc,id.asc", game.id)),
     sbTryFetchAll("sync_state?select=key,state,locked_at,updated_at,created_at&order=updated_at.desc"),
   ]);
 
@@ -542,6 +545,7 @@ async function main() {
   report.push("# Price History Audit Report");
   report.push("");
   report.push(`Generated: ${now.toISOString()}`);
+  report.push(`Game: ${game.name ?? game.slug} (${game.slug})`);
   report.push(`Freshness threshold: ${FRESH_HOURS} hours`);
   report.push(`Recent coverage window: ${RECENT_DAYS} days`);
   report.push("");

@@ -1,11 +1,11 @@
 {
   "crons": [
     {
-      "path": "/api/sync/justtcg?_index=0",
+      "path": "/api/sync/justtcg?game=one_piece&_index=0",
       "schedule": "0 6 * * *"
     },
     {
-      "path": "/api/sync/justtcg-history?maxSets=1&historyDuration=1y",
+      "path": "/api/sync/justtcg-history?game=one_piece&maxSets=1&historyDuration=1y",
       "schedule": "30 7 * * *"
     }
   ]

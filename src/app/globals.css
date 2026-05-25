@@ -640,6 +640,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   flex-shrink: 0;
 }
 
+.c-nav-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
 .c-lockup-wm {
   font-family: var(--font-space-grotesk), system-ui, sans-serif;
   font-weight: 700;
@@ -671,10 +679,22 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .c-nav-links {
   display: inline-flex;
-  gap: 28px;
+  gap: clamp(14px, 2vw, 28px);
   list-style: none;
   margin: 0;
   padding: 0;
+}
+
+.c-topnav-inner:not(.is-admin) .c-nav-links {
+  flex: 1 1 auto;
+  justify-content: center;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.c-topnav-inner:not(.is-admin) .c-nav-links::-webkit-scrollbar {
+  display: none;
 }
 
 .c-nav-link {
@@ -686,6 +706,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   padding: 4px 0;
   position: relative;
   transition: color 0.15s ease;
+  white-space: nowrap;
 }
 
 .c-nav-link:hover {
@@ -757,7 +778,57 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 /* Widen the shared Stage-B nav above admin pages so the wordmark/links
    align with the 1680px .admin-container (vs the 1280px public layout). */
 .c-topnav-inner.is-admin {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto minmax(260px, 1fr);
+  column-gap: 24px;
   max-width: 1680px;
+  padding-left: clamp(28px, 5vw, 76px);
+  padding-right: clamp(28px, 5vw, 76px);
+}
+
+.c-topnav-inner.is-admin .c-nav-left {
+  justify-self: start;
+}
+
+.c-topnav-inner.is-admin .c-nav-links {
+  justify-self: center;
+}
+
+.c-topnav-inner.is-admin .c-nav-right {
+  justify-self: end;
+}
+
+@media (max-width: 900px) {
+  .c-topnav-inner.is-admin {
+    grid-template-columns: 1fr auto;
+    row-gap: 12px;
+  }
+
+  .c-topnav-inner.is-admin .c-nav-links {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: start;
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+}
+
+@media (max-width: 820px) {
+  .c-topnav-inner:not(.is-admin) {
+    flex-wrap: wrap;
+  }
+
+  .c-topnav-inner:not(.is-admin) .c-nav-links {
+    order: 3;
+    width: 100%;
+    justify-content: flex-start;
+    padding-bottom: 4px;
+  }
+
+  .c-topnav-inner:not(.is-admin) .c-nav-right {
+    margin-left: auto;
+  }
 }
 
 /* Mono "View site ↗" link in the admin nav right slot (mockup `.nav-view`). */
@@ -1889,6 +1960,41 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   font-size: 30px;
   color: var(--ink);
   margin-top: 2px;
+}
+
+.admin-game-switcher {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+}
+
+.admin-game-switcher span {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.admin-game-switcher select {
+  height: 40px;
+  min-width: 220px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  color: var(--ink);
+  padding: 0 34px 0 12px;
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.admin-game-switcher select:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 73, 54, 0.14);
 }
 
 /* Selectable status card (mockup `.scard`) — used as filter chip row. */

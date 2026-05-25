@@ -19,6 +19,8 @@
 //     (--clear-stale wipes tcg_market on flagged base rows so the next sync
 //      can re-price them against the fixed matcher.)
 
+import { loadGameScope, scriptGameSlug, withGameFilter } from "./lib/supabase-game-scope.mjs";
+
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://kiquytaevufssveqmqix.supabase.co";
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!KEY) {
@@ -27,6 +29,7 @@ if (!KEY) {
 }
 const CLEAR_STALE = process.argv.includes("--clear-stale");
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" };
+const GAME_SLUG = scriptGameSlug();
 
 async function fetchAll(path) {
   const all = [];
@@ -54,11 +57,14 @@ async function patch(path, body) {
   return r.ok;
 }
 
-const sets = await fetchAll("sets?select=id,code,slug");
+const GAME = await loadGameScope({ supabaseUrl: SB_URL, supabaseKey: KEY, gameSlug: GAME_SLUG });
+console.log(`Using game scope: ${GAME.slug}`);
+
+const sets = await fetchAll(withGameFilter("sets?select=id,code,slug", GAME.id));
 const setIdToCode = new Map(sets.map((s) => [s.id, (s.code ?? "").toUpperCase()]));
 const promoSetId = sets.find((s) => s.slug === "p" || s.slug === "promo")?.id ?? null;
 
-const cards = await fetchAll("cards?select=id,set_id,name,card_number,card_image_id,variant_label,rarity,price_stats(tcg_market,market_avg,updated_at)");
+const cards = await fetchAll(withGameFilter("cards?select=id,set_id,name,card_number,card_image_id,variant_label,rarity,price_stats(tcg_market,market_avg,updated_at)", GAME.id));
 console.log(`Loaded ${cards.length} cards.\n`);
 
 const tcgPrice = (c) => {
@@ -177,7 +183,7 @@ if (CLEAR_STALE) {
 
   let cleared = 0;
   for (const id of toClear) {
-    const ok = await patch(`price_stats?card_id=eq.${id}`, { tcg_market: null, market_avg: null });
+    const ok = await patch(`price_stats?card_id=eq.${id}&game_id=eq.${encodeURIComponent(GAME.id)}`, { tcg_market: null, market_avg: null });
     if (ok) cleared++;
   }
   console.log(`Cleared ${cleared}/${toClear.size}.`);
