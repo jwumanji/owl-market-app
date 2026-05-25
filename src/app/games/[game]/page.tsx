@@ -174,7 +174,7 @@ async function loadGameOverview(gameRouteSlug: string): Promise<OverviewData> {
           cost,
           types,
           game_payload,
-          sets (slug, code, name)
+          sets!cards_set_game_fk (slug, code, name)
         `)
         .eq("game_id", game.id)
         .order("card_number")

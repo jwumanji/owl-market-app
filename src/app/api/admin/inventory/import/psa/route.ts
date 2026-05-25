@@ -581,7 +581,7 @@ export async function POST(request: Request) {
     .from("cards")
     .select(`
       id, name, card_number,
-      sets (code)
+      sets!cards_set_game_fk (code)
     `)
     .eq("game_id", game.id)
     .limit(10000);

@@ -133,7 +133,7 @@ async function loadInventoryItem(id: string, measurementPage: number, gameSlug: 
   if (item.card_id) {
     const cardRes = await supabase
       .from("cards")
-      .select("id, name, card_number, rarity, image_url, image_url_small, sets (code, name)")
+      .select("id, name, card_number, rarity, image_url, image_url_small, sets!cards_set_game_fk (code, name)")
       .eq("id", item.card_id)
       .eq("game_id", game.id)
       .single();

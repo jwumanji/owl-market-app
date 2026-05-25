@@ -40,7 +40,7 @@ export async function GET(
       game_payload,
       image_url,
       image_url_small,
-      price_stats (
+      price_stats!price_stats_card_game_fk (
         market_avg,
         tcg_market,
         ebay_avg,
@@ -56,7 +56,7 @@ export async function GET(
         atl_date,
         updated_at
       ),
-      sets (
+      sets!cards_set_game_fk (
         id,
         slug,
         code,

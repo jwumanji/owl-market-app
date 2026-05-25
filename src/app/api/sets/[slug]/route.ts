@@ -7,6 +7,7 @@ import {
   publicOnlyForCatalogPreview,
   resolveGameScope,
 } from "@/lib/game-scope";
+import { firstRelation } from "@/lib/supabase-relations";
 
 export async function GET(
   request: Request,
@@ -58,7 +59,7 @@ export async function GET(
         game_payload,
         image_url,
         image_url_small,
-        price_stats (
+        price_stats!price_stats_card_game_fk (
           market_avg,
           tcg_market,
           ebay_avg,
@@ -75,7 +76,14 @@ export async function GET(
       return NextResponse.json({ error: cardsErr.message }, { status: 500 });
     }
     if (!batch || batch.length === 0) break;
-    allCards.push(...withOnePiecePayloadFallbacksList(batch as Record<string, unknown>[]));
+    allCards.push(
+      ...withOnePiecePayloadFallbacksList(
+        (batch as Record<string, unknown>[]).map((row) => ({
+          ...row,
+          price_stats: firstRelation(row.price_stats as Record<string, unknown> | Record<string, unknown>[] | null),
+        }))
+      )
+    );
     if (batch.length < pageSize) break;
     from += pageSize;
   }

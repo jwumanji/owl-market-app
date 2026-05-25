@@ -7,6 +7,7 @@ import { RARITY_META } from "@/app/rarities/rarities-data";
 import { withOnePiecePayloadFallbacksList } from "@/lib/game-payload";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
+import { firstRelation, flattenPriceStatsCardRow } from "@/lib/supabase-relations";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +18,8 @@ export const metadata = {
 
 /* ── Shape a card query result into DashboardCard ── */
 function toDashboardCard(row: Record<string, unknown>): DashboardCard {
-  const ps = row.price_stats as { market_avg: number | null; chg_1d: number | null } | null;
-  const set = row.sets as { code: string } | null;
+  const ps = firstRelation(row.price_stats as { market_avg: number | null; chg_1d: number | null } | Array<{ market_avg: number | null; chg_1d: number | null }> | null);
+  const set = firstRelation(row.sets as { code: string } | Array<{ code: string }> | null);
   return {
     id: row.id as string,
     card_image_id: row.card_image_id as string,
@@ -31,10 +32,21 @@ function toDashboardCard(row: Record<string, unknown>): DashboardCard {
   };
 }
 
-const CARD_SELECT = `
-  id, card_image_id, name, rarity, image_url_small,
-  sets (code),
-  price_stats!inner (market_avg, chg_1d)
+const DASHBOARD_PRICE_CARD_SELECT = `
+  market_avg, chg_1d,
+  cards!price_stats_card_game_fk!inner (
+    id, card_image_id, name, rarity, image_url_small,
+    sets!cards_set_game_fk (code)
+  )
+`;
+
+const MARKET_PRICE_CARD_SELECT = `
+  market_avg, tcg_market, ebay_avg, chg_1d, chg_7d, chg_30d,
+  cards!price_stats_card_game_fk!inner (
+    id, card_image_id, card_number, name, name_base, variant_label, rarity,
+    card_type, color, game_payload, image_url, image_url_small,
+    sets!cards_set_game_fk (id, slug, code, name, series, color, year)
+  )
 `;
 
 const PREMIUM_RARITIES = ["MR", "PROMO", "SP", "SEC", "TR"];
@@ -69,16 +81,11 @@ export async function MarketsPageContent({
   ] = await Promise.all([
     // Existing: top 20 by market value
     supabase
-      .from("cards")
-      .select(`
-        id, card_image_id, card_number, name, name_base, variant_label, rarity,
-        card_type, color, game_payload, image_url, image_url_small,
-        price_stats (market_avg, tcg_market, ebay_avg, chg_1d, chg_7d, chg_30d),
-        sets (id, slug, code, name, series, color, year)
-      `)
+      .from("price_stats")
+      .select(MARKET_PRICE_CARD_SELECT)
       .eq("game_id", game.id)
-      .not("price_stats", "is", null)
-      .order("market_avg", { referencedTable: "price_stats", ascending: false })
+      .not("market_avg", "is", null)
+      .order("market_avg", { ascending: false })
       .limit(20),
 
     supabase
@@ -89,36 +96,36 @@ export async function MarketsPageContent({
 
     // Trending: high-value cards with positive gains
     supabase
-      .from("cards")
-      .select(CARD_SELECT)
+      .from("price_stats")
+      .select(DASHBOARD_PRICE_CARD_SELECT)
       .eq("game_id", game.id)
-      .gt("price_stats.market_avg", 5)
-      .gt("price_stats.chg_1d", 0)
-      .order("chg_1d", { referencedTable: "price_stats", ascending: false })
+      .gt("market_avg", 5)
+      .gt("chg_1d", 0)
+      .order("chg_1d", { ascending: false })
       .limit(5),
 
     // Top Gainers
     supabase
-      .from("cards")
-      .select(CARD_SELECT)
+      .from("price_stats")
+      .select(DASHBOARD_PRICE_CARD_SELECT)
       .eq("game_id", game.id)
-      .not("price_stats.chg_1d", "is", null)
-      .order("chg_1d", { referencedTable: "price_stats", ascending: false })
+      .not("chg_1d", "is", null)
+      .order("chg_1d", { ascending: false })
       .limit(5),
 
     // Top Losers
     supabase
-      .from("cards")
-      .select(CARD_SELECT)
+      .from("price_stats")
+      .select(DASHBOARD_PRICE_CARD_SELECT)
       .eq("game_id", game.id)
-      .not("price_stats.chg_1d", "is", null)
-      .order("chg_1d", { referencedTable: "price_stats", ascending: true })
+      .not("chg_1d", "is", null)
+      .order("chg_1d", { ascending: true })
       .limit(5),
 
     // Rarity aggregation: fetch all cards for premium rarities
     supabase
       .from("cards")
-      .select("rarity, price_stats!inner (market_avg, chg_1d)")
+      .select("rarity, price_stats!price_stats_card_game_fk!inner (market_avg, chg_1d)")
       .eq("game_id", game.id)
       .in("rarity", PREMIUM_RARITIES),
 
@@ -133,7 +140,7 @@ export async function MarketsPageContent({
     // Sealed boxes
     supabase
       .from("sealed_products")
-      .select("name, product_type, market_avg, chg_1d, sets (code)")
+      .select("name, product_type, market_avg, chg_1d, sets!sealed_products_set_game_fk (code)")
       .eq("game_id", game.id)
       .not("market_avg", "is", null)
       .order("market_avg", { ascending: false })
@@ -156,7 +163,9 @@ export async function MarketsPageContent({
 
   // ── Existing table data ──
   const cards = (withOnePiecePayloadFallbacksList(
-    (cardsRes.data as unknown as Record<string, unknown>[] | null) ?? []
+    ((cardsRes.data as unknown as Record<string, unknown>[] | null) ?? [])
+      .map(flattenPriceStatsCardRow)
+      .filter((row): row is Record<string, unknown> => row != null)
   ) as unknown as CardRow[]).sort(
     (a, b) => (b.price_stats?.market_avg ?? 0) - (a.price_stats?.market_avg ?? 0)
   );
@@ -231,37 +240,44 @@ export async function MarketsPageContent({
 
   // ── Dashboard: Trending / Gainers / Losers ──
   const trending = ((trendingRes.data ?? []) as Record<string, unknown>[])
+    .map(flattenPriceStatsCardRow)
+    .filter((row): row is Record<string, unknown> => row != null)
     .sort((a, b) => {
-      const pa = a.price_stats as { chg_1d: number | null } | null;
-      const pb = b.price_stats as { chg_1d: number | null } | null;
+      const pa = firstRelation(a.price_stats as { chg_1d: number | null } | Array<{ chg_1d: number | null }> | null);
+      const pb = firstRelation(b.price_stats as { chg_1d: number | null } | Array<{ chg_1d: number | null }> | null);
       return (pb?.chg_1d ?? 0) - (pa?.chg_1d ?? 0);
     })
     .map(toDashboardCard);
 
   const topGainers = ((gainersRes.data ?? []) as Record<string, unknown>[])
+    .map(flattenPriceStatsCardRow)
+    .filter((row): row is Record<string, unknown> => row != null)
     .sort((a, b) => {
-      const pa = a.price_stats as { chg_1d: number | null } | null;
-      const pb = b.price_stats as { chg_1d: number | null } | null;
+      const pa = firstRelation(a.price_stats as { chg_1d: number | null } | Array<{ chg_1d: number | null }> | null);
+      const pb = firstRelation(b.price_stats as { chg_1d: number | null } | Array<{ chg_1d: number | null }> | null);
       return (pb?.chg_1d ?? 0) - (pa?.chg_1d ?? 0);
     })
     .map(toDashboardCard);
 
   const topLosers = ((losersRes.data ?? []) as Record<string, unknown>[])
+    .map(flattenPriceStatsCardRow)
+    .filter((row): row is Record<string, unknown> => row != null)
     .sort((a, b) => {
-      const pa = a.price_stats as { chg_1d: number | null } | null;
-      const pb = b.price_stats as { chg_1d: number | null } | null;
+      const pa = firstRelation(a.price_stats as { chg_1d: number | null } | Array<{ chg_1d: number | null }> | null);
+      const pb = firstRelation(b.price_stats as { chg_1d: number | null } | Array<{ chg_1d: number | null }> | null);
       return (pa?.chg_1d ?? 0) - (pb?.chg_1d ?? 0);
     })
     .map(toDashboardCard);
 
   // ── Dashboard: Rarity Ranking ──
   const rarityGroups: Record<string, { prices: number[]; changes: number[] }> = {};
-  for (const row of (rarityCardsRes.data ?? []) as unknown as { rarity: string; price_stats: { market_avg: number | null; chg_1d: number | null } }[]) {
+  for (const row of (rarityCardsRes.data ?? []) as unknown as { rarity: string; price_stats: { market_avg: number | null; chg_1d: number | null } | Array<{ market_avg: number | null; chg_1d: number | null }> | null }[]) {
     const r = row.rarity;
+    const ps = firstRelation(row.price_stats);
     if (!rarityGroups[r]) rarityGroups[r] = { prices: [], changes: [] };
-    if (row.price_stats?.market_avg != null) {
-      rarityGroups[r].prices.push(row.price_stats.market_avg);
-      rarityGroups[r].changes.push(row.price_stats.chg_1d ?? 0);
+    if (ps?.market_avg != null) {
+      rarityGroups[r].prices.push(ps.market_avg);
+      rarityGroups[r].changes.push(ps.chg_1d ?? 0);
     }
   }
 
@@ -291,18 +307,19 @@ export async function MarketsPageContent({
     const charIds = charList.map((c) => c.id);
     const { data: charCards } = await supabase
       .from("cards")
-      .select("character_id, rarity, price_stats!inner (market_avg, chg_1d)")
+      .select("character_id, rarity, price_stats!price_stats_card_game_fk!inner (market_avg, chg_1d)")
       .eq("game_id", game.id)
       .in("character_id", charIds);
 
     const charMap: Record<string, { total: number; chgSum: number; count: number; rarities: Set<string> }> = {};
-    for (const row of (charCards ?? []) as unknown as { character_id: string; rarity: string | null; price_stats: { market_avg: number | null; chg_1d: number | null } }[]) {
+    for (const row of (charCards ?? []) as unknown as { character_id: string; rarity: string | null; price_stats: { market_avg: number | null; chg_1d: number | null } | Array<{ market_avg: number | null; chg_1d: number | null }> | null }[]) {
       if (!charMap[row.character_id]) {
         charMap[row.character_id] = { total: 0, chgSum: 0, count: 0, rarities: new Set() };
       }
       const m = charMap[row.character_id];
-      m.total += row.price_stats?.market_avg ?? 0;
-      m.chgSum += row.price_stats?.chg_1d ?? 0;
+      const ps = firstRelation(row.price_stats);
+      m.total += ps?.market_avg ?? 0;
+      m.chgSum += ps?.chg_1d ?? 0;
       m.count++;
       if (row.rarity) m.rarities.add(row.rarity);
     }

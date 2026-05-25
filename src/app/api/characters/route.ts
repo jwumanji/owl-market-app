@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { gameParamFromRequest, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
+import { firstRelation, flattenPriceStatsCardRow } from "@/lib/supabase-relations";
 
 // ---------------------------------------------------------------------------
 // GET /api/characters — returns character index data with top cards + prices
@@ -42,25 +43,28 @@ export async function GET(request: Request) {
 
       // Get top 5 cards by price
       const { data: topCards } = await supabase
-        .from("cards")
+        .from("price_stats")
         .select(`
-          id, name, card_number, variant_label, rarity,
-          set_id, image_url, image_url_small, card_image_id,
-          sets!inner (code, name),
-          price_stats!inner (
-            tcg_market, market_avg,
-            chg_1d, chg_7d, chg_30d,
-            ath, atl
+          tcg_market, market_avg,
+          chg_1d, chg_7d, chg_30d,
+          ath, atl,
+          cards!price_stats_card_game_fk!inner (
+            id, name, card_number, variant_label, rarity,
+            set_id, image_url, image_url_small, card_image_id,
+            sets!cards_set_game_fk (code, name)
           )
         `)
         .eq("game_id", game.id)
-        .eq("character_id", char.id)
-        .not("price_stats.tcg_market", "is", null)
-        .order("price_stats(tcg_market)", { ascending: false })
+        .eq("cards.character_id", char.id)
+        .not("tcg_market", "is", null)
+        .order("tcg_market", { ascending: false })
         .limit(10);
 
       // Get sparkline history for top cards
-      const topCardIds = (topCards ?? []).map((c) => c.id);
+      const normalizedTopCards = ((topCards ?? []) as Record<string, unknown>[])
+        .map(flattenPriceStatsCardRow)
+        .filter((row): row is Record<string, unknown> => row != null);
+      const topCardIds = normalizedTopCards.map((c) => c.id as string);
       const { data: history } = topCardIds.length
         ? await supabase
             .from("price_history")
@@ -83,7 +87,7 @@ export async function GET(request: Request) {
       // Calculate character index (sum of all card market prices)
       const { data: allPrices } = await supabase
         .from("cards")
-        .select("price_stats (tcg_market, chg_7d, chg_30d)")
+        .select("price_stats!price_stats_card_game_fk!inner (tcg_market, chg_7d, chg_30d)")
         .eq("game_id", game.id)
         .eq("character_id", char.id)
         .not("price_stats.tcg_market", "is", null);
@@ -94,11 +98,15 @@ export async function GET(request: Request) {
       let pricedCount = 0;
 
       for (const card of allPrices ?? []) {
-        const ps = card.price_stats as unknown as {
+        const ps = firstRelation(card.price_stats as unknown as {
           tcg_market: number | null;
           chg_7d: number | null;
           chg_30d: number | null;
-        };
+        } | Array<{
+          tcg_market: number | null;
+          chg_7d: number | null;
+          chg_30d: number | null;
+        }> | null);
         if (ps?.tcg_market) {
           indexValue += ps.tcg_market;
           totalChg7d += ps.chg_7d ?? 0;
@@ -121,12 +129,15 @@ export async function GET(request: Request) {
         chg7d: avgChg7d,
         chg30d: avgChg30d,
         up: avgChg7d >= 0,
-        topCards: (topCards ?? []).map((c) => {
-          const ps = c.price_stats as unknown as {
+        topCards: normalizedTopCards.map((c) => {
+          const ps = firstRelation(c.price_stats as unknown as {
             tcg_market: number; market_avg: number;
             chg_1d: number; chg_7d: number; chg_30d: number;
-          };
-          const setInfo = c.sets as unknown as { code: string; name: string };
+          } | Array<{
+            tcg_market: number; market_avg: number;
+            chg_1d: number; chg_7d: number; chg_30d: number;
+          }> | null);
+          const setInfo = firstRelation(c.sets as unknown as { code: string; name: string } | Array<{ code: string; name: string }> | null);
           return {
             name: c.name,
             set: setInfo?.code ?? "",
@@ -136,7 +147,7 @@ export async function GET(request: Request) {
             chg1d: ps?.chg_1d ?? 0,
             chg7d: ps?.chg_7d ?? 0,
             chg30d: ps?.chg_30d ?? 0,
-            spark: historyMap[c.id] ?? [ps?.tcg_market ?? 0, ps?.tcg_market ?? 0],
+            spark: historyMap[c.id as string] ?? [ps?.tcg_market ?? 0, ps?.tcg_market ?? 0],
             imageUrl: c.image_url ?? null,
             imageUrlSmall: c.image_url_small ?? null,
             cardImageId: c.card_image_id ?? null,

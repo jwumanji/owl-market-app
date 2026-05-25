@@ -25,7 +25,7 @@ type CardSearchRow = {
 
 const SEARCH_SELECT = `
   id, name, card_number, rarity, image_url, image_url_small, set_id,
-  sets (code, name)
+  sets!cards_set_game_fk (code, name)
 `;
 
 const STOP_WORDS = new Set([

@@ -148,7 +148,7 @@ async function hydrateInventoryRows(rows: InventoryQueryRow[], gameId: string): 
       .from("cards")
       .select(`
         id, name, image_url, image_url_small, card_number,
-        sets (code)
+        sets!cards_set_game_fk (code)
       `)
       .eq("game_id", gameId)
       .in("id", cardIds);

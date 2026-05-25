@@ -169,7 +169,7 @@ async function loadCatalog(gameRouteSlug: string, searchParams: CatalogSearchPar
         cost,
         types,
         game_payload,
-        sets (slug, code, name)
+        sets!cards_set_game_fk (slug, code, name)
       `, { count: "exact" })
       .eq("game_id", game.id);
 

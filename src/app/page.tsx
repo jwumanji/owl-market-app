@@ -9,6 +9,7 @@ import {
 } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
 import { createServiceClient } from "@/lib/supabase-server";
+import { firstRelation, flattenPriceStatsCardRow } from "@/lib/supabase-relations";
 
 export const dynamic = "force-dynamic";
 
@@ -64,22 +65,27 @@ async function fetchTopCards(): Promise<TeaserCard[]> {
     if (gameResult.error) return [];
 
     const { data, error } = await supabase
-      .from("cards")
+      .from("price_stats")
       .select(
-        `id, card_image_id, card_number, name, rarity, image_url_small,
-         price_stats (market_avg, chg_1d),
-         sets (code, name)`,
+        `market_avg, chg_1d,
+         cards!price_stats_card_game_fk!inner (
+           id, card_image_id, card_number, name, rarity, image_url_small,
+           sets!cards_set_game_fk (code, name)
+         )`,
       )
       .eq("game_id", gameResult.game.id)
-      .not("price_stats", "is", null)
-      .order("market_avg", { referencedTable: "price_stats", ascending: false })
+      .not("market_avg", "is", null)
+      .order("market_avg", { ascending: false })
       .limit(5);
 
     if (error || !data) return [];
 
-    return (data as Record<string, unknown>[]).map((row): TeaserCard => {
-      const ps = row.price_stats as { market_avg: number | null; chg_1d: number | null } | null;
-      const set = row.sets as { code: string | null; name: string | null } | null;
+    return (data as Record<string, unknown>[])
+      .map(flattenPriceStatsCardRow)
+      .filter((row): row is Record<string, unknown> => row != null)
+      .map((row): TeaserCard => {
+      const ps = firstRelation(row.price_stats as { market_avg: number | null; chg_1d: number | null } | Array<{ market_avg: number | null; chg_1d: number | null }> | null);
+      const set = firstRelation(row.sets as { code: string | null; name: string | null } | Array<{ code: string | null; name: string | null }> | null);
       return {
         id: row.id as string,
         card_image_id: (row.card_image_id as string | null) ?? null,

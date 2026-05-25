@@ -125,7 +125,7 @@ async function loadCardDetail(gameRouteSlug: string, rawId: string): Promise<Det
         image_url,
         image_url_small,
         game_payload,
-        sets (id, slug, code, name, year)
+        sets!cards_set_game_fk (id, slug, code, name, year)
       `)
       .eq("game_id", game.id)
       .limit(1);

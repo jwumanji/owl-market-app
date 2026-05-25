@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { withOnePiecePayloadFallbacksList } from "@/lib/game-payload";
 import { gameParamFromRequest, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
+import { firstRelation, flattenPriceStatsCardRow } from "@/lib/supabase-relations";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -30,45 +31,45 @@ export async function GET(request: Request) {
   const orderBy = sortCol[sort] ?? "market_avg";
 
   let query = supabase
-    .from("cards")
+    .from("price_stats")
     .select(`
-      id,
-      card_image_id,
-      card_number,
-      name,
-      name_base,
-      variant_label,
-      rarity,
-      card_type,
-      color,
-      game_payload,
-      image_url,
-      image_url_small,
-      price_stats (
-        market_avg,
-        tcg_market,
-        ebay_avg,
-        chg_1d,
-        chg_7d,
-        chg_30d
-      ),
-      sets (
+      market_avg,
+      tcg_market,
+      ebay_avg,
+      chg_1d,
+      chg_7d,
+      chg_30d,
+      cards!price_stats_card_game_fk!inner (
         id,
-        slug,
-        code,
+        card_image_id,
+        card_number,
         name,
-        series,
+        name_base,
+        variant_label,
+        rarity,
+        card_type,
         color,
-        year
+        game_payload,
+        image_url,
+        image_url_small,
+        sets!cards_set_game_fk (
+          id,
+          slug,
+          code,
+          name,
+          series,
+          color,
+          year
+        )
       )
     `)
     .eq("game_id", game.id)
-    .not("price_stats", "is", null)
-    .order(orderBy, { referencedTable: "price_stats", ascending: false })
+    .not(orderBy, "is", null)
+    .order(orderBy, { ascending: false })
     .limit(limit);
 
   if (setId && setId !== "all") {
-    query = query.eq("set_id", setId);
+    query = query.eq("cards.set_id", setId);
   }
 
   const { data, error } = await query;
@@ -78,9 +79,13 @@ export async function GET(request: Request) {
   }
 
   // Fallback JS sort in case referencedTable ordering doesn't work
-  const sorted = withOnePiecePayloadFallbacksList((data ?? []) as Record<string, unknown>[]).sort((a, b) => {
-    const pa = a.price_stats as Record<string, number> | null;
-    const pb = b.price_stats as Record<string, number> | null;
+  const normalized = ((data ?? []) as Record<string, unknown>[])
+    .map(flattenPriceStatsCardRow)
+    .filter((row): row is Record<string, unknown> => row != null);
+
+  const sorted = withOnePiecePayloadFallbacksList(normalized).sort((a, b) => {
+    const pa = firstRelation(a.price_stats as Record<string, number> | Record<string, number>[] | null);
+    const pb = firstRelation(b.price_stats as Record<string, number> | Record<string, number>[] | null);
     return (pb?.[orderBy] ?? 0) - (pa?.[orderBy] ?? 0);
   });
 

@@ -340,7 +340,7 @@ export default async function AdminInventoryPage({
       .from("cards")
       .select(`
         id, name, image_url, image_url_small, card_number,
-        sets (code)
+        sets!cards_set_game_fk (code)
       `)
       .in("id", cardIds)
       .eq("game_id", gameId);

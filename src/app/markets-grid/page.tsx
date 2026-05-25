@@ -5,6 +5,7 @@ import MarketGrid from "@/components/market/MarketGrid";
 import { CardRow } from "@/lib/types";
 import { withOnePiecePayloadFallbacksList } from "@/lib/game-payload";
 import { resolveGameScope } from "@/lib/game-scope";
+import { flattenPriceStatsCardRow } from "@/lib/supabase-relations";
 
 export default async function MarketsGridPage() {
   const supabase = createServiceClient();
@@ -19,45 +20,47 @@ export default async function MarketsGridPage() {
   const { game } = gameResult;
 
   const { data } = await supabase
-    .from("cards")
+    .from("price_stats")
     .select(`
-      id,
-      card_image_id,
-      card_number,
-      name,
-      name_base,
-      variant_label,
-      rarity,
-      card_type,
-      color,
-      game_payload,
-      image_url,
-      image_url_small,
-      price_stats (
-        market_avg,
-        tcg_market,
-        ebay_avg,
-        chg_1d,
-        chg_7d,
-        chg_30d
-      ),
-      sets (
+      market_avg,
+      tcg_market,
+      ebay_avg,
+      chg_1d,
+      chg_7d,
+      chg_30d,
+      cards!price_stats_card_game_fk!inner (
         id,
-        slug,
-        code,
+        card_image_id,
+        card_number,
         name,
-        series,
+        name_base,
+        variant_label,
+        rarity,
+        card_type,
         color,
-        year
+        game_payload,
+        image_url,
+        image_url_small,
+        sets!cards_set_game_fk (
+          id,
+          slug,
+          code,
+          name,
+          series,
+          color,
+          year
+        )
       )
     `)
     .eq("game_id", game.id)
-    .not("price_stats", "is", null)
-    .order("market_avg", { referencedTable: "price_stats", ascending: false })
+    .not("market_avg", "is", null)
+    .order("market_avg", { ascending: false })
     .limit(20);
 
   const cards: CardRow[] = (withOnePiecePayloadFallbacksList(
-    (data as unknown as Record<string, unknown>[] | null) ?? []
+    ((data as unknown as Record<string, unknown>[] | null) ?? [])
+      .map(flattenPriceStatsCardRow)
+      .filter((row): row is Record<string, unknown> => row != null)
   ) as unknown as CardRow[]).sort(
     (a, b) => (b.price_stats?.market_avg ?? 0) - (a.price_stats?.market_avg ?? 0)
   );

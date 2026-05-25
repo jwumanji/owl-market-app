@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase-server";
 import { RARITY_META } from "@/app/rarities/rarities-data";
 import { gameParamFromRequest, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
 import { ONE_PIECE_DB_SLUG } from "@/lib/games/one-piece";
+import { firstRelation, flattenPriceStatsCardRow } from "@/lib/supabase-relations";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -61,7 +62,7 @@ async function loadCatalogOnlyRarities(supabase: ReturnType<typeof createService
           rarity,
           image_url,
           image_url_small,
-          sets (code, name)
+          sets!cards_set_game_fk (code, name)
         `)
         .eq("game_id", gameId)
         .eq("rarity_id", rarity.id)
@@ -162,6 +163,13 @@ export async function GET(request: Request) {
     if (!promoSetId) return query.eq("rarity", "PR");
     return query.or(`set_id.eq.${promoSetId},rarity.eq.PR`);
   };
+  const applyPromoPriceFilter = <T extends {
+    or: (filters: string, options?: { foreignTable?: string }) => T;
+    eq: (column: string, value: string) => T;
+  }>(query: T): T => {
+    if (!promoSetId) return query.eq("cards.rarity", "PR");
+    return query.or(`set_id.eq.${promoSetId},rarity.eq.PR`, { foreignTable: "cards" });
+  };
 
   // ── Step 1: Batch-fetch ALL card counts + price aggregation in one pass ──
   // Paginate all cards with price_stats to avoid 1000-row limit
@@ -195,7 +203,7 @@ export async function GET(request: Request) {
   while (true) {
     let q = supabase
       .from("cards")
-      .select("rarity, price_stats!inner (tcg_market, chg_7d, chg_30d)")
+      .select("rarity, price_stats!price_stats_card_game_fk!inner (tcg_market, chg_7d, chg_30d)")
       .eq("game_id", game.id)
       .in("rarity", nonPromoRarities)
       .not("price_stats.tcg_market", "is", null)
@@ -206,11 +214,15 @@ export async function GET(request: Request) {
     if (!page || page.length === 0) break;
 
     for (const card of page) {
-      const ps = card.price_stats as unknown as {
+      const ps = firstRelation(card.price_stats as unknown as {
         tcg_market: number | null;
         chg_7d: number | null;
         chg_30d: number | null;
-      };
+      } | Array<{
+        tcg_market: number | null;
+        chg_7d: number | null;
+        chg_30d: number | null;
+      }> | null);
       if (ps?.tcg_market) {
         allPriced.push({
           rarity: card.rarity as string,
@@ -230,7 +242,7 @@ export async function GET(request: Request) {
   while (true) {
     let q = supabase
       .from("cards")
-      .select("rarity, price_stats!inner (tcg_market, chg_7d, chg_30d)")
+      .select("rarity, price_stats!price_stats_card_game_fk!inner (tcg_market, chg_7d, chg_30d)")
       .eq("game_id", game.id)
       .not("price_stats.tcg_market", "is", null)
       .range(promoFrom, promoFrom + pricePageSize - 1);
@@ -240,11 +252,15 @@ export async function GET(request: Request) {
     if (!page || page.length === 0) break;
 
     for (const card of page) {
-      const ps = card.price_stats as unknown as {
+      const ps = firstRelation(card.price_stats as unknown as {
         tcg_market: number | null;
         chg_7d: number | null;
         chg_30d: number | null;
-      };
+      } | Array<{
+        tcg_market: number | null;
+        chg_7d: number | null;
+        chg_30d: number | null;
+      }> | null);
       if (ps?.tcg_market) {
         allPriced.push({
           rarity: "PROMO",
@@ -281,49 +297,52 @@ export async function GET(request: Request) {
   // ── Step 2: Fetch top 10 cards per rarity (parallel) ──
   const topCardsPromises = distinctRarities.map(async (code) => {
     const fields = `
-        id, name, card_number, variant_label, rarity,
-        card_image_id, image_url, image_url_small,
-        sets!inner (code, name),
-        price_stats!inner (
-          tcg_market, market_avg,
-          chg_1d, chg_7d, chg_30d
+        tcg_market, market_avg,
+        chg_1d, chg_7d, chg_30d,
+        cards!price_stats_card_game_fk!inner (
+          id, name, card_number, variant_label, rarity,
+          card_image_id, image_url, image_url_small, set_id,
+          sets!cards_set_game_fk (code, name)
         )
       `;
 
     if (code === "PROMO") {
       let q = supabase
-        .from("cards")
+        .from("price_stats")
         .select(fields)
         .eq("game_id", game.id)
-        .not("price_stats.tcg_market", "is", null)
-        .order("price_stats(tcg_market)", { ascending: false })
+        .not("tcg_market", "is", null)
+        .order("tcg_market", { ascending: false })
         .limit(10);
-      q = applyPromoFilter(q);
+      q = applyPromoPriceFilter(q);
       const { data: topCards } = await q;
       return { code, topCards: topCards ?? [] };
     }
 
     let q = supabase
-      .from("cards")
+      .from("price_stats")
       .select(fields)
       .eq("game_id", game.id)
-      .eq("rarity", code)
-      .not("price_stats.tcg_market", "is", null)
-      .order("price_stats(tcg_market)", { ascending: false })
+      .eq("cards.rarity", code)
+      .not("tcg_market", "is", null)
+      .order("tcg_market", { ascending: false })
       .limit(10);
-    if (promoSetId) q = q.neq("set_id", promoSetId);
+    if (promoSetId) q = q.neq("cards.set_id", promoSetId);
     const { data: topCards } = await q;
 
     return { code, topCards: topCards ?? [] };
   });
 
   const topCardsResults = await Promise.all(topCardsPromises);
-  const topCardsByRarity: Record<string, typeof topCardsResults[0]["topCards"]> = {};
+  const topCardsByRarity: Record<string, Record<string, unknown>[]> = {};
   const allTopCardIds: string[] = [];
 
   for (const { code, topCards } of topCardsResults) {
-    topCardsByRarity[code] = topCards;
-    for (const c of topCards) allTopCardIds.push(c.id);
+    const normalizedCards = (topCards as Record<string, unknown>[])
+      .map(flattenPriceStatsCardRow)
+      .filter((row): row is Record<string, unknown> => row != null);
+    topCardsByRarity[code] = normalizedCards;
+    for (const c of normalizedCards) allTopCardIds.push(c.id as string);
   }
 
   // ── Step 3: Fetch sparkline history for ALL top cards at once ──
@@ -364,11 +383,14 @@ export async function GET(request: Request) {
     const avgChg30d = pricedCount > 0 ? +(agg!.totalChg30d / pricedCount).toFixed(1) : 0;
 
     const topCards = (topCardsByRarity[code] ?? []).map((c) => {
-      const ps = c.price_stats as unknown as {
+      const ps = firstRelation(c.price_stats as unknown as {
         tcg_market: number; market_avg: number;
         chg_1d: number; chg_7d: number; chg_30d: number;
-      };
-      const setInfo = c.sets as unknown as { code: string; name: string };
+      } | Array<{
+        tcg_market: number; market_avg: number;
+        chg_1d: number; chg_7d: number; chg_30d: number;
+      }> | null);
+      const setInfo = firstRelation(c.sets as unknown as { code: string; name: string } | Array<{ code: string; name: string }> | null);
       return {
         name: c.name,
         set: setInfo?.code ?? "",
@@ -378,7 +400,7 @@ export async function GET(request: Request) {
         chg1d: ps?.chg_1d ?? 0,
         chg7d: ps?.chg_7d ?? 0,
         chg30d: ps?.chg_30d ?? 0,
-        spark: historyMap[c.id] ?? [ps?.tcg_market ?? 0, ps?.tcg_market ?? 0],
+        spark: historyMap[c.id as string] ?? [ps?.tcg_market ?? 0, ps?.tcg_market ?? 0],
         cardImageId: (c as Record<string, unknown>).card_image_id as string ?? "",
         imageSmall: ((c as Record<string, unknown>).image_url_small as string | null) || ((c as Record<string, unknown>).image_url as string | null) || null,
       };

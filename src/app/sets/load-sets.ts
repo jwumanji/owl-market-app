@@ -12,6 +12,7 @@ import {
   type GameScope,
 } from "@/lib/game-scope";
 import { ONE_PIECE_DB_SLUG } from "@/lib/games/one-piece";
+import { firstRelation } from "@/lib/supabase-relations";
 import type { CatalogSetCard } from "./sets-data";
 
 // ---------------------------------------------------------------------------
@@ -343,7 +344,7 @@ export async function loadSets(options: {
         variant_label,
         image_url,
         image_url_small,
-        price_stats (
+        price_stats!price_stats_card_game_fk (
           market_avg,
           tcg_market,
           chg_1d,
@@ -396,7 +397,7 @@ export async function loadSets(options: {
     const code = normalizeCode(rawCode);
     totalRowsByCode[code] = (totalRowsByCode[code] ?? 0) + 1;
 
-    const ps = card.price_stats as Record<string, number> | null;
+    const ps = firstRelation(card.price_stats as Record<string, number> | Record<string, number>[] | null);
     if (!ps || !ps.tcg_market) continue;
 
     if (!cardsByCode[code]) cardsByCode[code] = [];
