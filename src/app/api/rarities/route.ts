@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase-server";
 import { RARITY_META } from "@/app/rarities/rarities-data";
 import { gameParamFromRequest, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
 import { ONE_PIECE_DB_SLUG } from "@/lib/games/one-piece";
+import { cachedPublicData, PUBLIC_DATA_CACHE_HEADERS, publicDataCacheKey } from "@/lib/public-data-cache";
 import { firstRelation, flattenPriceStatsCardRow } from "@/lib/supabase-relations";
 
 export const dynamic = "force-dynamic";
@@ -121,7 +122,7 @@ async function loadCatalogOnlyRarities(supabase: ReturnType<typeof createService
 
   return NextResponse.json(
     results.filter((rarity) => rarity.cardCount > 0).sort((a, b) => b.cardCount - a.cardCount),
-    { headers: { "Cache-Control": "no-store, max-age=0" } }
+    { headers: PUBLIC_DATA_CACHE_HEADERS }
   );
 }
 
@@ -145,6 +146,7 @@ export async function GET(request: Request) {
     return loadCatalogOnlyRarities(supabase, game.id);
   }
 
+  const withCards = await cachedPublicData(publicDataCacheKey("api-rarities", game.id), async () => {
   const distinctRarities = Object.keys(RARITY_META).filter((k) => k !== "SEALED");
   const nonPromoRarities = distinctRarities.filter((k) => k !== "PROMO");
 
@@ -425,11 +427,12 @@ export async function GET(request: Request) {
   });
 
   // Filter nulls; include any rarity with cards OR prices, sort by index value
-  const withCards = results
+  return results
     .filter((r): r is NonNullable<typeof r> => r != null && (r.indexValue > 0 || r.cardCount > 0))
     .sort((a, b) => b.indexValue - a.indexValue);
+  });
 
   return NextResponse.json(withCards, {
-    headers: { "Cache-Control": "no-store, max-age=0" },
+    headers: PUBLIC_DATA_CACHE_HEADERS,
   });
 }

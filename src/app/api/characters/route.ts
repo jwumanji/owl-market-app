@@ -1,47 +1,35 @@
 import { NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase-server";
 import { gameParamFromRequest, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
+import { cachedPublicData, PUBLIC_DATA_CACHE_HEADERS, publicDataCacheKey } from "@/lib/public-data-cache";
+import { createServiceClient } from "@/lib/supabase-server";
 import { firstRelation, flattenPriceStatsCardRow } from "@/lib/supabase-relations";
 
 // ---------------------------------------------------------------------------
-// GET /api/characters — returns character index data with top cards + prices
+// GET /api/characters - returns character index data with top cards + prices
 // ---------------------------------------------------------------------------
 
-export async function GET(request: Request) {
+async function loadCharacterIndex(gameId: string) {
   const supabase = createServiceClient();
-  const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
-    defaultToOnePiece: true,
-    publicOnly: publicOnlyForCatalogPreview(),
-  });
 
-  if (gameResult.error) {
-    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
-  }
-  const { game } = gameResult;
-
-  // 1. Fetch all characters
   const { data: characters, error: charErr } = await supabase
     .from("characters")
     .select("id, slug, name, subtitle, faction, tier, type_tag")
-    .eq("game_id", game.id)
+    .eq("game_id", gameId)
     .order("tier")
     .order("name");
 
   if (charErr) {
-    return NextResponse.json({ error: charErr.message }, { status: 500 });
+    throw new Error(charErr.message);
   }
 
-  // 2. For each character, get their cards with prices
   const results = await Promise.all(
     (characters ?? []).map(async (char) => {
-      // Count cards for this character
       const { count } = await supabase
         .from("cards")
         .select("id", { count: "exact", head: true })
-        .eq("game_id", game.id)
+        .eq("game_id", gameId)
         .eq("character_id", char.id);
 
-      // Get top 5 cards by price
       const { data: topCards } = await supabase
         .from("price_stats")
         .select(`
@@ -54,13 +42,12 @@ export async function GET(request: Request) {
             sets!cards_set_game_fk (code, name)
           )
         `)
-        .eq("game_id", game.id)
+        .eq("game_id", gameId)
         .eq("cards.character_id", char.id)
         .not("tcg_market", "is", null)
         .order("tcg_market", { ascending: false })
         .limit(10);
 
-      // Get sparkline history for top cards
       const normalizedTopCards = ((topCards ?? []) as Record<string, unknown>[])
         .map(flattenPriceStatsCardRow)
         .filter((row): row is Record<string, unknown> => row != null);
@@ -69,13 +56,12 @@ export async function GET(request: Request) {
         ? await supabase
             .from("price_history")
             .select("card_id, tcg_market, recorded_at")
-            .eq("game_id", game.id)
+            .eq("game_id", gameId)
             .in("card_id", topCardIds)
             .order("recorded_at", { ascending: false })
             .limit(topCardIds.length * 9)
         : { data: [] };
 
-      // Group history by card_id
       const historyMap: Record<string, number[]> = {};
       for (const row of history ?? []) {
         if (!historyMap[row.card_id]) historyMap[row.card_id] = [];
@@ -84,11 +70,10 @@ export async function GET(request: Request) {
         }
       }
 
-      // Calculate character index (sum of all card market prices)
       const { data: allPrices } = await supabase
         .from("cards")
         .select("price_stats!price_stats_card_game_fk!inner (tcg_market, chg_7d, chg_30d)")
-        .eq("game_id", game.id)
+        .eq("game_id", gameId)
         .eq("character_id", char.id)
         .not("price_stats.tcg_market", "is", null);
 
@@ -131,11 +116,17 @@ export async function GET(request: Request) {
         up: avgChg7d >= 0,
         topCards: normalizedTopCards.map((c) => {
           const ps = firstRelation(c.price_stats as unknown as {
-            tcg_market: number; market_avg: number;
-            chg_1d: number; chg_7d: number; chg_30d: number;
+            tcg_market: number;
+            market_avg: number;
+            chg_1d: number;
+            chg_7d: number;
+            chg_30d: number;
           } | Array<{
-            tcg_market: number; market_avg: number;
-            chg_1d: number; chg_7d: number; chg_30d: number;
+            tcg_market: number;
+            market_avg: number;
+            chg_1d: number;
+            chg_7d: number;
+            chg_30d: number;
           }> | null);
           const setInfo = firstRelation(c.sets as unknown as { code: string; name: string } | Array<{ code: string; name: string }> | null);
           return {
@@ -157,10 +148,32 @@ export async function GET(request: Request) {
     })
   );
 
-  // Filter out characters with no priced cards, sort by index value
-  const withCards = results
+  return results
     .filter((r) => r.indexValue > 0)
     .sort((a, b) => b.indexValue - a.indexValue);
+}
 
-  return NextResponse.json(withCards);
+export async function GET(request: Request) {
+  const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
+    defaultToOnePiece: true,
+    publicOnly: publicOnlyForCatalogPreview(),
+  });
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+
+  try {
+    const withCards = await cachedPublicData(
+      publicDataCacheKey("api-characters", gameResult.game.id),
+      () => loadCharacterIndex(gameResult.game.id)
+    );
+    return NextResponse.json(withCards, { headers: PUBLIC_DATA_CACHE_HEADERS });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to load character data." },
+      { status: 500 }
+    );
+  }
 }

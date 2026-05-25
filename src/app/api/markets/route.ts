@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { withOnePiecePayloadFallbacksList } from "@/lib/game-payload";
 import { gameParamFromRequest, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
+import { cachedPublicData, PUBLIC_DATA_CACHE_HEADERS, publicDataCacheKey } from "@/lib/public-data-cache";
 import { firstRelation, flattenPriceStatsCardRow } from "@/lib/supabase-relations";
 
 export async function GET(request: Request) {
@@ -72,22 +73,34 @@ export async function GET(request: Request) {
     query = query.eq("cards.set_id", setId);
   }
 
-  const { data, error } = await query;
+  try {
+    const sorted = await cachedPublicData(
+      publicDataCacheKey("api-markets", game.id, setId ?? "all", sort, limit),
+      async () => {
+        const { data, error } = await query;
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        // Fallback JS sort in case referencedTable ordering doesn't work
+        const normalized = ((data ?? []) as Record<string, unknown>[])
+          .map(flattenPriceStatsCardRow)
+          .filter((row): row is Record<string, unknown> => row != null);
+
+        return withOnePiecePayloadFallbacksList(normalized).sort((a, b) => {
+          const pa = firstRelation(a.price_stats as Record<string, number> | Record<string, number>[] | null);
+          const pb = firstRelation(b.price_stats as Record<string, number> | Record<string, number>[] | null);
+          return (pb?.[orderBy] ?? 0) - (pa?.[orderBy] ?? 0);
+        });
+      }
+    );
+
+    return NextResponse.json(sorted, { headers: PUBLIC_DATA_CACHE_HEADERS });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to load market cards." },
+      { status: 500 }
+    );
   }
-
-  // Fallback JS sort in case referencedTable ordering doesn't work
-  const normalized = ((data ?? []) as Record<string, unknown>[])
-    .map(flattenPriceStatsCardRow)
-    .filter((row): row is Record<string, unknown> => row != null);
-
-  const sorted = withOnePiecePayloadFallbacksList(normalized).sort((a, b) => {
-    const pa = firstRelation(a.price_stats as Record<string, number> | Record<string, number>[] | null);
-    const pb = firstRelation(b.price_stats as Record<string, number> | Record<string, number>[] | null);
-    return (pb?.[orderBy] ?? 0) - (pa?.[orderBy] ?? 0);
-  });
-
-  return NextResponse.json(sorted);
 }

@@ -12,6 +12,7 @@ import {
   type GameScope,
 } from "@/lib/game-scope";
 import { ONE_PIECE_DB_SLUG } from "@/lib/games/one-piece";
+import { cachedPublicData, publicDataCacheKey } from "@/lib/public-data-cache";
 import { firstRelation } from "@/lib/supabase-relations";
 import type { CatalogSetCard } from "./sets-data";
 
@@ -281,7 +282,7 @@ async function loadCatalogOnlySets(
   return { sets, extraSets: [], game: gameResponsePayload(game) };
 }
 
-export async function loadSets(options: {
+async function loadSetsUncached(options: {
   game?: string | null;
   publicOnly?: boolean;
   includeCatalogCards?: boolean;
@@ -605,4 +606,21 @@ export async function loadSets(options: {
   });
 
   return { sets, extraSets, game: gameResponsePayload(game) };
+}
+
+export async function loadSets(options: {
+  game?: string | null;
+  publicOnly?: boolean;
+  includeCatalogCards?: boolean;
+} = {}): Promise<LoadedSets> {
+  const publicOnly = options.publicOnly ?? !allowsPrivateGamePreview();
+  return cachedPublicData(
+    publicDataCacheKey(
+      "sets-loader",
+      options.game ?? "default",
+      publicOnly,
+      Boolean(options.includeCatalogCards)
+    ),
+    () => loadSetsUncached({ ...options, publicOnly })
+  );
 }

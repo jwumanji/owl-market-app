@@ -8,6 +8,7 @@ import {
   resolveGameScope,
 } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
+import { cachedPublicData, publicDataCacheKey } from "@/lib/public-data-cache";
 import { createServiceClient } from "@/lib/supabase-server";
 import { firstRelation, flattenPriceStatsCardRow } from "@/lib/supabase-relations";
 
@@ -29,7 +30,8 @@ const GAMES = [
 
 async function fetchRiftboundTileState() {
   const privatePreview = allowsPrivateGamePreview();
-  try {
+  return cachedPublicData(publicDataCacheKey("home-riftbound-tile", privatePreview), async () => {
+    try {
     const supabase = createServiceClient();
     const gameResult = await resolveGameScope(supabase, "riftbound", {
       defaultToOnePiece: false,
@@ -50,13 +52,15 @@ async function fetchRiftboundTileState() {
 
     if (game.isPublic) return { enabled: true, status };
     return { enabled: privatePreview, status: "Preview" };
-  } catch {
-    return { enabled: privatePreview, status: "Preview" };
-  }
+    } catch {
+      return { enabled: privatePreview, status: "Preview" };
+    }
+  });
 }
 
 async function fetchTopCards(): Promise<TeaserCard[]> {
-  try {
+  return cachedPublicData(publicDataCacheKey("home-top-cards", DEFAULT_PUBLIC_GAME_ROUTE_SLUG), async () => {
+    try {
     const supabase = createServiceClient();
     const gameResult = await resolveGameScope(supabase, DEFAULT_PUBLIC_GAME_ROUTE_SLUG, {
       defaultToOnePiece: true,
@@ -99,9 +103,10 @@ async function fetchTopCards(): Promise<TeaserCard[]> {
         chg_1d: ps?.chg_1d ?? null,
       };
     });
-  } catch {
-    return [];
-  }
+    } catch {
+      return [];
+    }
+  });
 }
 
 export default async function Home() {

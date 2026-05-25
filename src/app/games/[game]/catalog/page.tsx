@@ -12,6 +12,7 @@ import {
   catalogCardType,
 } from "@/lib/catalog-card-fields";
 import { catalogPageDescription } from "@/lib/game-catalog-copy";
+import { cachedPublicData, publicDataCacheKey } from "@/lib/public-data-cache";
 import "./catalog.css";
 
 export const dynamic = "force-dynamic";
@@ -109,7 +110,7 @@ function hrefFor(gameRouteSlug: string, params: CatalogSearchParams) {
   return `${gamePath(gameRouteSlug, "/catalog")}${suffix ? `?${suffix}` : ""}`;
 }
 
-async function loadCatalog(gameRouteSlug: string, searchParams: CatalogSearchParams): Promise<CatalogData> {
+async function loadCatalogUncached(gameRouteSlug: string, searchParams: CatalogSearchParams): Promise<CatalogData> {
   try {
     const supabase = createServiceClient();
     const gameResult = await resolveGameScope(supabase, gameRouteSlug, {
@@ -211,6 +212,21 @@ async function loadCatalog(gameRouteSlug: string, searchParams: CatalogSearchPar
       message: error instanceof Error ? error.message : "Unable to load catalog.",
     };
   }
+}
+
+async function loadCatalog(gameRouteSlug: string, searchParams: CatalogSearchParams): Promise<CatalogData> {
+  return cachedPublicData(
+    publicDataCacheKey(
+      "catalog-page",
+      gameRouteSlug,
+      searchParams.set ?? "",
+      searchParams.rarity ?? "",
+      searchParams.variant ?? "",
+      cleanSearch(searchParams.q),
+      pageIndex(searchParams.page) + 1
+    ),
+    () => loadCatalogUncached(gameRouteSlug, searchParams)
+  );
 }
 
 export async function generateMetadata({ params }: { params: { game: string } }) {

@@ -40,8 +40,13 @@ export default function MarketTable({ cards: initialCards, sets, gameRouteSlug }
   }, [gameRouteSlug]);
 
   useEffect(() => {
+    if (selectedSet === "all" && sortBy === "value") {
+      setCards(initialCards);
+      setLoading(false);
+      return;
+    }
     fetchCards(selectedSet, sortBy);
-  }, [selectedSet, sortBy, fetchCards]);
+  }, [initialCards, selectedSet, sortBy, fetchCards]);
 
   const filtered = useMemo(() => {
     let result = cards;
