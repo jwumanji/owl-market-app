@@ -1,4 +1,18 @@
 import { createServiceClient } from "@/lib/supabase-server";
+import {
+  catalogCardCost,
+  catalogCardDomains,
+  catalogCardType,
+} from "@/lib/catalog-card-fields";
+import { withOnePiecePayloadFallbacks } from "@/lib/game-payload";
+import {
+  allowsPrivateGamePreview,
+  gameResponsePayload,
+  resolveGameScope,
+  type GameScope,
+} from "@/lib/game-scope";
+import { ONE_PIECE_DB_SLUG } from "@/lib/games/one-piece";
+import type { CatalogSetCard } from "./sets-data";
 
 // ---------------------------------------------------------------------------
 // loadSets() — groups cards by cards.printed_set_code so EB04, OP14, OP15 etc
@@ -84,15 +98,213 @@ const TYPE_COLOR: Record<string, string> = {
 export type LoadedSets = {
   sets: Array<Record<string, unknown>>;
   extraSets: Array<Record<string, unknown>>;
+  game: ReturnType<typeof gameResponsePayload>;
 };
 
-export async function loadSets(): Promise<LoadedSets> {
+const CATALOG_TYPE_COLOR: Record<string, string> = {
+  main: "#4F8EF7",
+  st: "#00D68F",
+  promo: "#F472B6",
+  organized: "#E8A020",
+  judge: "#9B72FF",
+};
+const CATALOG_SET_CARD_LIMIT = 24;
+
+type CatalogCardRow = {
+  id: string;
+  set_id: string | null;
+  card_image_id: string | null;
+  card_number: string | null;
+  name: string;
+  rarity: string | null;
+  variant_label: string | null;
+  card_type: string | null;
+  color: string[] | string | null;
+  cost: number | string | null;
+  types: string[] | string | null;
+  image_url: string | null;
+  image_url_small: string | null;
+  game_payload: Record<string, unknown> | null;
+};
+
+function toCatalogSetCard(row: CatalogCardRow): CatalogSetCard {
+  return {
+    id: row.id,
+    cardImageId: row.card_image_id,
+    number: row.card_number,
+    name: row.name,
+    rarity: row.rarity,
+    variant: row.variant_label,
+    type: catalogCardType(row),
+    cost: catalogCardCost(row),
+    domains: catalogCardDomains(row),
+    img: row.image_url_small ?? row.image_url,
+  };
+}
+
+function classifyCatalogType(code: string | null | undefined, setTypeCode: string | null | undefined) {
+  const type = (setTypeCode ?? "").toUpperCase();
+  if (type === "MAIN_SET") return "main";
+  if (type === "PROVING_GROUNDS") return "st";
+  if (type === "ORGANIZED_PLAY_PROMO") return "organized";
+  if (type === "JUDGE_PROMO") return "judge";
+  if (type === "PROMO") return "promo";
+
+  const setCode = (code ?? "").toUpperCase();
+  if (["OGN", "SFD", "UNL"].includes(setCode)) return "main";
+  if (setCode === "OGS") return "st";
+  if (setCode === "OPP") return "organized";
+  if (setCode === "JDG") return "judge";
+  return "promo";
+}
+
+async function loadCatalogOnlySets(
+  supabase: ReturnType<typeof createServiceClient>,
+  game: GameScope,
+  options: { includeCatalogCards?: boolean } = {}
+): Promise<LoadedSets> {
+  const { data: setRows, error: setsErr } = await supabase
+    .from("sets")
+    .select("id, slug, code, name, year, color, card_count, set_type_id")
+    .eq("game_id", game.id)
+    .order("code");
+
+  if (setsErr) throw new Error(setsErr.message);
+
+  const { data: setTypeRows, error: setTypeErr } = await supabase
+    .from("game_set_types")
+    .select("id, code, name")
+    .eq("game_id", game.id);
+
+  if (setTypeErr) throw new Error(setTypeErr.message);
+
+  const setTypeById = new Map(
+    ((setTypeRows ?? []) as Array<{ id: string; code: string | null; name: string | null }>).map((row) => [row.id, row])
+  );
+
+  const normalizedSetRows = (setRows ?? []) as Array<{
+    id: string;
+    slug: string;
+    code: string | null;
+    name: string;
+    year: number | null;
+    color: string | null;
+    card_count: number | null;
+    set_type_id: string | null;
+  }>;
+  const setIds = normalizedSetRows.map((set) => set.id);
+  const cardsBySetId = new Map<string, CatalogSetCard[]>();
+
+  if (options.includeCatalogCards && setIds.length > 0) {
+    const pageSize = 1000;
+    let from = 0;
+
+    while (true) {
+      const { data: cardRows, error: cardsErr } = await supabase
+        .from("cards")
+        .select(`
+          id,
+          set_id,
+          card_image_id,
+          card_number,
+          name,
+          rarity,
+          variant_label,
+          card_type,
+          color,
+          cost,
+          types,
+          image_url,
+          image_url_small,
+          game_payload
+        `)
+        .eq("game_id", game.id)
+        .in("set_id", setIds)
+        .order("set_id")
+        .order("card_number")
+        .range(from, from + pageSize - 1);
+
+      if (cardsErr) throw new Error(cardsErr.message);
+      if (!cardRows || cardRows.length === 0) break;
+
+      for (const cardRow of cardRows as unknown as CatalogCardRow[]) {
+        if (!cardRow.set_id) continue;
+        const cards = cardsBySetId.get(cardRow.set_id) ?? [];
+        if (cards.length < CATALOG_SET_CARD_LIMIT) {
+          cards.push(toCatalogSetCard(cardRow));
+          cardsBySetId.set(cardRow.set_id, cards);
+        }
+      }
+
+      if (cardRows.length < pageSize) break;
+      from += pageSize;
+    }
+  }
+
+  const sets = normalizedSetRows.map((set) => {
+    const setType = set.set_type_id ? setTypeById.get(set.set_type_id) : null;
+    const type = classifyCatalogType(set.code, setType?.code);
+    const color = set.color || CATALOG_TYPE_COLOR[type] || DEFAULT_COLOR;
+    const totalCards = set.card_count ?? 0;
+
+    return {
+      slug: set.slug,
+      code: set.code ?? set.slug,
+      name: set.name,
+      year: set.year,
+      type,
+      color,
+      colorD: hexToRgba(color, 0.14),
+      colorBd: hexToRgba(color, 0.3),
+      price: 0,
+      chg7d: 0,
+      chg1d: 0,
+      chg30d: 0,
+      chgMax: 0,
+      cards: 0,
+      cardsTotal: totalCards,
+      volume: "catalog only",
+      ath: "—",
+      atl: "—",
+      up: true,
+      spark: [10, 10],
+      perf: { h1: "0%", h24: "0%", d7: "0%", m1: "0%", y1: "0%", max: "0%" },
+      perfUp: [true, true, true, true, true, true],
+      topCards: [],
+      catalogCards: cardsBySetId.get(set.id) ?? [],
+      comingSoon: false,
+      pricingStatus: "catalog_only",
+    };
+  });
+
+  return { sets, extraSets: [], game: gameResponsePayload(game) };
+}
+
+export async function loadSets(options: {
+  game?: string | null;
+  publicOnly?: boolean;
+  includeCatalogCards?: boolean;
+} = {}): Promise<LoadedSets> {
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, options.game, {
+    defaultToOnePiece: true,
+    publicOnly: options.publicOnly ?? !allowsPrivateGamePreview(),
+  });
+
+  if (gameResult.error) {
+    throw new Error(gameResult.error.message);
+  }
+  const game: GameScope = gameResult.game;
+
+  if (game.slug !== ONE_PIECE_DB_SLUG) {
+    return loadCatalogOnlySets(supabase, game, { includeCatalogCards: options.includeCatalogCards });
+  }
 
   // 1. All sets meta (for name / year / color lookup keyed by code)
   const { data: allSets, error: setsErr } = await supabase
     .from("sets")
     .select("id, slug, code, name, year, color, card_count")
+    .eq("game_id", game.id)
     .order("code");
 
   if (setsErr) throw new Error(setsErr.message);
@@ -123,6 +335,7 @@ export async function loadSets(): Promise<LoadedSets> {
         id,
         set_id,
         printed_set_code,
+        game_payload,
         name,
         card_number,
         card_image_id,
@@ -141,6 +354,7 @@ export async function loadSets(): Promise<LoadedSets> {
           atl
         )
       `)
+      .eq("game_id", game.id)
       .order("id", { ascending: true })
       .range(from, from + pageSize - 1);
 
@@ -175,7 +389,8 @@ export async function loadSets(): Promise<LoadedSets> {
   const cardsByCode: Record<string, CardCore[]> = {};
   const totalRowsByCode: Record<string, number> = {};
 
-  for (const card of allCards) {
+  for (const cardRow of allCards) {
+    const card = withOnePiecePayloadFallbacks(cardRow);
     const rawCode = (card.printed_set_code as string | null) ?? null;
     if (!rawCode) continue;
     const code = normalizeCode(rawCode);
@@ -254,6 +469,7 @@ export async function loadSets(): Promise<LoadedSets> {
       const { data: history } = await supabase
         .from("price_history")
         .select("card_id, tcg_market, recorded_at")
+        .eq("game_id", game.id)
         .in("card_id", chunk)
         .gte("recorded_at", sinceIso)
         .order("recorded_at", { ascending: true });
@@ -387,5 +603,5 @@ export async function loadSets(): Promise<LoadedSets> {
     return String(a.code).localeCompare(String(b.code));
   });
 
-  return { sets, extraSets };
+  return { sets, extraSets, game: gameResponsePayload(game) };
 }

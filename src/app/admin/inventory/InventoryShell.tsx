@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import InventoryTabs, { InventoryRow } from "./InventoryTabs";
 import type { InventoryBundleSummary } from "../bundles/bundle-types";
 import type { CustomerOrderSummary } from "../orders/order-types";
+import { DEFAULT_PUBLIC_GAME_DB_SLUG } from "@/lib/game-scope";
 
 type InventoryStatus = "new" | "grading" | "sale" | "ship" | "sold";
 type StatusFilter = InventoryStatus | "all";
@@ -25,6 +26,7 @@ export default function InventoryShell({
   bundlesError = null,
   initialStatusFilter = "all",
   initialPsa10CandidatesOnly = false,
+  gameSlug = DEFAULT_PUBLIC_GAME_DB_SLUG,
 }: {
   items: InventoryRow[];
   orders?: CustomerOrderSummary[];
@@ -33,6 +35,7 @@ export default function InventoryShell({
   bundlesError?: string | null;
   initialStatusFilter?: StatusFilter;
   initialPsa10CandidatesOnly?: boolean;
+  gameSlug?: string;
 }) {
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatusFilter);
@@ -163,6 +166,7 @@ export default function InventoryShell({
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
         psa10CandidatesOnly={psa10CandidatesOnly}
+        gameSlug={gameSlug}
       />
     </>
   );

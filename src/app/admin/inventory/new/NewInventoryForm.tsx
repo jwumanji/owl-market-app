@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { DEFAULT_PUBLIC_GAME_DB_SLUG } from "@/lib/game-scope";
 import { GRADED_RATINGS, type CatalogMatchStatus, type GradedRating, type InventoryStatus, type InventoryType } from "@/lib/inventory-options";
 
 type PurchasedFrom = "facebook" | "ebay" | "instagram" | "direct_person" | "event";
@@ -95,7 +96,11 @@ function todayDateString() {
   return new Date(now.getTime() - offset * 60_000).toISOString().slice(0, 10);
 }
 
-export default function NewInventoryForm() {
+export default function NewInventoryForm({
+  gameSlug = DEFAULT_PUBLIC_GAME_DB_SLUG,
+}: {
+  gameSlug?: string;
+}) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CardSearchResult[]>([]);
@@ -140,7 +145,8 @@ export default function NewInventoryForm() {
     }
 
     setLoading(true);
-    const res = await fetch(`/api/admin/cards/search?q=${encodeURIComponent(value)}`);
+    const params = new URLSearchParams({ q: value, game: gameSlug });
+    const res = await fetch(`/api/admin/cards/search?${params}`);
     setLoading(false);
 
     if (!res.ok) {
@@ -183,6 +189,7 @@ export default function NewInventoryForm() {
       cost_basis: costBasis,
       purchased_from: purchasedFrom,
       notes,
+      game: gameSlug,
     };
 
     const hasScanUploads = Boolean(frontScan || backScan);
@@ -211,7 +218,7 @@ export default function NewInventoryForm() {
       return;
     }
 
-    router.push("/admin/inventory");
+    router.push(`/admin/inventory?game=${encodeURIComponent(gameSlug)}`);
   }
 
   const selectedCardId = selectedCard?.id ?? null;
@@ -616,7 +623,7 @@ export default function NewInventoryForm() {
 
           <div className="flex gap-3 lg:col-span-2">
             <a
-              href="/admin/inventory"
+              href={`/admin/inventory?game=${encodeURIComponent(gameSlug)}`}
               className="admin-btn admin-btn-ghost"
             >
               Cancel

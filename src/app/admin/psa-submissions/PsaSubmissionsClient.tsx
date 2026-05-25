@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { DEFAULT_PUBLIC_GAME_DB_SLUG } from "@/lib/game-scope";
 
 export type PsaSubmissionItemView = {
   row_number: number | null;
@@ -33,6 +34,7 @@ export type PsaSubmissionView = {
 
 type Props = {
   initialSubmissions: PsaSubmissionView[];
+  gameSlug?: string;
 };
 
 type GradeCount = {
@@ -229,7 +231,10 @@ function GradePills({ counts }: { counts: GradeCount[] }) {
   });
 }
 
-export default function PsaSubmissionsClient({ initialSubmissions }: Props) {
+export default function PsaSubmissionsClient({
+  initialSubmissions,
+  gameSlug = DEFAULT_PUBLIC_GAME_DB_SLUG,
+}: Props) {
   const [submissions, setSubmissions] = useState(initialSubmissions);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -259,10 +264,10 @@ export default function PsaSubmissionsClient({ initialSubmissions }: Props) {
 
     setSavingId(submission.id);
     setError(null);
-    const res = await fetch(`/api/admin/psa-submissions/${submission.id}`, {
+    const res = await fetch(`/api/admin/psa-submissions/${submission.id}?game=${encodeURIComponent(gameSlug)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: nextName }),
+      body: JSON.stringify({ name: nextName, game: gameSlug }),
     });
     const payload = await res.json().catch(() => null);
     setSavingId(null);

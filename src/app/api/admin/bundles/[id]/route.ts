@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { INVENTORY_STATUSES, type InventoryStatus } from "@/lib/inventory-options";
 import { SALE_CHANNELS, type SaleChannel } from "@/lib/sale-options";
+import {
+  gameParamFromBody,
+  gameParamFromRequest,
+  resolveGameScope,
+} from "@/lib/game-scope";
 import { createServiceClient } from "@/lib/supabase-server";
 
 type RequestBody = Record<string, unknown>;
@@ -69,6 +74,7 @@ function inventoryItemIds(body: RequestBody) {
 
 async function validateInventoryItems(
   supabase: ReturnType<typeof createServiceClient>,
+  gameId: string,
   bundleId: string,
   ids: string[]
 ) {
@@ -79,6 +85,7 @@ async function validateInventoryItems(
   const inventoryRes = await supabase
     .from("inventory_items")
     .select("id")
+    .eq("game_id", gameId)
     .in("id", ids);
 
   if (inventoryRes.error) {
@@ -92,6 +99,7 @@ async function validateInventoryItems(
   const assignedRes = await supabase
     .from("inventory_bundle_items")
     .select("bundle_id, inventory_item_id")
+    .eq("game_id", gameId)
     .in("inventory_item_id", ids);
 
   if (assignedRes.error) {
@@ -106,10 +114,11 @@ async function validateInventoryItems(
   return { error: null };
 }
 
-async function currentInventoryIds(supabase: ReturnType<typeof createServiceClient>, bundleId: string) {
+async function currentInventoryIds(supabase: ReturnType<typeof createServiceClient>, gameId: string, bundleId: string) {
   const linksRes = await supabase
     .from("inventory_bundle_items")
     .select("inventory_item_id")
+    .eq("game_id", gameId)
     .eq("bundle_id", bundleId);
 
   if (linksRes.error) {
@@ -150,12 +159,22 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   const supabase = createServiceClient();
-  const inventoryValidation = await validateInventoryItems(supabase, params.id, ids);
+  const gameResult = await resolveGameScope(
+    supabase,
+    gameParamFromBody(requestBody) ?? gameParamFromRequest(request)
+  );
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
+
+  const inventoryValidation = await validateInventoryItems(supabase, game.id, params.id, ids);
   if (inventoryValidation.error) {
     return NextResponse.json({ error: inventoryValidation.error }, { status: 400 });
   }
 
-  const existingIds = await currentInventoryIds(supabase, params.id);
+  const existingIds = await currentInventoryIds(supabase, game.id, params.id);
   const nextIds = new Set(ids);
   const previousIds = new Set(existingIds);
   const removedIds = existingIds.filter((id) => !nextIds.has(id));
@@ -172,6 +191,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       sold_price: "value" in soldPrice ? soldPrice.value : null,
       updated_at: new Date().toISOString(),
     })
+    .eq("game_id", game.id)
     .eq("id", params.id);
 
   if (bundleRes.error) {
@@ -182,6 +202,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const { error: deleteError } = await supabase
       .from("inventory_bundle_items")
       .delete()
+      .eq("game_id", game.id)
       .eq("bundle_id", params.id)
       .in("inventory_item_id", removedIds);
 
@@ -194,6 +215,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const { error: addError } = await supabase
       .from("inventory_bundle_items")
       .insert(addedIds.map((inventoryItemId, index) => ({
+        game_id: game.id,
         bundle_id: params.id,
         inventory_item_id: inventoryItemId,
         position: existingIds.length + index,
@@ -211,6 +233,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       sale_channel: saleChannel.value,
       sold_date: saleChannel.value === "not_sold" ? null : soldDate,
     })
+    .eq("game_id", game.id)
     .in("id", ids);
 
   if (inventoryError) {
@@ -220,11 +243,19 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   return NextResponse.json({ id: params.id });
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request));
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
+
   const { error } = await supabase
     .from("inventory_bundles")
     .delete()
+    .eq("game_id", game.id)
     .eq("id", params.id);
 
   if (error) {

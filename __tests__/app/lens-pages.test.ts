@@ -71,7 +71,7 @@ test("pregrade page renders standalone workspace and NULL inventory history", as
   const pagePath = path.resolve("src/app/admin/lens/pregrade/page.tsx");
   const ranges: { from: number; to: number }[] = [];
   const nullFilters: { column: string; value: unknown }[] = [];
-  const workspaceProps: Array<{ inventoryItemId?: string | null; cardIdentity: { name: string } }> = [];
+  const workspaceProps: Array<{ gameSlug?: string; inventoryItemId?: string | null; cardIdentity: { name: string } }> = [];
   const rows = [
     {
       id: "measurement-1",
@@ -109,6 +109,9 @@ test("pregrade page renders standalone workspace and NULL inventory history", as
           nullFilters.push({ column, value });
           return query;
         },
+        eq() {
+          return query;
+        },
         order() {
           return query;
         },
@@ -130,9 +133,15 @@ test("pregrade page renders standalone workspace and NULL inventory history", as
     },
   };
   const mocks: Record<string, unknown> = {
+    "../../AdminGameSwitcher": {
+      __esModule: true,
+      default() {
+        return React.createElement("div", { "data-testid": "admin-game-switcher" });
+      },
+    },
     "@/components/centering/CenteringWorkspace": {
       __esModule: true,
-      default(props: { inventoryItemId?: string | null; cardIdentity: { name: string } }) {
+      default(props: { gameSlug?: string; inventoryItemId?: string | null; cardIdentity: { name: string } }) {
         workspaceProps.push(props);
         return React.createElement(
           "div",
@@ -148,6 +157,28 @@ test("pregrade page renders standalone workspace and NULL inventory history", as
     "@/lib/supabase-server": {
       createServiceClient() {
         return supabase;
+      },
+    },
+    "@/lib/admin-games": {
+      loadAdminGameOptions() {
+        return Promise.resolve([{ slug: "one_piece", name: "One Piece Card Game", isPublic: true }]);
+      },
+    },
+    "@/lib/game-scope": {
+      DEFAULT_PUBLIC_GAME_DB_SLUG: "one_piece",
+      resolveGameScope() {
+        return Promise.resolve({
+          game: {
+            id: "game-one-piece",
+            slug: "one_piece",
+            routeSlug: "one-piece",
+            name: "One Piece Card Game",
+            isActive: true,
+            isPublic: true,
+            metadata: { route_slug: "one-piece" },
+          },
+          error: null,
+        });
       },
     },
     "next/link": {
@@ -168,6 +199,7 @@ test("pregrade page renders standalone workspace and NULL inventory history", as
       module: moduleStub,
       process,
       require: localRequire,
+      URLSearchParams,
     }),
     { filename: pagePath }
   );
@@ -177,7 +209,9 @@ test("pregrade page renders standalone workspace and NULL inventory history", as
 
   assert.deepEqual(nullFilters, [{ column: "inventory_item_id", value: null }]);
   assert.deepEqual(ranges, [{ from: 0, to: 19 }]);
-  assert.deepEqual(JSON.parse(JSON.stringify(workspaceProps)), [{ cardIdentity: { name: "Standalone pre-grade" } }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(workspaceProps)), [
+    { gameSlug: "one_piece", cardIdentity: { name: "Standalone pre-grade" } },
+  ]);
   assert.match(html, /data-testid="centering-workspace"/);
   assert.match(html, /Pre-grade History/);
   assert.match(html, /PSA_10/);

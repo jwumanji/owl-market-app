@@ -17,6 +17,8 @@
 //   SUPABASE_SERVICE_ROLE_KEY=... node scripts/merge-duplicate-sets.mjs
 //   SUPABASE_SERVICE_ROLE_KEY=... node scripts/merge-duplicate-sets.mjs --apply
 
+import { loadGameScope, scriptGameSlug, withGameFilter } from "./lib/supabase-game-scope.mjs";
+
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://kiquytaevufssveqmqix.supabase.co";
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!KEY) {
@@ -25,6 +27,7 @@ if (!KEY) {
 }
 const APPLY = process.argv.includes("--apply");
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" };
+const GAME_SLUG = scriptGameSlug();
 
 async function sbGet(path) {
   const r = await fetch(`${SB_URL}/rest/v1/${path}`, { headers: H });
@@ -57,7 +60,10 @@ async function sbDelete(path) {
   return true;
 }
 
-const sets = await sbGet("sets?select=id,code,slug,name,series,created_at&order=created_at.asc");
+const GAME = await loadGameScope({ supabaseUrl: SB_URL, supabaseKey: KEY, gameSlug: GAME_SLUG });
+console.log(`Using game scope: ${GAME.slug}`);
+
+const sets = await sbGet(withGameFilter("sets?select=id,game_id,code,slug,name,series,created_at&order=created_at.asc", GAME.id));
 const byCode = {};
 for (const s of sets) (byCode[s.code] = byCode[s.code] || []).push(s);
 
@@ -97,7 +103,7 @@ console.log("\nFor each duplicate, will migrate row counts in:");
 for (const { duplicates } of plans) {
   for (const d of duplicates) {
     for (const tbl of REFERENCING_TABLES) {
-      const rows = await sbGet(`${tbl}?set_id=eq.${d.id}&select=id`);
+      const rows = await sbGet(withGameFilter(`${tbl}?set_id=eq.${d.id}&select=id`, GAME.id));
       console.log(`  ${tbl}.set_id=${d.id.slice(0, 8)}…: ${rows.length} row(s)`);
     }
   }
@@ -112,10 +118,10 @@ console.log("\nApplying...");
 for (const { code, canonical, duplicates } of plans) {
   for (const d of duplicates) {
     for (const tbl of REFERENCING_TABLES) {
-      const ok = await sbPatch(`${tbl}?set_id=eq.${d.id}`, { set_id: canonical.id });
+      const ok = await sbPatch(withGameFilter(`${tbl}?set_id=eq.${d.id}`, GAME.id), { set_id: canonical.id });
       console.log(`  ${code}: re-pointed ${tbl} from ${d.id.slice(0, 8)}… → ${canonical.id.slice(0, 8)}…: ${ok ? "ok" : "FAILED"}`);
     }
-    const okDel = await sbDelete(`sets?id=eq.${d.id}`);
+    const okDel = await sbDelete(withGameFilter(`sets?id=eq.${d.id}`, GAME.id));
     console.log(`  ${code}: deleted duplicate set ${d.id.slice(0, 8)}…: ${okDel ? "ok" : "FAILED"}`);
   }
 }

@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { getCurrentAdminUser } from "@/lib/admin-user";
+import {
+  gameParamFromBody,
+  gameParamFromRequest,
+  resolveGameScope,
+} from "@/lib/game-scope";
 import { createServiceClient } from "@/lib/supabase-server";
 import { CATALOG_MATCH_STATUSES, GRADED_RATINGS, type CatalogMatchStatus } from "@/lib/inventory-options";
 import { isUploadFile, uploadInventoryScan } from "@/lib/inventory-scans";
@@ -12,6 +17,7 @@ import {
 } from "@/lib/private-custom-cards";
 
 type InventorySource = {
+  game_id: string | null;
   card_id: string | null;
   custom_card_id: string | null;
   manual_card_name: string | null;
@@ -131,6 +137,15 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(
+    supabase,
+    gameParamFromBody(body) ?? gameParamFromRequest(request)
+  );
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
 
   if ("card_id" in body || "custom_card_id" in body || "manual_card_name" in body) {
     const cardId = stringValue(body, "card_id")?.trim() || null;
@@ -144,6 +159,22 @@ export async function POST(request: Request) {
 
     if (cardId && customCardId) {
       return NextResponse.json({ error: "Choose a catalog card or a private card, not both" }, { status: 400 });
+    }
+
+    if (cardId) {
+      const { data: catalogCard, error: cardError } = await supabase
+        .from("cards")
+        .select("id")
+        .eq("game_id", game.id)
+        .eq("id", cardId)
+        .maybeSingle();
+
+      if (cardError) {
+        return NextResponse.json({ error: cardError.message }, { status: 500 });
+      }
+      if (!catalogCard) {
+        return NextResponse.json({ error: "Catalog card was not found for this game" }, { status: 400 });
+      }
     }
 
     if (!cardId && !customCardId && !manualName) {
@@ -224,7 +255,7 @@ export async function POST(request: Request) {
     }
 
     if (customCardId && currentUser) {
-      const privateCardResult = await getPrivateCustomCard(supabase, currentUser.id, customCardId);
+      const privateCardResult = await getPrivateCustomCard(supabase, currentUser.id, customCardId, game.id);
       if (privateCardResult.error || !privateCardResult.card) {
         const message = isMissingPrivateCustomCardsError(privateCardResult.error)
           ? "Private card table is not ready. Run schema-migration-v25-private-custom-cards.sql in Supabase."
@@ -234,7 +265,7 @@ export async function POST(request: Request) {
 
       privateCustomCard = privateCardResult.card;
       if (customImageFrontUrl) {
-        await updatePrivateCustomCardImages(supabase, currentUser.id, customCardId, customImageFrontUrl);
+        await updatePrivateCustomCardImages(supabase, currentUser.id, customCardId, customImageFrontUrl, undefined, game.id);
       }
     }
 
@@ -246,7 +277,7 @@ export async function POST(request: Request) {
         image_url: customImageFrontUrl,
         image_url_small: customImageFrontUrl,
         notes: typeof body.notes === "string" ? body.notes.trim() || null : null,
-      });
+      }, game.id);
 
       if (privateCardResult.error || !privateCardResult.card) {
         const message = isMissingPrivateCustomCardsError(privateCardResult.error)
@@ -269,6 +300,7 @@ export async function POST(request: Request) {
     }
 
     const rows = Array.from({ length: quantity }, () => ({
+      game_id: game.id,
       card_id: cardId,
       custom_card_id: cardId ? null : customCardId,
       manual_card_name: cardId ? null : privateCustomCard?.name ?? manualName,
@@ -316,7 +348,8 @@ export async function POST(request: Request) {
 
   const { data: source, error: sourceError } = await supabase
     .from("inventory_items")
-    .select("card_id, custom_card_id, manual_card_name, manual_card_number, manual_set_code, catalog_match_status, item_nickname, pending_card_match, inventory_type, status, graded_rating, certification_number, custom_image_front_url, custom_image_back_url, customer_name, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from, notes")
+    .select("game_id, card_id, custom_card_id, manual_card_name, manual_card_number, manual_set_code, catalog_match_status, item_nickname, pending_card_match, inventory_type, status, graded_rating, certification_number, custom_image_front_url, custom_image_back_url, customer_name, shipping_tracking, shipping_label_url, shipped_at, sale_channel, sold_date, sold_price, acquired_at, cost_basis, purchased_from, notes")
+    .eq("game_id", game.id)
     .eq("id", sourceId)
     .single();
 
@@ -328,6 +361,7 @@ export async function POST(request: Request) {
   const { data, error } = await supabase
     .from("inventory_items")
     .insert({
+      game_id: game.id,
       card_id: item.card_id,
       custom_card_id: item.custom_card_id,
       manual_card_name: item.manual_card_name,
@@ -384,10 +418,35 @@ export async function DELETE(request: Request) {
   }
 
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(
+    supabase,
+    gameParamFromBody(body) ?? gameParamFromRequest(request)
+  );
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
+
+  const { data: scopedItems, error: scopedError } = await supabase
+    .from("inventory_items")
+    .select("id")
+    .eq("game_id", game.id)
+    .in("id", ids);
+
+  if (scopedError) {
+    return NextResponse.json({ error: scopedError.message }, { status: 500 });
+  }
+
+  const scopedIds = (scopedItems ?? []).map((item) => item.id);
+  if (scopedIds.length !== ids.length) {
+    return NextResponse.json({ error: "One or more inventory items were not found for this game" }, { status: 404 });
+  }
+
   const { error: orderLinkError } = await supabase
     .from("customer_order_items")
     .delete()
-    .in("inventory_item_id", ids);
+    .in("inventory_item_id", scopedIds);
 
   if (orderLinkError) {
     return NextResponse.json({ error: `Could not unlink deleted items from orders: ${orderLinkError.message}` }, { status: 500 });
@@ -396,7 +455,7 @@ export async function DELETE(request: Request) {
   const { error: psaLinkError } = await supabase
     .from("psa_submission_items")
     .update({ inventory_item_id: null })
-    .in("inventory_item_id", ids);
+    .in("inventory_item_id", scopedIds);
 
   if (psaLinkError) {
     return NextResponse.json({ error: `Could not preserve PSA submission links: ${psaLinkError.message}` }, { status: 500 });
@@ -405,7 +464,8 @@ export async function DELETE(request: Request) {
   const { data, error } = await supabase
     .from("inventory_items")
     .delete()
-    .in("id", ids)
+    .eq("game_id", game.id)
+    .in("id", scopedIds)
     .select("id");
 
   if (error) {

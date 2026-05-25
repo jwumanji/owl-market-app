@@ -6,6 +6,7 @@
 //   --fix-isolated-outliers delete interior rows that spike away from both neighbors
 
 import fs from "node:fs";
+import { loadGameScope, scriptGameSlug, withGameFilter } from "./lib/supabase-game-scope.mjs";
 
 const REPORT_PATH = "price-history-cleanup-plan.md";
 const APPLY = process.argv.includes("--apply");
@@ -41,6 +42,7 @@ loadEnvFile();
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const GAME_SLUG = scriptGameSlug();
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
@@ -72,11 +74,11 @@ async function sbFetchAll(path, pageSize = 1000) {
   return rows;
 }
 
-async function deleteHistoryRows(ids) {
+async function deleteHistoryRows(ids, gameId) {
   const chunkSize = 75;
   for (let i = 0; i < ids.length; i += chunkSize) {
     const chunk = ids.slice(i, i + chunkSize);
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/price_history?id=in.(${chunk.join(",")})`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/price_history?id=in.(${chunk.join(",")})&game_id=eq.${encodeURIComponent(gameId)}`, {
       method: "DELETE",
       headers: restHeaders({ Prefer: "return=minimal" }),
     });
@@ -198,11 +200,12 @@ function cardLabel(card, setById) {
 }
 
 async function main() {
-  console.log("Loading Supabase cards and price_history...");
+  const game = await loadGameScope({ supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_KEY, gameSlug: GAME_SLUG });
+  console.log(`Loading Supabase cards and price_history for game scope: ${game.slug}...`);
   const [sets, cards, historyRows] = await Promise.all([
-    sbFetchAll("sets?select=id,code,slug,name"),
-    sbFetchAll("cards?select=id,set_id,card_number,name,variant_label,price_stats(tcg_market,market_avg,updated_at)"),
-    sbFetchAll("price_history?select=id,card_id,tcg_market,market_avg,recorded_at&order=recorded_at.asc,id.asc"),
+    sbFetchAll(withGameFilter("sets?select=id,code,slug,name", game.id)),
+    sbFetchAll(withGameFilter("cards?select=id,set_id,card_number,name,variant_label,price_stats(tcg_market,market_avg,updated_at)", game.id)),
+    sbFetchAll(withGameFilter("price_history?select=id,card_id,tcg_market,market_avg,recorded_at&order=recorded_at.asc,id.asc", game.id)),
   ]);
 
   const setById = new Map(sets.map((set) => [set.id, set]));
@@ -295,6 +298,7 @@ async function main() {
   report.push("# Price History Cleanup Plan");
   report.push("");
   report.push(`Generated: ${new Date().toISOString()}`);
+  report.push(`Game: ${game.name ?? game.slug} (${game.slug})`);
   report.push(`Mode: ${APPLY ? "apply" : "dry-run"}`);
   report.push(`Fix severe latest: ${FIX_SEVERE_LATEST}`);
   report.push(`Fix isolated outliers: ${FIX_ISOLATED_OUTLIERS}`);
@@ -346,7 +350,7 @@ async function main() {
 
   if (idsToDelete.length > 0) {
     console.log("Deleting planned price_history rows...");
-    await deleteHistoryRows(idsToDelete);
+    await deleteHistoryRows(idsToDelete, game.id);
   }
   console.log("Cleanup apply complete.");
 }

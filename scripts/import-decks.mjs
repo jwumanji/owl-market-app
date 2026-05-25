@@ -17,6 +17,9 @@ const SB_HEADERS = {
 
 const OPT_BASE = "https://optcgapi.com/api";
 const SLEEP_MS = 500;
+const ONE_PIECE_DB_SLUG = "one_piece";
+const SET_UPSERT_CONFLICT = "game_id,slug";
+const CARD_UPSERT_CONFLICT = "game_id,card_image_id";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -94,7 +97,7 @@ async function fetchJson(url) {
 async function sbUpsert(table, rows, onConflict) {
   if (rows.length === 0) return true;
   const r = await fetch(
-    `${SUPABASE_URL}/rest/v1/${table}?on_conflict=${onConflict}`,
+    `${SUPABASE_URL}/rest/v1/${table}?on_conflict=${encodeURIComponent(onConflict)}`,
     {
       method: "POST",
       headers: { ...SB_HEADERS, Prefer: "resolution=merge-duplicates,return=minimal" },
@@ -108,9 +111,23 @@ async function sbUpsert(table, rows, onConflict) {
   return true;
 }
 
-async function getSetUuid(dbId) {
+async function loadOnePieceGame() {
   const r = await fetch(
-    `${SUPABASE_URL}/rest/v1/sets?code=eq.${dbId}&select=id`,
+    `${SUPABASE_URL}/rest/v1/games?select=id,slug,name&slug=eq.${encodeURIComponent(ONE_PIECE_DB_SLUG)}`,
+    { headers: SB_HEADERS },
+  );
+  if (!r.ok) throw new Error(`games lookup failed: ${r.status} ${await r.text()}`);
+  const data = await r.json();
+  const game = data[0] ?? null;
+  if (!game?.id) {
+    throw new Error("One Piece game row is missing. Run the multi-TCG game migration before importing decks.");
+  }
+  return game;
+}
+
+async function getSetUuid(dbId, gameId) {
+  const r = await fetch(
+    `${SUPABASE_URL}/rest/v1/sets?game_id=eq.${encodeURIComponent(gameId)}&code=eq.${encodeURIComponent(dbId)}&select=id`,
     { headers: SB_HEADERS },
   );
   if (!r.ok) throw new Error(`sets lookup failed: ${r.status}`);
@@ -123,10 +140,11 @@ async function getSetUuid(dbId) {
 // so always include all columns — use null when the API has no value.
 // Columns omitted entirely (tcg_product_id, image_url_small, ...) are
 // preserved on update.
-function transformCard(c, setUuid, deckId) {
+function transformCard(c, setUuid, deckId, gameId) {
   const color = nullIfNullStr(c.card_color);
   const subs = nullIfNullStr(c.sub_types);
   return {
+    game_id: gameId,
     card_image_id: reprintSyntheticId(c, deckId),
     card_number: c.card_set_id,
     name: c.card_name,
@@ -148,6 +166,7 @@ function transformCard(c, setUuid, deckId) {
 }
 
 async function main() {
+  const game = await loadOnePieceGame();
   console.log("Fetching deck index...");
   const decks = await fetchJson(`${OPT_BASE}/allDecks/`);
   // Spec gotcha: API returns ST22 out of numeric order — sort defensively.
@@ -162,18 +181,19 @@ async function main() {
     const apiId = deck.structure_deck_id;
 
     try {
-      // 1. Upsert into sets table (idempotent on slug).
+      // 1. Upsert into sets table (idempotent per game slug).
       const setOk = await sbUpsert(
         "sets",
         [
           {
+            game_id: game.id,
             slug: dbId.toLowerCase(),
             code: dbId,
             name: deck.structure_deck_name,
             series: "STARTER",
           },
         ],
-        "slug",
+        SET_UPSERT_CONFLICT,
       );
       if (!setOk) {
         setErrors++;
@@ -181,7 +201,7 @@ async function main() {
       }
 
       // 2. Resolve UUID for the FK.
-      const setUuid = await getSetUuid(dbId);
+      const setUuid = await getSetUuid(dbId, game.id);
       if (!setUuid) {
         console.error(`[${dbId}] set lookup returned no row — skipping`);
         setErrors++;
@@ -196,13 +216,13 @@ async function main() {
         continue;
       }
 
-      // 4. Upsert each card on (card_image_id). Dedupe by card_image_id
+      // 4. Upsert each card on (game_id, card_image_id). Dedupe by card_image_id
       //    within the batch — Postgres rejects ON CONFLICT touching the
       //    same row twice in one statement.
       const byId = new Map();
-      for (const c of cards) byId.set(reprintSyntheticId(c, dbId), transformCard(c, setUuid, dbId));
+      for (const c of cards) byId.set(reprintSyntheticId(c, dbId), transformCard(c, setUuid, dbId, game.id));
       const rows = Array.from(byId.values());
-      const cardOk = await sbUpsert("cards", rows, "card_image_id");
+      const cardOk = await sbUpsert("cards", rows, CARD_UPSERT_CONFLICT);
       if (!cardOk) {
         setErrors++;
         continue;

@@ -2,8 +2,10 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { CHARACTERS as FALLBACK_CHARS, TIER_LABELS } from "./characters-data";
+import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
+import { gamePath, gameQueryValue } from "@/lib/game-routes";
 
 /* ── Types ── */
 interface CharacterCard {
@@ -60,6 +62,19 @@ function assignColors(chars: CharacterData[]): CharacterData[] {
     colorBd: c.colorBd || PALETTE[i % PALETTE.length].colorBd,
     spark: c.spark || generateSparkFromChange(c.chg7d, c.chg30d),
   }));
+}
+
+function routeParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function gameDisplayName(gameRouteSlug: string) {
+  if (gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG) return "One Piece TCG";
+  return gameRouteSlug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function generateSparkFromChange(chg7d: number, chg30d: number): number[] {
@@ -168,7 +183,7 @@ function CharAvatar({ src, name, size = 28 }: { src: string | null; name: string
 }
 
 /* ── Card Image with Hover Preview ── */
-function CardImageCell({ card }: { card: CharacterCard }) {
+function CardImageCell({ card, gameRouteSlug }: { card: CharacterCard; gameRouteSlug: string }) {
   const router = useRouter();
   const [showPreview, setShowPreview] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
@@ -182,7 +197,7 @@ function CardImageCell({ card }: { card: CharacterCard }) {
   };
   const handleClick = () => {
     if (card.cardImageId) {
-      router.push(`/card/${card.cardImageId}`);
+      router.push(gamePath(gameRouteSlug, `/card/${card.cardImageId}`));
     }
   };
 
@@ -392,7 +407,7 @@ function CharacterDetail({ c }: { c: CharacterData }) {
 }
 
 /* ── Character Cards Table ── */
-function CharacterCards({ c }: { c: CharacterData }) {
+function CharacterCards({ c, gameRouteSlug }: { c: CharacterData; gameRouteSlug: string }) {
   return (
     <div className="ch-cards-section">
       <div className="section-header">
@@ -400,7 +415,7 @@ function CharacterCards({ c }: { c: CharacterData }) {
           <div className="section-title">Top Cards &mdash; <span style={{ color: c.color }}>{c.name}</span></div>
           <div className="section-sub">Top {c.topCards.length} highest value cards across all sets</div>
         </div>
-        <Link href="/markets" className="section-action">View all in markets &rarr;</Link>
+        <Link href={gamePath(gameRouteSlug, "/markets")} className="section-action">View all in markets &rarr;</Link>
       </div>
       <div className="cards-table-wrap">
         <table className="cards-table">
@@ -420,7 +435,7 @@ function CharacterCards({ c }: { c: CharacterData }) {
               <tr key={i} className={card.cardImageId ? "ch-card-clickable" : ""}>
                 <td className="rank-n">{i + 1}</td>
                 <td className="ch-card-img-td">
-                  <CardImageCell card={card} />
+                  <CardImageCell card={card} gameRouteSlug={gameRouteSlug} />
                 </td>
                 <td>
                   <div className="card-cell">
@@ -508,28 +523,48 @@ function AllCharactersGrid({ chars, activeSlug, onSelect }: { chars: CharacterDa
 /* ── Main Page ── */
 
 export default function CharactersPage() {
-  const [characters, setCharacters] = useState<CharacterData[]>(() => assignColors(FALLBACK_CHARS));
-  const [activeChar, setActiveChar] = useState(FALLBACK_CHARS[0].slug);
+  const params = useParams<{ game?: string | string[] }>();
+  const gameRouteSlug = routeParam(params.game) ?? DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
+  const isDefaultGame = gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
+  const [characters, setCharacters] = useState<CharacterData[]>(() => isDefaultGame ? assignColors(FALLBACK_CHARS) : []);
+  const [activeChar, setActiveChar] = useState(isDefaultGame ? FALLBACK_CHARS[0].slug : "");
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
-    fetch("/api/characters")
+    if (isDefaultGame) {
+      setCharacters(assignColors(FALLBACK_CHARS));
+      setActiveChar(FALLBACK_CHARS[0].slug);
+    } else {
+      setCharacters([]);
+      setActiveChar("");
+    }
+    setLoading(true);
+
+    const query = new URLSearchParams({ game: gameQueryValue(gameRouteSlug) });
+    fetch(`/api/characters?${query}`)
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
           setCharacters(assignColors(data));
           setActiveChar(data[0].slug);
+        } else if (!isDefaultGame) {
+          setCharacters([]);
+          setActiveChar("");
         }
       })
       .catch(() => {
-        // keep fallback data
+        if (!isDefaultGame) {
+          setCharacters([]);
+          setActiveChar("");
+        }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [gameRouteSlug, isDefaultGame]);
 
   const c = characters.find((x) => x.slug === activeChar) || characters[0];
+  const hasCharacters = Boolean(c);
 
   const selectChar = useCallback((slug: string) => {
     setActiveChar(slug);
@@ -560,7 +595,7 @@ export default function CharactersPage() {
         <span className="bsep"> &rsaquo; </span>
         <span style={{ color: "var(--ink)" }}>Characters</span>
       </div>
-      <div className="ph-eyebrow">One Piece TCG</div>
+      <div className="ph-eyebrow">{gameDisplayName(gameRouteSlug)}</div>
       <div className="ph-title">
         Character <span>Index</span>
       </div>
@@ -569,50 +604,70 @@ export default function CharactersPage() {
         {loading ? " Loading live data..." : " Updates with live data"}
       </div>
 
-      {/* Search + All Characters Dropdown */}
-      <CharToolbar
-        search={search}
-        onSearchChange={setSearch}
-        characters={characters}
-        activeSlug={activeChar}
-        onSelect={selectChar}
-      />
-
-      {/* Top 10 Rank Cards */}
-      <div className="ch-rank-row">
-        {top10.map((ch, i) => (
-          <RankCard key={ch.slug} c={ch} rank={i + 1} active={activeChar === ch.slug} onClick={() => selectChar(ch.slug)} />
-        ))}
-      </div>
-
-      {/* Detail + Cards */}
-      <div className="ch-detail-section">
-        <CharacterDetail c={c} />
-        <CharacterCards c={c} />
-      </div>
-
-      {/* See All Characters Button / Grid */}
-      {!showAll ? (
-        <div className="ch-see-all-wrap">
-          <button className="ch-see-all-btn" onClick={() => setShowAll(true)}>
-            See All Characters
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </button>
-        </div>
-      ) : (
-        <>
-          <AllCharactersGrid chars={filteredChars} activeSlug={activeChar} onSelect={selectChar} />
-          <div className="ch-see-all-wrap">
-            <button className="ch-see-all-btn" onClick={() => setShowAll(false)}>
-              Collapse
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="18 15 12 9 6 15" />
-              </svg>
-            </button>
+      {!hasCharacters && !loading ? (
+        <div className="ch-detail" style={{ padding: 28, textAlign: "center" }}>
+          <div className="ch-detail-name">No character index yet</div>
+          <div className="ch-detail-sub" style={{ marginTop: 8 }}>
+            {gameDisplayName(gameRouteSlug)} has catalog data loaded, but no character taxonomy or pricing index is enabled yet.
           </div>
+          <div style={{ marginTop: 18 }}>
+            <Link href={gamePath(gameRouteSlug, "/catalog")} className="section-action">
+              Open catalog &rarr;
+            </Link>
+          </div>
+        </div>
+      ) : hasCharacters ? (
+        <>
+          {/* Search + All Characters Dropdown */}
+          <CharToolbar
+            search={search}
+            onSearchChange={setSearch}
+            characters={characters}
+            activeSlug={activeChar}
+            onSelect={selectChar}
+          />
+
+          {/* Top 10 Rank Cards */}
+          <div className="ch-rank-row">
+            {top10.map((ch, i) => (
+              <RankCard key={ch.slug} c={ch} rank={i + 1} active={activeChar === ch.slug} onClick={() => selectChar(ch.slug)} />
+            ))}
+          </div>
+
+          {/* Detail + Cards */}
+          <div className="ch-detail-section">
+            <CharacterDetail c={c} />
+            <CharacterCards c={c} gameRouteSlug={gameRouteSlug} />
+          </div>
+
+          {/* See All Characters Button / Grid */}
+          {!showAll ? (
+            <div className="ch-see-all-wrap">
+              <button className="ch-see-all-btn" onClick={() => setShowAll(true)}>
+                See All Characters
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <>
+              <AllCharactersGrid chars={filteredChars} activeSlug={activeChar} onSelect={selectChar} />
+              <div className="ch-see-all-wrap">
+                <button className="ch-see-all-btn" onClick={() => setShowAll(false)}>
+                  Collapse
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="18 15 12 9 6 15" />
+                  </svg>
+                </button>
+              </div>
+            </>
+          )}
         </>
+      ) : (
+        <div className="ch-detail" style={{ padding: 28, textAlign: "center" }}>
+          <div className="ch-detail-sub">Loading character data...</div>
+        </div>
       )}
     </section>
   );

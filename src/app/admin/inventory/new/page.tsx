@@ -4,7 +4,23 @@ export const metadata = {
   title: "Add Inventory - OWL Market",
 };
 
-export default function NewInventoryPage() {
+type NewInventorySearchParams = {
+  game?: string | string[];
+};
+
+function getInitialGame(searchParams?: NewInventorySearchParams) {
+  const game = Array.isArray(searchParams?.game) ? searchParams?.game[0] : searchParams?.game;
+  return game?.trim() || undefined;
+}
+
+export default async function NewInventoryPage({
+  searchParams,
+}: {
+  searchParams?: NewInventorySearchParams | Promise<NewInventorySearchParams>;
+}) {
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const gameSlug = getInitialGame(resolvedSearchParams);
+
   return (
     <section className="mx-auto max-w-[1100px] pl-7 pr-7 py-8">
       <div className="admin-page-head">
@@ -17,7 +33,7 @@ export default function NewInventoryPage() {
         </div>
       </div>
 
-      <NewInventoryForm />
+      <NewInventoryForm gameSlug={gameSlug} />
     </section>
   );
 }

@@ -1,5 +1,7 @@
+import { ONE_PIECE_JUSTTCG_GAME_SLUG, parseVariant } from "@/lib/games/one-piece";
+
 const BASE = "https://api.justtcg.com/v1";
-const GAME = "one-piece-card-game";
+const GAME = ONE_PIECE_JUSTTCG_GAME_SLUG;
 
 function headers(): HeadersInit {
   const key = process.env.JUSTTCG_API_KEY;
@@ -100,24 +102,4 @@ export function getNearMintPrice(card: JustTCGCard): JustTCGVariant | null {
   );
 }
 
-/**
- * Parse variant type from JustTCG card name.
- * Returns null for base cards, "Parallel" for parallels, etc.
- */
-export function parseVariant(name: string): string | null {
-  if (/\(Manga\)/i.test(name)) return "Manga";
-  if (/\(Red Super Alternate Art\)/i.test(name)) return "Red Super Alternate Art";
-  if (/\(Super Alternate Art\)/i.test(name)) return "Super Alternate Art";
-  if (/\(SP\).*\(Gold\)/i.test(name)) return "SP Gold";
-  if (/\(SP\).*\(Silver\)/i.test(name)) return "SP Silver";
-  if (/\(SP\)/i.test(name)) return "SP";
-  if (/\(SPR\)/i.test(name)) return "SP";
-  if (/\(TR\)/i.test(name)) return "TR";
-  if (/\(Alternate Art\)/i.test(name)) return "Alternate Art";
-  if (/\(Parallel\)/i.test(name)) return "Parallel";
-  if (/\(Wanted Poster\)/i.test(name)) return "Wanted Poster";
-  if (/\(Gold-Stamped Signature\)/i.test(name)) return "Gold-Stamped Signature";
-  if (/\(Jolly Roger Foil\)/i.test(name)) return "Jolly Roger Foil";
-  if (/\(Reprint\)/i.test(name)) return "Reprint";
-  return null;
-}
+export { parseVariant };

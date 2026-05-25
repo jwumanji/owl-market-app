@@ -2,6 +2,9 @@
 
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
+import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
+import { gamePath, gameQueryValue } from "@/lib/game-routes";
 import {
   RARITIES as FALLBACK_RARITIES,
   TOP_5_SLUGS,
@@ -27,7 +30,12 @@ function rarityClass(rarity: string): string {
   return "rb-r";
 }
 
-function buildTieredRarities(apiData: RarityData[], fallback: RarityData[]) {
+function buildTieredRarities(apiData: RarityData[], fallback: RarityData[], useFallbackOrdering: boolean) {
+  if (!useFallbackOrdering) {
+    const all = apiData;
+    return { top5: all.slice(0, 5), tier2: all.slice(5, 10), all };
+  }
+
   const lookup = new Map<string, RarityData>();
   for (const r of apiData) lookup.set(r.slug, r);
   for (const r of fallback) if (!lookup.has(r.slug)) lookup.set(r.slug, r);
@@ -35,6 +43,19 @@ function buildTieredRarities(apiData: RarityData[], fallback: RarityData[]) {
   const top5 = TOP_5_SLUGS.map((s) => lookup.get(s)).filter(Boolean) as RarityData[];
   const tier2 = TIER_2_SLUGS.map((s) => lookup.get(s)).filter(Boolean) as RarityData[];
   return { top5, tier2, all: [...top5, ...tier2] };
+}
+
+function routeParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function gameDisplayName(gameRouteSlug: string) {
+  if (gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG) return "One Piece TCG";
+  return gameRouteSlug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 /* ── Rarity Ranking Card (top 5) ── */
@@ -84,6 +105,7 @@ function RankCard({ r, rank, active, onClick }: { r: RarityData; rank: number; a
 
 /* ── Small Rank Card (tier 2, #6-10) ── */
 function SmallRankCard({ r, rank, active, onClick }: { r: RarityData; rank: number; active: boolean; onClick: () => void }) {
+  const catalogOnly = r.pricingStatus === "catalog_only";
   return (
     <div
       className="ch-rank-card ch-rank-card-sm"
@@ -98,12 +120,18 @@ function SmallRankCard({ r, rank, active, onClick }: { r: RarityData; rank: numb
         <span className={`rb ${rarityClass(r.code)}`} style={{ fontSize: 9 }}>{r.code}</span>
       </div>
       <div className="ch-rank-name">{r.name}</div>
-      <div className="ch-rank-price">${r.indexValue.toLocaleString()}</div>
+      <div className="ch-rank-price">
+        {catalogOnly ? `${r.cardCount.toLocaleString()} cards` : `$${r.indexValue.toLocaleString()}`}
+      </div>
       <div
         className="ch-rank-chg"
         style={{ color: r.chg7d === 0 ? "var(--ink-3)" : r.up ? "var(--gain-2)" : "var(--loss-2)" }}
       >
-        {r.chg7d === 0 ? "" : r.up ? "\u2191" : "\u2193"} {Math.abs(r.chg7d)}% <span className="ch-rank-period">7D</span>
+        {catalogOnly ? "\u00A0" : (
+          <>
+            {r.chg7d === 0 ? "" : r.up ? "\u2191" : "\u2193"} {Math.abs(r.chg7d)}% <span className="ch-rank-period">7D</span>
+          </>
+        )}
       </div>
     </div>
   );
@@ -111,6 +139,7 @@ function SmallRankCard({ r, rank, active, onClick }: { r: RarityData; rank: numb
 
 /* ── Rarity Detail Panel ── */
 function RarityDetail({ r }: { r: RarityData }) {
+  const catalogOnly = r.pricingStatus === "catalog_only";
   return (
     <div className="ch-detail">
       <div className="ch-detail-header" style={{ background: `linear-gradient(135deg,${r.colorD},transparent)` }}>
@@ -124,7 +153,20 @@ function RarityDetail({ r }: { r: RarityData }) {
         <div className="ch-detail-sub">{r.subtitle}</div>
       </div>
       <div className="ch-detail-stats">
-        {r.indexValue > 0 ? (
+        {catalogOnly ? (
+          [
+            ["Catalog Cards", String(r.cardCount), r.color],
+            ["Pricing", "Not enabled", undefined],
+            ["Avg Card Price", "\u2014", undefined],
+            ["7D Change", "\u2014", "var(--ink-3)"],
+            ["30D Change", "\u2014", "var(--ink-3)"],
+          ].map(([k, v, clr]) => (
+            <div className="ch-stat-row" key={k}>
+              <span className="ch-stat-key">{k}</span>
+              <span className="ch-stat-val" style={clr ? { color: clr } : undefined}>{v}</span>
+            </div>
+          ))
+        ) : r.indexValue > 0 ? (
           [
             ["Rarity Index", `$${r.indexValue.toLocaleString()}`, r.color],
             ["Avg Card Price", `$${r.avgCardPrice.toFixed(2)}`, undefined],
@@ -148,7 +190,8 @@ function RarityDetail({ r }: { r: RarityData }) {
 }
 
 /* ── Rarity Cards Table ── */
-function RarityCards({ r }: { r: RarityData }) {
+function RarityCards({ r, gameRouteSlug }: { r: RarityData; gameRouteSlug: string }) {
+  const catalogOnly = r.pricingStatus === "catalog_only";
   return (
     <div className="ch-cards-section">
       <div className="section-header">
@@ -156,11 +199,15 @@ function RarityCards({ r }: { r: RarityData }) {
           <div className="section-title">Top Cards &mdash; <span style={{ color: r.color }}>{r.name}</span></div>
           <div className="section-sub">
             {r.topCards.length > 0
-              ? `${r.topCards.length} highest value ${r.code} cards across all sets`
+              ? catalogOnly
+                ? `${r.topCards.length} catalog preview cards with ${r.code} rarity`
+                : `${r.topCards.length} highest value ${r.code} cards across all sets`
               : "No card data available yet"}
           </div>
         </div>
-        <Link href="/markets" className="section-action">View all in markets &rarr;</Link>
+        <Link href={gamePath(gameRouteSlug, catalogOnly ? "/catalog" : "/markets")} className="section-action">
+          View all in {catalogOnly ? "catalog" : "markets"} &rarr;
+        </Link>
       </div>
       {r.topCards.length > 0 ? (
         <div className="cards-table-wrap">
@@ -178,7 +225,11 @@ function RarityCards({ r }: { r: RarityData }) {
             </thead>
             <tbody>
               {r.topCards.map((card, i) => {
-                const href = card.cardImageId ? `/card/${card.cardImageId}` : undefined;
+                const href = catalogOnly && card.cardId
+                  ? gamePath(gameRouteSlug, `/catalog/${card.cardId}`)
+                  : card.cardImageId
+                    ? gamePath(gameRouteSlug, `/card/${card.cardImageId}`)
+                    : undefined;
                 return (
                 <tr key={i} onClick={href ? () => window.location.href = href : undefined} style={href ? { cursor: "pointer" } : undefined} className={href ? "tr-link" : undefined}>
                   <td className="rank-n">{i + 1}</td>
@@ -196,11 +247,11 @@ function RarityCards({ r }: { r: RarityData }) {
                     </div>
                   </td>
                   <td><span className={`rb ${rarityClass(card.rarity)}`}>{card.rarity}</span></td>
-                  <td className="price-r">${card.avg.toFixed(2)}</td>
-                  <td className="price-r">${card.tcg}</td>
-                  <td className={`chg-r ${card.chg1d >= 0 ? "up" : "dn"}`}>{card.chg1d >= 0 ? "+" : ""}{card.chg1d}%</td>
-                  <td className={`chg-r ${card.chg7d >= 0 ? "up" : "dn"}`}>{card.chg7d >= 0 ? "+" : ""}{card.chg7d}%</td>
-                  <td className={`chg-r ${card.chg30d >= 0 ? "up" : "dn"}`}>{card.chg30d >= 0 ? "+" : ""}{card.chg30d}%</td>
+                  <td className="price-r">{catalogOnly ? "\u2014" : `$${card.avg.toFixed(2)}`}</td>
+                  <td className="price-r">{catalogOnly ? "\u2014" : `$${card.tcg}`}</td>
+                  <td className={`chg-r ${card.chg1d >= 0 ? "up" : "dn"}`}>{catalogOnly ? "\u2014" : `${card.chg1d >= 0 ? "+" : ""}${card.chg1d}%`}</td>
+                  <td className={`chg-r ${card.chg7d >= 0 ? "up" : "dn"}`}>{catalogOnly ? "\u2014" : `${card.chg7d >= 0 ? "+" : ""}${card.chg7d}%`}</td>
+                  <td className={`chg-r ${card.chg30d >= 0 ? "up" : "dn"}`}>{catalogOnly ? "\u2014" : `${card.chg30d >= 0 ? "+" : ""}${card.chg30d}%`}</td>
                 </tr>
                 );
               })}
@@ -219,25 +270,31 @@ function RarityCards({ r }: { r: RarityData }) {
 /* ── Main Page ── */
 
 export default function RaritiesPage() {
+  const params = useParams<{ game?: string | string[] }>();
+  const gameRouteSlug = routeParam(params.game) ?? DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
+  const isDefaultGame = gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
   const [allRarities, setAllRarities] = useState<RarityData[]>([]);
   const [activeRarity, setActiveRarity] = useState<string>(TOP_5_SLUGS[0]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/rarities", { cache: "no-store" })
+    const query = new URLSearchParams({ game: gameQueryValue(gameRouteSlug) });
+    fetch(`/api/rarities?${query}`, { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
           setAllRarities(data);
+          if (!isDefaultGame) setActiveRarity(data[0].slug);
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [gameRouteSlug, isDefaultGame]);
 
-  const { top5, tier2, all } = buildTieredRarities(allRarities, FALLBACK_RARITIES);
+  const { top5, tier2, all } = buildTieredRarities(allRarities, FALLBACK_RARITIES, isDefaultGame);
   const r = all.find((x) => x.slug === activeRarity) || top5[0];
-  const showSkeleton = loading || allRarities.length === 0 || !r;
+  const showSkeleton = loading || (isDefaultGame && (allRarities.length === 0 || !r));
+  const showEmpty = !loading && !isDefaultGame && all.length === 0;
 
   const selectRarity = useCallback((slug: string) => {
     setActiveRarity(slug);
@@ -251,7 +308,7 @@ export default function RaritiesPage() {
         <span className="bsep"> &rsaquo; </span>
         <span style={{ color: "var(--ink)" }}>Rarities</span>
       </div>
-      <div className="ph-eyebrow">One Piece TCG</div>
+      <div className="ph-eyebrow">{gameDisplayName(gameRouteSlug)}</div>
       <div className="ph-title">
         Rarity <span>Index</span>
       </div>
@@ -261,7 +318,16 @@ export default function RaritiesPage() {
           : `${all.length} categories tracked \u00B7 Ranked by total card value \u00B7 Updates with live data`}
       </div>
 
-      {showSkeleton ? (
+      {showEmpty ? (
+        <div className="rar-coming-soon">
+          <p>
+            No rarity taxonomy is available for <strong>{gameDisplayName(gameRouteSlug)}</strong> yet.
+          </p>
+          <Link href={gamePath(gameRouteSlug, "/catalog")} className="section-action">
+            Open catalog &rarr;
+          </Link>
+        </div>
+      ) : showSkeleton ? (
         <>
           <div className="ch-rank-row">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -304,14 +370,14 @@ export default function RaritiesPage() {
           {/* Detail + Cards table */}
           <div className="ch-detail-section">
             <RarityDetail r={r} />
-            <RarityCards r={r} />
+            <RarityCards r={r} gameRouteSlug={gameRouteSlug} />
           </div>
         </>
       )}
 
       {/* See All Cards */}
       <div className="rar-see-all">
-        <Link href="/markets" className="rar-see-all-btn">
+        <Link href={gamePath(gameRouteSlug, all.some((rarity) => rarity.pricingStatus === "catalog_only") ? "/catalog" : "/markets")} className="rar-see-all-btn">
           See All Cards &rarr;
         </Link>
       </div>

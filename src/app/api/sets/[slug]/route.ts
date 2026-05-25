@@ -1,17 +1,34 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { withOnePiecePayloadFallbacksList } from "@/lib/game-payload";
+import {
+  gameParamFromRequest,
+  gameResponsePayload,
+  publicOnlyForCatalogPreview,
+  resolveGameScope,
+} from "@/lib/game-scope";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: { slug: string } }
 ) {
   const { slug } = params;
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
+    defaultToOnePiece: true,
+    publicOnly: publicOnlyForCatalogPreview(),
+  });
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
 
   // 1. Fetch set by slug or code
   const { data: set, error: setErr } = await supabase
     .from("sets")
     .select("id, slug, code, name, series, color, year")
+    .eq("game_id", game.id)
     .or(`slug.eq.${slug},code.ilike.${slug}`)
     .limit(1)
     .single();
@@ -38,6 +55,7 @@ export async function GET(
         rarity,
         card_type,
         color,
+        game_payload,
         image_url,
         image_url_small,
         price_stats (
@@ -49,6 +67,7 @@ export async function GET(
           chg_30d
         )
       `)
+      .eq("game_id", game.id)
       .eq("set_id", set.id)
       .range(from, from + pageSize - 1);
 
@@ -56,10 +75,10 @@ export async function GET(
       return NextResponse.json({ error: cardsErr.message }, { status: 500 });
     }
     if (!batch || batch.length === 0) break;
-    allCards.push(...batch);
+    allCards.push(...withOnePiecePayloadFallbacksList(batch as Record<string, unknown>[]));
     if (batch.length < pageSize) break;
     from += pageSize;
   }
 
-  return NextResponse.json({ set, cards: allCards });
+  return NextResponse.json({ game: gameResponsePayload(game), set, cards: allCards });
 }
