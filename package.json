@@ -10,6 +10,7 @@
     "audit:game-boundaries": "node scripts/audit-game-boundaries.mjs",
     "audit:riftbound-pricing": "node scripts/audit-riftbound-pricing-readiness.mjs",
     "riftbound:audit": "node scripts/riftbound-audit.mjs",
+    "smoke:centering": "node scripts/run-centering-smoke-tests.mjs",
     "owl-lens:sync-contract": "node scripts/owl-lens-sync.mjs",
     "owl-lens:generate-types": "openapi-typescript contracts/owl-lens.openapi.yaml -o src/lib/owl-lens/openapi.generated.ts",
     "owl-lens:check-types": "node scripts/owl-lens-check.mjs"
