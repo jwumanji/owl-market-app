@@ -22,19 +22,28 @@ const componentJavaScript = ts.transpileModule(componentSource, {
 
 type Exports = {
   default: React.ComponentType<{
+    gameSlug?: string | null;
     inventoryItemId?: string | null;
     preloadImageUrl?: string | null;
     cardIdentity: { name: string; setCode?: string | null; cardNumber?: string | null; rarity?: string | null };
   }>;
-  buildMeasurementFormData: (input: { inventoryItemId?: string | null; file: File; manualOverlay?: unknown }) => FormData;
+  buildMeasurementFormData: (input: {
+    gameSlug?: string | null;
+    inventoryItemId?: string | null;
+    file: File;
+    manualOverlay?: unknown;
+  }) => FormData;
   buildResultViewModel: (result: Record<string, unknown>) => Record<string, unknown>;
+  buildWorkspaceContextCopy: (input: { inventoryItemId?: string | null }) => Record<string, unknown>;
   centeringReducer: (state: Record<string, unknown>, action: Record<string, unknown>) => Record<string, unknown>;
   defaultManualOverlay: (width: number, height: number) => Record<string, unknown>;
   downloadReportElement: (input: { element: HTMLElement; filename: string; toPngImpl: () => Promise<string> }) => Promise<void>;
+  failureViewModel: (error: { code?: string; message?: string } | null | undefined) => Record<string, unknown>;
   fetchPreloadedImageFile: (input: { imageUrl: string; fetchImpl: typeof fetch }) => Promise<File>;
   isManualCorrectionError: (error: { code?: string } | null) => boolean;
   measurePreloadedImage: (input: {
     imageUrl: string;
+    gameSlug?: string | null;
     inventoryItemId?: string | null;
     dispatchAction: (action: { type: string; result?: unknown; error?: unknown }) => void;
     onFile: (file: File) => void;
@@ -168,9 +177,11 @@ function measurementResponse() {
 }
 
 function renderWorkspace({
+  gameSlug = "one-piece",
   preloadImageUrl = null,
   inventoryItemId = "inventory-1",
 }: {
+  gameSlug?: string | null;
   preloadImageUrl?: string | null;
   inventoryItemId?: string | null;
 } = {}) {
@@ -178,6 +189,7 @@ function renderWorkspace({
 
   return renderToStaticMarkup(
     React.createElement(exports.default, {
+      gameSlug,
       inventoryItemId,
       preloadImageUrl,
       cardIdentity: {
@@ -223,6 +235,10 @@ function responseLike({
 test("workspace renders measure-this-card button when preload URL is passed", () => {
   const html = renderWorkspace({ preloadImageUrl: "https://cdn.example/cards/front.png" });
 
+  assert.match(html, /Inventory centering/);
+  assert.match(html, /Saves to inventory/);
+  assert.match(html, /Results attach to this inventory item/);
+  assert.match(html, /Measure the saved front image and save the centering result to this inventory item/);
   assert.match(html, /Ready to measure/);
   assert.match(html, /Measure this card/);
   assert.match(html, /Upload a different image/);
@@ -232,18 +248,36 @@ test("workspace renders measure-this-card button when preload URL is passed", ()
 test("workspace renders upload zone when no preload URL is passed", () => {
   const html = renderWorkspace();
 
-  assert.match(html, /Upload a front scan/);
+  assert.match(html, /Upload front scan for this inventory item/);
   assert.match(html, /Browse scan/);
+  assert.match(html, /Saves to inventory/);
   assert.doesNotMatch(html, /Measure this card/);
 });
 
 test("workspace renders standalone mode without inventory item context", () => {
   const html = renderWorkspace({ inventoryItemId: null, preloadImageUrl: "https://cdn.example/cards/front.png" });
 
-  assert.match(html, /Upload a front scan/);
+  assert.match(html, /Standalone pre-grade/);
+  assert.match(html, /No inventory link/);
+  assert.match(html, /will not attach to inventory/);
+  assert.match(html, /Upload a standalone front scan/);
   assert.match(html, /Browse scan/);
   assert.doesNotMatch(html, /Ready to measure/);
   assert.doesNotMatch(html, /Measure this card/);
+});
+
+test("workspace context copy differentiates inventory and standalone destinations", () => {
+  const { exports } = loadComponent();
+
+  const inventoryCopy = exports.buildWorkspaceContextCopy({ inventoryItemId: "inventory-1" });
+  const standaloneCopy = exports.buildWorkspaceContextCopy({ inventoryItemId: null });
+
+  assert.equal(inventoryCopy.mode, "inventory");
+  assert.equal(inventoryCopy.badge, "Saves to inventory");
+  assert.equal(inventoryCopy.processingTarget, "Result target: inventory item");
+  assert.equal(standaloneCopy.mode, "standalone");
+  assert.equal(standaloneCopy.badge, "No inventory link");
+  assert.equal(standaloneCopy.processingTarget, "Result target: standalone pre-grade");
 });
 
 test("workspace reducer moves through upload, processing, results, failure, and reset states", () => {
@@ -280,6 +314,21 @@ test("result view model renders echoed thresholds and PSA tone", () => {
   ]);
 });
 
+test("failure view model distinguishes manual, validation, and service errors", () => {
+  const { exports } = loadComponent();
+
+  const manual = exports.failureViewModel({ code: "CARD_NOT_DETECTED", message: "No card boundary could be detected." });
+  const validation = exports.failureViewModel({ code: "UNSUPPORTED_MEDIA_TYPE", message: "Upload a JPEG, PNG, or WEBP image." });
+  const service = exports.failureViewModel({ code: "MEASUREMENT_FAILED", message: "Could not reach the centering service." });
+
+  assert.equal(manual.kind, "manual");
+  assert.equal(manual.eyebrow, "Manual correction available");
+  assert.equal(validation.kind, "validation");
+  assert.equal(validation.eyebrow, "Upload needs attention");
+  assert.equal(service.kind, "service");
+  assert.equal(service.eyebrow, "Service unavailable");
+});
+
 test("manual-drag handler updates corrected overlay geometry and gap measurements", () => {
   const { exports } = loadComponent();
   const overlay = exports.defaultManualOverlay(1000, 1400);
@@ -311,6 +360,7 @@ test("manual correction retry payload includes manual_adjustment and corrected c
   });
 
   assert.equal(formData.get("inventoryItemId"), "inventory-1");
+  assert.equal(formData.has("game"), false);
   assert.equal(formData.get("file"), file);
   assert.equal(formData.get("manual_adjustment"), "true");
   assert.deepEqual(JSON.parse(String(formData.get("corrected_overlay"))), JSON.parse(JSON.stringify(overlay)));
@@ -318,15 +368,17 @@ test("manual correction retry payload includes manual_adjustment and corrected c
   assert.equal(exports.isManualCorrectionError({ code: "FILE_TOO_LARGE" }), false);
 });
 
-test("standalone measurement payload omits inventoryItemId", () => {
+test("standalone measurement payload omits inventoryItemId while preserving game scope", () => {
   const { exports } = loadComponent();
   const file = new File(["image"], "card.jpg", { type: "image/jpeg" });
 
   const formData = exports.buildMeasurementFormData({
+    gameSlug: "one-piece",
     file,
   });
 
   assert.equal(formData.has("inventoryItemId"), false);
+  assert.equal(formData.get("game"), "one-piece");
   assert.equal(formData.get("file"), file);
 });
 
@@ -358,6 +410,7 @@ test("measure-this-card action fetches the preloaded image and posts it for meas
 
   const outcome = await exports.measurePreloadedImage({
     imageUrl: "https://cdn.example/cards/front.png",
+    gameSlug: "one-piece",
     inventoryItemId: "inventory-1",
     dispatchAction(action) {
       actions.push(action.type);
@@ -375,6 +428,7 @@ test("measure-this-card action fetches the preloaded image and posts it for meas
   assert.equal(files[0].name, "front.png");
   assert.equal(files[0].type, "image/png");
   assert.equal(postBodies[0].get("inventoryItemId"), "inventory-1");
+  assert.equal(postBodies[0].get("game"), "one-piece");
   assert.equal(postBodies[0].get("file"), files[0]);
 });
 
@@ -401,7 +455,7 @@ test("preloaded image fetch failure returns inline error path and leaves upload 
   assert.equal(outcome.preloadError, exports.PRELOAD_FETCH_ERROR_MESSAGE);
   assert.equal(exports.PRELOAD_FETCH_ERROR_MESSAGE, "Couldn't load saved scan. Upload a fresh image instead.");
   assert.deepEqual(actions, ["startUpload", "reset"]);
-  assert.match(uploadZoneHtml, /Upload a front scan/);
+  assert.match(uploadZoneHtml, /Upload front scan for this inventory item/);
 });
 
 test("download report trigger writes a PNG filename and clicks a download link", async () => {

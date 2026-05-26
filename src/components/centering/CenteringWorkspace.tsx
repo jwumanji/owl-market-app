@@ -59,6 +59,19 @@ type WorkspaceAction =
   | { type: "failure"; error: CenteringError }
   | { type: "reset" };
 
+type WorkspaceContextCopy = {
+  mode: "inventory" | "standalone";
+  eyebrow: string;
+  badge: string;
+  description: string;
+  uploadTitle: string;
+  uploadDescription: string;
+  preloadedDescription: string;
+  processingTarget: string;
+  resultDescription: string;
+  manualDescription: string;
+};
+
 const INITIAL_STATE: WorkspaceState = {
   status: "idle",
   result: null,
@@ -66,6 +79,11 @@ const INITIAL_STATE: WorkspaceState = {
 };
 
 const RETRYABLE_ERROR_CODES = new Set<ApiErrorCode>(["CARD_NOT_DETECTED", "IMAGE_UNREADABLE"]);
+const VALIDATION_ERROR_CODES = new Set<ApiErrorCode>([
+  "INVALID_UPLOAD",
+  "FILE_TOO_LARGE",
+  "UNSUPPORTED_MEDIA_TYPE",
+]);
 export const PRELOAD_FETCH_ERROR_MESSAGE = "Couldn't load saved scan. Upload a fresh image instead.";
 const PROCESSING_STEPS = [
   "Validating image",
@@ -107,6 +125,21 @@ const TONE_STYLES: Record<
   },
 };
 
+const FAILURE_PANEL_STYLES = {
+  manual: {
+    panelClass: "border-gold bg-[#FCEBCF]",
+    labelClass: "text-gold",
+  },
+  validation: {
+    panelClass: "border-loss-2 bg-[#FBE3E3]",
+    labelClass: "text-loss-2",
+  },
+  service: {
+    panelClass: "border-coral bg-bg-3",
+    labelClass: "text-coral",
+  },
+};
+
 export function centeringReducer(state: WorkspaceState, action: WorkspaceAction): WorkspaceState {
   switch (action.type) {
     case "startUpload":
@@ -124,6 +157,38 @@ export function centeringReducer(state: WorkspaceState, action: WorkspaceAction)
   }
 }
 
+export function buildWorkspaceContextCopy({ inventoryItemId }: { inventoryItemId?: string | null }): WorkspaceContextCopy {
+  if (inventoryItemId) {
+    return {
+      mode: "inventory",
+      eyebrow: "Inventory centering",
+      badge: "Saves to inventory",
+      description: "Results attach to this inventory item and stay with its record.",
+      uploadTitle: "Upload front scan for this inventory item",
+      uploadDescription:
+        "Drop, paste, or browse for a JPEG, PNG, or WEBP image. OWL Market sends it through the authenticated OWL proxy and saves the result to this inventory item.",
+      preloadedDescription: "Measure the saved front image and save the centering result to this inventory item.",
+      processingTarget: "Result target: inventory item",
+      resultDescription: "This centering report is linked to the inventory item.",
+      manualDescription: "Corrected measurements will attach to this inventory item.",
+    };
+  }
+
+  return {
+    mode: "standalone",
+    eyebrow: "Standalone pre-grade",
+    badge: "No inventory link",
+    description: "Results stay as a standalone pre-grade check and will not attach to inventory.",
+    uploadTitle: "Upload a standalone front scan",
+    uploadDescription:
+      "Drop, paste, or browse for a JPEG, PNG, or WEBP image. OWL Market sends it through the authenticated OWL proxy and saves the result without an inventory attachment.",
+    preloadedDescription: "Measure this image as a standalone pre-grade check.",
+    processingTarget: "Result target: standalone pre-grade",
+    resultDescription: "This report is not attached to an inventory item.",
+    manualDescription: "Corrected measurements remain standalone and will not attach to inventory.",
+  };
+}
+
 export function psaTone(ceiling: PsaCeiling): keyof typeof TONE_STYLES {
   if (ceiling === "PSA_10") return "green";
   if (ceiling === "PSA_9" || ceiling === "PSA_8") return "yellow";
@@ -132,6 +197,37 @@ export function psaTone(ceiling: PsaCeiling): keyof typeof TONE_STYLES {
 
 export function isManualCorrectionError(error: CenteringError | undefined) {
   return Boolean(error?.code && RETRYABLE_ERROR_CODES.has(error.code));
+}
+
+export function failureViewModel(error: CenteringError | undefined) {
+  if (isManualCorrectionError(error)) {
+    return {
+      kind: "manual" as const,
+      eyebrow: "Manual correction available",
+      code: error?.code ?? "CARD_NOT_DETECTED",
+      title: error?.message ?? "Card borders need review.",
+      description:
+        "The scan reached OWL Lens, but the card boundary needs a human adjustment before measuring.",
+    };
+  }
+
+  if (error?.code && VALIDATION_ERROR_CODES.has(error.code)) {
+    return {
+      kind: "validation" as const,
+      eyebrow: "Upload needs attention",
+      code: error.code,
+      title: error.message ?? "The uploaded image cannot be measured.",
+      description: "Use a clear JPEG, PNG, or WEBP front image, then upload it again.",
+    };
+  }
+
+  return {
+    kind: "service" as const,
+    eyebrow: "Service unavailable",
+    code: error?.code ?? "MEASUREMENT_FAILED",
+    title: error?.message ?? "Measurement failed.",
+    description: "OWL Market could not complete the measurement through the API proxy.",
+  };
 }
 
 export function defaultManualOverlay(width: number, height: number): MeasurementOverlay {
@@ -454,19 +550,30 @@ export async function measurePreloadedImage({
   };
 }
 
-function StatusPanel({ status }: { status: WorkspaceStatus }) {
+function StatePill({ children }: { children: string }) {
+  return (
+    <span className="inline-flex items-center rounded-c-sm border-[1.2px] border-ink/25 bg-bg-2 px-3 py-1.5 font-mono-2 text-xs font-semibold uppercase text-ink-2">
+      {children}
+    </span>
+  );
+}
+
+function StatusPanel({ status, contextCopy }: { status: WorkspaceStatus; contextCopy: WorkspaceContextCopy }) {
   const activeIndex = status === "uploading" ? 0 : status === "processing" ? 2 : -1;
 
   return (
     <div className="admin-card p-5">
-      <div className="flex items-center gap-3">
-        <div className="h-7 w-7 animate-spin rounded-full border-2 border-ink/30 border-t-coral" />
-        <div>
-          <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-coral">
-            {status === "uploading" ? "Uploading" : "Processing"}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="h-7 w-7 animate-spin rounded-full border-2 border-ink/30 border-t-coral" />
+          <div>
+            <div className="font-mono-2 text-xs font-bold uppercase text-coral">
+              {status === "uploading" ? "Uploading" : "Processing"}
+            </div>
+            <div className="mt-1 text-sm text-ink-2">Expected processing time is 1-3 seconds.</div>
           </div>
-          <div className="mt-1 text-sm text-ink-2">Expected processing time is 1-3 seconds.</div>
         </div>
+        <StatePill>{contextCopy.processingTarget}</StatePill>
       </div>
       <ol className="mt-5 grid gap-2">
         {PROCESSING_STEPS.map((step, index) => (
@@ -495,28 +602,31 @@ function UploadZone({
   getInputProps,
   isDragActive,
   imageSrc,
+  contextCopy,
 }: {
   getRootProps: ReturnType<typeof useDropzone>["getRootProps"];
   getInputProps: ReturnType<typeof useDropzone>["getInputProps"];
   isDragActive: boolean;
   imageSrc: string | null;
+  contextCopy: WorkspaceContextCopy;
 }) {
   return (
     <div
       {...getRootProps()}
-      className={`flex min-h-[560px] cursor-pointer flex-col items-center justify-center rounded-c-md border-[1.5px] border-dashed p-8 text-center outline-none transition-colors ${
+      className={`flex min-h-[520px] cursor-pointer flex-col items-center justify-center rounded-c-md border-[1.5px] border-dashed p-5 text-center outline-none transition-colors sm:min-h-[560px] sm:p-8 ${
         isDragActive ? "border-coral bg-bg-3" : "border-ink/40 bg-bg-2 hover:border-coral hover:bg-bg-3"
       }`}
     >
       <input {...getInputProps()} />
       {imageSrc ? (
         <div className="w-full">
-          <div className="mb-4 font-mono-2 text-xs font-bold uppercase tracking-wider text-ink-2">Ready to measure</div>
+          <div className="mb-4 font-mono-2 text-xs font-bold uppercase text-ink-2">Ready to measure</div>
           <div className="mx-auto flex aspect-[5/7] max-h-[420px] max-w-[300px] items-center justify-center rounded-c-sm border-[1.5px] border-ink bg-bg-3">
             <svg viewBox="0 0 100 140" role="img" aria-label="Selected card image preview" className="h-full w-full">
               <image href={imageSrc} x="0" y="0" width="100" height="140" preserveAspectRatio="xMidYMid meet" />
             </svg>
           </div>
+          <p className="mx-auto mt-4 max-w-md text-sm leading-6 text-ink-2">{contextCopy.processingTarget}</p>
         </div>
       ) : (
         <div className="max-w-xl">
@@ -531,11 +641,11 @@ function UploadZone({
               />
             </svg>
           </div>
-          <h2 className="font-grotesk text-2xl font-bold text-ink">Upload a front scan</h2>
-          <p className="mt-3 text-sm leading-6 text-ink-2">
-            Drop, paste, or browse for a JPEG, PNG, or WEBP image. The browser sends it through the
-            authenticated OWL proxy, never directly to the CV service.
-          </p>
+          <div className="mb-3 flex justify-center">
+            <StatePill>{contextCopy.badge}</StatePill>
+          </div>
+          <h2 className="font-grotesk text-2xl font-bold text-ink">{contextCopy.uploadTitle}</h2>
+          <p className="mt-3 text-sm leading-6 text-ink-2">{contextCopy.uploadDescription}</p>
           <div className="admin-btn admin-btn-primary mt-6">Browse scan</div>
         </div>
       )}
@@ -545,17 +655,23 @@ function UploadZone({
 
 function PreloadedImagePanel({
   imageSrc,
+  contextCopy,
   onMeasure,
   onUploadDifferent,
 }: {
   imageSrc: string;
+  contextCopy: WorkspaceContextCopy;
   onMeasure: () => void;
   onUploadDifferent: () => void;
 }) {
   return (
-    <div className="admin-card flex min-h-[560px] flex-col items-center justify-center p-8 text-center">
+    <div className="admin-card flex min-h-[520px] flex-col items-center justify-center p-5 text-center sm:min-h-[560px] sm:p-8">
       <div className="w-full">
-        <div className="mb-4 font-mono-2 text-xs font-bold uppercase tracking-wider text-ink-2">Ready to measure</div>
+        <div className="mb-3 flex justify-center">
+          <StatePill>{contextCopy.badge}</StatePill>
+        </div>
+        <div className="mb-3 font-mono-2 text-xs font-bold uppercase text-ink-2">Ready to measure</div>
+        <p className="mx-auto mb-5 max-w-lg text-sm leading-6 text-ink-2">{contextCopy.preloadedDescription}</p>
         <div className="mx-auto flex aspect-[5/7] max-h-[420px] max-w-[300px] items-center justify-center rounded-c-sm border-[1.5px] border-ink bg-bg-3">
           <svg viewBox="0 0 100 140" role="img" aria-label="Saved card image preview" className="h-full w-full">
             <image href={imageSrc} x="0" y="0" width="100" height="140" preserveAspectRatio="xMidYMid meet" />
@@ -570,6 +686,16 @@ function PreloadedImagePanel({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function PreloadFetchAlert({ message, contextCopy }: { message: string; contextCopy: WorkspaceContextCopy }) {
+  return (
+    <div className="rounded-c-sm border-[1.5px] border-gold bg-[#FCEBCF] px-4 py-3">
+      <div className="font-mono-2 text-xs font-bold uppercase text-gold">Saved scan unavailable</div>
+      <p className="mt-1 text-sm font-semibold text-ink">{message}</p>
+      <p className="mt-1 text-sm leading-6 text-ink-2">{contextCopy.uploadDescription}</p>
     </div>
   );
 }
@@ -673,6 +799,7 @@ function ResultPanel({
   result,
   imageSrc,
   cardIdentity,
+  contextCopy,
   onDownload,
   onReset,
   reportRef,
@@ -680,6 +807,7 @@ function ResultPanel({
   result: MeasurementResponse;
   imageSrc: string | null;
   cardIdentity: CardIdentity;
+  contextCopy: WorkspaceContextCopy;
   onDownload: () => void;
   onReset: () => void;
   reportRef: RefObject<HTMLDivElement>;
@@ -694,39 +822,46 @@ function ResultPanel({
   return (
     <div ref={reportRef} className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
       <section className="admin-card p-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-coral">Measured Overlay</div>
-            <h2 className="mt-1 font-grotesk text-xl font-bold text-ink">{cardIdentity.name}</h2>
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <div className="font-mono-2 text-xs font-bold uppercase text-coral">Measured overlay</div>
+            <h2 className="mt-1 break-words font-grotesk text-xl font-bold text-ink">{cardIdentity.name}</h2>
           </div>
           {cardIdentity.rarity && (
-            <span className="inline-flex items-center rounded-c-pill border-[1.2px] border-coral bg-bg-3 px-3 py-1 font-mono-2 text-xs font-bold uppercase tracking-wider text-coral">
+            <span className="inline-flex shrink-0 items-center rounded-c-pill border-[1.2px] border-coral bg-bg-3 px-3 py-1 font-mono-2 text-xs font-bold uppercase text-coral">
               {cardIdentity.rarity}
             </span>
           )}
         </div>
-        <div className="admin-card-inset flex min-h-[520px] items-center justify-center p-3">
+        <div className="admin-card-inset flex min-h-[420px] items-center justify-center p-3 sm:min-h-[520px]">
           <OverlaySvg imageSrc={imageSrc} overlay={result.overlay} imageSize={imageSize} tone={viewModel.tone} />
         </div>
       </section>
 
       <section className="admin-card p-5">
-        <div className={`inline-flex rounded-c-sm border-[1.5px] px-3 py-2 font-mono-2 text-xs font-bold uppercase tracking-wider ${tone.borderClass} ${tone.softClass} ${tone.textClass}`}>
-          {viewModel.ceilingLabel}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="font-mono-2 text-xs font-bold uppercase text-ink-2">Result summary</div>
+            <div className={`mt-2 inline-flex rounded-c-sm border-[1.5px] px-3 py-2 font-mono-2 text-xs font-bold uppercase ${tone.borderClass} ${tone.softClass} ${tone.textClass}`}>
+              {viewModel.ceilingLabel}
+            </div>
+          </div>
+          <StatePill>{contextCopy.badge}</StatePill>
         </div>
-        <div className="mt-5 grid grid-cols-2 gap-3">
+        <p className="mt-3 text-sm leading-6 text-ink-2">{contextCopy.resultDescription}</p>
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <RatioBox label="Left / Right" value={viewModel.leftRight} tone={viewModel.tone} />
           <RatioBox label="Top / Bottom" value={viewModel.topBottom} tone={viewModel.tone} />
         </div>
         <div className={`mt-4 rounded-c-sm border-[1.5px] p-4 ${tone.borderClass} ${tone.softClass}`}>
-          <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-ink-2">Worst axis</div>
+          <div className="font-mono-2 text-xs font-bold uppercase text-ink-2">Worst axis</div>
           <div className={`mt-2 text-lg font-bold ${tone.textClass}`}>
             {viewModel.worstAxisLabel} at {viewModel.worstAxisValue}
           </div>
         </div>
         <div className="mt-5 overflow-hidden rounded-c-sm border-[1.5px] border-ink">
           <table className="w-full text-left text-sm">
-            <thead className="bg-bg-3 font-mono-2 text-xs uppercase tracking-wider text-ink-2">
+            <thead className="bg-bg-3 font-mono-2 text-xs uppercase text-ink-2">
               <tr>
                 <th className="px-3 py-2 font-semibold">Ceiling</th>
                 <th className="px-3 py-2 font-semibold">Ratio</th>
@@ -769,7 +904,7 @@ function RatioBox({
   const style = TONE_STYLES[tone];
   return (
     <div className={`rounded-c-sm border-[1.5px] p-4 ${style.borderClass} ${style.softClass}`}>
-      <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-ink-2">{label}</div>
+      <div className="font-mono-2 text-xs font-bold uppercase text-ink-2">{label}</div>
       <div className={`mt-2 font-mono-2 text-2xl font-bold ${style.textClass}`}>{value}</div>
     </div>
   );
@@ -822,7 +957,7 @@ function ManualOverlayEditor({
   return (
     <svg
       viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}
-      className="h-full max-h-[620px] w-full rounded-c-sm bg-bg-3"
+      className="h-full max-h-[620px] w-full touch-none rounded-c-sm bg-bg-3"
       onPointerMove={onPointerMove}
       onPointerUp={() => setActiveHandle(null)}
       onPointerLeave={() => setActiveHandle(null)}
@@ -902,7 +1037,9 @@ function FailurePanel({
   imageSrc,
   imageSize,
   manualOverlay,
+  contextCopy,
   onManualOverlayChange,
+  onManualOverlayReset,
   onRetry,
   onReset,
   canRetry,
@@ -911,33 +1048,33 @@ function FailurePanel({
   imageSrc: string | null;
   imageSize: { width: number; height: number };
   manualOverlay: MeasurementOverlay;
+  contextCopy: WorkspaceContextCopy;
   onManualOverlayChange: (overlay: MeasurementOverlay) => void;
+  onManualOverlayReset: () => void;
   onRetry: () => void;
   onReset: () => void;
   canRetry: boolean;
 }) {
   const showManualCorrection = isManualCorrectionError(error);
+  const failure = failureViewModel(error);
+  const style = FAILURE_PANEL_STYLES[failure.kind];
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
-      <section className="rounded-c-md border-[1.5px] border-loss-2 bg-[#FBE3E3] p-4">
-        <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-loss-2">{error?.code ?? "MEASUREMENT_FAILED"}</div>
-        <h2 className="mt-2 font-grotesk text-2xl font-bold text-ink">{error?.message ?? "Measurement failed."}</h2>
-        {showManualCorrection ? (
-          <p className="mt-2 text-sm leading-6 text-ink-2">
-            Drag the outer card and inner frame corners, then re-measure with those corrections.
-          </p>
-        ) : (
-          <p className="mt-2 text-sm leading-6 text-ink-2">
-            Try another image or return to the upload state.
-          </p>
-        )}
+      <section className={`rounded-c-md border-[1.5px] p-4 ${style.panelClass}`}>
+        <div className={`font-mono-2 text-xs font-bold uppercase ${style.labelClass}`}>{failure.eyebrow}</div>
+        <h2 className="mt-2 break-words font-grotesk text-2xl font-bold text-ink">{failure.title}</h2>
+        <p className="mt-2 text-sm leading-6 text-ink-2">{failure.description}</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <StatePill>{failure.code}</StatePill>
+          <StatePill>{contextCopy.processingTarget}</StatePill>
+        </div>
       </section>
 
       <section className="admin-card p-4 lg:col-span-2">
         {showManualCorrection ? (
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-            <div className="admin-card-inset flex min-h-[520px] items-center justify-center p-3">
+            <div className="admin-card-inset flex min-h-[380px] items-center justify-center p-2 sm:min-h-[520px] sm:p-3">
               <ManualOverlayEditor
                 imageSrc={imageSrc}
                 imageSize={imageSize}
@@ -947,7 +1084,11 @@ function FailurePanel({
             </div>
             <div className="space-y-4">
               <div className="admin-card-inset p-4">
-                <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-ink-2">Manual correction</div>
+                <div className="font-mono-2 text-xs font-bold uppercase text-ink-2">Manual correction</div>
+                <p className="mt-2 text-sm leading-6 text-ink-2">
+                  Drag the amber outer-card handles and green inner-frame handles, then re-measure.
+                </p>
+                <p className="mt-2 text-sm leading-6 text-ink-2">{contextCopy.manualDescription}</p>
                 <div className="mt-3 grid grid-cols-2 gap-3 font-mono-2 text-xs text-ink">
                   <div>Outer X {Math.round(manualOverlay.outerCard.x)}</div>
                   <div>Outer Y {Math.round(manualOverlay.outerCard.y)}</div>
@@ -965,6 +1106,13 @@ function FailurePanel({
               </button>
               <button
                 type="button"
+                onClick={onManualOverlayReset}
+                className="admin-btn admin-btn-ghost w-full justify-center"
+              >
+                Reset borders
+              </button>
+              <button
+                type="button"
                 onClick={onReset}
                 className="admin-btn admin-btn-ghost w-full justify-center"
               >
@@ -973,9 +1121,14 @@ function FailurePanel({
             </div>
           </div>
         ) : (
-          <button type="button" onClick={onReset} className="admin-btn admin-btn-ghost">
-            Measure another
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" onClick={onRetry} disabled={!canRetry} className="admin-btn admin-btn-primary disabled:cursor-not-allowed disabled:opacity-50">
+              Try again
+            </button>
+            <button type="button" onClick={onReset} className="admin-btn admin-btn-ghost">
+              Measure another
+            </button>
+          </div>
         )}
       </section>
     </div>
@@ -999,6 +1152,7 @@ export default function CenteringWorkspace({
   const reportRef = useRef<HTMLDivElement>(null);
   const imageSrc = previewUrl ?? preloadImageSrc ?? null;
   const showPreloadedPanel = Boolean(preloadImageSrc && !showUploadZone && !selectedFile);
+  const contextCopy = useMemo(() => buildWorkspaceContextCopy({ inventoryItemId }), [inventoryItemId]);
 
   useEffect(() => {
     if (!selectedFile) return;
@@ -1110,6 +1264,14 @@ export default function CenteringWorkspace({
   }, [measureFile]);
 
   const canRetryWithCorrections = Boolean(selectedFile);
+  const resetSelection = useCallback(() => {
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    dispatch({ type: "reset" });
+  }, []);
+  const resetManualOverlay = useCallback(() => {
+    setManualOverlay(defaultManualOverlay(imageSize.width, imageSize.height));
+  }, [imageSize.height, imageSize.width]);
   const headerMeta = useMemo(
     () =>
       [cardIdentity.setCode, cardIdentity.cardNumber, cardIdentity.rarity]
@@ -1120,27 +1282,26 @@ export default function CenteringWorkspace({
 
   return (
     <section className="space-y-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-coral">Owl Lens</div>
-          <h2 className="mt-2 font-grotesk text-3xl font-bold text-ink">{cardIdentity.name}</h2>
-          {headerMeta && <div className="mt-2 font-mono-2 text-xs font-semibold uppercase tracking-wider text-ink-2">{headerMeta}</div>}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="font-mono-2 text-xs font-bold uppercase text-coral">{contextCopy.eyebrow}</div>
+          <h2 className="mt-2 break-words font-grotesk text-3xl font-bold text-ink">{cardIdentity.name}</h2>
+          {headerMeta && <div className="mt-2 font-mono-2 text-xs font-semibold uppercase text-ink-2">{headerMeta}</div>}
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-ink-2">{contextCopy.description}</p>
         </div>
-        <div className="admin-card px-3 py-2 font-mono-2 text-xs font-semibold uppercase tracking-wider text-ink-2">
-          {state.status}
+        <div className="flex flex-wrap gap-2 lg:justify-end">
+          <StatePill>{contextCopy.badge}</StatePill>
+          <StatePill>{state.status}</StatePill>
         </div>
       </div>
 
       {state.status === "idle" && (
         <>
-          {preloadFetchError && (
-            <div className="rounded-c-sm border-[1.5px] border-loss-2 bg-[#FBE3E3] px-4 py-3 text-sm font-semibold text-ink">
-              {preloadFetchError}
-            </div>
-          )}
+          {preloadFetchError && <PreloadFetchAlert message={preloadFetchError} contextCopy={contextCopy} />}
           {showPreloadedPanel && preloadImageSrc ? (
             <PreloadedImagePanel
               imageSrc={preloadImageSrc}
+              contextCopy={contextCopy}
               onMeasure={measurePreloadedFile}
               onUploadDifferent={() => {
                 setPreloadFetchError(null);
@@ -1153,18 +1314,22 @@ export default function CenteringWorkspace({
               getInputProps={dropzone.getInputProps}
               isDragActive={dropzone.isDragActive}
               imageSrc={selectedFile ? previewUrl : null}
+              contextCopy={contextCopy}
             />
           )}
         </>
       )}
 
-      {(state.status === "uploading" || state.status === "processing") && <StatusPanel status={state.status} />}
+      {(state.status === "uploading" || state.status === "processing") && (
+        <StatusPanel status={state.status} contextCopy={contextCopy} />
+      )}
 
       {state.status === "results" && state.result && (
         <ResultPanel
           result={state.result}
           imageSrc={imageSrc}
           cardIdentity={cardIdentity}
+          contextCopy={contextCopy}
           reportRef={reportRef}
           onDownload={() => {
             if (reportRef.current) {
@@ -1174,11 +1339,7 @@ export default function CenteringWorkspace({
               });
             }
           }}
-          onReset={() => {
-            setSelectedFile(null);
-            setPreviewUrl(null);
-            dispatch({ type: "reset" });
-          }}
+          onReset={resetSelection}
         />
       )}
 
@@ -1188,16 +1349,14 @@ export default function CenteringWorkspace({
           imageSrc={imageSrc}
           imageSize={imageSize}
           manualOverlay={manualOverlay}
+          contextCopy={contextCopy}
           onManualOverlayChange={setManualOverlay}
+          onManualOverlayReset={resetManualOverlay}
           canRetry={canRetryWithCorrections}
           onRetry={() => {
             if (selectedFile) void submitMeasurement(selectedFile, manualOverlay);
           }}
-          onReset={() => {
-            setSelectedFile(null);
-            setPreviewUrl(null);
-            dispatch({ type: "reset" });
-          }}
+          onReset={resetSelection}
         />
       )}
     </section>
