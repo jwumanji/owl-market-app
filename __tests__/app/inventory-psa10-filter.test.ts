@@ -339,7 +339,13 @@ test("inventory page leaves PSA 10 candidate filter off and attaches latest cent
     "psa9:PSA_9",
     "unmeasured:none",
   ]);
-  assert.ok(calls.some((call) => call.columns?.includes("inventory_centering_latest(psa_ceiling)")));
+  assert.ok(
+    calls.some((call) =>
+      call.columns?.includes(
+        "inventory_centering_latest!centering_measurements_inventory_item_game_fk(psa_ceiling)"
+      )
+    )
+  );
   assert.ok(calls.some((call) => call.column === "game_id" && call.value === "game-one-piece"));
   assert.ok(!calls.some((call) => call.column === "inventory_centering_latest.psa_ceiling"));
 });
@@ -352,7 +358,13 @@ test("inventory page applies PSA 10 candidate filter with an inner latest-view j
 
   assert.match(html, /data-candidate-filter="true"/);
   assert.deepEqual(shellProps[0].items.map((item) => item.id), ["psa10"]);
-  assert.ok(calls.some((call) => call.columns?.includes("inventory_centering_latest!inner(psa_ceiling)")));
+  assert.ok(
+    calls.some((call) =>
+      call.columns?.includes(
+        "inventory_centering_latest!centering_measurements_inventory_item_game_fk!inner(psa_ceiling)"
+      )
+    )
+  );
   assert.ok(
     calls.some((call) => call.column === "inventory_centering_latest.psa_ceiling" && call.value === "PSA_10")
   );

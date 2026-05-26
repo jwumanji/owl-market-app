@@ -122,9 +122,11 @@ const INVENTORY_SELECT_BASE_LEGACY_MATCH = `
 `;
 
 const CATALOG_MATCH_STATUS_VALUES = new Set<string>(CATALOG_MATCH_STATUSES);
+const INVENTORY_CENTERING_LATEST_RELATION =
+  "inventory_centering_latest!centering_measurements_inventory_item_game_fk";
 
 function inventorySelectWithCentering(columns: string, psa10CandidatesOnly: boolean) {
-  return `${columns}, inventory_centering_latest${psa10CandidatesOnly ? "!inner" : ""}(psa_ceiling)`;
+  return `${columns}, ${INVENTORY_CENTERING_LATEST_RELATION}${psa10CandidatesOnly ? "!inner" : ""}(psa_ceiling)`;
 }
 
 function isMissingPsaColumnsError(error: { message?: string } | null) {
