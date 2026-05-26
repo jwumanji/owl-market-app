@@ -293,6 +293,9 @@ function loadInventoryTabsHelpers() {
         return "ORDER-1";
       },
     },
+    "@/lib/game-scope": {
+      DEFAULT_PUBLIC_GAME_DB_SLUG: "one_piece",
+    },
     "@/lib/inventory-options": {
       GRADED_RATINGS: ["PSA 10", "PSA 9", "BGS 9.5"],
     },

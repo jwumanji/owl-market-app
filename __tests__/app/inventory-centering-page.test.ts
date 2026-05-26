@@ -229,6 +229,22 @@ function loadPage({
         return supabase;
       },
     },
+    "@/lib/game-scope": {
+      resolveGameScope() {
+        return Promise.resolve({
+          game: {
+            id: onePieceGame.id,
+            slug: onePieceGame.slug,
+            routeSlug: "one-piece",
+            name: onePieceGame.name,
+            isActive: true,
+            isPublic: true,
+            metadata: onePieceGame.metadata,
+          },
+          error: null,
+        });
+      },
+    },
     "next/link": {
       __esModule: true,
       default(props: { href: string; children: React.ReactNode; className?: string }) {
