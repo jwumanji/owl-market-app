@@ -31,12 +31,12 @@ function CardRow({ card, rank, gameRouteSlug }: { card: DashboardCard; rank: num
         alt={card.name}
         className="c-dthumb"
         fallbackTimeoutMs={0}
-        fetchPriority={rank <= 2 ? "high" : "low"}
+        fetchPriority="low"
         height={59}
         imageUrl={card.image_url}
         imageUrlPreview={card.image_url_preview}
         imageUrlSmall={card.image_url_small}
-        loading={rank <= 2 ? "eager" : "lazy"}
+        loading="lazy"
         width={42}
       />
       <span className="c-dinfo">

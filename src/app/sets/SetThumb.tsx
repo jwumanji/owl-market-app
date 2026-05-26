@@ -60,7 +60,7 @@ export default function SetThumb({
       >
         {imgUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={imgUrl} alt={`${code} box art`} loading="lazy" />
+          <img src={imgUrl} alt={`${code} box art`} loading="lazy" decoding="async" />
         ) : (
           <span className={sz.placeholderCls} aria-hidden>
             {code.replace(/[0-9]/g, "")[0] ?? "·"}
@@ -74,7 +74,7 @@ export default function SetThumb({
           aria-hidden
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={imgUrl} alt="" />
+          <img src={imgUrl} alt="" loading="lazy" decoding="async" />
           <div className="sv2-thumb-preview-caption">
             <span className="sv2-thumb-preview-code">{code}</span>
           </div>

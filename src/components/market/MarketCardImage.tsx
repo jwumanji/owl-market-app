@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 
 import CardHoverZoom from "../ui/CardHoverZoom";
+import FastCardImage from "../ui/FastCardImage";
 
 type MarketCardImageProps = {
   alt: string;
@@ -77,7 +77,7 @@ export default function MarketCardImage({
 
   return (
     <CardHoverZoom src={src} previewSrc={imageUrlPreview ?? imageUrl ?? src} alt={alt}>
-      <Image
+      <FastCardImage
         src={src}
         alt={alt}
         width={width ?? 64}

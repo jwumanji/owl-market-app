@@ -1,7 +1,7 @@
 import Link from "next/link";
-import Image from "next/image";
 import RarityBadge from "@/components/ui/RarityBadge";
 import CardHoverZoom from "@/components/ui/CardHoverZoom";
+import FastCardImage from "@/components/ui/FastCardImage";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
 import { formatPct } from "@/lib/utils";
@@ -48,7 +48,7 @@ function CardThumb({ card, priority }: { card: TeaserCard; priority: boolean }) 
   if (imageSrc) {
     return (
       <CardHoverZoom src={imageSrc} previewSrc={card.image_url_preview ?? card.image_url ?? imageSrc} alt={card.name}>
-        <Image
+        <FastCardImage
           src={imageSrc}
           alt=""
           width={52}

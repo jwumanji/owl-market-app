@@ -52,13 +52,32 @@ export const metadata: Metadata = {
     "TCG market intelligence platform for pricing, trends, catalog data, and portfolio tracking.",
 };
 
+function publicSupabaseOrigin() {
+  const value = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!value) return null;
+
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const supabaseOrigin = publicSupabaseOrigin();
+
   return (
     <html lang="en" className="dark">
+      {supabaseOrigin ? (
+        <head>
+          <link rel="dns-prefetch" href={supabaseOrigin} />
+          <link rel="preconnect" href={supabaseOrigin} crossOrigin="anonymous" />
+        </head>
+      ) : null}
       <body
         className={`${inter.variable} ${ibmPlexMono.variable} ${spaceGrotesk.variable} ${caveat.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >

@@ -1,12 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { CardRow } from "@/lib/types";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
 import { formatPrice, formatPct } from "@/lib/utils";
 import RarityBadge from "@/components/ui/RarityBadge";
+import FastCardImage from "@/components/ui/FastCardImage";
 
 function changeVariant(pct: number | null | undefined): "up" | "down" | "flat" {
   if (pct == null || pct === 0) return "flat";
@@ -38,7 +38,7 @@ export default function MarketGrid({
                 <RarityBadge rarity={card.rarity} />
               </span>
               {imageSrc ? (
-                <Image
+                <FastCardImage
                   src={imageSrc}
                   alt={card.name}
                   width={256}

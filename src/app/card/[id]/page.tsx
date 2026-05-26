@@ -233,6 +233,8 @@ export default function CardDetailPage() {
             <img
               src={card.image_url}
               alt={card.name}
+              decoding="async"
+              fetchPriority="high"
               className="w-full aspect-[5/7] object-cover rounded-c-md border-[1.5px] border-ink shadow-[0_10px_24px_rgba(26,15,8,0.10)]"
             />
           ) : (

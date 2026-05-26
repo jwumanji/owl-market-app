@@ -217,7 +217,7 @@ export default async function GameCatalogCardPage({
         <div className="catalog-card-art" aria-hidden="true">
           {card.image_url_small || card.image_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={card.image_url_small ?? card.image_url ?? ""} alt="" />
+            <img src={card.image_url_small ?? card.image_url ?? ""} alt="" loading="lazy" decoding="async" />
           ) : (
             <span>{set?.code ?? "RB"}</span>
           )}

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import FastCardImage from "@/components/ui/FastCardImage";
 import { CHARACTERS as FALLBACK_CHARS, TIER_LABELS } from "./characters-data";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gamePath, gameQueryValue } from "@/lib/game-routes";
@@ -163,7 +163,7 @@ function CharAvatar({ src, name, size = 28 }: { src: string | null; name: string
   const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
   if (src) {
     return (
-      <Image
+      <FastCardImage
         src={src}
         alt={name}
         width={size}
@@ -208,13 +208,13 @@ function CardImageCell({ card }: { card: CharacterCard }) {
       onMouseLeave={handleMouseLeave}
     >
       {imgSrc ? (
-        <Image src={imgSrc} alt={card.name} width={32} height={45} sizes="32px" loading="lazy" fetchPriority="low" className="ch-card-thumb" />
+        <FastCardImage src={imgSrc} alt={card.name} width={32} height={45} sizes="32px" loading="lazy" fetchPriority="low" className="ch-card-thumb" />
       ) : (
         <div className="ch-card-thumb-placeholder" />
       )}
       {showPreview && fullSrc && (
         <div className="ch-card-hover-preview">
-          <Image src={fullSrc} alt={card.name} width={200} height={280} sizes="200px" loading="lazy" />
+          <FastCardImage src={fullSrc} alt={card.name} width={200} height={280} sizes="200px" loading="lazy" />
         </div>
       )}
     </div>
@@ -366,9 +366,9 @@ function CharacterDetail({ c }: { c: CharacterData }) {
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,transparent,${color},transparent)` }} />
         <div className="ch-detail-header-inner">
           {fullImg ? (
-            <Image src={fullImg} alt={c.name} className="ch-detail-avatar" width={80} height={112} sizes="80px" loading="lazy" />
+            <FastCardImage src={fullImg} alt={c.name} className="ch-detail-avatar" width={80} height={112} sizes="80px" loading="lazy" />
           ) : avatar ? (
-            <Image src={avatar} alt={c.name} className="ch-detail-avatar" width={80} height={112} sizes="80px" loading="lazy" />
+            <FastCardImage src={avatar} alt={c.name} className="ch-detail-avatar" width={80} height={112} sizes="80px" loading="lazy" />
           ) : (
             <div className="ch-detail-avatar-placeholder">
               {c.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}

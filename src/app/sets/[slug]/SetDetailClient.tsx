@@ -325,7 +325,7 @@ export default function SetDetailClient({
             <div className="setd-id-box">
               {imgFile ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={`/sets/${imgFile}`} alt={`${set.code} ${set.name} Booster Box`} />
+                <img src={`/sets/${imgFile}`} alt={`${set.code} ${set.name} Booster Box`} decoding="async" fetchPriority="high" />
               ) : (
                 boxArtIcon(set.code)
               )}
@@ -492,7 +492,7 @@ export default function SetDetailClient({
                           <div className="setd-tc-card-art">
                             {c.img ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={c.img} alt={c.n} loading="lazy" />
+                              <img src={c.img} alt={c.n} loading="lazy" decoding="async" />
                             ) : (
                               c.e
                             )}
@@ -573,7 +573,7 @@ function CatalogCardsTable({
                   <div className="setd-tc-card-art">
                     {card.img ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={card.img} alt={card.name} loading="lazy" />
+                      <img src={card.img} alt={card.name} loading="lazy" decoding="async" />
                     ) : (
                       setCode
                     )}
