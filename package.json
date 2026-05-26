@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "audit:game-boundaries": "node scripts/audit-game-boundaries.mjs",
+    "audit:public-performance": "node scripts/audit-public-performance.mjs",
     "audit:riftbound-pricing": "node scripts/audit-riftbound-pricing-readiness.mjs",
     "riftbound:audit": "node scripts/riftbound-audit.mjs",
     "owl-lens:sync-contract": "node scripts/owl-lens-sync.mjs",

@@ -101,7 +101,24 @@ function PerfCell({ period, v }: { period: string; v: number | null }) {
   );
 }
 
-function generateChartData(set: SetData, range: RangeKey): { x: string; y: number }[] {
+function hashSeed(value: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function seededRandom(seed: number) {
+  let state = seed || 1;
+  return () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+}
+
+function generateChartData(set: SetData, range: RangeKey, seed: number): { x: string; y: number }[] {
   const numDays = RANGE_DAYS[range];
   const base = set.price;
   const vol = base * 0.03;
@@ -109,10 +126,12 @@ function generateChartData(set: SetData, range: RangeKey): { x: string; y: numbe
   const pts: { x: string; y: number }[] = [];
   let p = base * (1 - trend * 0.9);
   const len = Math.max(numDays, 7);
+  const rand = seededRandom(hashSeed(`${set.slug}:${range}:${seed}`));
+
   for (let i = len; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    const noise = (Math.random() - 0.46) * vol;
+    const noise = (rand() - 0.46) * vol;
     p = Math.max(p + (trend * base) / len + noise, base * 0.2);
     pts.push({ x: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }), y: +p.toFixed(2) });
   }
@@ -147,7 +166,7 @@ export default function SetDetailClient({
     ["--set-color-bd" as string]: hexToRgba(set.color, 0.32),
   } as React.CSSProperties), [set.color]);
 
-  const chartPoints = useMemo(() => generateChartData(set, range), [set, range, chartSeed]);
+  const chartPoints = useMemo(() => generateChartData(set, range, chartSeed), [set, range, chartSeed]);
 
   const chartData: ChartData<"line"> = useMemo(() => ({
     labels: chartPoints.map((p) => p.x),
