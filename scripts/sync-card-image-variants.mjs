@@ -4,6 +4,7 @@
 // Usage:
 //   node scripts/sync-card-image-variants.mjs --game=one_piece --limit=50
 //   node scripts/sync-card-image-variants.mjs --game=one_piece --limit=50 --apply
+//   node scripts/sync-card-image-variants.mjs --game=one_piece --retry-errors --retry-reason=storage_upload --apply
 //
 // Games with unapproved asset status are blocked unless explicitly overridden
 // with --allow-unapproved-assets.
@@ -17,6 +18,7 @@ const REPORT_PATH = readArg("--report") ?? "card-image-variants-report.md";
 const APPLY = process.argv.includes("--apply");
 const FORCE = process.argv.includes("--force");
 const RETRY_ERRORS = process.argv.includes("--retry-errors");
+const RETRY_REASON = readArg("--retry-reason");
 const ALLOW_UNAPPROVED = process.argv.includes("--allow-unapproved-assets");
 const GAME_SLUG = readArg("--game") ?? process.env.OWL_GAME_SLUG ?? "one_piece";
 const LIMIT = parsePositiveInt(readArg("--limit"), 50);
@@ -147,6 +149,16 @@ function shortError(error) {
   return message.slice(0, 500);
 }
 
+function retryErrorPattern(reason) {
+  const normalized = String(reason ?? "").trim().toLowerCase();
+  if (!normalized) return null;
+  if (normalized === "storage_upload") return "%upload failed%";
+  if (normalized === "source_404") return "%404%";
+  if (normalized === "source_timeout") return "%timed out%";
+  if (normalized === "source_download_failed") return "%download failed%";
+  throw new Error(`Unknown retry reason '${reason}'. Expected storage_upload, source_404, source_timeout, or source_download_failed.`);
+}
+
 function mdTable(headers, rows) {
   const out = [];
   out.push(`| ${headers.join(" | ")} |`);
@@ -169,6 +181,7 @@ function writeReport({ game, blockedReason, rows, counts }) {
     `Concurrency: ${CONCURRENCY}`,
     `Force: ${FORCE ? "yes" : "no"}`,
     `Retry errors: ${RETRY_ERRORS ? "yes" : "no"}`,
+    `Retry reason: ${RETRY_REASON ?? "any"}`,
     "",
   ];
 
@@ -272,7 +285,7 @@ const CARD_SELECT = `
   image_mirror_status
 `;
 
-async function runCardQuery(game, { statuses, excludeMirrored = false, limit }) {
+async function runCardQuery(game, { statuses, excludeMirrored = false, errorLike = null, limit }) {
   let query = supabase
     .from("cards")
     .select(CARD_SELECT)
@@ -286,6 +299,9 @@ async function runCardQuery(game, { statuses, excludeMirrored = false, limit }) 
   }
   if (excludeMirrored) {
     query = query.neq("image_mirror_status", "mirrored");
+  }
+  if (errorLike) {
+    query = query.ilike("image_mirror_error", errorLike);
   }
 
   const { data, error } = await query;
@@ -304,6 +320,10 @@ async function loadCards(game) {
   }
 
   if (RETRY_ERRORS) {
+    const errorLike = retryErrorPattern(RETRY_REASON);
+    if (errorLike) {
+      return runCardQuery(game, { statuses: ["error"], errorLike, limit: LIMIT });
+    }
     return runCardQuery(game, { excludeMirrored: true, limit: LIMIT });
   }
 
