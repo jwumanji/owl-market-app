@@ -13,6 +13,8 @@ export const runtime = "nodejs";
 type MeasurementResponse =
   operations["measureCardCentering"]["responses"][200]["content"]["application/json"];
 
+type JsonRecord = Record<string, unknown>;
+
 function createAuthClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -61,6 +63,61 @@ function passthroughHeaders(response: Response) {
   const contentType = response.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
   return headers;
+}
+
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasNumber(record: JsonRecord, key: string) {
+  const value = record[key];
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function hasString(record: JsonRecord, key: string) {
+  const value = record[key];
+  return typeof value === "string" && value.length > 0;
+}
+
+function isMeasurementResponse(value: unknown): value is MeasurementResponse {
+  if (!isRecord(value)) return false;
+  const image = value.image;
+  const centering = value.centering;
+  const psa = value.psa;
+  const pipeline = value.pipeline;
+  const metadata = value.metadata;
+  const overlay = value.overlay;
+
+  if (!isRecord(image) || !hasString(image, "contentType") || !hasNumber(image, "widthPx") || !hasNumber(image, "heightPx")) {
+    return false;
+  }
+  if (!isRecord(centering)) return false;
+
+  const leftRight = centering.leftRight;
+  const topBottom = centering.topBottom;
+  if (!isRecord(leftRight) || !hasNumber(leftRight, "leftPercent") || !hasNumber(leftRight, "rightPercent")) {
+    return false;
+  }
+  if (!isRecord(topBottom) || !hasNumber(topBottom, "topPercent") || !hasNumber(topBottom, "bottomPercent")) {
+    return false;
+  }
+  if (!hasString(centering, "worstAxis") || !hasNumber(centering, "worstAxisMaxPercent")) {
+    return false;
+  }
+  if (!isRecord(psa) || !hasString(psa, "ceiling")) {
+    return false;
+  }
+  if (!isRecord(pipeline) || !hasString(pipeline, "mode") || !hasString(pipeline, "version")) {
+    return false;
+  }
+  if (!isRecord(metadata) || !hasNumber(metadata, "processingMs")) {
+    return false;
+  }
+  if (!isRecord(overlay)) {
+    return false;
+  }
+
+  return true;
 }
 
 function measurementRow(gameId: string, inventoryItemId: string | null, response: MeasurementResponse) {
@@ -161,6 +218,13 @@ export async function POST(request: Request) {
   const responseBody = await cvResponse.text();
   const headers = passthroughHeaders(cvResponse);
 
+  if (cvResponse.status >= 500) {
+    return NextResponse.json(
+      { error: "Owl Lens CV service failed", upstreamStatus: cvResponse.status },
+      { status: 502 }
+    );
+  }
+
   if (!cvResponse.ok) {
     return new Response(responseBody, {
       status: cvResponse.status,
@@ -170,7 +234,11 @@ export async function POST(request: Request) {
 
   let measurement: MeasurementResponse;
   try {
-    measurement = JSON.parse(responseBody) as MeasurementResponse;
+    const parsed = JSON.parse(responseBody) as unknown;
+    if (!isMeasurementResponse(parsed)) {
+      return NextResponse.json({ error: "Owl Lens CV service returned an invalid measurement response" }, { status: 502 });
+    }
+    measurement = parsed;
   } catch {
     return NextResponse.json({ error: "Owl Lens CV service returned invalid JSON" }, { status: 502 });
   }
