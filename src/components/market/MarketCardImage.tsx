@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 
 import CardHoverZoom from "../ui/CardHoverZoom";
@@ -8,6 +9,7 @@ type MarketCardImageProps = {
   alt: string;
   className?: string;
   fallbackTimeoutMs?: number;
+  fetchPriority?: "high" | "low" | "auto";
   height?: number;
   imageUrl?: string | null;
   imageUrlSmall?: string | null;
@@ -23,6 +25,7 @@ export default function MarketCardImage({
   alt,
   className,
   fallbackTimeoutMs = 0,
+  fetchPriority = "auto",
   height,
   imageUrl,
   imageUrlSmall,
@@ -30,8 +33,8 @@ export default function MarketCardImage({
   width,
 }: MarketCardImageProps) {
   const sources = useMemo(
-    () => [imageUrl, imageUrlSmall].filter((src): src is string => Boolean(src)),
-    [imageUrl, imageUrlSmall],
+    () => [imageUrlSmall, imageUrl].filter((src): src is string => Boolean(src)),
+    [imageUrlSmall, imageUrl],
   );
   const [sourceIndex, setSourceIndex] = useState(0);
   const [loadedSource, setLoadedSource] = useState<string | null>(null);
@@ -71,14 +74,15 @@ export default function MarketCardImage({
   }
 
   return (
-    <CardHoverZoom src={src} alt={alt}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+    <CardHoverZoom src={src} previewSrc={imageUrl ?? src} alt={alt}>
+      <Image
         src={src}
         alt={alt}
-        width={width}
-        height={height}
+        width={width ?? 64}
+        height={height ?? 90}
         loading={loading}
+        fetchPriority={fetchPriority}
+        sizes={`${width ?? 64}px`}
         className={className}
         onLoad={() => {
           setLoadedSource(src);

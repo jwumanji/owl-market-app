@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { CHARACTERS as FALLBACK_CHARS, TIER_LABELS } from "./characters-data";
@@ -161,12 +162,14 @@ function CharAvatar({ src, name, size = 28 }: { src: string | null; name: string
   const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
   if (src) {
     return (
-      <img
+      <Image
         src={src}
         alt={name}
         width={size}
         height={Math.round(size * 1.4)}
         loading="lazy"
+        fetchPriority="low"
+        sizes={`${size}px`}
         className="ch-avatar-img"
         style={{ width: size, height: Math.round(size * 1.4) }}
       />
@@ -204,13 +207,13 @@ function CardImageCell({ card }: { card: CharacterCard }) {
       onMouseLeave={handleMouseLeave}
     >
       {imgSrc ? (
-        <img src={imgSrc} alt={card.name} width={32} height={45} loading="lazy" className="ch-card-thumb" />
+        <Image src={imgSrc} alt={card.name} width={32} height={45} sizes="32px" loading="lazy" fetchPriority="low" className="ch-card-thumb" />
       ) : (
         <div className="ch-card-thumb-placeholder" />
       )}
       {showPreview && fullSrc && (
         <div className="ch-card-hover-preview">
-          <img src={fullSrc} alt={card.name} width={200} height={280} loading="lazy" />
+          <Image src={fullSrc} alt={card.name} width={200} height={280} sizes="200px" loading="lazy" />
         </div>
       )}
     </div>
@@ -362,9 +365,9 @@ function CharacterDetail({ c }: { c: CharacterData }) {
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,transparent,${color},transparent)` }} />
         <div className="ch-detail-header-inner">
           {fullImg ? (
-            <img src={fullImg} alt={c.name} className="ch-detail-avatar" width={80} height={112} loading="lazy" />
+            <Image src={fullImg} alt={c.name} className="ch-detail-avatar" width={80} height={112} sizes="80px" loading="lazy" />
           ) : avatar ? (
-            <img src={avatar} alt={c.name} className="ch-detail-avatar" width={80} height={112} loading="lazy" />
+            <Image src={avatar} alt={c.name} className="ch-detail-avatar" width={80} height={112} sizes="80px" loading="lazy" />
           ) : (
             <div className="ch-detail-avatar-placeholder">
               {c.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}

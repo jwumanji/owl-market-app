@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import RarityBadge from "@/components/ui/RarityBadge";
 import CardHoverZoom from "@/components/ui/CardHoverZoom";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
@@ -41,17 +42,20 @@ function deltaState(chg: number | null | undefined): "up" | "down" | "flat" {
   return chg > 0 ? "up" : "down";
 }
 
-function CardThumb({ card }: { card: TeaserCard }) {
-  const imageSrc = card.image_url ?? card.image_url_small;
+function CardThumb({ card, priority }: { card: TeaserCard; priority: boolean }) {
+  const imageSrc = card.image_url_small ?? card.image_url;
   if (imageSrc) {
     return (
-      <CardHoverZoom src={imageSrc} alt={card.name}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+      <CardHoverZoom src={imageSrc} previewSrc={card.image_url ?? imageSrc} alt={card.name}>
+        <Image
           src={imageSrc}
           alt=""
+          width={52}
+          height={73}
+          sizes="52px"
           className="c-teaser-thumb"
-          loading="lazy"
+          loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : "low"}
         />
       </CardHoverZoom>
     );
@@ -102,7 +106,7 @@ export default function HomeTeaserTable({
             >
               <span className="c-teaser-rank">{String(i + 1).padStart(2, "0")}</span>
               <div className="c-teaser-card-cell">
-                <CardThumb card={card} />
+                <CardThumb card={card} priority={i < 3} />
                 <div className="c-teaser-card-meta">
                   <div className="c-teaser-card-name">{card.name}</div>
                   <div className="c-teaser-card-set">

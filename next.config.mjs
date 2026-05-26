@@ -1,5 +1,16 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  images: {
+    formats: ["image/avif", "image/webp"],
+    imageSizes: [32, 48, 64, 96, 128, 256],
+    minimumCacheTTL: 86400,
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "**",
+      },
+    ],
+  },
   async redirects() {
     return [
       { source: "/markets", destination: "/games/one-piece/markets", permanent: false },

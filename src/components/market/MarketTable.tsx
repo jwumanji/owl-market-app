@@ -110,10 +110,11 @@ export default function MarketTable({ cards: initialCards, sets, gameRouteSlug }
                   <MarketCardImage
                     alt={card.name ?? ""}
                     className="h-[73px] w-[52px] rounded-[4px] border-[1.5px] border-ink object-cover"
+                    fetchPriority={i < 4 ? "high" : "low"}
                     height={73}
                     imageUrl={card.image_url}
                     imageUrlSmall={card.image_url_small}
-                    loading="eager"
+                    loading={i < 4 ? "eager" : "lazy"}
                     width={52}
                   />
                 </td>

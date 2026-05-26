@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { CardRow } from "@/lib/types";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
@@ -24,7 +25,7 @@ export default function MarketGrid({
       {cards.map((card, i) => {
         const ps = card.price_stats;
         const rank = String(i + 1).padStart(2, "0");
-        const imageSrc = card.image_url ?? card.image_url_small;
+        const imageSrc = card.image_url_small ?? card.image_url;
         return (
           <Link
             key={card.id}
@@ -37,10 +38,14 @@ export default function MarketGrid({
                 <RarityBadge rarity={card.rarity} />
               </span>
               {imageSrc ? (
-                <img
+                <Image
                   src={imageSrc}
                   alt={card.name}
+                  width={256}
+                  height={358}
                   loading="lazy"
+                  fetchPriority="low"
+                  sizes="(max-width: 640px) 45vw, (max-width: 1024px) 22vw, 180px"
                 />
               ) : (
                 <div className="mgrid-img-placeholder" />

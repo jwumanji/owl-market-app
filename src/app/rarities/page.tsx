@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
@@ -236,7 +237,7 @@ function RarityCards({ r, gameRouteSlug }: { r: RarityData; gameRouteSlug: strin
                   <td>
                     <div className="card-cell">
                       {card.imageSmall && (
-                        <img src={card.imageSmall} alt="" className="card-thumb" loading="lazy" />
+                        <Image src={card.imageSmall} alt="" className="card-thumb" width={28} height={38} sizes="28px" loading="lazy" fetchPriority="low" />
                       )}
                       <div style={{ minWidth: 0 }}>
                         <div className="card-name">{card.name}</div>

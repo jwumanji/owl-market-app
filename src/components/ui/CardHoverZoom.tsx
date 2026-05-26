@@ -11,14 +11,16 @@ interface Props {
   src: string | null;
   alt: string;
   children: React.ReactNode;
+  previewSrc?: string | null;
 }
 
-export default function CardHoverZoom({ src, alt, children }: Props) {
+export default function CardHoverZoom({ src, alt, children, previewSrc }: Props) {
   const wrapRef = useRef<HTMLSpanElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const zoomSrc = previewSrc ?? src;
 
   const show = useCallback(() => {
-    if (!src) return;
+    if (!zoomSrc) return;
     const el = wrapRef.current;
     if (!el) return;
     if (typeof window === "undefined") return;
@@ -35,7 +37,7 @@ export default function CardHoverZoom({ src, alt, children }: Props) {
       Math.min(top, window.innerHeight - PREVIEW_H - VIEWPORT_PAD),
     );
     setPos({ left, top });
-  }, [src]);
+  }, [zoomSrc]);
 
   const hide = useCallback(() => setPos(null), []);
 
@@ -47,14 +49,14 @@ export default function CardHoverZoom({ src, alt, children }: Props) {
       onMouseLeave={hide}
     >
       {children}
-      {src && pos && (
+      {zoomSrc && pos && (
         <span
           className="c-hzoom-pop"
           style={{ left: pos.left, top: pos.top }}
           aria-hidden="true"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={src} alt={alt} />
+          <img src={zoomSrc} alt={alt} loading="lazy" decoding="async" />
         </span>
       )}
     </span>
