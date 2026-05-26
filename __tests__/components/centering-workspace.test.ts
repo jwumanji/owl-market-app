@@ -27,7 +27,12 @@ type Exports = {
     intakeMode?: "single" | "frontBack";
     cardIdentity: { name: string; setCode?: string | null; cardNumber?: string | null; rarity?: string | null };
   }>;
-  buildMeasurementFormData: (input: { inventoryItemId?: string | null; file: File; manualOverlay?: unknown }) => FormData;
+  buildMeasurementFormData: (input: {
+    inventoryItemId?: string | null;
+    file: File;
+    backFile?: File | null;
+    manualOverlay?: unknown;
+  }) => FormData;
   buildResultViewModel: (result: Record<string, unknown>) => Record<string, unknown>;
   centeringReducer: (state: Record<string, unknown>, action: Record<string, unknown>) => Record<string, unknown>;
   defaultManualOverlay: (width: number, height: number) => Record<string, unknown>;
@@ -49,6 +54,7 @@ type Exports = {
   submitMeasurementRequest: (input: {
     inventoryItemId?: string | null;
     file: File;
+    backFile?: File | null;
     fetchImpl: typeof fetch;
   }) => Promise<{ ok: true; result: unknown } | { ok: false; error: { code?: string; message?: string } | null }>;
 };
@@ -238,14 +244,14 @@ test("workspace renders measure-this-card button when preload URL is passed", ()
   assert.match(html, /Ready to measure/);
   assert.match(html, /Measure this card/);
   assert.match(html, /Upload a different image/);
-  assert.doesNotMatch(html, /Upload a front scan/);
+  assert.doesNotMatch(html, /Upload card image/);
 });
 
 test("workspace renders upload zone when no preload URL is passed", () => {
   const html = renderWorkspace();
 
-  assert.match(html, /Upload a front scan/);
-  assert.match(html, /Browse scan/);
+  assert.match(html, /Upload card image/);
+  assert.match(html, /Browse image/);
   assert.doesNotMatch(html, /Measure this card/);
 });
 
@@ -256,14 +262,17 @@ test("workspace renders front and back intake when requested", () => {
   assert.match(html, /Back scan/);
   assert.match(html, /Upload front/);
   assert.match(html, /Upload back/);
-  assert.match(html, /Measure front scan/);
+  assert.match(html, /Upload both sides before measuring/);
+  assert.match(html, /Measure card/);
+  assert.doesNotMatch(html, /Upload a front scan/);
+  assert.doesNotMatch(html, /Measure front scan/);
 });
 
 test("workspace renders standalone mode without inventory item context", () => {
   const html = renderWorkspace({ inventoryItemId: null, preloadImageUrl: "https://cdn.example/cards/front.png" });
 
-  assert.match(html, /Upload a front scan/);
-  assert.match(html, /Browse scan/);
+  assert.match(html, /Upload card image/);
+  assert.match(html, /Browse image/);
   assert.doesNotMatch(html, /Ready to measure/);
   assert.doesNotMatch(html, /Measure this card/);
 });
@@ -350,6 +359,20 @@ test("standalone measurement payload omits inventoryItemId", () => {
 
   assert.equal(formData.has("inventoryItemId"), false);
   assert.equal(formData.get("file"), file);
+});
+
+test("paired pregrade payload includes front and back files", () => {
+  const { exports } = loadComponent();
+  const frontFile = new File(["front"], "front.jpg", { type: "image/jpeg" });
+  const backFile = new File(["back"], "back.jpg", { type: "image/jpeg" });
+
+  const formData = exports.buildMeasurementFormData({
+    file: frontFile,
+    backFile,
+  });
+
+  assert.equal(formData.get("file"), frontFile);
+  assert.equal(formData.get("backFile"), backFile);
 });
 
 test("measurement request preserves string API errors", async () => {
@@ -441,7 +464,7 @@ test("preloaded image fetch failure returns inline error path and leaves upload 
   assert.equal(outcome.preloadError, exports.PRELOAD_FETCH_ERROR_MESSAGE);
   assert.equal(exports.PRELOAD_FETCH_ERROR_MESSAGE, "Couldn't load saved scan. Upload a fresh image instead.");
   assert.deepEqual(actions, ["startUpload", "reset"]);
-  assert.match(uploadZoneHtml, /Upload a front scan/);
+  assert.match(uploadZoneHtml, /Upload card image/);
 });
 
 test("download report trigger writes a PNG filename and clicks a download link", async () => {

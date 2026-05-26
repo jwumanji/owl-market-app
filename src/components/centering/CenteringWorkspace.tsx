@@ -233,11 +233,13 @@ export function buildMeasurementFormData({
   gameSlug,
   inventoryItemId,
   file,
+  backFile,
   manualOverlay,
 }: {
   gameSlug?: string | null;
   inventoryItemId?: string | null;
   file: File;
+  backFile?: File | null;
   manualOverlay?: MeasurementOverlay | null;
 }) {
   const formData = new FormData();
@@ -248,6 +250,9 @@ export function buildMeasurementFormData({
     formData.set("inventoryItemId", inventoryItemId);
   }
   formData.set("file", file);
+  if (backFile) {
+    formData.set("backFile", backFile);
+  }
 
   if (manualOverlay) {
     formData.set("manual_adjustment", "true");
@@ -396,12 +401,14 @@ export async function submitMeasurementRequest({
   gameSlug,
   inventoryItemId,
   file,
+  backFile,
   manualOverlay,
   fetchImpl = fetch,
 }: {
   gameSlug?: string | null;
   inventoryItemId?: string | null;
   file: File;
+  backFile?: File | null;
   manualOverlay?: MeasurementOverlay | null;
   fetchImpl?: typeof fetch;
 }): Promise<{ ok: true; result: MeasurementResponse } | { ok: false; error: CenteringError }> {
@@ -411,6 +418,7 @@ export async function submitMeasurementRequest({
       gameSlug,
       inventoryItemId,
       file,
+      backFile,
       manualOverlay,
     }),
   }).catch(() => null);
@@ -575,12 +583,12 @@ function UploadZone({
               />
             </svg>
           </div>
-          <h2 className="font-grotesk text-2xl font-bold text-ink">Upload a front scan</h2>
+          <h2 className="font-grotesk text-2xl font-bold text-ink">Upload card image</h2>
           <p className="mt-3 text-sm leading-6 text-ink-2">
             Drop, paste, or browse for a JPEG, PNG, or WEBP image. The browser sends it through the
             authenticated OWL proxy, never directly to the CV service.
           </p>
-          <div className="admin-btn admin-btn-primary mt-6">Browse scan</div>
+          <div className="admin-btn admin-btn-primary mt-6">Browse image</div>
         </div>
       )}
     </div>
@@ -694,7 +702,7 @@ function FrontBackUploadPanel({
       </div>
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="font-mono-2 text-xs font-semibold uppercase tracking-wider text-ink-2">
-          Front scan required. Back scan optional.
+          Upload both sides before measuring.
         </div>
         <button
           type="button"
@@ -702,7 +710,7 @@ function FrontBackUploadPanel({
           disabled={!canMeasure}
           className="admin-btn admin-btn-primary justify-center disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Measure front scan
+          Measure card
         </button>
       </div>
     </div>
@@ -1208,7 +1216,7 @@ export default function CenteringWorkspace({
   }, [preloadImageSrc]);
 
   const submitMeasurement = useCallback(
-    async (file: File, overlay?: MeasurementOverlay | null) => {
+    async (file: File, overlay?: MeasurementOverlay | null, backFile?: File | null) => {
       dispatch({ type: "startUpload" });
       await delay(250);
       dispatch({ type: "startProcessing" });
@@ -1217,6 +1225,7 @@ export default function CenteringWorkspace({
         gameSlug,
         inventoryItemId,
         file,
+        backFile,
         manualOverlay: overlay,
       });
 
@@ -1256,11 +1265,11 @@ export default function CenteringWorkspace({
     setBackPreviewUrl(null);
   }, []);
 
-  const measureSelectedFrontFile = useCallback(() => {
-    if (selectedFile) {
-      void submitMeasurement(selectedFile);
+  const measureSelectedCardFiles = useCallback(() => {
+    if (selectedFile && selectedBackFile) {
+      void submitMeasurement(selectedFile, null, selectedBackFile);
     }
-  }, [selectedFile, submitMeasurement]);
+  }, [selectedBackFile, selectedFile, submitMeasurement]);
 
   const measurePreloadedFile = useCallback(() => {
     if (!preloadImageSrc) return;
@@ -1401,8 +1410,8 @@ export default function CenteringWorkspace({
               backImageSrc={backPreviewUrl}
               frontFileName={selectedFile?.name ?? null}
               backFileName={selectedBackFile?.name ?? null}
-              canMeasure={Boolean(selectedFile)}
-              onMeasure={measureSelectedFrontFile}
+              canMeasure={Boolean(selectedFile && selectedBackFile)}
+              onMeasure={measureSelectedCardFiles}
             />
           ) : (
             <UploadZone
@@ -1447,7 +1456,7 @@ export default function CenteringWorkspace({
           onManualOverlayChange={setManualOverlay}
           canRetry={canRetryWithCorrections}
           onRetry={() => {
-            if (selectedFile) void submitMeasurement(selectedFile, manualOverlay);
+            if (selectedFile) void submitMeasurement(selectedFile, manualOverlay, selectedBackFile);
           }}
           onReset={() => {
             clearSelectedFiles();
