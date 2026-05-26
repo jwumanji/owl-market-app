@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import AdminGameSwitcher from "../../AdminGameSwitcher";
 import CenteringWorkspace from "@/components/centering/CenteringWorkspace";
+import { getCurrentAdminUser } from "@/lib/admin-user";
 import { loadAdminGameOptions, type AdminGameOption } from "@/lib/admin-games";
 import { DEFAULT_PUBLIC_GAME_DB_SLUG, resolveGameScope } from "@/lib/game-scope";
 import { createServiceClient } from "@/lib/supabase-server";
@@ -53,6 +55,16 @@ function pageFromSearchParams(searchParams?: PregradeSearchParams) {
 
 function gameFromSearchParams(searchParams?: PregradeSearchParams) {
   return searchParamValue(searchParams?.game)?.trim() || DEFAULT_PUBLIC_GAME_DB_SLUG;
+}
+
+function pregradeRedirectPath(searchParams?: PregradeSearchParams) {
+  const params = new URLSearchParams();
+  const page = searchParamValue(searchParams?.page)?.trim();
+  const game = searchParamValue(searchParams?.game)?.trim();
+  if (page) params.set("page", page);
+  if (game) params.set("game", game);
+  const query = params.toString();
+  return `/admin/lens/pregrade${query ? `?${query}` : ""}`;
 }
 
 function formatPercent(value: string | number | null | undefined) {
@@ -236,6 +248,11 @@ export default async function PregradePage({
 }: {
   searchParams?: PregradeSearchParams;
 }) {
+  const currentUser = await getCurrentAdminUser();
+  if (!currentUser) {
+    redirect(`/login?redirect=${encodeURIComponent(pregradeRedirectPath(searchParams))}`);
+  }
+
   const page = pageFromSearchParams(searchParams);
   const requestedGame = gameFromSearchParams(searchParams);
   const [history, gameOptions] = await Promise.all([

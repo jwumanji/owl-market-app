@@ -414,6 +414,7 @@ export async function submitMeasurementRequest({
 }): Promise<{ ok: true; result: MeasurementResponse } | { ok: false; error: CenteringError }> {
   const response = await fetchImpl("/api/centering/measure", {
     method: "POST",
+    credentials: "same-origin",
     body: buildMeasurementFormData({
       gameSlug,
       inventoryItemId,
@@ -435,6 +436,16 @@ export async function submitMeasurementRequest({
   const body = isJson ? await response.json().catch(() => null) : null;
   const text = isJson ? null : await response.text().catch(() => null);
   if (!response.ok) {
+    if (response.status === 401) {
+      return {
+        ok: false,
+        error: {
+          code: "MEASUREMENT_FAILED",
+          message: "Your admin session expired. Sign in again, then retry the measurement.",
+        },
+      };
+    }
+
     return {
       ok: false,
       error: readErrorBody(body) ?? readErrorText(text) ?? { code: "MEASUREMENT_FAILED", message: "Measurement failed." },

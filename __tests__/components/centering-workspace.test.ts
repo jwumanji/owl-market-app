@@ -393,6 +393,23 @@ test("measurement request preserves string API errors", async () => {
   }
 });
 
+test("measurement request turns unauthorized responses into a sign-in prompt", async () => {
+  const { exports } = loadComponent();
+  const file = new File(["image"], "card.jpg", { type: "image/jpeg" });
+  const fetchImpl = async () => responseLike({
+    ok: false,
+    status: 401,
+    body: { error: "Unauthorized" },
+  });
+
+  const outcome = await exports.submitMeasurementRequest({ file, fetchImpl });
+
+  assert.equal(outcome.ok, false);
+  if (!outcome.ok) {
+    assert.equal(outcome.error?.message, "Your admin session expired. Sign in again, then retry the measurement.");
+  }
+});
+
 test("measure-this-card action fetches the preloaded image and posts it for measurement", async () => {
   const { exports } = loadComponent();
   const actions: string[] = [];

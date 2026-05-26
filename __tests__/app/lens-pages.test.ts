@@ -169,6 +169,11 @@ test("pregrade page renders standalone workspace and NULL inventory history", as
         return supabase;
       },
     },
+    "@/lib/admin-user": {
+      getCurrentAdminUser() {
+        return Promise.resolve({ id: "admin-user-1", email: "admin@example.com" });
+      },
+    },
     "@/lib/admin-games": {
       loadAdminGameOptions() {
         return Promise.resolve([{ slug: "one_piece", name: "One Piece Card Game", isPublic: true }]);
@@ -194,6 +199,11 @@ test("pregrade page renders standalone workspace and NULL inventory history", as
     "next/link": {
       __esModule: true,
       default: linkMock,
+    },
+    "next/navigation": {
+      redirect(url: string) {
+        throw new Error(`redirect:${url}`);
+      },
     },
   };
 
