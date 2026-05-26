@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { gameParamFromRequest, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
 import { cachedPublicData, PUBLIC_DATA_CACHE_HEADERS, publicDataCacheKey } from "@/lib/public-data-cache";
 import { loadPublicCharacterSummaryRows, type PublicCharacterSummaryRow } from "@/lib/public-page-summaries";
-import { createServiceClient } from "@/lib/supabase-server";
+import { createCachedServiceClient } from "@/lib/supabase-server";
 import { firstRelation } from "@/lib/supabase-relations";
+
+export const revalidate = 300;
 
 // ---------------------------------------------------------------------------
 // GET /api/characters - returns character index data with top cards + prices
@@ -62,7 +64,7 @@ function mapCharacterSummary(row: PublicCharacterSummaryRow) {
 }
 
 async function loadCharacterSummaries(gameId: string) {
-  const supabase = createServiceClient();
+  const supabase = createCachedServiceClient();
   const rows = await loadPublicCharacterSummaryRows(supabase, gameId);
   if (!rows) return null;
 
@@ -139,7 +141,7 @@ function trendSpark(stats: PriceStatsRelation | null) {
 }
 
 async function loadCharacterIndex(gameId: string) {
-  const supabase = createServiceClient();
+  const supabase = createCachedServiceClient();
 
   const { data: characters, error: charErr } = await supabase
     .from("characters")
@@ -283,7 +285,7 @@ async function loadCharacterIndex(gameId: string) {
 }
 
 export async function GET(request: Request) {
-  const supabase = createServiceClient();
+  const supabase = createCachedServiceClient();
   const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
     defaultToOnePiece: true,
     publicOnly: publicOnlyForCatalogPreview(),

@@ -1,6 +1,7 @@
 import { SetDetailPageContent } from "@/app/sets/[slug]/SetDetailPageContent";
+import { PUBLIC_DATA_CACHE_TTL_SECONDS } from "@/lib/public-data-cache";
 
-export const dynamic = "force-dynamic";
+export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
 
 export async function generateMetadata({
   params,

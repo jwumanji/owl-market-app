@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createServiceClient } from "@/lib/supabase-server";
+import { createCachedServiceClient } from "@/lib/supabase-server";
 import { gamePath } from "@/lib/game-routes";
 import {
   publicOnlyForCatalogPreview,
@@ -12,10 +12,10 @@ import {
   catalogCardType,
 } from "@/lib/catalog-card-fields";
 import { catalogPageDescription } from "@/lib/game-catalog-copy";
-import { cachedPublicData, publicDataCacheKey } from "@/lib/public-data-cache";
+import { cachedPublicData, PUBLIC_DATA_CACHE_TTL_SECONDS, publicDataCacheKey } from "@/lib/public-data-cache";
 import "./catalog.css";
 
-export const dynamic = "force-dynamic";
+export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
 
 const PAGE_SIZE = 100;
 
@@ -112,7 +112,7 @@ function hrefFor(gameRouteSlug: string, params: CatalogSearchParams) {
 
 async function loadCatalogUncached(gameRouteSlug: string, searchParams: CatalogSearchParams): Promise<CatalogData> {
   try {
-    const supabase = createServiceClient();
+    const supabase = createCachedServiceClient();
     const gameResult = await resolveGameScope(supabase, gameRouteSlug, {
       defaultToOnePiece: false,
       publicOnly: publicOnlyForCatalogPreview(),
@@ -154,6 +154,7 @@ async function loadCatalogUncached(gameRouteSlug: string, searchParams: CatalogS
     const from = currentPage * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
 
+    const hasCardFilters = Boolean(selectedSet || selectedRarity || selectedVariant || query);
     let cardsQuery = supabase
       .from("cards")
       .select(`
@@ -171,7 +172,7 @@ async function loadCatalogUncached(gameRouteSlug: string, searchParams: CatalogS
         types,
         game_payload,
         sets!cards_set_game_fk (slug, code, name)
-      `, { count: "exact" })
+      `, hasCardFilters ? { count: "planned" } : undefined)
       .eq("game_id", game.id);
 
     if (selectedSet) cardsQuery = cardsQuery.eq("set_id", selectedSet.id);
@@ -197,7 +198,7 @@ async function loadCatalogUncached(gameRouteSlug: string, searchParams: CatalogS
       rarities,
       variants,
       cards: (cardsRes.data ?? []) as unknown as CardRow[],
-      totalCards: cardsRes.count ?? 0,
+      totalCards: cardsRes.count ?? sets.reduce((sum, set) => sum + (set.card_count ?? 0), 0),
       pageIndex: currentPage,
       selectedSet,
       selectedRarity,

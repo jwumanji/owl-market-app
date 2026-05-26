@@ -36,23 +36,38 @@ export function getServiceClientConfigError() {
   return null;
 }
 
-export function createServiceClient() {
+type ServiceClientOptions = {
+  cache?: RequestCache;
+  revalidate?: number;
+};
+
+export function createServiceClient(options: ServiceClientOptions = {}) {
   const configError = getServiceClientConfigError();
   if (configError) {
     throw new Error(configError);
   }
+
+  const requestCache = options.cache ?? "no-store";
+  const nextOptions = options.revalidate
+    ? { revalidate: options.revalidate }
+    : undefined;
 
   return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {
       global: {
-        fetch: (url, options = {}) =>
+        fetch: (url, requestOptions = {}) =>
           fetch(url, {
-            ...options,
-            cache: "no-store",
+            ...requestOptions,
+            ...(nextOptions ? {} : { cache: requestCache }),
+            ...(nextOptions ? { next: nextOptions } : {}),
           }),
       },
     }
   );
+}
+
+export function createCachedServiceClient(revalidate = 300) {
+  return createServiceClient({ revalidate });
 }

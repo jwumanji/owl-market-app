@@ -1,6 +1,7 @@
 import { SetsPageContent } from "@/app/sets/SetsPageContent";
+import { PUBLIC_DATA_CACHE_TTL_SECONDS } from "@/lib/public-data-cache";
 
-export const dynamic = "force-dynamic";
+export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
 
 export default async function GameSetsPage({
   params,

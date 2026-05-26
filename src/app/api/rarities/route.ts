@@ -5,9 +5,9 @@ import { ONE_PIECE_DB_SLUG } from "@/lib/games/one-piece";
 import { cachedPublicData, PUBLIC_DATA_CACHE_HEADERS, publicDataCacheKey } from "@/lib/public-data-cache";
 import { loadPublicRaritySummaryRows, type PublicRaritySummaryRow } from "@/lib/public-page-summaries";
 import { firstRelation } from "@/lib/supabase-relations";
-import { createServiceClient } from "@/lib/supabase-server";
+import { createCachedServiceClient, createServiceClient } from "@/lib/supabase-server";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 export const maxDuration = 30;
 
 const CATALOG_RARITY_COLORS = [
@@ -459,7 +459,7 @@ async function loadOnePieceRarityIndex(supabase: SupabaseServiceClient, gameId: 
 }
 
 export async function GET(request: Request) {
-  const supabase = createServiceClient();
+  const supabase = createCachedServiceClient();
   const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
     defaultToOnePiece: true,
     publicOnly: publicOnlyForCatalogPreview(),

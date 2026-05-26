@@ -3,7 +3,7 @@ import { unstable_cache } from "next/cache";
 export const PUBLIC_DATA_CACHE_TTL_SECONDS = 300;
 
 export const PUBLIC_DATA_CACHE_HEADERS = {
-  "Cache-Control": `public, s-maxage=${PUBLIC_DATA_CACHE_TTL_SECONDS}, stale-while-revalidate=${PUBLIC_DATA_CACHE_TTL_SECONDS * 3}`,
+  "Cache-Control": `public, max-age=60, s-maxage=${PUBLIC_DATA_CACHE_TTL_SECONDS}, stale-while-revalidate=${PUBLIC_DATA_CACHE_TTL_SECONDS * 3}`,
 };
 
 type CacheEntry<T> = {

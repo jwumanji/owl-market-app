@@ -1,11 +1,12 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import OwlMark from "@/components/brand/OwlMark";
 import Wordmark from "@/components/brand/Wordmark";
 import { DEFAULT_PUBLIC_GAME_DB_SLUG, DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
-import { gamePath } from "@/lib/game-routes";
+import { gamePath, gameQueryValue } from "@/lib/game-routes";
 import Ticker from "./Ticker";
 
 type NavVariant = "public" | "admin";
@@ -71,6 +72,7 @@ function gameRouteSlugFromAdminGame(gameSlug: string) {
 }
 
 export default function Nav({ variant }: NavProps) {
+  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const resolvedVariant: NavVariant =
@@ -80,10 +82,30 @@ export default function Nav({ variant }: NavProps) {
   const activeAdminGameRouteSlug = gameRouteSlugFromAdminGame(activeAdminGameSlug);
   const activeGameRouteSlug = gameRouteSlugFromPath(pathname);
   const isDefaultPublicGame = activeGameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
-  const links = isAdmin ? adminLinks(activeAdminGameSlug) : publicLinks(activeGameRouteSlug);
+  const links = useMemo(
+    () => (isAdmin ? adminLinks(activeAdminGameSlug) : publicLinks(activeGameRouteSlug)),
+    [activeAdminGameSlug, activeGameRouteSlug, isAdmin]
+  );
   const viewSiteHref = activeAdminGameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG
     ? "/"
     : gamePath(activeAdminGameRouteSlug);
+
+  useEffect(() => {
+    if (isAdmin) return;
+
+    const timeout = window.setTimeout(() => {
+      for (const link of links) {
+        router.prefetch(link.href);
+      }
+
+      const game = encodeURIComponent(gameQueryValue(activeGameRouteSlug));
+      void fetch(`/api/rarities?game=${game}`, { cache: "force-cache" }).catch(() => {});
+      void fetch(`/api/characters?game=${game}`, { cache: "force-cache" }).catch(() => {});
+      void fetch(`/api/markets?game=${game}&limit=20`, { cache: "force-cache" }).catch(() => {});
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [activeGameRouteSlug, isAdmin, links, router]);
 
   return (
     <nav className="c-topnav" aria-label="Primary">

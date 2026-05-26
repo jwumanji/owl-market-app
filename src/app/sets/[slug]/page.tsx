@@ -1,6 +1,7 @@
 import { SetDetailPageContent } from "./SetDetailPageContent";
+import { PUBLIC_DATA_CACHE_TTL_SECONDS } from "@/lib/public-data-cache";
 
-export const dynamic = "force-dynamic";
+export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
 
 export async function generateMetadata({ params }: { params: { slug: string } }) {
   const slug = decodeURIComponent(params.slug).toLowerCase();

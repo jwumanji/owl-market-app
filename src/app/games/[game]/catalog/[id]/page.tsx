@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createServiceClient } from "@/lib/supabase-server";
+import { createCachedServiceClient } from "@/lib/supabase-server";
 import { gamePath } from "@/lib/game-routes";
 import {
   publicOnlyForCatalogPreview,
@@ -15,9 +15,10 @@ import {
   catalogSourcePayload,
 } from "@/lib/catalog-card-fields";
 import { catalogCardDescription } from "@/lib/game-catalog-copy";
+import { PUBLIC_DATA_CACHE_TTL_SECONDS } from "@/lib/public-data-cache";
 import "../catalog.css";
 
-export const dynamic = "force-dynamic";
+export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
 
 type SetInfo = {
   id: string;
@@ -96,7 +97,7 @@ function payloadRows(payload: Record<string, unknown>) {
 
 async function loadCardDetail(gameRouteSlug: string, rawId: string): Promise<DetailData> {
   try {
-    const supabase = createServiceClient();
+    const supabase = createCachedServiceClient();
     const gameResult = await resolveGameScope(supabase, gameRouteSlug, {
       defaultToOnePiece: false,
       publicOnly: publicOnlyForCatalogPreview(),

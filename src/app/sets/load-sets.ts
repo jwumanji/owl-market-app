@@ -1,4 +1,4 @@
-import { createServiceClient } from "@/lib/supabase-server";
+import { createCachedServiceClient, createServiceClient } from "@/lib/supabase-server";
 import {
   catalogCardCost,
   catalogCardDomains,
@@ -287,7 +287,7 @@ async function loadSetsUncached(options: {
   publicOnly?: boolean;
   includeCatalogCards?: boolean;
 } = {}): Promise<LoadedSets> {
-  const supabase = createServiceClient();
+  const supabase = createCachedServiceClient();
   const gameResult = await resolveGameScope(supabase, options.game, {
     defaultToOnePiece: true,
     publicOnly: options.publicOnly ?? !allowsPrivateGamePreview(),

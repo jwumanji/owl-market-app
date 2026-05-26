@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase-server";
+import { createCachedServiceClient } from "@/lib/supabase-server";
 import { withOnePiecePayloadFallbacksList } from "@/lib/game-payload";
 import { gameParamFromRequest, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
 import { cachedPublicData, PUBLIC_DATA_CACHE_HEADERS, publicDataCacheKey } from "@/lib/public-data-cache";
 import { firstRelation, flattenPriceStatsCardRow } from "@/lib/supabase-relations";
+
+export const revalidate = 300;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -11,7 +13,7 @@ export async function GET(request: Request) {
   const sort = searchParams.get("sort") ?? "value";
   const limit = Math.min(parseInt(searchParams.get("limit") ?? "20", 10), 100);
 
-  const supabase = createServiceClient();
+  const supabase = createCachedServiceClient();
   const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
     defaultToOnePiece: true,
     publicOnly: publicOnlyForCatalogPreview(),

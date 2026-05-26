@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createServiceClient } from "@/lib/supabase-server";
+import { createCachedServiceClient } from "@/lib/supabase-server";
 import { CardRow, SetInfo, DashboardData, DashboardCard, RarityRankItem, CharacterRankItem, SealedRankItem, EbaySaleItem } from "@/lib/types";
 import MarketTable from "@/components/market/MarketTable";
 import MarketDashboard from "@/components/market/MarketDashboard";
@@ -7,10 +7,10 @@ import { RARITY_META } from "@/app/rarities/rarities-data";
 import { withOnePiecePayloadFallbacksList } from "@/lib/game-payload";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
-import { cachedPublicData, publicDataCacheKey } from "@/lib/public-data-cache";
+import { cachedPublicData, PUBLIC_DATA_CACHE_TTL_SECONDS, publicDataCacheKey } from "@/lib/public-data-cache";
 import { firstRelation, flattenPriceStatsCardRow } from "@/lib/supabase-relations";
 
-export const dynamic = "force-dynamic";
+export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
 
 export const metadata = {
   title: "Markets — OWL Market",
@@ -59,7 +59,7 @@ export async function MarketsPageContent({
 }: {
   gameRouteSlug?: string | null;
 } = {}) {
-  const supabase = createServiceClient();
+  const supabase = createCachedServiceClient();
   const gameResult = await resolveGameScope(supabase, gameRouteSlug, {
     defaultToOnePiece: true,
     publicOnly: publicOnlyForCatalogPreview(),

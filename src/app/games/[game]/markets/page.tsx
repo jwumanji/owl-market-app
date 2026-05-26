@@ -1,6 +1,7 @@
 import { MarketsPageContent } from "@/app/markets/MarketsPageContent";
+import { PUBLIC_DATA_CACHE_TTL_SECONDS } from "@/lib/public-data-cache";
 
-export const dynamic = "force-dynamic";
+export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
 
 export const metadata = {
   title: "Markets - OWL Market",
