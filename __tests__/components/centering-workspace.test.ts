@@ -24,6 +24,7 @@ type Exports = {
   default: React.ComponentType<{
     inventoryItemId?: string | null;
     preloadImageUrl?: string | null;
+    intakeMode?: "single" | "frontBack";
     cardIdentity: { name: string; setCode?: string | null; cardNumber?: string | null; rarity?: string | null };
   }>;
   buildMeasurementFormData: (input: { inventoryItemId?: string | null; file: File; manualOverlay?: unknown }) => FormData;
@@ -45,6 +46,11 @@ type Exports = {
   PRELOAD_FETCH_ERROR_MESSAGE: string;
   psaTone: (ceiling: string) => string;
   reportFileName: (cardName: string) => string;
+  submitMeasurementRequest: (input: {
+    inventoryItemId?: string | null;
+    file: File;
+    fetchImpl: typeof fetch;
+  }) => Promise<{ ok: true; result: unknown } | { ok: false; error: { code?: string; message?: string } | null }>;
 };
 
 function loadComponent() {
@@ -170,9 +176,11 @@ function measurementResponse() {
 function renderWorkspace({
   preloadImageUrl = null,
   inventoryItemId = "inventory-1",
+  intakeMode,
 }: {
   preloadImageUrl?: string | null;
   inventoryItemId?: string | null;
+  intakeMode?: "single" | "frontBack";
 } = {}) {
   const { exports } = loadComponent();
 
@@ -180,6 +188,7 @@ function renderWorkspace({
     React.createElement(exports.default, {
       inventoryItemId,
       preloadImageUrl,
+      intakeMode,
       cardIdentity: {
         name: "Nami",
         setCode: "OP01",
@@ -217,6 +226,9 @@ function responseLike({
     async json() {
       return body ?? null;
     },
+    async text() {
+      return typeof body === "string" ? body : JSON.stringify(body ?? null);
+    },
   } as Response;
 }
 
@@ -235,6 +247,16 @@ test("workspace renders upload zone when no preload URL is passed", () => {
   assert.match(html, /Upload a front scan/);
   assert.match(html, /Browse scan/);
   assert.doesNotMatch(html, /Measure this card/);
+});
+
+test("workspace renders front and back intake when requested", () => {
+  const html = renderWorkspace({ inventoryItemId: null, intakeMode: "frontBack" });
+
+  assert.match(html, /Front scan/);
+  assert.match(html, /Back scan/);
+  assert.match(html, /Upload front/);
+  assert.match(html, /Upload back/);
+  assert.match(html, /Measure front scan/);
 });
 
 test("workspace renders standalone mode without inventory item context", () => {
@@ -328,6 +350,24 @@ test("standalone measurement payload omits inventoryItemId", () => {
 
   assert.equal(formData.has("inventoryItemId"), false);
   assert.equal(formData.get("file"), file);
+});
+
+test("measurement request preserves string API errors", async () => {
+  const { exports } = loadComponent();
+  const file = new File(["image"], "card.jpg", { type: "image/jpeg" });
+  const fetchImpl = async () => responseLike({
+    ok: false,
+    status: 500,
+    body: { error: "OWL_LENS_CV_URL is not configured" },
+  });
+
+  const outcome = await exports.submitMeasurementRequest({ file, fetchImpl });
+
+  assert.equal(outcome.ok, false);
+  if (!outcome.ok) {
+    assert.equal(outcome.error?.code, "MEASUREMENT_FAILED");
+    assert.equal(outcome.error?.message, "OWL_LENS_CV_URL is not configured");
+  }
 });
 
 test("measure-this-card action fetches the preloaded image and posts it for measurement", async () => {

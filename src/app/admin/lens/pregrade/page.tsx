@@ -263,6 +263,7 @@ export default async function PregradePage({
 
       <CenteringWorkspace
         gameSlug={history.gameSlug}
+        intakeMode="frontBack"
         cardIdentity={{
           name: "Standalone pre-grade",
         }}

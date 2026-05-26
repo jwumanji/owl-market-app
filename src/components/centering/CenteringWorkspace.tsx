@@ -21,14 +21,18 @@ type ApiErrorCode =
   | "CARD_NOT_DETECTED"
   | "MEASUREMENT_FAILED";
 
-type ApiErrorBody = {
-  error?: {
-    code?: ApiErrorCode;
-    message?: string;
-    details?: Record<string, unknown>;
-  };
+type ApiError = {
+  code?: ApiErrorCode;
+  message?: string;
+  details?: Record<string, unknown>;
 };
-type CenteringError = ApiErrorBody["error"] | null;
+
+type ApiErrorBody = {
+  error?: ApiError | string;
+  detail?: string | { msg?: string }[];
+  message?: string;
+};
+type CenteringError = ApiError | null;
 
 export type CardIdentity = {
   name: string;
@@ -41,6 +45,7 @@ export type CenteringWorkspaceProps = {
   gameSlug?: string | null;
   inventoryItemId?: string | null;
   preloadImageUrl?: string | null;
+  intakeMode?: "single" | "frontBack";
   cardIdentity: CardIdentity;
 };
 
@@ -305,10 +310,46 @@ function delay(ms: number) {
   });
 }
 
+function isApiErrorCode(value: unknown): value is ApiErrorCode {
+  return typeof value === "string" && (
+    value === "INVALID_UPLOAD" ||
+    value === "FILE_TOO_LARGE" ||
+    value === "UNSUPPORTED_MEDIA_TYPE" ||
+    value === "IMAGE_UNREADABLE" ||
+    value === "CARD_NOT_DETECTED" ||
+    value === "MEASUREMENT_FAILED"
+  );
+}
+
+function detailMessage(detail: ApiErrorBody["detail"]) {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((entry) => entry?.msg).filter(Boolean).join(" ");
+  }
+  return null;
+}
+
 function readErrorBody(body: unknown): CenteringError {
-  if (!body || typeof body !== "object" || !("error" in body)) return null;
-  const error = (body as ApiErrorBody).error;
-  return error && typeof error === "object" ? error : null;
+  if (!body || typeof body !== "object") return null;
+  const payload = body as ApiErrorBody;
+  const error = payload.error;
+  if (error && typeof error === "object") {
+    return {
+      code: isApiErrorCode(error.code) ? error.code : "MEASUREMENT_FAILED",
+      message: error.message || "Measurement failed.",
+      details: error.details,
+    };
+  }
+  if (typeof error === "string" && error.trim()) {
+    return { code: "MEASUREMENT_FAILED", message: error.trim() };
+  }
+  const message = detailMessage(payload.detail) ?? payload.message;
+  return message ? { code: "MEASUREMENT_FAILED", message } : null;
+}
+
+function readErrorText(text: string | null): CenteringError {
+  const message = text?.trim();
+  return message ? { code: "MEASUREMENT_FAILED", message } : null;
 }
 
 function extensionForContentType(contentType: string) {
@@ -381,11 +422,14 @@ export async function submitMeasurementRequest({
     };
   }
 
-  const body = await response.json().catch(() => null);
+  const contentType = response.headers.get("content-type") ?? "";
+  const isJson = contentType.toLowerCase().includes("application/json");
+  const body = isJson ? await response.json().catch(() => null) : null;
+  const text = isJson ? null : await response.text().catch(() => null);
   if (!response.ok) {
     return {
       ok: false,
-      error: readErrorBody(body) ?? { code: "MEASUREMENT_FAILED", message: "Measurement failed." },
+      error: readErrorBody(body) ?? readErrorText(text) ?? { code: "MEASUREMENT_FAILED", message: "Measurement failed." },
     };
   }
 
@@ -539,6 +583,128 @@ function UploadZone({
           <div className="admin-btn admin-btn-primary mt-6">Browse scan</div>
         </div>
       )}
+    </div>
+  );
+}
+
+type DropzoneBindings = {
+  getRootProps: ReturnType<typeof useDropzone>["getRootProps"];
+  getInputProps: ReturnType<typeof useDropzone>["getInputProps"];
+  isDragActive: boolean;
+};
+
+function SideUploadZone({
+  label,
+  title,
+  actionLabel,
+  imageSrc,
+  fileName,
+  dropzone,
+}: {
+  label: string;
+  title: string;
+  actionLabel: string;
+  imageSrc: string | null;
+  fileName: string | null;
+  dropzone: DropzoneBindings;
+}) {
+  return (
+    <div
+      {...dropzone.getRootProps()}
+      className={`flex min-h-[340px] cursor-pointer flex-col justify-between rounded-c-md border-[1.5px] border-dashed p-5 outline-none transition-colors ${
+        dropzone.isDragActive ? "border-coral bg-bg-3" : "border-ink/40 bg-bg-2 hover:border-coral hover:bg-bg-3"
+      }`}
+    >
+      <input {...dropzone.getInputProps()} />
+      <div>
+        <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-coral">{label}</div>
+        <h3 className="mt-2 font-grotesk text-2xl font-bold text-ink">{title}</h3>
+      </div>
+
+      {imageSrc ? (
+        <div className="my-5">
+          <div className="mx-auto flex aspect-[5/7] max-h-[230px] max-w-[170px] items-center justify-center overflow-hidden rounded-c-sm border-[1.5px] border-ink bg-bg-3">
+            <svg viewBox="0 0 100 140" role="img" aria-label={`${label} selected card image preview`} className="h-full w-full">
+              <image href={imageSrc} x="0" y="0" width="100" height="140" preserveAspectRatio="xMidYMid meet" />
+            </svg>
+          </div>
+          {fileName && (
+            <div className="mt-3 truncate text-center font-mono-2 text-xs font-semibold text-ink-2">{fileName}</div>
+          )}
+        </div>
+      ) : (
+        <div className="my-8 flex items-center justify-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-c-sm border-[1.5px] border-coral bg-bg-3 text-coral">
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+              <path
+                d="M12 16V4m0 0 4 4m-4-4-4 4M5 16v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+              />
+            </svg>
+          </div>
+        </div>
+      )}
+
+      <div className="admin-btn admin-btn-ghost w-full justify-center">{actionLabel}</div>
+    </div>
+  );
+}
+
+function FrontBackUploadPanel({
+  frontDropzone,
+  backDropzone,
+  frontImageSrc,
+  backImageSrc,
+  frontFileName,
+  backFileName,
+  onMeasure,
+  canMeasure,
+}: {
+  frontDropzone: DropzoneBindings;
+  backDropzone: DropzoneBindings;
+  frontImageSrc: string | null;
+  backImageSrc: string | null;
+  frontFileName: string | null;
+  backFileName: string | null;
+  onMeasure: () => void;
+  canMeasure: boolean;
+}) {
+  return (
+    <div className="admin-card p-5">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <SideUploadZone
+          label="Front"
+          title="Front scan"
+          actionLabel={frontImageSrc ? "Replace front" : "Upload front"}
+          imageSrc={frontImageSrc}
+          fileName={frontFileName}
+          dropzone={frontDropzone}
+        />
+        <SideUploadZone
+          label="Back"
+          title="Back scan"
+          actionLabel={backImageSrc ? "Replace back" : "Upload back"}
+          imageSrc={backImageSrc}
+          fileName={backFileName}
+          dropzone={backDropzone}
+        />
+      </div>
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="font-mono-2 text-xs font-semibold uppercase tracking-wider text-ink-2">
+          Front scan required. Back scan optional.
+        </div>
+        <button
+          type="button"
+          onClick={onMeasure}
+          disabled={!canMeasure}
+          className="admin-btn admin-btn-primary justify-center disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Measure front scan
+        </button>
+      </div>
     </div>
   );
 }
@@ -986,12 +1152,15 @@ export default function CenteringWorkspace({
   gameSlug = null,
   inventoryItemId,
   preloadImageUrl = null,
+  intakeMode = "single",
   cardIdentity,
 }: CenteringWorkspaceProps) {
   const [state, dispatch] = useReducer(centeringReducer, INITIAL_STATE);
   const preloadImageSrc = inventoryItemId ? preloadImageUrl : null;
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedBackFile, setSelectedBackFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [backPreviewUrl, setBackPreviewUrl] = useState<string | null>(null);
   const [showUploadZone, setShowUploadZone] = useState(!preloadImageSrc);
   const [preloadFetchError, setPreloadFetchError] = useState<string | null>(null);
   const [manualOverlay, setManualOverlay] = useState<MeasurementOverlay>(() => defaultManualOverlay(1024, 1428));
@@ -999,6 +1168,7 @@ export default function CenteringWorkspace({
   const reportRef = useRef<HTMLDivElement>(null);
   const imageSrc = previewUrl ?? preloadImageSrc ?? null;
   const showPreloadedPanel = Boolean(preloadImageSrc && !showUploadZone && !selectedFile);
+  const usesFrontBackIntake = intakeMode === "frontBack" && !preloadImageSrc;
 
   useEffect(() => {
     if (!selectedFile) return;
@@ -1008,6 +1178,15 @@ export default function CenteringWorkspace({
       URL.revokeObjectURL(objectUrl);
     };
   }, [selectedFile]);
+
+  useEffect(() => {
+    if (!selectedBackFile) return;
+    const objectUrl = URL.createObjectURL(selectedBackFile);
+    setBackPreviewUrl(objectUrl);
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [selectedBackFile]);
 
   useEffect(() => {
     if (!imageSrc) return;
@@ -1060,6 +1239,29 @@ export default function CenteringWorkspace({
     [submitMeasurement]
   );
 
+  const selectFrontFile = useCallback((file: File) => {
+    setPreloadFetchError(null);
+    setSelectedFile(file);
+  }, []);
+
+  const selectBackFile = useCallback((file: File) => {
+    setPreloadFetchError(null);
+    setSelectedBackFile(file);
+  }, []);
+
+  const clearSelectedFiles = useCallback(() => {
+    setSelectedFile(null);
+    setSelectedBackFile(null);
+    setPreviewUrl(null);
+    setBackPreviewUrl(null);
+  }, []);
+
+  const measureSelectedFrontFile = useCallback(() => {
+    if (selectedFile) {
+      void submitMeasurement(selectedFile);
+    }
+  }, [selectedFile, submitMeasurement]);
+
   const measurePreloadedFile = useCallback(() => {
     if (!preloadImageSrc) return;
 
@@ -1086,6 +1288,22 @@ export default function CenteringWorkspace({
     [measureFile]
   );
 
+  const onFrontDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      const [file] = acceptedFiles;
+      if (file) selectFrontFile(file);
+    },
+    [selectFrontFile]
+  );
+
+  const onBackDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      const [file] = acceptedFiles;
+      if (file) selectBackFile(file);
+    },
+    [selectBackFile]
+  );
+
   const dropzone = useDropzone({
     accept: {
       "image/jpeg": [".jpg", ".jpeg"],
@@ -1096,18 +1314,46 @@ export default function CenteringWorkspace({
     onDrop,
   });
 
+  const frontDropzone = useDropzone({
+    accept: {
+      "image/jpeg": [".jpg", ".jpeg"],
+      "image/png": [".png"],
+      "image/webp": [".webp"],
+    },
+    multiple: false,
+    onDrop: onFrontDrop,
+  });
+
+  const backDropzone = useDropzone({
+    accept: {
+      "image/jpeg": [".jpg", ".jpeg"],
+      "image/png": [".png"],
+      "image/webp": [".webp"],
+    },
+    multiple: false,
+    onDrop: onBackDrop,
+  });
+
   useEffect(() => {
     function onPaste(event: ClipboardEvent) {
       const file = Array.from(event.clipboardData?.files ?? []).find((candidate) => candidate.type.startsWith("image/"));
       if (file) {
         event.preventDefault();
-        measureFile(file);
+        if (usesFrontBackIntake) {
+          if (selectedFile) {
+            selectBackFile(file);
+          } else {
+            selectFrontFile(file);
+          }
+        } else {
+          measureFile(file);
+        }
       }
     }
 
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  }, [measureFile]);
+  }, [measureFile, selectBackFile, selectFrontFile, selectedFile, usesFrontBackIntake]);
 
   const canRetryWithCorrections = Boolean(selectedFile);
   const headerMeta = useMemo(
@@ -1147,6 +1393,17 @@ export default function CenteringWorkspace({
                 setShowUploadZone(true);
               }}
             />
+          ) : usesFrontBackIntake ? (
+            <FrontBackUploadPanel
+              frontDropzone={frontDropzone}
+              backDropzone={backDropzone}
+              frontImageSrc={previewUrl}
+              backImageSrc={backPreviewUrl}
+              frontFileName={selectedFile?.name ?? null}
+              backFileName={selectedBackFile?.name ?? null}
+              canMeasure={Boolean(selectedFile)}
+              onMeasure={measureSelectedFrontFile}
+            />
           ) : (
             <UploadZone
               getRootProps={dropzone.getRootProps}
@@ -1175,8 +1432,7 @@ export default function CenteringWorkspace({
             }
           }}
           onReset={() => {
-            setSelectedFile(null);
-            setPreviewUrl(null);
+            clearSelectedFiles();
             dispatch({ type: "reset" });
           }}
         />
@@ -1194,8 +1450,7 @@ export default function CenteringWorkspace({
             if (selectedFile) void submitMeasurement(selectedFile, manualOverlay);
           }}
           onReset={() => {
-            setSelectedFile(null);
-            setPreviewUrl(null);
+            clearSelectedFiles();
             dispatch({ type: "reset" });
           }}
         />

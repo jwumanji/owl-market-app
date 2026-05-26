@@ -71,7 +71,12 @@ test("pregrade page renders standalone workspace and NULL inventory history", as
   const pagePath = path.resolve("src/app/admin/lens/pregrade/page.tsx");
   const ranges: { from: number; to: number }[] = [];
   const nullFilters: { column: string; value: unknown }[] = [];
-  const workspaceProps: Array<{ gameSlug?: string; inventoryItemId?: string | null; cardIdentity: { name: string } }> = [];
+  const workspaceProps: Array<{
+    gameSlug?: string;
+    inventoryItemId?: string | null;
+    intakeMode?: string;
+    cardIdentity: { name: string };
+  }> = [];
   const rows = [
     {
       id: "measurement-1",
@@ -141,7 +146,12 @@ test("pregrade page renders standalone workspace and NULL inventory history", as
     },
     "@/components/centering/CenteringWorkspace": {
       __esModule: true,
-      default(props: { gameSlug?: string; inventoryItemId?: string | null; cardIdentity: { name: string } }) {
+      default(props: {
+        gameSlug?: string;
+        inventoryItemId?: string | null;
+        intakeMode?: string;
+        cardIdentity: { name: string };
+      }) {
         workspaceProps.push(props);
         return React.createElement(
           "div",
@@ -210,7 +220,7 @@ test("pregrade page renders standalone workspace and NULL inventory history", as
   assert.deepEqual(nullFilters, [{ column: "inventory_item_id", value: null }]);
   assert.deepEqual(ranges, [{ from: 0, to: 19 }]);
   assert.deepEqual(JSON.parse(JSON.stringify(workspaceProps)), [
-    { gameSlug: "one_piece", cardIdentity: { name: "Standalone pre-grade" } },
+    { gameSlug: "one_piece", intakeMode: "frontBack", cardIdentity: { name: "Standalone pre-grade" } },
   ]);
   assert.match(html, /data-testid="centering-workspace"/);
   assert.match(html, /Pre-grade History/);
