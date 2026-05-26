@@ -34,6 +34,7 @@ function CardRow({ card, rank, gameRouteSlug }: { card: DashboardCard; rank: num
         fetchPriority={rank <= 2 ? "high" : "low"}
         height={59}
         imageUrl={card.image_url}
+        imageUrlPreview={card.image_url_preview}
         imageUrlSmall={card.image_url_small}
         loading={rank <= 2 ? "eager" : "lazy"}
         width={42}

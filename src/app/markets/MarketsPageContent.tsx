@@ -28,6 +28,7 @@ function toDashboardCard(row: Record<string, unknown>): DashboardCard {
     rarity: (row.rarity as string | null) ?? null,
     image_url: (row.image_url as string | null) ?? null,
     image_url_small: (row.image_url_small as string | null) ?? null,
+    image_url_preview: (row.image_url_preview as string | null) ?? null,
     set_code: set?.code ?? null,
     market_avg: ps?.market_avg ?? null,
     chg_1d: ps?.chg_1d ?? null,
@@ -37,7 +38,7 @@ function toDashboardCard(row: Record<string, unknown>): DashboardCard {
 const DASHBOARD_PRICE_CARD_SELECT = `
   market_avg, chg_1d,
   cards!price_stats_card_game_fk!inner (
-    id, card_image_id, name, rarity, image_url, image_url_small,
+    id, card_image_id, name, rarity, image_url, image_url_small, image_url_preview,
     sets!cards_set_game_fk (code)
   )
 `;
@@ -46,7 +47,7 @@ const MARKET_PRICE_CARD_SELECT = `
   market_avg, tcg_market, ebay_avg, chg_1d, chg_7d, chg_30d,
   cards!price_stats_card_game_fk!inner (
     id, card_image_id, card_number, name, name_base, variant_label, rarity,
-    card_type, color, game_payload, image_url, image_url_small,
+    card_type, color, game_payload, image_url, image_url_small, image_url_preview,
     sets!cards_set_game_fk (id, slug, code, name, series, color, year)
   )
 `;
@@ -82,7 +83,7 @@ export async function MarketsPageContent({
     catalogCountRes,
   ] = await Promise.all([
     // Existing: top 20 by market value
-    cachedPublicData(publicDataCacheKey("markets-page-v2", game.id, "cards"), async () =>
+    cachedPublicData(publicDataCacheKey("markets-page-v3", game.id, "cards"), async () =>
       await supabase
         .from("price_stats")
         .select(MARKET_PRICE_CARD_SELECT)
@@ -92,7 +93,7 @@ export async function MarketsPageContent({
         .limit(20)
     ),
 
-    cachedPublicData(publicDataCacheKey("markets-page-v2", game.id, "sets"), async () =>
+    cachedPublicData(publicDataCacheKey("markets-page-v3", game.id, "sets"), async () =>
       await supabase
         .from("sets")
         .select("id, slug, code, name, series, color, year")
@@ -101,7 +102,7 @@ export async function MarketsPageContent({
     ),
 
     // Trending: high-value cards with positive gains
-    cachedPublicData(publicDataCacheKey("markets-page-v2", game.id, "trending"), async () =>
+    cachedPublicData(publicDataCacheKey("markets-page-v3", game.id, "trending"), async () =>
       await supabase
         .from("price_stats")
         .select(DASHBOARD_PRICE_CARD_SELECT)
@@ -113,7 +114,7 @@ export async function MarketsPageContent({
     ),
 
     // Top Gainers
-    cachedPublicData(publicDataCacheKey("markets-page-v2", game.id, "gainers"), async () =>
+    cachedPublicData(publicDataCacheKey("markets-page-v3", game.id, "gainers"), async () =>
       await supabase
         .from("price_stats")
         .select(DASHBOARD_PRICE_CARD_SELECT)
@@ -124,7 +125,7 @@ export async function MarketsPageContent({
     ),
 
     // Top Losers
-    cachedPublicData(publicDataCacheKey("markets-page-v2", game.id, "losers"), async () =>
+    cachedPublicData(publicDataCacheKey("markets-page-v3", game.id, "losers"), async () =>
       await supabase
         .from("price_stats")
         .select(DASHBOARD_PRICE_CARD_SELECT)
@@ -135,7 +136,7 @@ export async function MarketsPageContent({
     ),
 
     // Rarity aggregation: fetch all cards for premium rarities
-    cachedPublicData(publicDataCacheKey("markets-page-v2", game.id, "rarity-cards"), async () =>
+    cachedPublicData(publicDataCacheKey("markets-page-v3", game.id, "rarity-cards"), async () =>
       await supabase
         .from("cards")
         .select("rarity, price_stats!price_stats_card_game_fk!inner (market_avg, chg_1d)")
@@ -144,7 +145,7 @@ export async function MarketsPageContent({
     ),
 
     // Characters (top 20 by tier, then we compute index)
-    cachedPublicData(publicDataCacheKey("markets-page-v2", game.id, "characters"), async () =>
+    cachedPublicData(publicDataCacheKey("markets-page-v3", game.id, "characters"), async () =>
       await supabase
         .from("characters")
         .select("id, slug, name")
@@ -154,7 +155,7 @@ export async function MarketsPageContent({
     ),
 
     // Sealed boxes
-    cachedPublicData(publicDataCacheKey("markets-page-v2", game.id, "sealed"), async () =>
+    cachedPublicData(publicDataCacheKey("markets-page-v3", game.id, "sealed"), async () =>
       await supabase
         .from("sealed_products")
         .select("name, product_type, market_avg, chg_1d, sets!sealed_products_set_game_fk (code)")
@@ -165,7 +166,7 @@ export async function MarketsPageContent({
     ),
 
     // Recent eBay sales
-    cachedPublicData(publicDataCacheKey("markets-page-v2", game.id, "ebay"), async () =>
+    cachedPublicData(publicDataCacheKey("markets-page-v3", game.id, "ebay"), async () =>
       await supabase
         .from("ebay_sales")
         .select("sale_price, sold_at, title")
@@ -175,7 +176,7 @@ export async function MarketsPageContent({
         .limit(5)
     ),
 
-    cachedPublicData(publicDataCacheKey("markets-page-v2", game.id, "catalog-count"), async () =>
+    cachedPublicData(publicDataCacheKey("markets-page-v3", game.id, "catalog-count"), async () =>
       await supabase
         .from("cards")
         .select("id", { count: "exact", head: true })
@@ -327,7 +328,7 @@ export async function MarketsPageContent({
   const charList = (charsRes.data ?? []) as { id: string; slug: string; name: string }[];
   if (charList.length > 0) {
     const charIds = charList.map((c) => c.id);
-    const { data: charCards } = await cachedPublicData(publicDataCacheKey("markets-page-v2", game.id, "char-cards"), async () =>
+    const { data: charCards } = await cachedPublicData(publicDataCacheKey("markets-page-v3", game.id, "char-cards"), async () =>
       await supabase
         .from("cards")
         .select("character_id, rarity, price_stats!price_stats_card_game_fk!inner (market_avg, chg_1d)")

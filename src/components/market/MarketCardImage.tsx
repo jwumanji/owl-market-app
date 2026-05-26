@@ -12,6 +12,7 @@ type MarketCardImageProps = {
   fetchPriority?: "high" | "low" | "auto";
   height?: number;
   imageUrl?: string | null;
+  imageUrlPreview?: string | null;
   imageUrlSmall?: string | null;
   loading?: "eager" | "lazy";
   width?: number;
@@ -28,6 +29,7 @@ export default function MarketCardImage({
   fetchPriority = "auto",
   height,
   imageUrl,
+  imageUrlPreview,
   imageUrlSmall,
   loading = "lazy",
   width,
@@ -74,7 +76,7 @@ export default function MarketCardImage({
   }
 
   return (
-    <CardHoverZoom src={src} previewSrc={imageUrl ?? src} alt={alt}>
+    <CardHoverZoom src={src} previewSrc={imageUrlPreview ?? imageUrl ?? src} alt={alt}>
       <Image
         src={src}
         alt={alt}

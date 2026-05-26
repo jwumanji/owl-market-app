@@ -21,6 +21,7 @@ interface CharacterCard {
   spark: number[];
   imageUrl?: string | null;
   imageUrlSmall?: string | null;
+  imageUrlPreview?: string | null;
   cardImageId?: string | null;
 }
 
@@ -108,7 +109,7 @@ function rarityClass(rarity: string): string {
 /** Get character avatar from their top card image */
 function getCharAvatar(c: CharacterData): string | null {
   const firstCard = c.topCards?.[0];
-  return firstCard?.imageUrlSmall ?? firstCard?.imageUrl ?? null;
+  return firstCard?.imageUrlSmall ?? firstCard?.imageUrlPreview ?? firstCard?.imageUrl ?? null;
 }
 
 /* ── SVG Sparkline ── */
@@ -198,7 +199,7 @@ function CardImageCell({ card }: { card: CharacterCard }) {
     setShowPreview(false);
   };
   const imgSrc = card.imageUrlSmall ?? card.imageUrl;
-  const fullSrc = card.imageUrl ?? card.imageUrlSmall;
+  const fullSrc = card.imageUrlPreview ?? card.imageUrl ?? card.imageUrlSmall;
 
   return (
     <div
@@ -358,7 +359,7 @@ function CharacterDetail({ c }: { c: CharacterData }) {
   const tier = TIER_LABELS[c.tier] || TIER_LABELS[3];
   const color = c.color || "#E89512";
   const avatar = getCharAvatar(c);
-  const fullImg = c.topCards?.[0]?.imageUrl ?? c.topCards?.[0]?.imageUrlSmall ?? null;
+  const fullImg = c.topCards?.[0]?.imageUrlPreview ?? c.topCards?.[0]?.imageUrl ?? c.topCards?.[0]?.imageUrlSmall ?? null;
   return (
     <div className="ch-detail">
       <div className="ch-detail-header" style={{ background: `linear-gradient(135deg,${c.colorD || "rgba(232,149,18,0.16)"},transparent)` }}>

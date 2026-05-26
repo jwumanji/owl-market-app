@@ -113,6 +113,7 @@ export default function MarketTable({ cards: initialCards, sets, gameRouteSlug }
                     fetchPriority={i < 4 ? "high" : "low"}
                     height={73}
                     imageUrl={card.image_url}
+                    imageUrlPreview={card.image_url_preview}
                     imageUrlSmall={card.image_url_small}
                     loading={i < 4 ? "eager" : "lazy"}
                     width={52}

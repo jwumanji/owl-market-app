@@ -37,6 +37,7 @@ function summaryTopCards(value: unknown) {
       spark: Array.isArray(card.spark) ? card.spark.map((point) => numeric(point as number | string | null | undefined)) : [0, 0],
       imageUrl: typeof card.imageUrl === "string" ? card.imageUrl : null,
       imageUrlSmall: typeof card.imageUrlSmall === "string" ? card.imageUrlSmall : null,
+      imageUrlPreview: typeof card.imageUrlPreview === "string" ? card.imageUrlPreview : null,
       cardImageId: typeof card.cardImageId === "string" ? card.cardImageId : null,
     }));
 }
@@ -118,6 +119,7 @@ type PricedCharacterCardRow = {
   set_id: string | null;
   image_url: string | null;
   image_url_small: string | null;
+  image_url_preview: string | null;
   card_image_id: string | null;
   sets: SetRelation | SetRelation[] | null;
   price_stats: PriceStatsRelation | PriceStatsRelation[] | null;
@@ -173,6 +175,7 @@ async function loadCharacterIndex(gameId: string) {
           set_id,
           image_url,
           image_url_small,
+          image_url_preview,
           card_image_id,
           sets!cards_set_game_fk (code, name),
           price_stats!price_stats_card_game_fk!inner (
@@ -267,6 +270,7 @@ async function loadCharacterIndex(gameId: string) {
           spark: trendSpark(ps),
           imageUrl: card.image_url ?? null,
           imageUrlSmall: card.image_url_small ?? null,
+          imageUrlPreview: card.image_url_preview ?? card.image_url ?? null,
           cardImageId: card.card_image_id ?? null,
         };
       }),
@@ -291,7 +295,7 @@ export async function GET(request: Request) {
 
   try {
     const withCards = await cachedPublicData(
-      publicDataCacheKey("api-characters-v5", gameResult.game.id),
+      publicDataCacheKey("api-characters-v6", gameResult.game.id),
       async () => {
         const summaryRows = await loadCharacterSummaries(gameResult.game.id);
         return summaryRows ?? loadCharacterIndex(gameResult.game.id);

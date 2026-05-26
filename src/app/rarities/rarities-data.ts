@@ -11,6 +11,7 @@ export interface RarityCard {
   spark: number[];
   cardImageId?: string;
   imageSmall?: string | null;
+  imagePreview?: string | null;
 }
 
 export interface RarityData {

@@ -59,7 +59,7 @@ async function fetchRiftboundTileState() {
 }
 
 async function fetchTopCards(): Promise<TeaserCard[]> {
-  return cachedPublicData(publicDataCacheKey("home-top-cards-v2", DEFAULT_PUBLIC_GAME_ROUTE_SLUG), async () => {
+  return cachedPublicData(publicDataCacheKey("home-top-cards-v3", DEFAULT_PUBLIC_GAME_ROUTE_SLUG), async () => {
     try {
     const supabase = createServiceClient();
     const gameResult = await resolveGameScope(supabase, DEFAULT_PUBLIC_GAME_ROUTE_SLUG, {
@@ -73,7 +73,7 @@ async function fetchTopCards(): Promise<TeaserCard[]> {
       .select(
         `market_avg, chg_1d,
          cards!price_stats_card_game_fk!inner (
-           id, card_image_id, card_number, name, rarity, image_url, image_url_small,
+           id, card_image_id, card_number, name, rarity, image_url, image_url_small, image_url_preview,
            sets!cards_set_game_fk (code, name)
          )`,
       )
@@ -97,6 +97,7 @@ async function fetchTopCards(): Promise<TeaserCard[]> {
         rarity: (row.rarity as string | null) ?? null,
         image_url: (row.image_url as string | null) ?? null,
         image_url_small: (row.image_url_small as string | null) ?? null,
+        image_url_preview: (row.image_url_preview as string | null) ?? null,
         set_code: set?.code ?? null,
         set_name: set?.name ?? null,
         card_number: (row.card_number as string | null) ?? null,

@@ -13,6 +13,7 @@ export type TeaserCard = {
   rarity: string | null;
   image_url: string | null;
   image_url_small: string | null;
+  image_url_preview?: string | null;
   set_code: string | null;
   set_name: string | null;
   card_number: string | null;
@@ -46,7 +47,7 @@ function CardThumb({ card, priority }: { card: TeaserCard; priority: boolean }) 
   const imageSrc = card.image_url_small ?? card.image_url;
   if (imageSrc) {
     return (
-      <CardHoverZoom src={imageSrc} previewSrc={card.image_url ?? imageSrc} alt={card.name}>
+      <CardHoverZoom src={imageSrc} previewSrc={card.image_url_preview ?? card.image_url ?? imageSrc} alt={card.name}>
         <Image
           src={imageSrc}
           alt=""

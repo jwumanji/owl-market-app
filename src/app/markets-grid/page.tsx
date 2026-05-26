@@ -41,6 +41,7 @@ export default async function MarketsGridPage() {
         game_payload,
         image_url,
         image_url_small,
+        image_url_preview,
         sets!cards_set_game_fk (
           id,
           slug,

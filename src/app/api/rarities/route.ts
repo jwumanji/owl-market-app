@@ -51,6 +51,7 @@ type CatalogCardRow = {
   rarity: string | null;
   image_url: string | null;
   image_url_small: string | null;
+  image_url_preview: string | null;
   sets: SetRelation | SetRelation[] | null;
 };
 
@@ -68,6 +69,7 @@ type PricedRarityCardRow = {
   card_image_id: string | null;
   image_url: string | null;
   image_url_small: string | null;
+  image_url_preview: string | null;
   set_id: string | null;
   sets: SetRelation | SetRelation[] | null;
   price_stats: PriceStatsRelation | PriceStatsRelation[] | null;
@@ -108,6 +110,7 @@ function summaryTopCards(value: unknown) {
       spark: Array.isArray(card.spark) ? card.spark.map((point) => numeric(point as number | string | null | undefined)) : [0, 0],
       cardImageId: stringValue(card.cardImageId),
       imageSmall: typeof card.imageSmall === "string" ? card.imageSmall : null,
+      imagePreview: typeof card.imagePreview === "string" ? card.imagePreview : null,
     }));
 }
 
@@ -237,6 +240,7 @@ async function loadCatalogOnlyRarities(supabase: SupabaseServiceClient, gameId: 
           rarity,
           image_url,
           image_url_small,
+          image_url_preview,
           sets!cards_set_game_fk (code, name)
         `)
         .eq("game_id", gameId)
@@ -290,6 +294,7 @@ async function loadCatalogOnlyRarities(supabase: SupabaseServiceClient, gameId: 
           chg30d: 0,
           spark: [10, 10],
           imageSmall: card.image_url_small ?? card.image_url ?? null,
+          imagePreview: card.image_url_preview ?? card.image_url ?? null,
         };
       }),
     };
@@ -350,6 +355,7 @@ async function loadOnePieceRarityIndex(supabase: SupabaseServiceClient, gameId: 
           card_image_id,
           image_url,
           image_url_small,
+          image_url_preview,
           set_id,
           sets!cards_set_game_fk (code, name),
           price_stats!price_stats_card_game_fk!inner (
@@ -443,6 +449,7 @@ async function loadOnePieceRarityIndex(supabase: SupabaseServiceClient, gameId: 
             spark: trendSpark(ps),
             cardImageId: card.card_image_id ?? "",
             imageSmall: card.image_url_small ?? card.image_url ?? null,
+            imagePreview: card.image_url_preview ?? card.image_url ?? null,
           };
         }),
       };
@@ -473,7 +480,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const withCards = await cachedPublicData(publicDataCacheKey("api-rarities-v5", game.id), async () => {
+    const withCards = await cachedPublicData(publicDataCacheKey("api-rarities-v6", game.id), async () => {
       const summaryRows = await loadRaritySummaries(supabase, game.id, game.slug);
       return summaryRows ?? loadOnePieceRarityIndex(supabase, game.id);
     });

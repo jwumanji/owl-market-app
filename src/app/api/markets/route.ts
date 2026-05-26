@@ -53,6 +53,7 @@ export async function GET(request: Request) {
         game_payload,
         image_url,
         image_url_small,
+        image_url_preview,
         sets!cards_set_game_fk (
           id,
           slug,
@@ -75,7 +76,7 @@ export async function GET(request: Request) {
 
   try {
     const sorted = await cachedPublicData(
-      publicDataCacheKey("api-markets-v2", game.id, setId ?? "all", sort, limit),
+      publicDataCacheKey("api-markets-v3", game.id, setId ?? "all", sort, limit),
       async () => {
         const { data, error } = await query;
 

@@ -31,6 +31,7 @@ export interface CardRow {
   printed_set_code?: string | null;
   image_url: string | null;
   image_url_small: string | null;
+  image_url_preview?: string | null;
   price_stats: PriceStats | null;
   sets: SetInfo | null;
 }
@@ -48,6 +49,7 @@ export interface DashboardCard {
   rarity: string | null;
   image_url: string | null;
   image_url_small: string | null;
+  image_url_preview?: string | null;
   set_code: string | null;
   market_avg: number | null;
   chg_1d: number | null;

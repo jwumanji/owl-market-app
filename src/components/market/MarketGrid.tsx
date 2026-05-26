@@ -25,7 +25,7 @@ export default function MarketGrid({
       {cards.map((card, i) => {
         const ps = card.price_stats;
         const rank = String(i + 1).padStart(2, "0");
-        const imageSrc = card.image_url_small ?? card.image_url;
+        const imageSrc = card.image_url_preview ?? card.image_url_small ?? card.image_url;
         return (
           <Link
             key={card.id}
