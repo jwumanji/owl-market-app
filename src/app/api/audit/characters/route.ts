@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { authorizeInternalRequest } from "@/lib/internal-api-auth";
 import {
   gameParamFromRequest,
   gameResponsePayload,
@@ -43,11 +44,9 @@ function nameMatchesCard(pattern: string, cardName: string): boolean {
 // GET /api/audit/characters — diagnostic report of character-card matching
 // ---------------------------------------------------------------------------
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const token = searchParams.get("token");
-
-  if (process.env.SYNC_SECRET && token !== process.env.SYNC_SECRET) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = authorizeInternalRequest(request);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
   const supabase = createServiceClient();

@@ -42,11 +42,19 @@ async function requireAdminUser() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user || !isAllowedAdminEmail(user.email)) {
-    return null;
+  if (!user) {
+    return { ok: false as const, status: 401, error: "Unauthorized" };
   }
 
-  return user;
+  if (!isAllowedAdminEmail(user.email)) {
+    return {
+      ok: false as const,
+      status: 403,
+      error: "This account is not allowed to access internal tools.",
+    };
+  }
+
+  return { ok: true as const, user };
 }
 
 function cvMeasureUrl() {
@@ -93,8 +101,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  if (!adminUser) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!adminUser.ok) {
+    return NextResponse.json({ error: adminUser.error }, { status: adminUser.status });
   }
 
   const formData = await request.formData().catch(() => null);

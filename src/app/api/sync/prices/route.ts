@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { authorizeInternalRequest } from "@/lib/internal-api-auth";
 import {
   gameParamFromRequest,
   gameResponsePayload,
@@ -7,6 +8,11 @@ import {
 } from "@/lib/game-scope";
 
 export async function GET(request: Request) {
+  const auth = authorizeInternalRequest(request);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
   const supabase = createServiceClient();
   const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request));
 

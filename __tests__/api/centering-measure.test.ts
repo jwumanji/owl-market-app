@@ -299,6 +299,18 @@ test("anonymous request returns 401 without DB write or CV call", async () => {
   assert.equal(route.insertedRows.length, 0);
 });
 
+test("non-admin authenticated request returns 403 without DB write or CV call", async () => {
+  const route = loadRoute({ user: { email: "not-admin@example.com" } });
+
+  const response = await route.POST(measurementRequest());
+
+  assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), { error: "This account is not allowed to access internal tools." });
+  assert.equal(route.serviceClientCalls, 0);
+  assert.equal(route.cvCalls.length, 0);
+  assert.equal(route.insertedRows.length, 0);
+});
+
 test("authenticated request with invalid inventoryItemId returns 404", async () => {
   const route = loadRoute({ inventoryFound: false });
 

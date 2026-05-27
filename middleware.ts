@@ -6,7 +6,6 @@ function isProtectedPath(pathname: string) {
   if (pathname === "/admin/inventory/preview") return false;
   if (pathname.startsWith("/admin")) return true;
   if (pathname.startsWith("/api/admin")) return true;
-  if (pathname.startsWith("/api/centering")) return true;
   return false;
 }
 
@@ -62,5 +61,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*", "/api/centering/:path*"],
+  matcher: ["/admin/:path*", "/api/admin/:path*"],
 };
