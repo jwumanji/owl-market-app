@@ -25,18 +25,20 @@ export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
   const supabase = createServerClient(url, anonKey, {
     cookies: {
-      get(name: string) {
-        return request.cookies.get(name)?.value;
+      getAll() {
+        return request.cookies.getAll().map(({ name, value }) => ({ name, value }));
       },
-      set(name: string, value: string, options) {
-        request.cookies.set({ name, value, ...options });
+      setAll(cookiesToSet, headers) {
+        cookiesToSet.forEach(({ name, value, options }) => {
+          request.cookies.set({ name, value, ...options });
+        });
         response = NextResponse.next({ request });
-        response.cookies.set({ name, value, ...options });
-      },
-      remove(name: string, options) {
-        request.cookies.set({ name, value: "", ...options });
-        response = NextResponse.next({ request });
-        response.cookies.set({ name, value: "", ...options });
+        cookiesToSet.forEach(({ name, value, options }) => {
+          response.cookies.set(name, value, options);
+        });
+        Object.entries(headers).forEach(([key, value]) => {
+          response.headers.set(key, value);
+        });
       },
     },
   });

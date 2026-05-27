@@ -24,14 +24,13 @@ function createAuthClient() {
   const cookieStore = cookies();
   return createServerClient(url, anonKey, {
     cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
+      getAll() {
+        return cookieStore.getAll().map(({ name, value }) => ({ name, value }));
       },
-      set(name: string, value: string, options) {
-        cookieStore.set({ name, value, ...options });
-      },
-      remove(name: string, options) {
-        cookieStore.set({ name, value: "", ...options });
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) => {
+          cookieStore.set({ name, value, ...options });
+        });
       },
     },
   });

@@ -1,11 +1,9 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabase";
+import { useSearchParams } from "next/navigation";
 
 export default function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = useMemo(
     () => searchParams.get("redirect") || "/admin/inventory",
@@ -21,21 +19,28 @@ export default function LoginForm() {
     setLoading(true);
     setError(null);
 
-    const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "same-origin",
+      body: JSON.stringify({
+        email,
+        password,
+        redirectTo,
+      }),
     });
+    const payload = await response.json().catch(() => null) as { error?: string; redirectTo?: string } | null;
 
     setLoading(false);
 
-    if (signInError) {
-      setError(signInError.message);
+    if (!response.ok) {
+      setError(payload?.error ?? "Sign in failed.");
       return;
     }
 
-    router.replace(redirectTo);
-    router.refresh();
+    window.location.assign(payload?.redirectTo ?? redirectTo);
   }
 
   return (
