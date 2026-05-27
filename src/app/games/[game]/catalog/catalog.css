@@ -12,12 +12,25 @@
   font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
   font-size: 12px;
   font-weight: 700;
-  color: var(--ink-3);
+  color: var(--breadcrumb-accent);
 }
 
 .catalog-breadcrumb a {
-  color: var(--ink-2);
+  color: var(--breadcrumb-accent);
   text-decoration: none;
+  transition: color .14s;
+}
+
+.catalog-breadcrumb a:hover {
+  color: var(--breadcrumb-active);
+}
+
+.catalog-breadcrumb span {
+  color: var(--breadcrumb-accent);
+}
+
+.catalog-breadcrumb span:last-child {
+  color: var(--breadcrumb-active);
 }
 
 .catalog-hero,

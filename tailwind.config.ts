@@ -20,6 +20,7 @@ const config: Config = {
         pink: "var(--pink)",
         coral: "var(--coral)",
         gold: "var(--gold)",
+        secondary: "var(--secondary)",
         "gain-2": "var(--gain-2)",
         "loss-2": "var(--loss-2)",
         // ── C1.5 Stage B additions ──

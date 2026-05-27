@@ -172,22 +172,22 @@ export default function CardDetailPage() {
   return (
     <section className="card-page max-w-[1180px] mx-auto px-8 pt-8 pb-24 text-ink">
       {/* Breadcrumb */}
-      <div className="mb-8 font-mono-2 font-semibold text-[12px] tracking-[0.04em] flex items-center flex-wrap">
-        <Link href={gamePath(gameRouteSlug, "/sets")} className="text-ink-3 hover:text-ink transition-colors">
+      <div className="mb-8 font-mono-2 font-semibold text-[12px] tracking-[0.04em] flex items-center flex-wrap text-[var(--breadcrumb-accent)]">
+        <Link href={gamePath(gameRouteSlug, "/sets")} className="text-[var(--breadcrumb-accent)] hover:text-ink transition-colors">
           Sets
         </Link>
         {set && (
           <>
-            <span className="mx-2 text-ink-3">/</span>
+            <span className="mx-2 text-[var(--breadcrumb-accent)]">/</span>
             <Link
               href={gamePath(gameRouteSlug, `/sets/${set.slug}`)}
-              className="text-ink-3 hover:text-ink transition-colors"
+              className="text-[var(--breadcrumb-accent)] hover:text-ink transition-colors"
             >
               {set.code} {set.name}
             </Link>
           </>
         )}
-        <span className="mx-2 text-ink-3">/</span>
+        <span className="mx-2 text-[var(--breadcrumb-accent)]">/</span>
         <span className="text-ink truncate max-w-[300px]">{card.name}</span>
       </div>
 

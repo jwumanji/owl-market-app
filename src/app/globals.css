@@ -23,6 +23,11 @@
   --coral: #FF4936;
   --gold:  #E89512;
 
+  /* Semantic UI accents */
+  --secondary: var(--coral);
+  --breadcrumb-accent: var(--secondary);
+  --breadcrumb-active: var(--ink);
+
   /* Semantic (new aliases — values aligned with brand bible) */
   --gain-2: #2D9961;
   --loss-2: #E04E4E;
@@ -127,13 +132,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
   font-weight: 600;
   font-size: 12px;
-  color: var(--ink-2);
+  color: var(--breadcrumb-accent);
   letter-spacing: 0.03em;
   margin-bottom: 20px;
 }
-.breadcrumb a { color: var(--ink-2); text-decoration: none; transition: color 0.14s; }
-.breadcrumb a:hover { color: var(--coral); }
-.bsep { color: var(--ink-3); }
+.breadcrumb a { color: var(--breadcrumb-accent); text-decoration: none; transition: color 0.14s; }
+.breadcrumb a:hover { color: var(--breadcrumb-active); }
+.bsep { color: var(--breadcrumb-accent); }
+.breadcrumb .here { color: var(--breadcrumb-active); }
 
 .ph-eyebrow {
   font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
