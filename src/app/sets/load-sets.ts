@@ -111,6 +111,7 @@ const CATALOG_TYPE_COLOR: Record<string, string> = {
   judge: "#9B72FF",
 };
 const CATALOG_SET_CARD_LIMIT = 24;
+const SET_INDEX_TOP_CARD_LIMIT = 5;
 
 type CatalogCardRow = {
   id: string;
@@ -286,6 +287,7 @@ async function loadSetsUncached(options: {
   game?: string | null;
   publicOnly?: boolean;
   includeCatalogCards?: boolean;
+  includeTopCards?: boolean;
 } = {}): Promise<LoadedSets> {
   const supabase = createCachedServiceClient();
   const gameResult = await resolveGameScope(supabase, options.game, {
@@ -452,7 +454,7 @@ async function loadSetsUncached(options: {
     }
     const deduped = Array.from(byNum.values())
       .sort((a, b) => b.ps.tcg_market - a.ps.tcg_market)
-      .slice(0, 10);
+      .slice(0, SET_INDEX_TOP_CARD_LIMIT);
     top10ByCode[code] = deduped;
     allTopIds.push(...deduped.map((c) => c.id));
   }
@@ -593,7 +595,7 @@ async function loadSetsUncached(options: {
           max: formatChg(chgMax),
         },
         perfUp: [true, chg1d >= 0, chg7d >= 0, chg30d >= 0, chgMax >= 0, chgMax >= 0],
-        topCards,
+        topCards: options.includeTopCards ? topCards : [],
         comingSoon: cards.length === 0,
       });
     }
@@ -612,6 +614,7 @@ export async function loadSets(options: {
   game?: string | null;
   publicOnly?: boolean;
   includeCatalogCards?: boolean;
+  includeTopCards?: boolean;
 } = {}): Promise<LoadedSets> {
   const publicOnly = options.publicOnly ?? !allowsPrivateGamePreview();
   return cachedPublicData(
@@ -619,7 +622,8 @@ export async function loadSets(options: {
       "sets-loader",
       options.game ?? "default",
       publicOnly,
-      Boolean(options.includeCatalogCards)
+      Boolean(options.includeCatalogCards),
+      Boolean(options.includeTopCards)
     ),
     () => loadSetsUncached({ ...options, publicOnly })
   );

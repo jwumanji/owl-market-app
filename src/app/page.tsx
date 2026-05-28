@@ -8,11 +8,11 @@ import {
   resolveGameScope,
 } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
-import { cachedPublicData, publicDataCacheKey } from "@/lib/public-data-cache";
-import { createServiceClient } from "@/lib/supabase-server";
+import { cachedPublicData, PUBLIC_DATA_CACHE_TTL_SECONDS, publicDataCacheKey } from "@/lib/public-data-cache";
+import { createCachedServiceClient } from "@/lib/supabase-server";
 import { firstRelation, flattenPriceStatsCardRow } from "@/lib/supabase-relations";
 
-export const dynamic = "force-dynamic";
+export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
 
 export const metadata = {
   title: "OwlMarket — See what others miss",
@@ -32,26 +32,26 @@ async function fetchRiftboundTileState() {
   const privatePreview = allowsPrivateGamePreview();
   return cachedPublicData(publicDataCacheKey("home-riftbound-tile", privatePreview), async () => {
     try {
-    const supabase = createServiceClient();
-    const gameResult = await resolveGameScope(supabase, "riftbound", {
-      defaultToOnePiece: false,
-      publicOnly: false,
-    });
+      const supabase = createCachedServiceClient(PUBLIC_DATA_CACHE_TTL_SECONDS);
+      const gameResult = await resolveGameScope(supabase, "riftbound", {
+        defaultToOnePiece: false,
+        publicOnly: false,
+      });
 
-    if (gameResult.error) {
+      if (gameResult.error) {
+        return { enabled: privatePreview, status: "Preview" };
+      }
+
+      const { game } = gameResult;
+      if (!game.isActive) return { enabled: false, status: "Soon" };
+
+      const pricingStatus = typeof game.metadata.pricing_status === "string"
+        ? game.metadata.pricing_status
+        : null;
+      const status = pricingStatus === "deferred" ? "Catalog" : "Live";
+
+      if (game.isPublic) return { enabled: true, status };
       return { enabled: privatePreview, status: "Preview" };
-    }
-
-    const { game } = gameResult;
-    if (!game.isActive) return { enabled: false, status: "Soon" };
-
-    const pricingStatus = typeof game.metadata.pricing_status === "string"
-      ? game.metadata.pricing_status
-      : null;
-    const status = pricingStatus === "deferred" ? "Catalog" : "Live";
-
-    if (game.isPublic) return { enabled: true, status };
-    return { enabled: privatePreview, status: "Preview" };
     } catch {
       return { enabled: privatePreview, status: "Preview" };
     }
@@ -61,50 +61,50 @@ async function fetchRiftboundTileState() {
 async function fetchTopCards(): Promise<TeaserCard[]> {
   return cachedPublicData(publicDataCacheKey("home-top-cards-v3", DEFAULT_PUBLIC_GAME_ROUTE_SLUG), async () => {
     try {
-    const supabase = createServiceClient();
-    const gameResult = await resolveGameScope(supabase, DEFAULT_PUBLIC_GAME_ROUTE_SLUG, {
-      defaultToOnePiece: true,
-      publicOnly: true,
-    });
-    if (gameResult.error) return [];
+      const supabase = createCachedServiceClient(PUBLIC_DATA_CACHE_TTL_SECONDS);
+      const gameResult = await resolveGameScope(supabase, DEFAULT_PUBLIC_GAME_ROUTE_SLUG, {
+        defaultToOnePiece: true,
+        publicOnly: true,
+      });
+      if (gameResult.error) return [];
 
-    const { data, error } = await supabase
-      .from("price_stats")
-      .select(
-        `market_avg, chg_1d,
-         cards!price_stats_card_game_fk!inner (
-           id, card_image_id, card_number, name, rarity, image_url, image_url_small, image_url_preview,
-           sets!cards_set_game_fk (code, name)
-         )`,
-      )
-      .eq("game_id", gameResult.game.id)
-      .not("market_avg", "is", null)
-      .order("market_avg", { ascending: false })
-      .limit(5);
+      const { data, error } = await supabase
+        .from("price_stats")
+        .select(
+          `market_avg, chg_1d,
+           cards!price_stats_card_game_fk!inner (
+             id, card_image_id, card_number, name, rarity, image_url, image_url_small, image_url_preview,
+             sets!cards_set_game_fk (code, name)
+           )`,
+        )
+        .eq("game_id", gameResult.game.id)
+        .not("market_avg", "is", null)
+        .order("market_avg", { ascending: false })
+        .limit(5);
 
-    if (error || !data) return [];
+      if (error || !data) return [];
 
-    return (data as Record<string, unknown>[])
-      .map(flattenPriceStatsCardRow)
-      .filter((row): row is Record<string, unknown> => row != null)
-      .map((row): TeaserCard => {
-      const ps = firstRelation(row.price_stats as { market_avg: number | null; chg_1d: number | null } | Array<{ market_avg: number | null; chg_1d: number | null }> | null);
-      const set = firstRelation(row.sets as { code: string | null; name: string | null } | Array<{ code: string | null; name: string | null }> | null);
-      return {
-        id: row.id as string,
-        card_image_id: (row.card_image_id as string | null) ?? null,
-        name: row.name as string,
-        rarity: (row.rarity as string | null) ?? null,
-        image_url: (row.image_url as string | null) ?? null,
-        image_url_small: (row.image_url_small as string | null) ?? null,
-        image_url_preview: (row.image_url_preview as string | null) ?? null,
-        set_code: set?.code ?? null,
-        set_name: set?.name ?? null,
-        card_number: (row.card_number as string | null) ?? null,
-        market_avg: ps?.market_avg ?? null,
-        chg_1d: ps?.chg_1d ?? null,
-      };
-    });
+      return (data as Record<string, unknown>[])
+        .map(flattenPriceStatsCardRow)
+        .filter((row): row is Record<string, unknown> => row != null)
+        .map((row): TeaserCard => {
+          const ps = firstRelation(row.price_stats as { market_avg: number | null; chg_1d: number | null } | Array<{ market_avg: number | null; chg_1d: number | null }> | null);
+          const set = firstRelation(row.sets as { code: string | null; name: string | null } | Array<{ code: string | null; name: string | null }> | null);
+          return {
+            id: row.id as string,
+            card_image_id: (row.card_image_id as string | null) ?? null,
+            name: row.name as string,
+            rarity: (row.rarity as string | null) ?? null,
+            image_url: (row.image_url as string | null) ?? null,
+            image_url_small: (row.image_url_small as string | null) ?? null,
+            image_url_preview: (row.image_url_preview as string | null) ?? null,
+            set_code: set?.code ?? null,
+            set_name: set?.name ?? null,
+            card_number: (row.card_number as string | null) ?? null,
+            market_avg: ps?.market_avg ?? null,
+            chg_1d: ps?.chg_1d ?? null,
+          };
+        });
     } catch {
       return [];
     }

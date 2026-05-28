@@ -27,7 +27,7 @@ export async function SetDetailPageContent({
   let loadedSets: SetData[] = [];
   let gameName = "One Piece TCG";
   try {
-    const data = await loadSets({ game: gameRouteSlug, includeCatalogCards: true });
+    const data = await loadSets({ game: gameRouteSlug, includeCatalogCards: true, includeTopCards: true });
     loadedSets = data.sets as unknown as SetData[];
     gameName = data.game.name;
   } catch (e) {

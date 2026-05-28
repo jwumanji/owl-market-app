@@ -13,6 +13,8 @@ export const revalidate = 300;
 
 type QueryResult<T> = PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
 
+const CHARACTER_TOP_CARD_LIMIT = 5;
+
 function numeric(value: number | string | null | undefined) {
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -27,6 +29,7 @@ function summaryTopCards(value: unknown) {
 
   return value
     .filter((card): card is Record<string, unknown> => card != null && typeof card === "object" && !Array.isArray(card))
+    .slice(0, CHARACTER_TOP_CARD_LIMIT)
     .map((card) => ({
       name: stringValue(card.name),
       set: stringValue(card.set),
@@ -37,7 +40,6 @@ function summaryTopCards(value: unknown) {
       chg7d: numeric(card.chg7d as number | string | null | undefined),
       chg30d: numeric(card.chg30d as number | string | null | undefined),
       spark: Array.isArray(card.spark) ? card.spark.map((point) => numeric(point as number | string | null | undefined)) : [0, 0],
-      imageUrl: typeof card.imageUrl === "string" ? card.imageUrl : null,
       imageUrlSmall: typeof card.imageUrlSmall === "string" ? card.imageUrlSmall : null,
       imageUrlPreview: typeof card.imageUrlPreview === "string" ? card.imageUrlPreview : null,
       cardImageId: typeof card.cardImageId === "string" ? card.cardImageId : null,
@@ -235,7 +237,7 @@ async function loadCharacterIndex(gameId: string) {
   for (const [characterId, cards] of Array.from(cardsByCharacter.entries())) {
     const topCards = [...cards]
       .sort((a, b) => (firstRelation(b.price_stats)?.tcg_market ?? 0) - (firstRelation(a.price_stats)?.tcg_market ?? 0))
-      .slice(0, 10);
+      .slice(0, CHARACTER_TOP_CARD_LIMIT);
     topCardsByCharacter.set(characterId, topCards);
   }
 
@@ -270,7 +272,6 @@ async function loadCharacterIndex(gameId: string) {
           chg7d: ps?.chg_7d ?? 0,
           chg30d: ps?.chg_30d ?? 0,
           spark: trendSpark(ps),
-          imageUrl: card.image_url ?? null,
           imageUrlSmall: card.image_url_small ?? null,
           imageUrlPreview: card.image_url_preview ?? card.image_url ?? null,
           cardImageId: card.card_image_id ?? null,
@@ -297,7 +298,7 @@ export async function GET(request: Request) {
 
   try {
     const withCards = await cachedPublicData(
-      publicDataCacheKey("api-characters-v6", gameResult.game.id),
+      publicDataCacheKey("api-characters-v7", gameResult.game.id),
       async () => {
         const summaryRows = await loadCharacterSummaries(gameResult.game.id);
         return summaryRows ?? loadCharacterIndex(gameResult.game.id);

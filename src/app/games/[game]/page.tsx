@@ -1,18 +1,24 @@
 import Link from "next/link";
-import { createServiceClient } from "@/lib/supabase-server";
+import { createCachedServiceClient } from "@/lib/supabase-server";
 import { gamePath } from "@/lib/game-routes";
 import {
   publicOnlyForCatalogPreview,
   resolveGameScope,
   type GameScope,
 } from "@/lib/game-scope";
+import { cachedPublicData, PUBLIC_DATA_CACHE_TTL_SECONDS, publicDataCacheKey } from "@/lib/public-data-cache";
+import { publicGameStaticParams } from "@/lib/static-game-params";
 import {
   catalogCardDomains,
   catalogCardType,
 } from "@/lib/catalog-card-fields";
 import "./game-overview.css";
 
-export const dynamic = "force-dynamic";
+export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
+
+export function generateStaticParams() {
+  return publicGameStaticParams();
+}
 
 type TaxonomyRow = {
   id: string;
@@ -105,11 +111,19 @@ function joinedSet(row: CardSampleRow) {
 }
 
 async function loadGameOverview(gameRouteSlug: string): Promise<OverviewData> {
+  const publicOnly = publicOnlyForCatalogPreview();
+  return cachedPublicData(
+    publicDataCacheKey("game-overview-v1", gameRouteSlug, publicOnly),
+    () => loadGameOverviewUncached(gameRouteSlug, publicOnly)
+  );
+}
+
+async function loadGameOverviewUncached(gameRouteSlug: string, publicOnly: boolean): Promise<OverviewData> {
   try {
-    const supabase = createServiceClient();
+    const supabase = createCachedServiceClient(PUBLIC_DATA_CACHE_TTL_SECONDS);
     const gameResult = await resolveGameScope(supabase, gameRouteSlug, {
       defaultToOnePiece: false,
-      publicOnly: publicOnlyForCatalogPreview(),
+      publicOnly,
     });
 
     if (gameResult.error) {

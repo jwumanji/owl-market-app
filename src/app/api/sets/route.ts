@@ -8,7 +8,11 @@ export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
 // GET /api/sets — returns all sets with aggregated price data for index page
 export async function GET(request: Request) {
   try {
-    const data = await loadSets({ game: gameParamFromRequest(request) });
+    const { searchParams } = new URL(request.url);
+    const data = await loadSets({
+      game: gameParamFromRequest(request),
+      includeTopCards: searchParams.get("includeTopCards") === "1",
+    });
     return NextResponse.json(data, {
       headers: PUBLIC_DATA_CACHE_HEADERS,
     });

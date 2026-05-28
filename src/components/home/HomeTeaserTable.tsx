@@ -107,7 +107,7 @@ export default function HomeTeaserTable({
             >
               <span className="c-teaser-rank">{String(i + 1).padStart(2, "0")}</span>
               <div className="c-teaser-card-cell">
-                <CardThumb card={card} priority={i < 3} />
+                <CardThumb card={card} priority={i === 0} />
                 <div className="c-teaser-card-meta">
                   <div className="c-teaser-card-name">{card.name}</div>
                   <div className="c-teaser-card-set">

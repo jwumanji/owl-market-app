@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createCachedServiceClient } from "@/lib/supabase-server";
 import { gamePath } from "@/lib/game-routes";
+import { publicGameStaticParams } from "@/lib/static-game-params";
 import {
   publicOnlyForCatalogPreview,
   resolveGameScope,
@@ -16,6 +17,10 @@ import { cachedPublicData, PUBLIC_DATA_CACHE_TTL_SECONDS, publicDataCacheKey } f
 import "./catalog.css";
 
 export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
+
+export function generateStaticParams() {
+  return publicGameStaticParams();
+}
 
 const PAGE_SIZE = 100;
 
