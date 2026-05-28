@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DEFAULT_PUBLIC_GAME } from "@/lib/games/registry";
+import { DEFAULT_PUBLIC_GAME, getGameDefinitionByRouteSlug } from "@/lib/games/registry";
 
 export const DEFAULT_PUBLIC_GAME_DB_SLUG = DEFAULT_PUBLIC_GAME.dbSlug;
 export const DEFAULT_PUBLIC_GAME_ROUTE_SLUG = DEFAULT_PUBLIC_GAME.routeSlug;
@@ -128,11 +128,13 @@ export async function resolveGameScope(
     return { game: null, error: { message: "game is required", status: 400 } };
   }
 
+  const knownGame = getGameDefinitionByRouteSlug(requested);
   const slugCandidates = Array.from(new Set([
+    knownGame?.dbSlug,
     requested,
     requested.replace(/-/g, "_"),
     requested.replace(/_/g, "-"),
-  ]));
+  ].filter((value): value is string => Boolean(value))));
 
   let row: GameRow | null = null;
   for (const slug of slugCandidates) {

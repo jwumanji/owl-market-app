@@ -1,4 +1,5 @@
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
+import { getGameDefinitionByRouteSlug } from "@/lib/games/registry";
 
 export function normalizeGameRouteSlug(gameRouteSlug: string | null | undefined) {
   return gameRouteSlug?.trim() || DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
@@ -11,5 +12,6 @@ export function gamePath(gameRouteSlug: string | null | undefined, path = "") {
 }
 
 export function gameQueryValue(gameRouteSlug: string | null | undefined) {
-  return normalizeGameRouteSlug(gameRouteSlug);
+  const routeSlug = normalizeGameRouteSlug(gameRouteSlug);
+  return getGameDefinitionByRouteSlug(routeSlug)?.dbSlug ?? routeSlug;
 }
