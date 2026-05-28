@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { CENTERING_MEASURE_ACTION, verifyAdminActionToken } from "@/lib/admin-action-token";
 import { isAllowedAdminEmail } from "@/lib/admin-auth";
 import { resolveGameScope } from "@/lib/game-scope";
 import { isUploadFile } from "@/lib/inventory-scans";
@@ -36,13 +37,21 @@ function createAuthClient() {
   });
 }
 
-async function requireAdminUser() {
+async function requireAdminUser(request: Request) {
   const supabase = createAuthClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
+    const actionToken = verifyAdminActionToken(
+      request.headers.get("x-admin-action-token"),
+      CENTERING_MEASURE_ACTION
+    );
+    if (actionToken.ok && isAllowedAdminEmail(actionToken.user.email)) {
+      return { ok: true as const, user: actionToken.user };
+    }
+
     return { ok: false as const, status: 401, error: "Unauthorized" };
   }
 
@@ -95,7 +104,7 @@ function measurementRow(gameId: string, inventoryItemId: string | null, response
 export async function POST(request: Request) {
   let adminUser;
   try {
-    adminUser = await requireAdminUser();
+    adminUser = await requireAdminUser(request);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Authentication is not configured.";
     return NextResponse.json({ error: message }, { status: 500 });

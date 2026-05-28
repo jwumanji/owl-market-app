@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import CenteringWorkspace from "@/components/centering/CenteringWorkspace";
+import { CENTERING_MEASURE_ACTION, createAdminActionToken } from "@/lib/admin-action-token";
+import { getCurrentAdminUser } from "@/lib/admin-user";
 import { resolveGameScope } from "@/lib/game-scope";
 import { createServiceClient } from "@/lib/supabase-server";
 
@@ -289,6 +291,15 @@ export default async function InventoryCenteringPage({
   params: { id: string };
   searchParams?: CenteringSearchParams;
 }) {
+  const currentUser = await getCurrentAdminUser();
+  if (!currentUser) {
+    redirect(`/login?redirect=${encodeURIComponent(`/admin/inventory/${params.id}/centering`)}`);
+  }
+  const adminActionToken = createAdminActionToken({
+    user: currentUser,
+    action: CENTERING_MEASURE_ACTION,
+  });
+
   const measurementPage = measurementPageFromSearchParams(searchParams);
   const requestedGame = gameFromSearchParams(searchParams);
   const { item, card, measurements, gameSlug } = await loadInventoryItem(params.id, measurementPage, requestedGame);
@@ -318,6 +329,7 @@ export default async function InventoryCenteringPage({
         gameSlug={gameSlug}
         inventoryItemId={item.id}
         preloadImageUrl={item.custom_image_front_url}
+        adminActionToken={adminActionToken}
         cardIdentity={{
           name: cardName,
           setCode,

@@ -91,7 +91,7 @@ function measurementResponse() {
   };
 }
 
-function measurementRequest(inventoryItemId = "inventory-1", game = "one_piece") {
+function measurementRequest(inventoryItemId = "inventory-1", game = "one_piece", headers?: HeadersInit) {
   const formData = new FormData();
   if (inventoryItemId) {
     formData.set("inventoryItemId", inventoryItemId);
@@ -101,6 +101,7 @@ function measurementRequest(inventoryItemId = "inventory-1", game = "one_piece")
 
   return new Request("http://localhost/api/centering/measure", {
     method: "POST",
+    headers,
     body: formData,
   });
 }
@@ -217,6 +218,15 @@ function loadRoute({
         };
       },
     },
+    "@/lib/admin-action-token": {
+      CENTERING_MEASURE_ACTION: "centering:measure",
+      verifyAdminActionToken(token: string | null, action: string) {
+        if (token === "valid-admin-action-token" && action === "centering:measure") {
+          return { ok: true, user: { id: "token-admin", email: "admin@example.com" } };
+        }
+        return { ok: false, reason: "invalid" };
+      },
+    },
     "@/lib/admin-auth": {
       isAllowedAdminEmail(email?: string | null) {
         return email === "admin@example.com";
@@ -309,6 +319,31 @@ test("non-admin authenticated request returns 403 without DB write or CV call", 
   assert.equal(route.serviceClientCalls, 0);
   assert.equal(route.cvCalls.length, 0);
   assert.equal(route.insertedRows.length, 0);
+});
+
+test("valid admin action token authorizes when Supabase session is not visible to the POST", async () => {
+  const cvBody = measurementResponse();
+  const cvText = JSON.stringify(cvBody);
+  const route = loadRoute({
+    user: null,
+    cvResponse: new Response(cvText, {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }),
+  });
+
+  const response = await route.POST(
+    measurementRequest("", "one_piece", {
+      "x-admin-action-token": "valid-admin-action-token",
+    })
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), cvText);
+  assert.equal(route.serviceClientCalls, 1);
+  assert.equal(route.cvCalls.length, 1);
+  assert.equal(route.insertedRows.length, 1);
+  assert.equal(route.insertedRows[0].inventory_item_id, null);
 });
 
 test("authenticated request with invalid inventoryItemId returns 404", async () => {

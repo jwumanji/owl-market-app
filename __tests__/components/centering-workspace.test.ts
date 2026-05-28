@@ -24,6 +24,7 @@ type Exports = {
   default: React.ComponentType<{
     inventoryItemId?: string | null;
     preloadImageUrl?: string | null;
+    adminActionToken?: string | null;
     intakeMode?: "single" | "frontBack";
     cardIdentity: { name: string; setCode?: string | null; cardNumber?: string | null; rarity?: string | null };
   }>;
@@ -42,6 +43,7 @@ type Exports = {
   measurePreloadedImage: (input: {
     imageUrl: string;
     inventoryItemId?: string | null;
+    adminActionToken?: string | null;
     dispatchAction: (action: { type: string; result?: unknown; error?: unknown }) => void;
     onFile: (file: File) => void;
     fetchImpl: typeof fetch;
@@ -55,6 +57,7 @@ type Exports = {
     inventoryItemId?: string | null;
     file: File;
     backFile?: File | null;
+    adminActionToken?: string | null;
     fetchImpl: typeof fetch;
   }) => Promise<{ ok: true; result: unknown } | { ok: false; error: { code?: string; message?: string } | null }>;
 };
@@ -111,6 +114,7 @@ function loadComponent() {
     exports: moduleStub.exports,
     File,
     FormData,
+    Headers,
     Image: class {},
     module: moduleStub,
     process,
@@ -410,11 +414,31 @@ test("measurement request turns unauthorized responses into a sign-in prompt", a
   }
 });
 
+test("measurement request sends admin action token header", async () => {
+  const { exports } = loadComponent();
+  const file = new File(["image"], "card.jpg", { type: "image/jpeg" });
+  let tokenHeader: string | null = null;
+  const fetchImpl = async (_input: RequestInfo | URL, init?: RequestInit) => {
+    tokenHeader = new Headers(init?.headers).get("x-admin-action-token");
+    return responseLike({ ok: true, body: measurementResponse() });
+  };
+
+  const outcome = await exports.submitMeasurementRequest({
+    file,
+    adminActionToken: "signed-admin-token",
+    fetchImpl,
+  });
+
+  assert.equal(outcome.ok, true);
+  assert.equal(tokenHeader, "signed-admin-token");
+});
+
 test("measure-this-card action fetches the preloaded image and posts it for measurement", async () => {
   const { exports } = loadComponent();
   const actions: string[] = [];
   const files: File[] = [];
   const postBodies: FormData[] = [];
+  const postTokenHeaders: Array<string | null> = [];
   const fetchCalls: string[] = [];
   const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
@@ -430,6 +454,7 @@ test("measure-this-card action fetches the preloaded image and posts it for meas
 
     if (url === "/api/centering/measure") {
       postBodies.push(init?.body as FormData);
+      postTokenHeaders.push(new Headers(init?.headers).get("x-admin-action-token"));
       return responseLike({ ok: true, body: measurementResponse() });
     }
 
@@ -439,6 +464,7 @@ test("measure-this-card action fetches the preloaded image and posts it for meas
   const outcome = await exports.measurePreloadedImage({
     imageUrl: "https://cdn.example/cards/front.png",
     inventoryItemId: "inventory-1",
+    adminActionToken: "preloaded-admin-token",
     dispatchAction(action) {
       actions.push(action.type);
     },
@@ -456,6 +482,7 @@ test("measure-this-card action fetches the preloaded image and posts it for meas
   assert.equal(files[0].type, "image/png");
   assert.equal(postBodies[0].get("inventoryItemId"), "inventory-1");
   assert.equal(postBodies[0].get("file"), files[0]);
+  assert.equal(postTokenHeaders[0], "preloaded-admin-token");
 });
 
 test("preloaded image fetch failure returns inline error path and leaves upload zone available", async () => {

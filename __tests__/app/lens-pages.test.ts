@@ -75,6 +75,7 @@ test("pregrade page renders standalone workspace and NULL inventory history", as
     gameSlug?: string;
     inventoryItemId?: string | null;
     intakeMode?: string;
+    adminActionToken?: string | null;
     cardIdentity: { name: string };
   }> = [];
   const rows = [
@@ -150,6 +151,7 @@ test("pregrade page renders standalone workspace and NULL inventory history", as
         gameSlug?: string;
         inventoryItemId?: string | null;
         intakeMode?: string;
+        adminActionToken?: string | null;
         cardIdentity: { name: string };
       }) {
         workspaceProps.push(props);
@@ -172,6 +174,12 @@ test("pregrade page renders standalone workspace and NULL inventory history", as
     "@/lib/admin-user": {
       getCurrentAdminUser() {
         return Promise.resolve({ id: "admin-user-1", email: "admin@example.com" });
+      },
+    },
+    "@/lib/admin-action-token": {
+      CENTERING_MEASURE_ACTION: "centering:measure",
+      createAdminActionToken({ user, action }: { user: { id: string }; action: string }) {
+        return `${action}:${user.id}:token`;
       },
     },
     "@/lib/admin-games": {
@@ -230,7 +238,12 @@ test("pregrade page renders standalone workspace and NULL inventory history", as
   assert.deepEqual(nullFilters, [{ column: "inventory_item_id", value: null }]);
   assert.deepEqual(ranges, [{ from: 0, to: 19 }]);
   assert.deepEqual(JSON.parse(JSON.stringify(workspaceProps)), [
-    { gameSlug: "one_piece", intakeMode: "frontBack", cardIdentity: { name: "Standalone pre-grade" } },
+    {
+      gameSlug: "one_piece",
+      intakeMode: "frontBack",
+      adminActionToken: "centering:measure:admin-user-1:token",
+      cardIdentity: { name: "Standalone pre-grade" },
+    },
   ]);
   assert.match(html, /data-testid="centering-workspace"/);
   assert.match(html, /Pre-grade History/);

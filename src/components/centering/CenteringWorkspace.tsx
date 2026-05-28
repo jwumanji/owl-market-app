@@ -45,6 +45,7 @@ export type CenteringWorkspaceProps = {
   gameSlug?: string | null;
   inventoryItemId?: string | null;
   preloadImageUrl?: string | null;
+  adminActionToken?: string | null;
   intakeMode?: "single" | "frontBack";
   cardIdentity: CardIdentity;
 };
@@ -403,6 +404,7 @@ export async function submitMeasurementRequest({
   file,
   backFile,
   manualOverlay,
+  adminActionToken,
   fetchImpl = fetch,
 }: {
   gameSlug?: string | null;
@@ -410,11 +412,18 @@ export async function submitMeasurementRequest({
   file: File;
   backFile?: File | null;
   manualOverlay?: MeasurementOverlay | null;
+  adminActionToken?: string | null;
   fetchImpl?: typeof fetch;
 }): Promise<{ ok: true; result: MeasurementResponse } | { ok: false; error: CenteringError }> {
+  const headers = new Headers();
+  if (adminActionToken) {
+    headers.set("x-admin-action-token", adminActionToken);
+  }
+
   const response = await fetchImpl("/api/centering/measure", {
     method: "POST",
     credentials: "same-origin",
+    headers,
     body: buildMeasurementFormData({
       gameSlug,
       inventoryItemId,
@@ -459,6 +468,7 @@ export async function measurePreloadedImage({
   imageUrl,
   gameSlug,
   inventoryItemId,
+  adminActionToken,
   dispatchAction,
   onFile,
   fetchImpl = fetch,
@@ -467,6 +477,7 @@ export async function measurePreloadedImage({
   imageUrl: string;
   gameSlug?: string | null;
   inventoryItemId?: string | null;
+  adminActionToken?: string | null;
   dispatchAction: (action: WorkspaceAction) => void;
   onFile: (file: File) => void;
   fetchImpl?: typeof fetch;
@@ -497,6 +508,7 @@ export async function measurePreloadedImage({
     gameSlug,
     inventoryItemId,
     file,
+    adminActionToken,
     fetchImpl,
   });
 
@@ -1171,6 +1183,7 @@ export default function CenteringWorkspace({
   gameSlug = null,
   inventoryItemId,
   preloadImageUrl = null,
+  adminActionToken = null,
   intakeMode = "single",
   cardIdentity,
 }: CenteringWorkspaceProps) {
@@ -1238,6 +1251,7 @@ export default function CenteringWorkspace({
         file,
         backFile,
         manualOverlay: overlay,
+        adminActionToken,
       });
 
       if (!outcome.ok) {
@@ -1247,7 +1261,7 @@ export default function CenteringWorkspace({
 
       dispatch({ type: "success", result: outcome.result });
     },
-    [gameSlug, inventoryItemId]
+    [adminActionToken, gameSlug, inventoryItemId]
   );
 
   const measureFile = useCallback(
@@ -1290,6 +1304,7 @@ export default function CenteringWorkspace({
       imageUrl: preloadImageSrc,
       inventoryItemId,
       gameSlug,
+      adminActionToken,
       dispatchAction: dispatch,
       onFile: setSelectedFile,
     }).then((outcome) => {
@@ -1298,7 +1313,7 @@ export default function CenteringWorkspace({
         setShowUploadZone(true);
       }
     });
-  }, [gameSlug, inventoryItemId, preloadImageSrc]);
+  }, [adminActionToken, gameSlug, inventoryItemId, preloadImageSrc]);
 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {

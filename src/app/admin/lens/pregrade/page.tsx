@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import AdminGameSwitcher from "../../AdminGameSwitcher";
 import CenteringWorkspace from "@/components/centering/CenteringWorkspace";
+import { CENTERING_MEASURE_ACTION, createAdminActionToken } from "@/lib/admin-action-token";
 import { getCurrentAdminUser } from "@/lib/admin-user";
 import { loadAdminGameOptions, type AdminGameOption } from "@/lib/admin-games";
 import { DEFAULT_PUBLIC_GAME_DB_SLUG, resolveGameScope } from "@/lib/game-scope";
@@ -252,6 +253,10 @@ export default async function PregradePage({
   if (!currentUser) {
     redirect(`/login?redirect=${encodeURIComponent(pregradeRedirectPath(searchParams))}`);
   }
+  const adminActionToken = createAdminActionToken({
+    user: currentUser,
+    action: CENTERING_MEASURE_ACTION,
+  });
 
   const page = pageFromSearchParams(searchParams);
   const requestedGame = gameFromSearchParams(searchParams);
@@ -281,6 +286,7 @@ export default async function PregradePage({
       <CenteringWorkspace
         gameSlug={history.gameSlug}
         intakeMode="frontBack"
+        adminActionToken={adminActionToken}
         cardIdentity={{
           name: "Standalone pre-grade",
         }}

@@ -209,6 +209,7 @@ function loadPage({
         gameSlug: string;
         inventoryItemId: string;
         preloadImageUrl?: string | null;
+        adminActionToken?: string | null;
         cardIdentity: { name: string };
       }) {
         return React.createElement(
@@ -218,6 +219,7 @@ function loadPage({
             "data-game": props.gameSlug,
             "data-item": props.inventoryItemId,
             "data-preload": props.preloadImageUrl ?? "",
+            "data-token": props.adminActionToken ?? "",
             "data-testid": "centering-workspace",
           },
           `Workspace ${props.cardIdentity.name}`
@@ -229,6 +231,17 @@ function loadPage({
         return supabase;
       },
     },
+    "@/lib/admin-user": {
+      getCurrentAdminUser() {
+        return Promise.resolve({ id: "admin-user-1", email: "admin@example.com" });
+      },
+    },
+    "@/lib/admin-action-token": {
+      CENTERING_MEASURE_ACTION: "centering:measure",
+      createAdminActionToken({ user, action }: { user: { id: string }; action: string }) {
+        return `${action}:${user.id}:token`;
+      },
+    },
     "next/link": {
       __esModule: true,
       default(props: { href: string; children: React.ReactNode; className?: string }) {
@@ -238,6 +251,9 @@ function loadPage({
     "next/navigation": {
       notFound() {
         throw new Error("not found");
+      },
+      redirect(url: string) {
+        throw new Error(`redirect:${url}`);
       },
     },
   };
@@ -287,6 +303,7 @@ test("inventory centering page renders workspace and empty history", async () =>
   assert.match(html, /data-game="one_piece"/);
   assert.match(html, /data-item="item-1"/);
   assert.match(html, /data-preload="https:\/\/cdn.example\/front.jpg"/);
+  assert.match(html, /data-token="centering:measure:admin-user-1:token"/);
   assert.match(html, /No centering measurements yet/);
   assert.deepEqual(ranges, [{ from: 0, to: 4 }]);
 });
