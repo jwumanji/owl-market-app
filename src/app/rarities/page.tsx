@@ -25,23 +25,6 @@ function safeCards(rarity: RarityData) {
   return Array.isArray(rarity.topCards) ? rarity.topCards : [];
 }
 
-function generatedSpark(chg7d: number | string | null | undefined, chg30d: number | string | null | undefined) {
-  const change = safeNumber(chg30d) || safeNumber(chg7d);
-  const end = 10;
-  const start = end / Math.max(0.35, 1 + change / 100);
-
-  return Array.from({ length: 9 }, (_, index) => {
-    const t = index / 8;
-    return +(start + (end - start) * t).toFixed(2);
-  });
-}
-
-function raritySpark(rarity: RarityData) {
-  return Array.isArray(rarity.spark) && rarity.spark.length > 0
-    ? rarity.spark
-    : generatedSpark(rarity.chg7d, rarity.chg30d);
-}
-
 function rarityClass(rarity: string | null | undefined): string {
   const r = (rarity ?? "").toUpperCase();
   if (r.includes("MANGA") || r === "MR") return "rb-mr";
@@ -116,26 +99,6 @@ function cardHref(card: RarityCard, catalogOnly: boolean, gameRouteSlug: string)
   return undefined;
 }
 
-function SparkBars({ values = [], color }: { values?: number[] | null; color: string }) {
-  const safeValues = Array.isArray(values) ? values.map(safeNumber) : [];
-  const max = Math.max(...safeValues, 1);
-  const bars = safeValues.length > 0 ? safeValues.slice(-12) : [1, 1, 1, 1, 1, 1];
-
-  return (
-    <div className="rar-spark" aria-hidden="true">
-      {bars.map((value, index) => (
-        <span
-          key={`${value}-${index}`}
-          style={{
-            height: `${Math.max(18, Math.round((value / max) * 100))}%`,
-            backgroundColor: color,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
 function ViewIcon({ type }: { type: RarityViewMode }) {
   return (
     <span className={`rar-view-icon ${type}`} aria-hidden="true">
@@ -193,7 +156,6 @@ function RarityPerformanceCard({
           <strong className={changeClass(rarity.chg30d)}>{catalogOnly ? "\u2014" : formatChange(rarity.chg30d)}</strong>
         </div>
       </div>
-      <SparkBars values={raritySpark(rarity)} color={rarity.color || "var(--gold)"} />
     </button>
   );
 }
@@ -271,7 +233,6 @@ function RarityPerformanceTable({
               <th className="r">Cards</th>
               <th className="r">7D</th>
               <th className="r">30D</th>
-              <th className="r">Trend</th>
             </tr>
           </thead>
           <tbody>
@@ -309,9 +270,6 @@ function RarityPerformanceTable({
                   <td className="r rar-num">{cardCount.toLocaleString()}</td>
                   <td className={`r rar-change ${changeClass(rarity.chg7d)}`}>{catalogOnly ? "\u2014" : formatChange(rarity.chg7d)}</td>
                   <td className={`r rar-change ${changeClass(rarity.chg30d)}`}>{catalogOnly ? "\u2014" : formatChange(rarity.chg30d)}</td>
-                  <td className="r">
-                    <SparkBars values={raritySpark(rarity)} color={rarity.color || "var(--gold)"} />
-                  </td>
                 </tr>
               );
             })}

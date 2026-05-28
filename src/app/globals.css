@@ -570,7 +570,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .rar-performance-table {
   width: 100%;
-  min-width: 920px;
+  min-width: 820px;
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -592,7 +592,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .rar-performance-table th:first-child { width: 52px; text-align: center; }
 .rar-performance-table th:nth-child(2) { width: 280px; }
-.rar-performance-table th:nth-child(8) { width: 108px; }
 .rar-performance-table th.r { text-align: right; }
 
 .rar-performance-table td {
@@ -631,9 +630,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .rar-rarity-card {
   position: relative;
   min-width: 0;
-  min-height: 236px;
+  min-height: 206px;
   display: grid;
-  grid-template-rows: auto auto auto 1fr auto auto;
+  grid-template-rows: auto auto auto 1fr auto;
   gap: 10px;
   padding: 15px;
   border: 1.5px solid var(--ink);
@@ -737,11 +736,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   color: var(--loss-2);
 }
 
-.rar-rarity-card .rar-spark {
-  width: 100%;
-  justify-content: flex-start;
-}
-
 .rar-rarity-cell {
   display: flex;
   align-items: center;
@@ -787,22 +781,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 .flat { color: var(--ink-3); }
-
-.rar-spark {
-  width: 82px;
-  height: 28px;
-  display: inline-flex;
-  align-items: end;
-  justify-content: flex-end;
-  gap: 3px;
-}
-
-.rar-spark span {
-  width: 5px;
-  min-height: 4px;
-  border-radius: 3px 3px 0 0;
-  opacity: 0.86;
-}
 
 .rar-index-hero {
   display: grid;
