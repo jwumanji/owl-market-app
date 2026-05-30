@@ -8,6 +8,8 @@ npm run smoke:centering
 
 The command compiles the TypeScript test files into `.tmp/centering-smoke-tests` and runs them with `node --test`. The generated files are disposable and ignored by git.
 
+For browser-level checks with live auth, Supabase data, Owl Lens CV behavior, and evidence capture, use the manual runbook: [Centering Manual Smoke Runbook](./centering-manual-smoke-runbook.md).
+
 ## Coverage
 
 The smoke suite runs:
