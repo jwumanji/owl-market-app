@@ -91,21 +91,21 @@ function loadGrading() {
 test("gradeTierColor maps grade ceilings to shared report colors", () => {
   const grading = loadGrading();
 
-  assert.equal(grading.gradeTierColor(10), "var(--green)");
-  assert.equal(grading.gradeTierColor(9), "var(--green)");
-  assert.equal(grading.gradeTierColor(8.5), "var(--owl)");
-  assert.equal(grading.gradeTierColor(7), "var(--owl)");
-  assert.equal(grading.gradeTierColor(6.5), "var(--coral)");
-  assert.equal(grading.gradeTierColor(5), "var(--coral)");
-  assert.equal(grading.gradeTierColor(4), "var(--red)");
+  assert.equal(grading.gradeTierColor(10), "var(--grade-10)");
+  assert.equal(grading.gradeTierColor(9), "var(--grade-9)");
+  assert.equal(grading.gradeTierColor(8.5), "var(--grade-8b)");
+  assert.equal(grading.gradeTierColor(8), "var(--grade-8)");
+  assert.equal(grading.gradeTierColor(7), "var(--grade-7)");
+  assert.equal(grading.gradeTierColor(6.5), "var(--grade-low)");
+  assert.equal(grading.gradeTierColor(4), "var(--grade-low)");
 });
 
 test("gradeTierColorFromLabel supports compact ceiling labels", () => {
   const grading = loadGrading();
 
-  assert.equal(grading.gradeTierColorFromLabel("≤6"), "var(--coral)");
-  assert.equal(grading.gradeTierColorFromLabel("<=3"), "var(--red)");
-  assert.equal(grading.gradeTierColorFromLabel("9.5"), "var(--green)");
+  assert.equal(grading.gradeTierColorFromLabel("≤6"), "var(--grade-low)");
+  assert.equal(grading.gradeTierColorFromLabel("<=3"), "var(--grade-low)");
+  assert.equal(grading.gradeTierColorFromLabel("9.5"), "var(--grade-9)");
 });
 
 test("graderResultsFromWorstMax gives BGS 9.5 the second-tier owl tone", () => {

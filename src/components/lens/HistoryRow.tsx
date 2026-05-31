@@ -9,7 +9,7 @@ import {
   formatPct,
   formatRelativeTime,
 } from "./history-utils";
-import { gradeTierAccentStyleFromLabel } from "./grading";
+import { gradeTierAccentStyleFromLabel, TONE_TEXT_CLASSES } from "./grading";
 import type { PreGradeFace, PreGradeSession } from "./lens-types";
 
 export type HistoryRowProps = {
@@ -18,12 +18,6 @@ export type HistoryRowProps = {
   onRename?: (id: string, newName: string) => Promise<void>;
   onDelete?: (id: string) => Promise<void>;
 };
-
-const TONE_TEXT_CLASSES = {
-  gain: "text-gain",
-  owl: "text-owl",
-  loss: "text-loss",
-} as const;
 
 const ROW_SIZE = {
   compact: {

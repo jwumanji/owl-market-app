@@ -9,15 +9,23 @@ import {
 import type { operations } from "@/lib/owl-lens/openapi.generated";
 import CardPreviewColumn from "./CardPreviewColumn";
 import FailureNotice from "./FailureNotice";
-import ResultsPanel from "./ResultsPanel";
-import ReviewWorkspace from "./ReviewWorkspace";
+import ResultScreen from "./ResultScreen";
 import UploadPane from "./UploadPane";
 import type { LensFace, LensFaceState, UploadFaceState } from "./lens-types";
 
 type MeasurementResponse =
   operations["measureCardCentering"]["responses"][200]["content"]["application/json"];
 
-type WorkflowStatus = "idle" | "uploading" | "processing" | "review" | "results";
+// The pregrade wizard advances through four explicit steps (matches the Owl
+// Lens wizard reference: Upload → Identify → Measure → Result). `measure` is the
+// transient CV-loading step; the Result step carries a `resultMode` sub-state.
+type WizardStep = "upload" | "identify" | "measure" | "result";
+type ResultMode = "view" | "adjust"; // only meaningful when step === "result"
+type MeasurePhase = "validating" | "measuring"; // drives the Measure checklist
+// Catalog linkage seam — always null in this pass. A later focused piece wires
+// catalog search + card_image_id; this field/action/UI slot exist so that lands
+// without re-touching the wizard spine.
+type CatalogMatch = { cardImageId: string; name: string; number: string } | null;
 type UploadedFace = UploadFaceState & {
   file: File;
   imageSize: { width: number; height: number };
@@ -51,28 +59,35 @@ type ReviewNotice =
   | { kind: "saveError"; body: string };
 
 type PregradeState = {
-  status: WorkflowStatus;
+  step: WizardStep;
+  resultMode: ResultMode;
+  measurePhase: MeasurePhase;
+  saved: boolean; // false until saveSuccess — the Result step renders pre/post-save from this
   activeUploadFace: LensFace;
-  activeReviewFace: LensFace;
+  activeResultFace: LensFace;
   cardIdentity: string;
+  catalogMatch: CatalogMatch;
   cardSessionId: string;
   remeasureMode: boolean;
   uploads: Partial<Record<LensFace, UploadedFace>>;
   faces: Partial<Record<LensFace, LensFaceState>>;
   faceMeta: Partial<Record<LensFace, FaceMeta>>;
   idleNotices: Partial<Record<LensFace, string>>;
-  reviewNotice: ReviewNotice | null;
+  resultNotice: ReviewNotice | null;
   addBackMode: boolean;
   isSaving: boolean;
 };
 
 type Action =
   | { type: "setCardIdentity"; value: string }
+  | { type: "setCatalogMatch"; match: CatalogMatch }
   | { type: "setActiveUploadFace"; face: LensFace }
-  | { type: "setActiveReviewFace"; face: LensFace }
+  | { type: "setActiveResultFace"; face: LensFace }
   | { type: "fileAccepted"; face: LensFace; upload: UploadedFace }
   | { type: "clearFace"; face: LensFace }
   | { type: "uploadError"; face: LensFace; message: string }
+  | { type: "continueToIdentify" }
+  | { type: "backToUpload" }
   | { type: "startMeasure" }
   | { type: "startProcessing" }
   | {
@@ -87,10 +102,12 @@ type Action =
   | { type: "overlayChange"; face: LensFace; overlay: OverlayGeometry }
   | { type: "freeCornersChange"; face: LensFace; enabled: boolean }
   | { type: "resetFace"; face: LensFace; overlay: OverlayGeometry }
+  | { type: "enterAdjust" }
+  | { type: "exitAdjust" }
   | { type: "addBack" }
   | { type: "continueFrontOnly" }
   | { type: "reopenSavedSession" }
-  | { type: "cancelReview" }
+  | { type: "cancelAdjust" }
   | { type: "startSave" }
   | { type: "saveSuccess" }
   | { type: "saveError"; message: string }
@@ -143,17 +160,21 @@ function randomId() {
 
 export function createInitialPregradeState(): PregradeState {
   return {
-    status: "idle",
+    step: "upload",
+    resultMode: "adjust",
+    measurePhase: "validating",
+    saved: false,
     activeUploadFace: "front",
-    activeReviewFace: "front",
+    activeResultFace: "front",
     cardIdentity: "",
+    catalogMatch: null,
     cardSessionId: randomId(),
     remeasureMode: false,
     uploads: {},
     faces: {},
     faceMeta: {},
     idleNotices: {},
-    reviewNotice: null,
+    resultNotice: null,
     addBackMode: false,
     isSaving: false,
   };
@@ -200,10 +221,10 @@ export function pregradeReducer(state: PregradeState, action: Action): PregradeS
       return { ...state, cardIdentity: action.value };
     case "setActiveUploadFace":
       return { ...state, activeUploadFace: action.face };
-    case "setActiveReviewFace":
+    case "setActiveResultFace":
       return {
         ...state,
-        activeReviewFace: action.face,
+        activeResultFace: action.face,
         faces: {
           ...state.faces,
           [action.face]: state.faces[action.face]
@@ -225,7 +246,7 @@ export function pregradeReducer(state: PregradeState, action: Action): PregradeS
         faces,
         faceMeta,
         idleNotices,
-        reviewNotice: null,
+        resultNotice: null,
         addBackMode: false,
         remeasureMode: false,
       };
@@ -250,17 +271,31 @@ export function pregradeReducer(state: PregradeState, action: Action): PregradeS
       };
     }
     case "uploadError":
+      // Upload-time failures (bad file, CV rejected the scan) bounce back to the Upload step.
       return {
         ...state,
-        status: "idle",
+        step: "upload",
         activeUploadFace: action.face,
         idleNotices: { ...state.idleNotices, [action.face]: action.message },
         isSaving: false,
       };
+    case "continueToIdentify":
+      // Forward nav from Upload. Front image is required; the Identify step then gates on a name.
+      if (!state.uploads.front) return state;
+      return { ...state, step: "identify", idleNotices: {}, resultNotice: null };
+    case "backToUpload":
+      return { ...state, step: "upload" };
     case "startMeasure":
-      return { ...state, status: "uploading", idleNotices: {}, reviewNotice: null, isSaving: false };
+      return {
+        ...state,
+        step: "measure",
+        measurePhase: "validating",
+        idleNotices: {},
+        resultNotice: null,
+        isSaving: false,
+      };
     case "startProcessing":
-      return { ...state, status: "processing" };
+      return { ...state, step: "measure", measurePhase: "measuring" };
     case "receiveCvResult": {
       const upload = state.uploads[action.face];
       return {
@@ -315,15 +350,22 @@ export function pregradeReducer(state: PregradeState, action: Action): PregradeS
         },
       };
     }
-    case "finishMeasure":
+    case "finishMeasure": {
+      // Report-first on a clean measurement; drop straight into adjust when the CV failed
+      // (a notice is set) or produced a placeholder overlay (face.adjusted) the user must fix.
+      const needsAdjust =
+        action.notice != null ||
+        (["front", "back"] as LensFace[]).some((face) => state.faces[face]?.adjusted);
       return {
         ...state,
-        status: "review",
-        activeReviewFace: action.activeFace,
-        reviewNotice: action.notice,
+        step: "result",
+        resultMode: needsAdjust ? "adjust" : "view",
+        activeResultFace: action.activeFace,
+        resultNotice: action.notice,
         addBackMode: false,
         remeasureMode: false,
       };
+    }
     case "overlayChange":
       if (!state.faces[action.face]) return state;
       return {
@@ -363,13 +405,19 @@ export function pregradeReducer(state: PregradeState, action: Action): PregradeS
           },
         },
       };
+    case "enterAdjust":
+      return { ...state, resultMode: "adjust", resultNotice: null };
+    case "exitAdjust":
+      return { ...state, resultMode: "view" };
     case "addBack":
+      // Name/Identify is already done, so adding a back returns to the Upload step
+      // (back face); the upload screen offers "Measure back" directly in this mode.
       return {
         ...state,
-        status: "idle",
+        step: "upload",
         activeUploadFace: "back",
         idleNotices: {},
-        reviewNotice: null,
+        resultNotice: null,
         addBackMode: true,
       };
     case "continueFrontOnly": {
@@ -381,46 +429,54 @@ export function pregradeReducer(state: PregradeState, action: Action): PregradeS
         ...state,
         faces,
         faceMeta,
-        activeReviewFace: "front",
-        reviewNotice: null,
+        activeResultFace: "front",
+        resultNotice: null,
       };
     }
     case "reopenSavedSession":
+      // Re-measure a saved session: drop into the Result step's adjust mode.
       return {
         ...state,
-        status: "review",
-        activeReviewFace: state.faces.front ? "front" : state.faces.back ? "back" : state.activeReviewFace,
-        reviewNotice: null,
+        step: "result",
+        resultMode: "adjust",
+        activeResultFace: state.faces.front ? "front" : state.faces.back ? "back" : state.activeResultFace,
+        resultNotice: null,
         addBackMode: false,
         isSaving: false,
         remeasureMode: true,
       };
-    case "cancelReview":
-      if (state.remeasureMode) {
-        return {
-          ...state,
-          status: "results",
-          reviewNotice: null,
-          isSaving: false,
-          remeasureMode: false,
-        };
+    case "cancelAdjust":
+      // Cancelling an adjust of a saved/re-measured session returns to the report;
+      // cancelling a fresh, unsaved measurement steps back to Upload (faces retained).
+      if (state.remeasureMode || state.saved) {
+        return { ...state, resultMode: "view", resultNotice: null, isSaving: false, remeasureMode: false };
       }
       return {
         ...state,
-        status: "idle",
-        activeUploadFace: state.activeReviewFace,
-        reviewNotice: null,
+        step: "upload",
+        activeUploadFace: state.activeResultFace,
+        resultNotice: null,
+        isSaving: false,
       };
     case "startSave":
-      return { ...state, isSaving: true, reviewNotice: null };
+      return { ...state, isSaving: true, resultNotice: null };
     case "saveSuccess":
-      return { ...state, status: "results", isSaving: false, reviewNotice: null, remeasureMode: false };
+      return {
+        ...state,
+        step: "result",
+        resultMode: "view",
+        saved: true,
+        isSaving: false,
+        resultNotice: null,
+        remeasureMode: false,
+      };
     case "saveError":
       return {
         ...state,
-        status: "review",
+        step: "result",
+        resultMode: "adjust",
         isSaving: false,
-        reviewNotice: { kind: "saveError", body: action.message },
+        resultNotice: { kind: "saveError", body: action.message },
       };
     case "resetAll":
       return createInitialPregradeState();
@@ -635,10 +691,10 @@ export async function saveFace({
 }
 
 function ProcessingPanel({
-  status,
+  phase,
   faces,
 }: {
-  status: "uploading" | "processing";
+  phase: MeasurePhase;
   faces: LensFace[];
 }) {
   const suffix = faces.length > 1 ? " (front, back)" : ` (${faces[0]})`;
@@ -648,14 +704,14 @@ function ProcessingPanel({
     "Measuring border ratios",
     "Calculating PSA ceiling",
   ];
-  const activeIndex = status === "uploading" ? 0 : 1;
+  const activeIndex = phase === "validating" ? 0 : 1;
 
   return (
     <section className="rounded-lg border border-border bg-surface p-8">
       <div className="mx-auto flex max-w-xl flex-col items-center text-center">
         <div className="h-12 w-12 animate-spin rounded-full border-2 border-border-2 border-t-owl" />
         <h2 className="mt-5 text-2xl font-semibold text-text">
-          {status === "uploading" ? "Validating upload" : "Measuring centering"}
+          {phase === "validating" ? "Validating upload" : "Measuring centering"}
         </h2>
         <p className="mt-2 text-sm leading-6 text-text-2">
           1-3 seconds per face.
@@ -719,27 +775,26 @@ export function PregradeHeader({ isResults }: { isResults: boolean }) {
 }
 
 type PregradeUploadStateProps = {
-  cardIdentity: string;
   uploads: Partial<Record<LensFace, UploadFaceState>>;
   idleNotices: Partial<Record<LensFace, string>>;
   addBackMode: boolean;
-  onCardIdentityChange: (value: string) => void;
   onFileSelect: (face: LensFace, file: File) => void;
   onClearFace: (face: LensFace) => void;
-  onMeasure: () => void;
+  onContinue: () => void; // normal flow → Identify step
+  onMeasureBack: () => void; // add-back flow → measure the back directly (name already set)
 };
 
 export function PregradeUploadState({
-  cardIdentity,
   uploads,
   idleNotices,
   addBackMode,
-  onCardIdentityChange,
   onFileSelect,
   onClearFace,
-  onMeasure,
+  onContinue,
+  onMeasureBack,
 }: PregradeUploadStateProps) {
-  const canMeasure = Boolean(uploads.front);
+  const canContinue = Boolean(uploads.front);
+  const canMeasureBack = Boolean(uploads.back);
 
   return (
     <section className="space-y-5" data-pregrade-upload-state="true">
@@ -748,18 +803,6 @@ export function PregradeUploadState({
           {COPY.idleAddBack}
         </div>
       )}
-
-      <div data-card-name-row="true">
-        <label className="mb-2 block font-mono text-[10px] font-bold uppercase tracking-wider text-text-2">
-          CARD NAME
-        </label>
-        <input
-          value={cardIdentity}
-          onChange={(event) => onCardIdentityChange(event.target.value)}
-          placeholder="Add card name..."
-          className="w-full rounded-lg border border-border bg-deep px-3.5 py-3 text-sm text-text outline-none transition-colors placeholder:text-text-3 focus:border-owl/50"
-        />
-      </div>
 
       <div className="grid gap-5 lg:grid-cols-[200px_minmax(0,1fr)]" data-upload-columns="true">
         <CardPreviewColumn
@@ -784,14 +827,25 @@ export function PregradeUploadState({
       </div>
 
       <div className="flex flex-col items-center gap-2">
-        <button
-          type="button"
-          disabled={!canMeasure}
-          onClick={onMeasure}
-          className="rounded-lg bg-owl px-8 py-3 font-mono text-xs font-bold uppercase tracking-widest text-void transition-colors hover:bg-owl-light disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          Measure
-        </button>
+        {addBackMode ? (
+          <button
+            type="button"
+            disabled={!canMeasureBack}
+            onClick={onMeasureBack}
+            className="rounded-lg bg-owl px-8 py-3 font-mono text-xs font-bold uppercase tracking-widest text-void transition-colors hover:bg-owl-light disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Measure back →
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={!canContinue}
+            onClick={onContinue}
+            className="rounded-lg bg-owl px-8 py-3 font-mono text-xs font-bold uppercase tracking-widest text-void transition-colors hover:bg-owl-light disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Continue to identify →
+          </button>
+        )}
         <div className="text-center text-xs text-text-2">
           Images are saved with your measurement so you can re-open and adjust later.
         </div>
@@ -800,7 +854,139 @@ export function PregradeUploadState({
   );
 }
 
-function reviewNoticeNode({
+type IdentifyStepProps = {
+  cardIdentity: string;
+  catalogMatch: CatalogMatch;
+  onCardIdentityChange: (value: string) => void;
+  onBack: () => void;
+  onMeasure: () => void;
+};
+
+export function IdentifyStep({
+  cardIdentity,
+  catalogMatch,
+  onCardIdentityChange,
+  onBack,
+  onMeasure,
+}: IdentifyStepProps) {
+  const canMeasure = cardIdentity.trim().length > 0;
+
+  return (
+    <section className="space-y-5" data-pregrade-identify-state="true">
+      <div data-card-name-row="true">
+        <label className="mb-2 block font-mono text-[10px] font-bold uppercase tracking-wider text-text-2">
+          CARD NAME<span className="ml-1 text-coral">*</span>
+        </label>
+        <input
+          value={cardIdentity}
+          onChange={(event) => onCardIdentityChange(event.target.value)}
+          placeholder="e.g. Zoro alt art, my graded Luffy…"
+          className="w-full rounded-lg border border-border bg-deep px-3.5 py-3 text-sm text-text outline-none transition-colors placeholder:text-text-3 focus:border-owl/50"
+        />
+        <p className="mt-2 text-xs text-text-2">
+          Your own label — shows in inventory. Doesn&apos;t have to match the catalog.
+        </p>
+      </div>
+
+      {/* Catalog seam — disabled this pass. A later focused piece wires catalog
+          search + card_image_id; the catalogMatch field/action already exist on state. */}
+      <div data-catalog-seam="true" aria-disabled="true" className="opacity-60">
+        <label className="mb-2 block font-mono text-[10px] font-bold uppercase tracking-wider text-text-2">
+          FIND IN CATALOG
+          <span className="ml-2 rounded border border-border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase text-text-2">
+            Optional
+          </span>
+        </label>
+        <input
+          disabled
+          value={catalogMatch ? catalogMatch.name : ""}
+          placeholder="Catalog search — coming in a later pass"
+          className="w-full cursor-not-allowed rounded-lg border border-border bg-deep px-3.5 py-3 text-sm text-text-3 outline-none"
+        />
+        {catalogMatch ? (
+          <p className="mt-2 text-xs text-text-2">
+            Linked to {catalogMatch.name} · {catalogMatch.number}
+          </p>
+        ) : (
+          <p className="mt-2 text-xs text-text-3">
+            Linking the catalog reference image (and card_image_id) lands in a later pass.
+          </p>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text-2 transition-colors hover:border-border-2 hover:text-owl"
+        >
+          <ArrowLeftIcon className="h-4 w-4" />
+          Back
+        </button>
+        <button
+          type="button"
+          disabled={!canMeasure}
+          onClick={onMeasure}
+          className="rounded-lg bg-owl px-8 py-3 font-mono text-xs font-bold uppercase tracking-widest text-void transition-colors hover:bg-owl-light disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Measure centering →
+        </button>
+      </div>
+      <p className="text-center text-xs text-text-2">Name required · catalog optional</p>
+    </section>
+  );
+}
+
+const STEP_SEQUENCE: Array<{ step: WizardStep; label: string }> = [
+  { step: "upload", label: "Upload" },
+  { step: "identify", label: "Identify" },
+  { step: "measure", label: "Measure" },
+  { step: "result", label: "Result" },
+];
+
+function stepStatus(step: WizardStep, current: WizardStep): "done" | "active" | "idle" {
+  const target = STEP_SEQUENCE.findIndex((entry) => entry.step === step);
+  const cursor = STEP_SEQUENCE.findIndex((entry) => entry.step === current);
+  if (target < cursor) return "done";
+  if (target === cursor) return "active";
+  return "idle";
+}
+
+// Functional stepper; final C1.5 styling (gradient active dot, --grade-* accents) lands in the token pass.
+function PregradeStepper({ current }: { current: WizardStep }) {
+  return (
+    <ol data-pregrade-stepper="true" className="mb-6 flex flex-wrap items-center gap-2">
+      {STEP_SEQUENCE.map(({ step, label }, index) => {
+        const status = stepStatus(step, current);
+        const dotClass =
+          status === "active"
+            ? "border-owl bg-owl text-void"
+            : status === "done"
+              ? "border-owl/50 bg-owl/10 text-owl"
+              : "border-border bg-deep text-text-3";
+        return (
+          <li key={step} data-step={step} data-step-status={status} className="flex items-center gap-2">
+            <span
+              className={`flex h-6 w-6 items-center justify-center rounded-full border font-mono text-[11px] font-bold ${dotClass}`}
+            >
+              {status === "done" ? "✓" : index + 1}
+            </span>
+            <span
+              className={`font-mono text-[11px] font-bold uppercase tracking-wider ${
+                status === "idle" ? "text-text-3" : "text-text"
+              }`}
+            >
+              {label}
+            </span>
+            {index < STEP_SEQUENCE.length - 1 && <span className="mx-1 h-px w-6 bg-border" />}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function resultNoticeNode({
   notice,
   onRetryBack,
   onContinueFrontOnly,
@@ -1058,9 +1244,9 @@ export default function PregradeWorkspace() {
   }
 
   const processingFaces = FACE_ORDER.filter((face) => state.uploads[face] && !state.faces[face]);
-  const isResults = state.status === "results";
-  const reviewNotice = reviewNoticeNode({
-    notice: state.reviewNotice,
+  const isResults = state.step === "result" && state.saved;
+  const resultNotice = resultNoticeNode({
+    notice: state.resultNotice,
     onRetryBack: () => void runMeasurement(["back"]),
     onContinueFrontOnly: () => dispatch({ type: "continueFrontOnly" }),
   });
@@ -1068,53 +1254,56 @@ export default function PregradeWorkspace() {
   return (
     <section className="mx-auto flex min-h-[calc(100vh-96px)] max-w-[1280px] flex-col px-4 py-8">
       <PregradeHeader isResults={isResults} />
+      <PregradeStepper current={state.step} />
 
-      {state.status === "idle" && (
+      {state.step === "upload" && (
         <PregradeUploadState
           uploads={state.uploads}
-          cardIdentity={state.cardIdentity}
           idleNotices={state.idleNotices}
           addBackMode={state.addBackMode}
-          onCardIdentityChange={(value) => dispatch({ type: "setCardIdentity", value })}
           onFileSelect={(face, file) => void handleFileSelected(face, file)}
           onClearFace={handleClearFace}
+          onContinue={() => dispatch({ type: "continueToIdentify" })}
+          onMeasureBack={() => void runMeasurement(["back"])}
+        />
+      )}
+
+      {state.step === "identify" && (
+        <IdentifyStep
+          cardIdentity={state.cardIdentity}
+          catalogMatch={state.catalogMatch}
+          onCardIdentityChange={(value) => dispatch({ type: "setCardIdentity", value })}
+          onBack={() => dispatch({ type: "backToUpload" })}
           onMeasure={() => void runMeasurement()}
         />
       )}
 
-      {(state.status === "uploading" || state.status === "processing") && (
+      {state.step === "measure" && (
         <ProcessingPanel
-          status={state.status}
+          phase={state.measurePhase}
           faces={processingFaces.length > 0 ? processingFaces : ["front"]}
         />
       )}
 
-      {state.status === "review" && (
-        <ReviewWorkspace
+      {state.step === "result" && (
+        <ResultScreen
           faces={state.faces}
-          activeFace={state.activeReviewFace}
-          cardIdentity={state.cardIdentity || null}
-          notice={reviewNotice}
-          saving={state.isSaving}
-          mode={state.remeasureMode ? "edit" : "review"}
-          allowAddBack={!state.remeasureMode && state.reviewNotice?.kind !== "backFailed"}
-          onActiveFaceChange={(face) => dispatch({ type: "setActiveReviewFace", face })}
-          onOverlayChange={(face, overlay) => dispatch({ type: "overlayChange", face, overlay })}
-          onFreeCornersChange={(face, enabled) => dispatch({ type: "freeCornersChange", face, enabled })}
-          onAddBack={() => dispatch({ type: "addBack" })}
-          onSave={() => void handleSave()}
-          onResetFace={handleResetFace}
-          onCancel={() => dispatch({ type: "cancelReview" })}
-        />
-      )}
-
-      {state.status === "results" && (
-        <ResultsPanel
-          faces={state.faces}
-          activeFace={state.activeReviewFace}
+          activeFace={state.activeResultFace}
+          resultMode={state.resultMode}
+          saved={state.saved}
           cardIdentity={state.cardIdentity || null}
           cardSessionId={state.cardSessionId}
-          onActiveFaceChange={(face) => dispatch({ type: "setActiveReviewFace", face })}
+          saving={state.isSaving}
+          notice={resultNotice}
+          allowAddBack={!state.remeasureMode && state.resultNotice?.kind !== "backFailed"}
+          onActiveFaceChange={(face) => dispatch({ type: "setActiveResultFace", face })}
+          onEnterAdjust={() => dispatch({ type: "enterAdjust" })}
+          onExitAdjust={() => dispatch({ type: "exitAdjust" })}
+          onOverlayChange={(face, overlay) => dispatch({ type: "overlayChange", face, overlay })}
+          onFreeCornersChange={(face, enabled) => dispatch({ type: "freeCornersChange", face, enabled })}
+          onResetFace={handleResetFace}
+          onAddBack={() => dispatch({ type: "addBack" })}
+          onSave={() => void handleSave()}
           onCardIdentityChange={(value) => dispatch({ type: "setCardIdentity", value })}
           onReMeasure={handleReMeasure}
           onMeasureAnother={handleMeasureAnother}

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { computeMeasurements, psaCeilingFront, type OverlayGeometry } from "@/lib/centering-math";
 import AxisRatioCard from "./AxisRatioCard";
 import FaceTabs, { type LensFace } from "./FaceTabs";
-import FaceResultCard from "./FaceResultCard";
+import FaceRatioCard from "./FaceRatioCard";
 import FreeCornersToggle from "./FreeCornersToggle";
 import GraderStrip from "./GraderStrip";
 import ImageOverlayPanel from "./ImageOverlayPanel";
@@ -100,11 +100,9 @@ export default function ImageOverlayDev() {
             }))
           }
         />
-        <FaceResultCard
+        <FaceRatioCard
           face={activeFace}
           measurement={measurement}
-          overlay={overlay}
-          imageUrl={SAMPLE_IMAGE}
           isWorst
           isActive
         />

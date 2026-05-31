@@ -126,13 +126,19 @@ type PregradeWorkspaceModule = {
     fetchImpl: typeof fetch;
   }) => Promise<void>;
   PregradeUploadState: (props: {
-    cardIdentity: string;
     uploads: Partial<Record<LensFace, Upload>>;
     idleNotices: Partial<Record<LensFace, string>>;
     addBackMode: boolean;
-    onCardIdentityChange: (value: string) => void;
     onFileSelect: (face: LensFace, file: File) => void;
     onClearFace: (face: LensFace) => void;
+    onContinue: () => void;
+    onMeasureBack: () => void;
+  }) => React.ReactElement;
+  IdentifyStep: (props: {
+    cardIdentity: string;
+    catalogMatch: { cardImageId: string; name: string; number: string } | null;
+    onCardIdentityChange: (value: string) => void;
+    onBack: () => void;
     onMeasure: () => void;
   }) => React.ReactElement;
 };
@@ -158,14 +164,13 @@ function uploadProps(overrides: {
   idleNotices?: Partial<Record<LensFace, string>>;
 } = {}) {
   return {
-    cardIdentity: "OP01-001",
     uploads: overrides.uploads ?? {},
     idleNotices: overrides.idleNotices ?? {},
     addBackMode: false,
-    onCardIdentityChange: () => undefined,
     onFileSelect: () => undefined,
     onClearFace: () => undefined,
-    onMeasure: () => undefined,
+    onContinue: () => undefined,
+    onMeasureBack: () => undefined,
   };
 }
 
@@ -178,9 +183,17 @@ function renderUploadState(overrides: Parameters<typeof uploadProps>[0] = {}) {
   };
 }
 
-function measureButton(root: React.ReactElement) {
+function continueButton(root: React.ReactElement) {
   const button = walkElements(root).find(
-    (element) => element.type === "button" && textContent(element.props.children).trim() === "Measure"
+    (element) => element.type === "button" && textContent(element.props.children).includes("Continue to identify")
+  );
+  assert.ok(button);
+  return button;
+}
+
+function measureCenteringButton(root: React.ReactElement) {
+  const button = walkElements(root).find(
+    (element) => element.type === "button" && textContent(element.props.children).includes("Measure centering")
   );
   assert.ok(button);
   return button;
@@ -207,24 +220,47 @@ const overlay: OverlayGeometry = {
   },
 };
 
-test("PregradeWorkspace upload state renders card name row above preview and upload boxes", () => {
+test("PregradeWorkspace upload state renders preview and two upload boxes without a name field", () => {
   const { html } = renderUploadState();
   const uploadPaneCount = html.match(/data-upload-pane="/g)?.length ?? 0;
-  const cardNameRowIndex = html.indexOf('data-card-name-row="true"');
   const uploadColumnsIndex = html.indexOf('data-upload-columns="true"');
-  const uploadColumnsHtml = html.slice(uploadColumnsIndex);
 
   assert.match(html, /data-pregrade-upload-state="true"/);
-  assert.ok(cardNameRowIndex >= 0);
   assert.ok(uploadColumnsIndex >= 0);
-  assert.ok(cardNameRowIndex < uploadColumnsIndex);
-  assert.doesNotMatch(uploadColumnsHtml, /Add card name/);
-  assert.match(uploadColumnsHtml, /data-card-preview-column="true"/);
+  // Naming now lives on the Identify step, not Upload.
+  assert.doesNotMatch(html, /data-card-name-row="true"/);
+  assert.doesNotMatch(html, /CARD NAME/);
+  assert.match(html, /data-card-preview-column="true"/);
   assert.equal(uploadPaneCount, 2);
-  assert.match(html, /CARD NAME/);
   assert.match(html, /Card preview/);
   assert.match(html, /Front[\s\S]*required/);
   assert.match(html, /Back[\s\S]*optional/);
+  assert.match(html, /Continue to identify/);
+});
+
+test("PregradeWorkspace identify step requires a name and disables the catalog seam", () => {
+  const workspace = loadModule<PregradeWorkspaceModule>("src/components/lens/PregradeWorkspace.tsx");
+  const baseProps = {
+    catalogMatch: null,
+    onCardIdentityChange: () => undefined,
+    onBack: () => undefined,
+    onMeasure: () => undefined,
+  };
+  const emptyTree = workspace.IdentifyStep({ ...baseProps, cardIdentity: "" });
+  const namedTree = workspace.IdentifyStep({ ...baseProps, cardIdentity: "Nami" });
+  const emptyHtml = renderToStaticMarkup(
+    React.createElement(workspace.IdentifyStep, { ...baseProps, cardIdentity: "" })
+  );
+
+  // Required name field present; catalog search is a disabled seam (no card_image_id this pass).
+  assert.match(emptyHtml, /data-pregrade-identify-state="true"/);
+  assert.match(emptyHtml, /CARD NAME/);
+  assert.match(emptyHtml, /data-catalog-seam="true"/);
+  assert.match(emptyHtml, /disabled/);
+
+  // Measure is gated on a non-empty name.
+  assert.equal(measureCenteringButton(emptyTree).props.disabled, true);
+  assert.equal(measureCenteringButton(namedTree).props.disabled, false);
 });
 
 test("PregradeWorkspace card preview starts empty and uses front upload thumbnail", () => {
@@ -245,7 +281,7 @@ test("PregradeWorkspace card preview starts empty and uses front upload thumbnai
   assert.match(uploaded.html, /alt="Front card thumbnail"/);
 });
 
-test("PregradeWorkspace measure button only requires front upload", () => {
+test("PregradeWorkspace continue button only requires front upload", () => {
   const empty = renderUploadState();
   const frontOnly = renderUploadState({
     uploads: {
@@ -257,8 +293,8 @@ test("PregradeWorkspace measure button only requires front upload", () => {
     },
   });
 
-  assert.equal(measureButton(empty.tree).props.disabled, true);
-  assert.equal(measureButton(frontOnly.tree).props.disabled, false);
+  assert.equal(continueButton(empty.tree).props.disabled, true);
+  assert.equal(continueButton(frontOnly.tree).props.disabled, false);
 });
 
 test("PregradeWorkspace upload failures stay isolated per face", () => {
@@ -291,13 +327,15 @@ test("PregradeWorkspace report header links back to Pre-grade with a visible lab
   assert.match(html, /viewBox="0 0 24 24"/);
 });
 
-test("PregradeWorkspace re-measure returns to review mode with the same session id", () => {
+test("PregradeWorkspace re-measure reopens the saved session in adjust mode with the same session id", () => {
   const workspace = loadModule<PregradeWorkspaceModule>("src/components/lens/PregradeWorkspace.tsx");
   const sessionId = "11111111-1111-4111-8111-111111111111";
   const state = {
     ...workspace.createInitialPregradeState(),
-    status: "results",
-    activeReviewFace: "back",
+    step: "result",
+    resultMode: "view",
+    saved: true,
+    activeResultFace: "back",
     cardSessionId: sessionId,
     faces: {
       front: {
@@ -311,10 +349,39 @@ test("PregradeWorkspace re-measure returns to review mode with the same session 
 
   const next = workspace.pregradeReducer(state, { type: "reopenSavedSession" });
 
-  assert.equal(next.status, "review");
+  assert.equal(next.step, "result");
+  assert.equal(next.resultMode, "adjust");
   assert.equal(next.remeasureMode, true);
   assert.equal(next.cardSessionId, sessionId);
-  assert.equal(next.activeReviewFace, "front");
+  assert.equal(next.activeResultFace, "front");
+});
+
+test("PregradeWorkspace finishMeasure lands in view on a clean measurement and adjust on a noisy one", () => {
+  const workspace = loadModule<PregradeWorkspaceModule>("src/components/lens/PregradeWorkspace.tsx");
+  const front = { face: "front", overlay, imageUrl: "blob:front", imageSize: { width: 100, height: 140 }, adjusted: false };
+  const base = { ...workspace.createInitialPregradeState(), step: "measure", faces: { front } };
+
+  // Clean measurement (no notice, no placeholder) → report-first view.
+  const clean = workspace.pregradeReducer(base, { type: "finishMeasure", activeFace: "front", notice: null });
+  assert.equal(clean.step, "result");
+  assert.equal(clean.resultMode, "view");
+
+  // A CV notice forces adjust.
+  const noisyNotice = workspace.pregradeReducer(base, {
+    type: "finishMeasure",
+    activeFace: "front",
+    notice: { kind: "manual", body: "Frame the borders yourself" },
+  });
+  assert.equal(noisyNotice.resultMode, "adjust");
+
+  // A placeholder overlay (face.adjusted) forces adjust even without a notice.
+  const placeholderBase = { ...base, faces: { front: { ...front, adjusted: true } } };
+  const placeholder = workspace.pregradeReducer(placeholderBase, {
+    type: "finishMeasure",
+    activeFace: "front",
+    notice: null,
+  });
+  assert.equal(placeholder.resultMode, "adjust");
 });
 
 test("PregradeWorkspace re-measure save targets the existing session id", async () => {

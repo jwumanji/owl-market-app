@@ -3,6 +3,8 @@ import {
   bgsCeilingFront,
   combinedCeiling,
   gradeRank,
+  isPsaFrontTenBorderline,
+  PSA_FRONT_TEN,
   psaCeilingBack,
   psaCeilingFront,
   tagCeilingBack,
@@ -49,24 +51,32 @@ export type GraderResult<TGrade extends GraderGrade = GraderGrade> = {
   };
 };
 
+// The tone scale lives entirely on the grade-band tokens so the Result screen uses one green and
+// one red everywhere: gain → --grade-10, loss → --grade-low, and the `owl` borderline tone →
+// --grade-8b. `owl` is the PSA-10 borderline band (toneFromWorstMax → PSA_FRONT_TEN), so the
+// borderline amber and the threshold logic share one source and can't drift.
 export const TINTED_TONE_CLASSES: Record<GraderTone, string> = {
-  gain: "tinted-gain text-gain",
-  owl: "tinted-owl text-owl",
-  loss: "tinted-loss text-loss",
+  gain: "tinted-gain text-grade-10",
+  owl: "tinted-owl text-grade-8b",
+  loss: "tinted-loss text-grade-low",
 };
 
 export const TONE_TEXT_CLASSES: Record<GraderTone, string> = {
-  gain: "text-gain",
-  owl: "text-owl",
-  loss: "text-loss",
+  gain: "text-grade-10",
+  owl: "text-grade-8b",
+  loss: "text-grade-low",
 };
 
+// Maps a numeric grade to the Owl Lens band scale (--grade-*). Single source of color for grade
+// badges, per-grader chips, and history pills. Color only — never feeds the centering math.
 export function gradeTierColor(grade: number) {
-  if (!Number.isFinite(grade)) return "var(--red)";
-  if (grade >= 9) return "var(--green)";
-  if (grade >= 7) return "var(--owl)";
-  if (grade >= 5) return "var(--coral)";
-  return "var(--red)";
+  if (!Number.isFinite(grade)) return "var(--grade-low)";
+  if (grade >= 10) return "var(--grade-10)";
+  if (grade >= 9) return "var(--grade-9)";
+  if (grade >= 8.5) return "var(--grade-8b)";
+  if (grade >= 8) return "var(--grade-8)";
+  if (grade >= 7) return "var(--grade-7)";
+  return "var(--grade-low)";
 }
 
 export function gradeTierColorFromLabel(label: string) {
@@ -95,9 +105,25 @@ export function gradeTierAccentStyleForGrade(grade: GraderGrade) {
 }
 
 export function toneFromWorstMax(worstMax: number): GraderTone {
-  if (worstMax <= 55) return "gain";
-  if (worstMax <= 60) return "owl";
+  if (worstMax <= PSA_FRONT_TEN.confidentMaxPct) return "gain";
+  if (worstMax <= PSA_FRONT_TEN.borderlineMaxPct) return "owl";
   return "loss";
+}
+
+/**
+ * Amber "varies" note for the combined ceiling when the only thing keeping a
+ * card off a PSA 10 is borderline front centering (worst side 55–60). Returns
+ * null unless the headline actually lands on PSA 9 because of that band, so we
+ * never imply 10 upside that the back — or another axis — has already ruled out.
+ */
+export function psaTenBorderlineNote(
+  frontWorstMax: number,
+  combinedPsaCeiling: PsaGrade
+): string | null {
+  if (combinedPsaCeiling === "PSA_9" && isPsaFrontTenBorderline(frontWorstMax)) {
+    return "Possible 10 · likely 9 · grader-dependent";
+  }
+  return null;
 }
 
 export function toneFromGrade(grade: GraderGrade): GraderTone {

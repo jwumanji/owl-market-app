@@ -274,11 +274,12 @@ test("HistoryRow ceiling pill uses grade tier color while ratios keep axis tone"
     })
   );
 
-  assert.match(html, /color:var\(--coral\)/);
-  assert.match(html, /border-color:var\(--coral\)/);
+  assert.match(html, /color:var\(--grade-low\)/);
+  assert.match(html, /border-color:var\(--grade-low\)/);
   assert.match(html, /data-history-ratios="true"/);
   assert.match(html, /text-\[14px\] leading-6/);
-  assert.match(html, /text-owl/);
+  // The borderline (58/42) ratio uses the shared owl tone → grade-8b amber.
+  assert.match(html, /text-grade-8b/);
 });
 
 test("HistoryRow exposes row and thumbnail hover highlight classes", () => {
