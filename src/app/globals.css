@@ -25,6 +25,17 @@
   --blue: #4F8EF7;
   --purple: #9B72FF;
 
+  /* Owl Lens grade-ceiling band scale (best → worst). Drives grade badges, per-grader
+     chips, and the borderline amber. Color only — see grading.ts for the mapping. */
+  --grade-10: #2D9961;
+  --grade-9: #5F8E2A;
+  --grade-8b: #B5780E;
+  /* Deeper amber-orange than the reference #E89512 so an 8 badge can't be mistaken for the
+     load-bearing --owl brand gold (#E8A020). Sits between --grade-8b and --grade-7. */
+  --grade-8: #C76E14;
+  --grade-7: #D9641A;
+  --grade-low: #D23B3B;
+
   /* Text */
   --text: #E4EAF6;
   --text2: #7A88A8;
