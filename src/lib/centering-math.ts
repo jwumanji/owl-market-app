@@ -307,14 +307,40 @@ export function combinedCeiling<TGrade extends GraderGrade>(
 }
 
 /**
- * PSA front centering thresholds.
+ * PSA front-centering thresholds for a Gem-Mint 10, expressed as the worst
+ * side's share of an axis (e.g. 55 == a 55/45 split).
+ *
+ * PSA publishes the 10 as a *range*, not a hard line: 55/45-or-better is a
+ * confident 10, while 55–60 is grader-dependent ("could come back 10 or 9").
+ * So the front 10 boundary is two numbers, not one:
+ *   worst ≤ confidentMaxPct                     → confident PSA 10
+ *   confidentMaxPct < worst ≤ borderlineMaxPct  → likely PSA 9, possible 10
+ *   worst > borderlineMaxPct                    → PSA 9 or lower (table below)
+ *
+ * This is the single place to edit if PSA revises the standard: change these
+ * two numbers and psaCeilingFront, the tone bands (toneFromWorstMax), and the
+ * borderline note all follow. Back centering uses a separate, looser standard
+ * (see psaCeilingBack) and has no borderline band.
+ */
+export const PSA_FRONT_TEN = {
+  /** Worst side ≤ this → confident PSA 10 (e.g. 55 == a 55/45 split). */
+  confidentMaxPct: 55,
+  /** Worst side in (confidentMaxPct, this] → borderline: likely 9, possible 10. */
+  borderlineMaxPct: 60,
+} as const;
+
+/**
+ * PSA front centering ceiling. The 10 cutoff is the confident end of PSA's
+ * published range (PSA_FRONT_TEN.confidentMaxPct); cards in the 55–60 borderline
+ * band resolve to a conservative PSA 9 here and are flagged separately via
+ * isPsaFrontTenBorderline so the UI can surface the 10 upside.
  * Source: PSA grading standards, https://www.psacard.com/gradingstandards
  */
 export function psaCeilingFront(worstMax: number): PsaGrade {
   return ceilingFromTable(
     worstMax,
     [
-      { max: 60, ceiling: "PSA_10" },
+      { max: PSA_FRONT_TEN.confidentMaxPct, ceiling: "PSA_10" },
       { max: 65, ceiling: "PSA_9" },
       { max: 70, ceiling: "PSA_8" },
       { max: 75, ceiling: "PSA_7" },
@@ -323,6 +349,18 @@ export function psaCeilingFront(worstMax: number): PsaGrade {
       { max: 90, ceiling: "PSA_4" },
     ],
     "PSA_3_OR_LESS"
+  );
+}
+
+/**
+ * True when a FRONT worst-side max sits in the PSA-10 borderline band — a likely
+ * 9 with genuine 10 upside that depends on the grader. Back centering has no
+ * equivalent band, so this is front-only by design.
+ */
+export function isPsaFrontTenBorderline(worstMax: number): boolean {
+  return (
+    worstMax > PSA_FRONT_TEN.confidentMaxPct &&
+    worstMax <= PSA_FRONT_TEN.borderlineMaxPct
   );
 }
 

@@ -19,6 +19,7 @@ const mathJavaScript = ts.transpileModule(fs.readFileSync(mathPath, "utf8"), {
 type MathModule = {
   psaCeilingFront: (worstMax: number) => string;
   psaCeilingBack: (worstMax: number) => string;
+  isPsaFrontTenBorderline: (worstMax: number) => boolean;
   bgsCeilingFront: (worstMax: number) => string;
   bgsCeilingBack: (worstMax: number) => string;
   tagCeilingFront: (worstMax: number, category?: "tcg" | "sports") => string;
@@ -48,13 +49,28 @@ function loadMath() {
 test("PSA threshold tables apply front and back boundaries independently", () => {
   const math = loadMath();
 
-  assert.equal(math.psaCeilingFront(60), "PSA_10");
-  assert.equal(math.psaCeilingFront(60.01), "PSA_9");
+  assert.equal(math.psaCeilingFront(55), "PSA_10");
+  assert.equal(math.psaCeilingFront(55.01), "PSA_9");
   assert.equal(math.psaCeilingFront(70.26), "PSA_7");
   assert.equal(math.psaCeilingFront(75.01), "PSA_6");
   assert.equal(math.psaCeilingBack(75), "PSA_10");
   assert.equal(math.psaCeilingBack(75.01), "PSA_9");
   assert.equal(math.psaCeilingBack(90.01), "PSA_2_OR_LESS");
+});
+
+test("PSA front 10 uses a 55/45 confident cutoff with a 55–60 borderline band", () => {
+  const math = loadMath();
+
+  // 55/45 or better is a confident 10; the 55–60 band falls to a conservative 9.
+  assert.equal(math.psaCeilingFront(55), "PSA_10");
+  assert.equal(math.psaCeilingFront(57), "PSA_9");
+  assert.equal(math.psaCeilingFront(60), "PSA_9");
+
+  // The borderline band is the open-closed interval (55, 60].
+  assert.equal(math.isPsaFrontTenBorderline(55), false);
+  assert.equal(math.isPsaFrontTenBorderline(55.01), true);
+  assert.equal(math.isPsaFrontTenBorderline(60), true);
+  assert.equal(math.isPsaFrontTenBorderline(60.01), false);
 });
 
 test("BGS threshold tables apply front and back boundaries independently", () => {
