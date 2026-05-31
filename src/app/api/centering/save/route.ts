@@ -4,6 +4,9 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { isAllowedAdminEmail } from "@/lib/admin-auth";
 import {
+  type BgsGrade,
+  bgsCeilingBack,
+  bgsCeilingFront,
   computeMeasurements,
   legacyOverlayFromGeometry,
   overlayGeometryFromUnknown,
@@ -13,6 +16,9 @@ import {
   psaCeilingBack,
   psaCeilingFront,
   type PsaGrade,
+  type TagGrade,
+  tagCeilingBack,
+  tagCeilingFront,
 } from "@/lib/centering-math";
 import { isUploadFile } from "@/lib/inventory-scans";
 import { createServiceClient } from "@/lib/supabase-server";
@@ -182,6 +188,13 @@ function measurementRow({
   const psaCeiling: PsaGrade = face === "back"
     ? psaCeilingBack(measurement.worstAxisMaxPct)
     : psaCeilingFront(measurement.worstAxisMaxPct);
+  const bgsCeiling: BgsGrade = face === "back"
+    ? bgsCeilingBack(measurement.worstAxisMaxPct)
+    : bgsCeilingFront(measurement.worstAxisMaxPct);
+  // Owl Lens is One Piece (TCG category); revisit when game-scope brings sports games.
+  const tagCeiling: TagGrade = face === "back"
+    ? tagCeilingBack(measurement.worstAxisMaxPct, "tcg")
+    : tagCeilingFront(measurement.worstAxisMaxPct, "tcg");
 
   return {
     inventory_item_id: inventoryItemId,
@@ -193,6 +206,8 @@ function measurementRow({
     worst_axis: measurement.worstAxis,
     worst_axis_max_pct: measurement.worstAxisMaxPct,
     psa_ceiling: psaCeiling,
+    bgs_ceiling: bgsCeiling,
+    tag_ceiling: tagCeiling,
     pipeline_mode: pipelineMode,
     pipeline_version: pipelineVersion,
     processing_ms: processingMs,

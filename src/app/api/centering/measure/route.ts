@@ -2,7 +2,15 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { isAllowedAdminEmail } from "@/lib/admin-auth";
-import { overlayGeometryFromUnknown, psaCeilingBack, psaCeilingFront } from "@/lib/centering-math";
+import {
+  bgsCeilingBack,
+  bgsCeilingFront,
+  overlayGeometryFromUnknown,
+  psaCeilingBack,
+  psaCeilingFront,
+  tagCeilingBack,
+  tagCeilingFront,
+} from "@/lib/centering-math";
 import { isUploadFile } from "@/lib/inventory-scans";
 import { createServiceClient } from "@/lib/supabase-server";
 import type { operations } from "@/lib/owl-lens/openapi.generated";
@@ -120,6 +128,13 @@ function measurementRow({
     psa_ceiling: face === "back"
       ? psaCeilingBack(response.centering.worstAxisMaxPercent)
       : psaCeilingFront(response.centering.worstAxisMaxPercent),
+    bgs_ceiling: face === "back"
+      ? bgsCeilingBack(response.centering.worstAxisMaxPercent)
+      : bgsCeilingFront(response.centering.worstAxisMaxPercent),
+    // Owl Lens is One Piece (TCG category); revisit when game-scope brings sports games.
+    tag_ceiling: face === "back"
+      ? tagCeilingBack(response.centering.worstAxisMaxPercent, "tcg")
+      : tagCeilingFront(response.centering.worstAxisMaxPercent, "tcg"),
     pipeline_mode: response.pipeline.mode,
     pipeline_version: response.pipeline.version,
     processing_ms: response.metadata.processingMs,

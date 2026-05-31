@@ -285,6 +285,8 @@ test("save uploads the image and persists computed measurement when overlay matc
     worst_axis: "leftRight",
     worst_axis_max_pct: 50,
     psa_ceiling: "PSA_10",
+    bgs_ceiling: "BGS_10",
+    tag_ceiling: "TAG_10_PRISTINE",
     pipeline_mode: "mock",
     pipeline_version: "0.1.0",
     processing_ms: 45,
@@ -316,7 +318,8 @@ test("save marks manual_adjustment when final overlay differs from CV overlay", 
   assert.equal(route.insertedRows[0].manual_adjustment, true);
   assert.equal(route.insertedRows[0].left_pct, 55.56);
   assert.equal(route.insertedRows[0].right_pct, 44.44);
-  assert.equal(route.insertedRows[0].psa_ceiling, "PSA_10");
+  // 55.56 worst-side sits in the PSA-10 borderline band (55–60) → conservative 9.
+  assert.equal(route.insertedRows[0].psa_ceiling, "PSA_9");
 });
 
 test("save applies back-face PSA tolerance for back measurements", async () => {
@@ -328,6 +331,9 @@ test("save applies back-face PSA tolerance for back measurements", async () => {
   assert.equal(route.insertedRows.length, 1);
   assert.equal(route.insertedRows[0].worst_axis_max_pct, 70.26);
   assert.equal(route.insertedRows[0].psa_ceiling, "PSA_10");
+  // BGS/TAG use the face-aware back functions for a back measurement.
+  assert.equal(route.insertedRows[0].bgs_ceiling, "BGS_9");
+  assert.equal(route.insertedRows[0].tag_ceiling, "TAG_9");
 });
 
 test("storage upload errors stop before database insert", async () => {

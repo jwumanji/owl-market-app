@@ -336,6 +336,8 @@ test("happy path forwards CV response and inserts centering measurement", async 
     worst_axis: "leftRight",
     worst_axis_max_pct: 52,
     psa_ceiling: "PSA_10",
+    bgs_ceiling: "BGS_9_5",
+    tag_ceiling: "TAG_10_GEM_MINT",
     pipeline_mode: "mock",
     pipeline_version: "0.1.0",
     processing_ms: 42,
@@ -401,6 +403,9 @@ test("persisted measure uses face-aware PSA ceiling instead of CV-provided ceili
   assert.equal(response.status, 200);
   assert.equal(route.insertedRows.length, 1);
   assert.equal(route.insertedRows[0].psa_ceiling, "PSA_10");
+  // BGS/TAG are persisted face-aware (back functions) on the measure path too.
+  assert.equal(route.insertedRows[0].bgs_ceiling, "BGS_9");
+  assert.equal(route.insertedRows[0].tag_ceiling, "TAG_9");
 });
 
 test("standalone request without inventoryItemId persists a null inventory link", async () => {
