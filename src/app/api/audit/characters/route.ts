@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { authorizeInternalRequest } from "@/lib/internal-api-auth";
+import {
+  gameParamFromRequest,
+  gameResponsePayload,
+  resolveGameScope,
+} from "@/lib/game-scope";
 
 export const maxDuration = 60;
 
@@ -38,19 +44,26 @@ function nameMatchesCard(pattern: string, cardName: string): boolean {
 // GET /api/audit/characters — diagnostic report of character-card matching
 // ---------------------------------------------------------------------------
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const token = searchParams.get("token");
-
-  if (process.env.SYNC_SECRET && token !== process.env.SYNC_SECRET) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = authorizeInternalRequest(request);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
+    defaultToOnePiece: true,
+  });
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
 
   // 1. Fetch all characters
   const { data: characters, error: charErr } = await supabase
     .from("characters")
     .select("id, name, slug, aliases")
+    .eq("game_id", game.id)
     .order("name");
 
   if (charErr) {
@@ -78,6 +91,7 @@ export async function GET(request: Request) {
     const { data: batch, error: cardsErr } = await supabase
       .from("cards")
       .select("id, name, name_base, character_id")
+      .eq("game_id", game.id)
       .range(from, from + pageSize - 1);
 
     if (cardsErr) {
@@ -175,6 +189,7 @@ export async function GET(request: Request) {
   const wouldBeTagged = matched.length;
 
   return NextResponse.json({
+    game: gameResponsePayload(game),
     summary: {
       total_cards: allCards.length,
       currently_tagged_in_db: currentlyTagged,

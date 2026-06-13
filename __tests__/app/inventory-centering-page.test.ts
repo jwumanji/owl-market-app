@@ -66,6 +66,15 @@ function baseCard() {
   };
 }
 
+const onePieceGame = {
+  id: "game-one-piece",
+  slug: "one_piece",
+  name: "One Piece Card Game",
+  is_active: true,
+  is_public: true,
+  metadata: { route_slug: "one-piece" },
+};
+
 function measurement(overrides: Partial<MeasurementRow> = {}): MeasurementRow {
   return {
     id: "measurement-1",
@@ -100,18 +109,52 @@ function loadPage({
 
   const supabase = {
     from(table: string) {
-      if (table === "inventory_items") {
-        let selectedId = "";
+      if (table === "games") {
+        let matched = true;
         const query = {
           select(_columns: string) {
             return query;
           },
-          eq(_column: string, value: string) {
-            selectedId = value;
+          eq(column: string, value: string) {
+            if (column === "slug") {
+              matched = value === onePieceGame.slug;
+            } else if (column === "id") {
+              matched = value === onePieceGame.id;
+            }
+            return query;
+          },
+          filter(column: string, _operator: string, value: string) {
+            if (column === "metadata->>route_slug") {
+              matched = value === onePieceGame.metadata.route_slug;
+            }
+            return query;
+          },
+          maybeSingle() {
+            return Promise.resolve({ data: matched ? onePieceGame : null, error: null });
+          },
+        };
+        return query;
+      }
+
+      if (table === "inventory_items") {
+        let selectedId = "";
+        let selectedGameId = "";
+        const query = {
+          select(_columns: string) {
+            return query;
+          },
+          eq(column: string, value: string) {
+            if (column === "id") {
+              selectedId = value;
+            } else if (column === "game_id") {
+              selectedGameId = value;
+            }
             return query;
           },
           async single() {
-            return selectedId === item.id ? { data: item, error: null } : { data: null, error: { message: "not found" } };
+            return selectedId === item.id && selectedGameId === onePieceGame.id
+              ? { data: item, error: null }
+              : { data: null, error: { message: "not found" } };
           },
         };
         return query;
@@ -162,13 +205,21 @@ function loadPage({
   const mocks: Record<string, unknown> = {
     "@/components/centering/CenteringWorkspace": {
       __esModule: true,
-      default(props: { inventoryItemId: string; preloadImageUrl?: string | null; cardIdentity: { name: string } }) {
+      default(props: {
+        gameSlug: string;
+        inventoryItemId: string;
+        preloadImageUrl?: string | null;
+        adminActionToken?: string | null;
+        cardIdentity: { name: string };
+      }) {
         return React.createElement(
           "div",
           {
             "data-card": props.cardIdentity.name,
+            "data-game": props.gameSlug,
             "data-item": props.inventoryItemId,
             "data-preload": props.preloadImageUrl ?? "",
+            "data-token": props.adminActionToken ?? "",
             "data-testid": "centering-workspace",
           },
           `Workspace ${props.cardIdentity.name}`
@@ -180,6 +231,17 @@ function loadPage({
         return supabase;
       },
     },
+    "@/lib/admin-user": {
+      getCurrentAdminUser() {
+        return Promise.resolve({ id: "admin-user-1", email: "admin@example.com" });
+      },
+    },
+    "@/lib/admin-action-token": {
+      CENTERING_MEASURE_ACTION: "centering:measure",
+      createAdminActionToken({ user, action }: { user: { id: string }; action: string }) {
+        return `${action}:${user.id}:token`;
+      },
+    },
     "next/link": {
       __esModule: true,
       default(props: { href: string; children: React.ReactNode; className?: string }) {
@@ -189,6 +251,9 @@ function loadPage({
     "next/navigation": {
       notFound() {
         throw new Error("not found");
+      },
+      redirect(url: string) {
+        throw new Error(`redirect:${url}`);
       },
     },
   };
@@ -216,6 +281,7 @@ function loadPage({
     module: moduleStub,
     process,
     require: localRequire,
+    URLSearchParams,
   });
 
   vm.runInContext(pageJavaScript, context, { filename: pagePath });
@@ -234,8 +300,10 @@ test("inventory centering page renders workspace and empty history", async () =>
 
   assert.match(html, /Card Centering Measurement/);
   assert.match(html, /Workspace Nami/);
+  assert.match(html, /data-game="one_piece"/);
   assert.match(html, /data-item="item-1"/);
   assert.match(html, /data-preload="https:\/\/cdn.example\/front.jpg"/);
+  assert.match(html, /data-token="centering:measure:admin-user-1:token"/);
   assert.match(html, /No centering measurements yet/);
   assert.deepEqual(ranges, [{ from: 0, to: 4 }]);
 });

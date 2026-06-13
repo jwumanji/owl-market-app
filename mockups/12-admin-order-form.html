@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OwlMarket — Admin · Order Detail (C1.5 mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Caveat:wght@700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #FFF5E4; --bg-2: #FFFFFF; --bg-3: #FCE6BE;
+      --ink: #1A0F08; --ink-2: #5C4534; --ink-3: #9A8475;
+      --pink: #FF6BB8; --coral: #FF4936; --gold: #E89512;
+      --gain: #2D9961; --loss: #E04E4E;
+      --select: #1F47A1;
+      --grad-brand: linear-gradient(135deg, #FF6BB8 0%, #FF4936 50%, #E89512 100%);
+      --r-sm: 8px; --r-md: 14px; --r-lg: 22px; --r-pill: 999px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: var(--bg); color: var(--ink); font-family: 'Space Grotesk', system-ui, sans-serif; font-weight: 500; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+    .container { max-width: 1480px; margin: 0 auto; padding-left: 28px; padding-right: 28px; }
+    a { color: inherit; }
+
+    /* ===== NAV (ADMIN) ===== */
+    .topnav { position: sticky; top: 0; z-index: 50; background: rgba(255, 245, 228, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1.5px solid rgba(26, 15, 8, 0.08); }
+    .topnav-inner { display: flex; align-items: center; gap: 22px; padding: 14px 28px; max-width: 1680px; margin: 0 auto; }
+    .lockup { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; flex-shrink: 0; }
+    .lockup-wm { font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: var(--ink); font-size: 22px; display: inline-flex; align-items: baseline; }
+    .lockup-wm em { font-family: 'Caveat', cursive; font-style: normal; font-weight: 700; font-size: 28px; margin-left: -2px; padding-right: 8px; padding-bottom: 2px; display: inline-block; background: var(--grad-brand); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+    .internal-chip { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--coral); background: #FFE2DD; border: 1.5px solid var(--coral); border-radius: var(--r-pill); padding: 3px 9px; flex-shrink: 0; }
+    .nav-links { display: inline-flex; gap: 22px; list-style: none; margin-left: 6px; }
+    .nav-links a { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: var(--ink-2); text-decoration: none; padding: 4px 0; position: relative; white-space: nowrap; }
+    .nav-links a.active { color: var(--ink); }
+    .nav-links a.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 2px; background: var(--grad-brand); border-radius: 2px; }
+    .nav-right { margin-left: auto; display: inline-flex; align-items: center; gap: 16px; }
+    .nav-view { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 12px; color: var(--ink-2); text-decoration: none; letter-spacing: 0.04em; }
+    .nav-view:hover { color: var(--ink); }
+    .nav-signout { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; color: var(--ink); background: transparent; border: 1.5px solid var(--ink); border-radius: var(--r-pill); padding: 7px 16px; cursor: pointer; text-decoration: none; transition: all 0.15s ease; }
+    .nav-signout:hover { background: var(--ink); color: var(--bg); }
+
+    main { padding: 32px 0 96px; }
+
+    .crumb { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; letter-spacing: 0.04em; color: var(--ink-2); text-decoration: none; display: inline-flex; gap: 6px; margin-bottom: 18px; }
+    .crumb:hover { color: var(--ink); }
+    .page-head { margin-bottom: 24px; display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+    .eyebrow { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; color: var(--ink-2); letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 8px; }
+    h1.title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; letter-spacing: -0.025em; line-height: 1; color: var(--ink); }
+    .order-num { margin-top: 8px; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+    .subline { margin-top: 10px; font-size: 14px; color: var(--ink-2); max-width: 600px; }
+    .head-actions { display: inline-flex; gap: 12px; flex-wrap: wrap; }
+
+    /* buttons */
+    .btn { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; padding: 0 16px; height: 42px; border-radius: var(--r-sm); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 7px; text-decoration: none; transition: all 0.13s ease; border: 1.5px solid transparent; white-space: nowrap; }
+    .btn-primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+    .btn-primary:hover { background: #2E1C10; }
+    .btn-ghost { background: var(--bg-2); color: var(--ink); border-color: var(--ink); }
+    .btn-ghost:hover { background: var(--bg-3); }
+    .btn-danger { background: var(--bg-2); color: var(--coral); border-color: var(--coral); }
+    .btn-danger:hover { background: #FFE2DD; }
+
+    /* panel + form primitives */
+    .panel { background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-md); padding: 22px 24px; margin-bottom: 18px; }
+    .panel-title { font-family: 'Space Grotesk'; font-weight: 700; font-size: 20px; color: var(--ink); letter-spacing: -0.01em; margin-bottom: 18px; }
+    .field-label { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2); display: block; margin-bottom: 8px; }
+    .field-label .req { color: var(--coral); margin-left: 3px; }
+    .input, .select, .textarea { font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 14px; color: var(--ink); background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-sm); padding: 10px 12px; width: 100%; outline: none; transition: border-color 0.12s, box-shadow 0.12s; }
+    .input::placeholder, .textarea::placeholder { color: var(--ink-3); }
+    .input:focus, .select:focus, .textarea:focus { border-color: var(--coral); box-shadow: 0 0 0 3px rgba(255,73,54,0.14); }
+    .input[type="date"] { font-family: 'JetBrains Mono', monospace; }
+    .textarea { resize: vertical; min-height: 84px; }
+    .select { appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 34px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%231A0F08' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .span2 { grid-column: 1 / -1; }
+
+    /* read-only field (auto-generated) */
+    .input.readonly { background: var(--bg-3); color: var(--ink-2); border-color: var(--ink-3); cursor: default; }
+    .readonly-tag { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); background: var(--bg-2); border: 1.2px solid var(--ink-3); border-radius: 4px; padding: 1px 6px; margin-left: 6px; }
+
+    /* marked-shipped checkbox box */
+    .check-box { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; border: 1.5px solid var(--ink); border-radius: var(--r-sm); padding: 13px 16px; background: var(--bg-2); cursor: pointer; transition: all 0.12s; }
+    .check-box.on { border-color: var(--gain); background: #DCF1E6; }
+    .check-box .cb { width: 20px; height: 20px; border: 1.5px solid var(--ink); border-radius: 5px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--bg-2); }
+    .check-box.on .cb { background: var(--gain); border-color: var(--gain); color: var(--bg); }
+    .check-box .cb-label { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink); }
+    .check-box.on .cb-label { color: var(--gain); }
+
+    /* always-on labeled sub-box: Order Sale Details (solid inset = always present; vs dashed = conditional) */
+    .subbox { grid-column: 1 / -1; border: 1.5px solid var(--ink); border-radius: var(--r-md); padding: 18px; background: var(--bg-3); }
+    .subbox-title { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 14px; }
+    .subgrid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+    .subbox .input, .subbox .select { background: var(--bg-2); }
+
+    /* ===== DUAL PANE ===== */
+    .dual { display: grid; grid-template-columns: minmax(0,1fr) minmax(360px, 0.8fr); gap: 18px; align-items: start; }
+    .pane { background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-md); padding: 20px; }
+    .pane-head { margin-bottom: 14px; }
+    .pane-head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .pane-title { font-family: 'Space Grotesk'; font-weight: 700; font-size: 18px; color: var(--ink); }
+    .pane-sub { margin-top: 4px; font-size: 12.5px; color: var(--ink-2); }
+    .pane-count { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-2); background: var(--bg-3); border: 1.5px solid var(--ink); border-radius: var(--r-sm); padding: 5px 10px; flex-shrink: 0; }
+    .pane-search { margin: 12px 0; }
+
+    .pick-list { display: flex; flex-direction: column; border: 1.5px solid var(--ink); border-radius: var(--r-sm); overflow: hidden; max-height: 420px; overflow-y: auto; }
+    .pick { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-top: 1px solid var(--bg-3); border-left: 3px solid transparent; background: var(--bg-2); }
+    .pick:first-child { border-top: none; }
+    .pick.added { border-left-color: var(--select); background: #F2F5FB; }
+    .pick-thumb { width: 38px; height: 53px; border-radius: 5px; border: 1.5px solid var(--ink); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk'; font-weight: 700; font-size: 13px; color: var(--bg); flex-shrink: 0; }
+    .pick-thumb.box { background: var(--ink-2); font-size: 9px; }
+    .pick-info { flex: 1; min-width: 0; }
+    .pick-name { display: block; font-family: 'Space Grotesk'; font-weight: 700; font-size: 13px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pick-meta { display: block; margin-top: 3px; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pick-btn { flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; border-radius: var(--r-sm); padding: 7px 12px; cursor: pointer; border: 1.5px solid; }
+    .pick-btn.add { background: var(--bg-2); color: var(--ink); border-color: var(--ink); }
+    .pick-btn.add:hover { background: var(--bg-3); }
+    .pick-btn.added { background: var(--select); color: var(--bg); border-color: var(--select); }
+
+    .group { margin-bottom: 14px; }
+    .group:last-child { margin-bottom: 0; }
+    .group-head { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+    .group-head .gcount { color: var(--ink-3); }
+    .sel-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1.5px solid var(--ink); border-radius: var(--r-sm); background: var(--bg); margin-bottom: 8px; }
+    .sel-item:last-child { margin-bottom: 0; }
+    .sel-rm { flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--coral); background: var(--bg-2); border: 1.5px solid var(--coral); border-radius: var(--r-sm); padding: 7px 11px; cursor: pointer; }
+    .sel-rm:hover { background: #FFE2DD; }
+
+    .form-footer { display: flex; gap: 12px; justify-content: space-between; margin-top: 20px; }
+    .footer-right { display: flex; gap: 12px; }
+
+    .mock-note { margin-top: 28px; padding: 14px 20px; background: var(--bg-2); border: 1.5px dashed var(--ink-3); border-radius: var(--r-md); font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em; color: var(--ink-2); text-align: center; text-transform: uppercase; font-weight: 600; line-height: 1.7; }
+  </style>
+</head>
+<body>
+
+  <!-- NAV (ADMIN) -->
+  <header class="topnav">
+    <div class="topnav-inner">
+      <a href="#" class="lockup">
+        <svg width="34" height="34" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="og-adm" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FF6BB8"/><stop offset="50%" stop-color="#FF4936"/><stop offset="100%" stop-color="#E89512"/></linearGradient>
+            <mask id="om-adm"><rect width="120" height="120" fill="white"/><circle cx="70" cy="56" r="20" fill="black"/></mask>
+          </defs>
+          <circle cx="60" cy="60" r="52" fill="url(#og-adm)" stroke="#1A0F08" stroke-width="5"/>
+          <circle cx="60" cy="60" r="38" fill="#1A0F08"/>
+          <circle cx="58" cy="60" r="26" fill="#FFF5E4" mask="url(#om-adm)"/>
+          <g transform="translate(80 60)"><path d="M 0,-11 Q 1.65,-1.65 11,0 Q 1.65,1.65 0,11 Q -1.65,1.65 -11,0 Q -1.65,-1.65 0,-11 Z" fill="#FFF5E4"/></g>
+        </svg>
+        <span class="lockup-wm">Owl<em>Market</em></span>
+      </a>
+      <span class="internal-chip">Internal</span>
+      <nav>
+        <ul class="nav-links">
+          <li><a href="#">Inventory</a></li>
+          <li><a href="#">Bundles</a></li>
+          <li><a href="#" class="active">Orders</a></li>
+          <li><a href="#">Lens</a></li>
+          <li><a href="#">PSA</a></li>
+        </ul>
+      </nav>
+      <div class="nav-right">
+        <a href="#" class="nav-view">View site ↗</a>
+        <a href="#" class="nav-signout">Sign out</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <a href="#" class="crumb">← Inventory · Need Shipping</a>
+
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Nickname Order</div>
+        <h1 class="title">Shanks Lot — Jake T.</h1>
+        <div class="order-num">Order #00184</div>
+        <p class="subline">Edit the customer details, shipping state, tracking number, and bundled inventory items.</p>
+      </div>
+      <div class="head-actions">
+        <a href="#" class="btn btn-ghost">Back to Inventory</a>
+        <a href="#" class="btn btn-primary">Add Order</a>
+      </div>
+    </div>
+
+    <!-- ORDER META -->
+    <div class="panel">
+      <div class="panel-title">Order details</div>
+      <div class="grid2">
+        <label>
+          <span class="field-label">Customer Order # <span class="readonly-tag">auto</span></span>
+          <input class="input readonly" type="text" value="00184" readonly />
+        </label>
+        <label>
+          <span class="field-label">Nickname Order</span>
+          <input class="input" type="text" value="Shanks Lot — Jake T." />
+        </label>
+        <label>
+          <span class="field-label">Customer Name <span class="req">*</span></span>
+          <input class="input" type="text" value="Jake Thompson" />
+        </label>
+        <label>
+          <span class="field-label">Tracking #</span>
+          <input class="input" type="text" value="9400 1112 3456 7890 1234 56" />
+        </label>
+        <label class="span2">
+          <span class="field-label">Shipping Label</span>
+          <textarea class="textarea">Jake Thompson
+482 Harbor View Rd
+Seattle, WA 98101
+USA</textarea>
+        </label>
+
+        <!-- Marked Shipped checkbox (checked → gain) -->
+        <label class="check-box on">
+          <span class="cb">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg>
+          </span>
+          <span class="cb-label">Marked Shipped</span>
+        </label>
+
+        <!-- Order Sale Details — always-on labeled sub-box -->
+        <div class="subbox">
+          <div class="subbox-title">Order Sale Details</div>
+          <div class="subgrid3">
+            <label>
+              <span class="field-label">Sold At</span>
+              <select class="select">
+                <option>----</option><option selected>Ebay</option><option>FB</option><option>Instagram</option><option>In Person</option><option>Traded</option>
+              </select>
+            </label>
+            <label>
+              <span class="field-label">Sold Date</span>
+              <input class="input" type="date" value="2026-05-15" />
+            </label>
+            <label>
+              <span class="field-label">Sold Price</span>
+              <input class="input" type="text" placeholder="0.00" value="1,820.00" />
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DUAL PANE: inventory search → order bundle -->
+    <div class="dual">
+
+      <!-- LEFT: inventory search -->
+      <div class="pane">
+        <div class="pane-head">
+          <div class="pane-head-row">
+            <span class="pane-title">Inventory Search</span>
+            <span class="pane-count">31 Available</span>
+          </div>
+          <div class="pane-sub">Search existing product inventory and add cards to the order.</div>
+        </div>
+        <div class="pane-search">
+          <input class="input" type="text" placeholder="Search card, set, nickname, cert, or inventory id" />
+        </div>
+        <div class="pick-list">
+          <div class="pick added">
+            <span class="pick-thumb" style="background:#7C2A1E;">S</span>
+            <span class="pick-info"><span class="pick-name">Shanks — Red Hair</span><span class="pick-meta">OP01 / OP01-120 / Graded / PSA 10 / Cert 78451123</span></span>
+            <button class="pick-btn added">Added ✓</button>
+          </div>
+          <div class="pick added">
+            <span class="pick-thumb" style="background:#594229;">S</span>
+            <span class="pick-info"><span class="pick-name">Shanks — Divine Departure</span><span class="pick-meta">OP01 / OP01-119 / Graded / PSA 9 / Cert 78460921</span></span>
+            <button class="pick-btn added">Added ✓</button>
+          </div>
+          <div class="pick added">
+            <span class="pick-thumb" style="background:#6B3F8A;">L</span>
+            <span class="pick-info"><span class="pick-name">Trafalgar Law — Room</span><span class="pick-meta">OP05 / OP05-069 / Raw / SR</span></span>
+            <button class="pick-btn added">Added ✓</button>
+          </div>
+          <div class="pick">
+            <span class="pick-thumb" style="background:#C53A2A;">L</span>
+            <span class="pick-info"><span class="pick-name">Luffy — Gear Fifth</span><span class="pick-meta">OP05 / OP05-119 / Graded / PSA 10 / Cert 89102447</span></span>
+            <button class="pick-btn add">Add</button>
+          </div>
+          <div class="pick">
+            <span class="pick-thumb" style="background:#2D6E4E;">Z</span>
+            <span class="pick-info"><span class="pick-name">Zoro — King of Hell</span><span class="pick-meta">OP06 / OP06-022 / Raw / SP</span></span>
+            <button class="pick-btn add">Add</button>
+          </div>
+          <div class="pick">
+            <span class="pick-thumb box">BOX</span>
+            <span class="pick-info"><span class="pick-name">OP01 Booster Box</span><span class="pick-meta">OP01 / Sealed</span></span>
+            <button class="pick-btn add">Add</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: order bundle (grouped by Type / Set) -->
+      <div class="pane">
+        <div class="pane-head">
+          <div class="pane-head-row">
+            <span class="pane-title">Order Bundle</span>
+            <span class="pane-count">3 In Order</span>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="group-head">Graded / OP01 <span class="gcount">2</span></div>
+          <div class="sel-item">
+            <span class="pick-thumb" style="background:#7C2A1E;">S</span>
+            <span class="pick-info"><span class="pick-name">Shanks — Red Hair</span><span class="pick-meta">OP01 / OP01-120 / Graded / PSA 10 / Cert 78451123</span></span>
+            <button class="sel-rm">Remove</button>
+          </div>
+          <div class="sel-item">
+            <span class="pick-thumb" style="background:#594229;">S</span>
+            <span class="pick-info"><span class="pick-name">Shanks — Divine Departure</span><span class="pick-meta">OP01 / OP01-119 / Graded / PSA 9 / Cert 78460921</span></span>
+            <button class="sel-rm">Remove</button>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="group-head">Raw / OP05 <span class="gcount">1</span></div>
+          <div class="sel-item">
+            <span class="pick-thumb" style="background:#6B3F8A;">L</span>
+            <span class="pick-info"><span class="pick-name">Trafalgar Law — Room</span><span class="pick-meta">OP05 / OP05-069 / Raw / SR</span></span>
+            <button class="sel-rm">Remove</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div class="form-footer">
+      <button class="btn btn-danger">Delete Order</button>
+      <div class="footer-right">
+        <a href="#" class="btn btn-ghost">Cancel</a>
+        <button class="btn btn-primary">Save Order</button>
+      </div>
+    </div>
+
+    <div class="mock-note">
+      MOCKUP · /admin/orders/[id] + /new · C1.5 · v1.0 · 2026-05-20 · ONE SHARED COMPONENT (OrderForm) · /admin/orders LIST = REDIRECT → /admin/inventory?status=ship<br>
+      MATCHES REAL: ORDER META (CUSTOMER ORDER # [auto/read-only] · NICKNAME · CUSTOMER NAME · TRACKING # · SHIPPING LABEL · MARKED SHIPPED CHECKBOX · ORDER SALE DETAILS sub-box: SOLD-AT / SOLD-DATE / SOLD-PRICE) · DUAL-PANE → LEFT "INVENTORY SEARCH" · RIGHT "ORDER BUNDLE" (GROUPED BY TYPE / SET) · FOOTER DELETE (edit) + SAVE/CREATE<br>
+      NEW PRIMITIVES: READ-ONLY FIELD (peach inset + AUTO tag) · CHECKBOX-BOX (checked = gain) · ALWAYS-ON SOLID SUB-BOX (vs DASHED = conditional) · TRANSFER-LIST + DESTRUCTIVE DELETE REUSED FROM BUNDLE FORM
+    </div>
+
+  </main>
+
+</body>
+</html>

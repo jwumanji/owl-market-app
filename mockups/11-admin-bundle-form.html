@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OwlMarket — Admin · Bundle Detail (C1.5 mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Caveat:wght@700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #FFF5E4; --bg-2: #FFFFFF; --bg-3: #FCE6BE;
+      --ink: #1A0F08; --ink-2: #5C4534; --ink-3: #9A8475;
+      --pink: #FF6BB8; --coral: #FF4936; --gold: #E89512;
+      --gain: #2D9961; --loss: #E04E4E;
+      --select: #1F47A1;
+      --grad-brand: linear-gradient(135deg, #FF6BB8 0%, #FF4936 50%, #E89512 100%);
+      --r-sm: 8px; --r-md: 14px; --r-lg: 22px; --r-pill: 999px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: var(--bg); color: var(--ink); font-family: 'Space Grotesk', system-ui, sans-serif; font-weight: 500; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+    .container { max-width: 1480px; margin: 0 auto; padding-left: 28px; padding-right: 28px; }
+    a { color: inherit; }
+
+    /* ===== NAV (ADMIN) ===== */
+    .topnav { position: sticky; top: 0; z-index: 50; background: rgba(255, 245, 228, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1.5px solid rgba(26, 15, 8, 0.08); }
+    .topnav-inner { display: flex; align-items: center; gap: 22px; padding: 14px 28px; max-width: 1680px; margin: 0 auto; }
+    .lockup { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; flex-shrink: 0; }
+    .lockup-wm { font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: var(--ink); font-size: 22px; display: inline-flex; align-items: baseline; }
+    .lockup-wm em { font-family: 'Caveat', cursive; font-style: normal; font-weight: 700; font-size: 28px; margin-left: -2px; padding-right: 8px; padding-bottom: 2px; display: inline-block; background: var(--grad-brand); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+    .internal-chip { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--coral); background: #FFE2DD; border: 1.5px solid var(--coral); border-radius: var(--r-pill); padding: 3px 9px; flex-shrink: 0; }
+    .nav-links { display: inline-flex; gap: 22px; list-style: none; margin-left: 6px; }
+    .nav-links a { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: var(--ink-2); text-decoration: none; padding: 4px 0; position: relative; white-space: nowrap; }
+    .nav-links a.active { color: var(--ink); }
+    .nav-links a.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 2px; background: var(--grad-brand); border-radius: 2px; }
+    .nav-right { margin-left: auto; display: inline-flex; align-items: center; gap: 16px; }
+    .nav-view { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 12px; color: var(--ink-2); text-decoration: none; letter-spacing: 0.04em; }
+    .nav-view:hover { color: var(--ink); }
+    .nav-signout { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; color: var(--ink); background: transparent; border: 1.5px solid var(--ink); border-radius: var(--r-pill); padding: 7px 16px; cursor: pointer; text-decoration: none; transition: all 0.15s ease; }
+    .nav-signout:hover { background: var(--ink); color: var(--bg); }
+
+    main { padding: 32px 0 96px; }
+
+    .crumb { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; letter-spacing: 0.04em; color: var(--ink-2); text-decoration: none; display: inline-flex; gap: 6px; margin-bottom: 18px; }
+    .crumb:hover { color: var(--ink); }
+    .page-head { margin-bottom: 24px; display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+    .eyebrow { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; color: var(--coral); letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 10px; }
+    h1.title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; letter-spacing: -0.025em; line-height: 1; color: var(--ink); }
+    .subline { margin-top: 10px; font-size: 14px; color: var(--ink-2); max-width: 600px; }
+    .head-actions { display: inline-flex; gap: 12px; flex-wrap: wrap; }
+
+    /* buttons */
+    .btn { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; padding: 0 16px; height: 42px; border-radius: var(--r-sm); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 7px; text-decoration: none; transition: all 0.13s ease; border: 1.5px solid transparent; white-space: nowrap; }
+    .btn-primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+    .btn-primary:hover { background: #2E1C10; }
+    .btn-ghost { background: var(--bg-2); color: var(--ink); border-color: var(--ink); }
+    .btn-ghost:hover { background: var(--bg-3); }
+    .btn-danger { background: var(--bg-2); color: var(--coral); border-color: var(--coral); }
+    .btn-danger:hover { background: #FFE2DD; }
+
+    /* panels + form primitives (inherited) */
+    .panel { background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-md); padding: 22px 24px; margin-bottom: 18px; }
+    .panel-title { font-family: 'Space Grotesk'; font-weight: 700; font-size: 20px; color: var(--ink); letter-spacing: -0.01em; margin-bottom: 18px; }
+    .field-label { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2); display: block; margin-bottom: 8px; }
+    .field-label .req { color: var(--coral); margin-left: 3px; }
+    .input, .select, .textarea { font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 14px; color: var(--ink); background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-sm); padding: 10px 12px; width: 100%; outline: none; transition: border-color 0.12s, box-shadow 0.12s; }
+    .input::placeholder, .textarea::placeholder { color: var(--ink-3); }
+    .input:focus, .select:focus, .textarea:focus { border-color: var(--coral); box-shadow: 0 0 0 3px rgba(255,73,54,0.14); }
+    .input[type="date"], .input[type="number"] { font-family: 'JetBrains Mono', monospace; }
+    .textarea { resize: vertical; min-height: 72px; }
+    .select { appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 34px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%231A0F08' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .span2 { grid-column: 1 / -1; }
+
+    /* sold conditional box (same convention as add-inventory) */
+    .sold-block { grid-column: 1 / -1; border: 1.5px dashed var(--gain); border-radius: var(--r-md); padding: 18px; background: #F3FAF6; margin-top: 4px; }
+    .sold-head { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .sold-head .sh-ttl { font-family: 'Space Grotesk'; font-weight: 700; font-size: 14px; color: var(--ink); }
+    .conditional-tag.green { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gain); background: #DCF1E6; border: 1.2px solid var(--gain); border-radius: 4px; padding: 2px 7px; }
+    .subgrid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+    /* ===== DUAL PANE ===== */
+    .dual { display: grid; grid-template-columns: minmax(0,1fr) minmax(360px, 0.8fr); gap: 18px; align-items: start; }
+    .pane { background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-md); padding: 20px; }
+    .pane-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .pane-title { font-family: 'Space Grotesk'; font-weight: 700; font-size: 18px; color: var(--ink); }
+    .pane-count { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-2); background: var(--bg-3); border: 1.5px solid var(--ink); border-radius: var(--r-sm); padding: 5px 10px; }
+    .pane-search { margin-bottom: 12px; }
+
+    .pick-list { display: flex; flex-direction: column; border: 1.5px solid var(--ink); border-radius: var(--r-sm); overflow: hidden; max-height: 420px; overflow-y: auto; }
+    .pick { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-top: 1px solid var(--bg-3); border-left: 3px solid transparent; background: var(--bg-2); }
+    .pick:first-child { border-top: none; }
+    .pick.added { border-left-color: var(--select); background: #F2F5FB; }
+    .pick-thumb { width: 38px; height: 53px; border-radius: 5px; border: 1.5px solid var(--ink); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk'; font-weight: 700; font-size: 13px; color: var(--bg); flex-shrink: 0; }
+    .pick-thumb.box { background: var(--ink-2); font-size: 9px; }
+    .pick-info { flex: 1; min-width: 0; }
+    .pick-name { display: block; font-family: 'Space Grotesk'; font-weight: 700; font-size: 13px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pick-meta { display: block; margin-top: 3px; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pick-btn { flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; border-radius: var(--r-sm); padding: 7px 12px; cursor: pointer; border: 1.5px solid; }
+    .pick-btn.add { background: var(--bg-2); color: var(--ink); border-color: var(--ink); }
+    .pick-btn.add:hover { background: var(--bg-3); }
+    .pick-btn.added { background: var(--select); color: var(--bg); border-color: var(--select); }
+
+    /* selected (bundle items) pane — grouped */
+    .group { margin-bottom: 14px; }
+    .group:last-child { margin-bottom: 0; }
+    .group-head { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+    .group-head .gcount { color: var(--ink-3); }
+    .sel-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1.5px solid var(--ink); border-radius: var(--r-sm); background: var(--bg); margin-bottom: 8px; }
+    .sel-item:last-child { margin-bottom: 0; }
+    .sel-rm { flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--coral); background: var(--bg-2); border: 1.5px solid var(--coral); border-radius: var(--r-sm); padding: 7px 11px; cursor: pointer; }
+    .sel-rm:hover { background: #FFE2DD; }
+    .empty-pane { border: 1.5px dashed var(--ink-3); border-radius: var(--r-sm); padding: 28px; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; font-weight: 600; color: var(--ink-3); }
+
+    /* footer */
+    .form-footer { display: flex; gap: 12px; justify-content: space-between; margin-top: 20px; }
+    .footer-right { display: flex; gap: 12px; }
+
+    .mock-note { margin-top: 28px; padding: 14px 20px; background: var(--bg-2); border: 1.5px dashed var(--ink-3); border-radius: var(--r-md); font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em; color: var(--ink-2); text-align: center; text-transform: uppercase; font-weight: 600; line-height: 1.7; }
+  </style>
+</head>
+<body>
+
+  <!-- NAV (ADMIN) -->
+  <header class="topnav">
+    <div class="topnav-inner">
+      <a href="#" class="lockup">
+        <svg width="34" height="34" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="og-adm" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FF6BB8"/><stop offset="50%" stop-color="#FF4936"/><stop offset="100%" stop-color="#E89512"/></linearGradient>
+            <mask id="om-adm"><rect width="120" height="120" fill="white"/><circle cx="70" cy="56" r="20" fill="black"/></mask>
+          </defs>
+          <circle cx="60" cy="60" r="52" fill="url(#og-adm)" stroke="#1A0F08" stroke-width="5"/>
+          <circle cx="60" cy="60" r="38" fill="#1A0F08"/>
+          <circle cx="58" cy="60" r="26" fill="#FFF5E4" mask="url(#om-adm)"/>
+          <g transform="translate(80 60)"><path d="M 0,-11 Q 1.65,-1.65 11,0 Q 1.65,1.65 0,11 Q -1.65,1.65 -11,0 Q -1.65,-1.65 0,-11 Z" fill="#FFF5E4"/></g>
+        </svg>
+        <span class="lockup-wm">Owl<em>Market</em></span>
+      </a>
+      <span class="internal-chip">Internal</span>
+      <nav>
+        <ul class="nav-links">
+          <li><a href="#">Inventory</a></li>
+          <li><a href="#" class="active">Bundles</a></li>
+          <li><a href="#">Orders</a></li>
+          <li><a href="#">Lens</a></li>
+          <li><a href="#">PSA</a></li>
+        </ul>
+      </nav>
+      <div class="nav-right">
+        <a href="#" class="nav-view">View site ↗</a>
+        <a href="#" class="nav-signout">Sign out</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <a href="#" class="crumb">← Bundles</a>
+
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Inventory Bundle</div>
+        <h1 class="title">OP01 Starter Showcase</h1>
+        <p class="subline">Edit the bundle name, status, sale details, and grouped inventory items.</p>
+      </div>
+      <div class="head-actions">
+        <a href="#" class="btn btn-ghost">Back to Bundles</a>
+        <a href="#" class="btn btn-primary">Create Bundle</a>
+      </div>
+    </div>
+
+    <!-- BUNDLE META -->
+    <div class="panel">
+      <div class="panel-title">Bundle details</div>
+      <div class="grid2">
+        <label>
+          <span class="field-label">Bundle Name <span class="req">*</span></span>
+          <input class="input" type="text" value="OP01 Starter Showcase" placeholder="PSA sequential bundle, deck core, promo lot..." />
+        </label>
+        <label>
+          <span class="field-label">Bundle Status <span class="req">*</span></span>
+          <select class="select">
+            <option>New</option><option>Grading</option><option>For Sale</option><option>Need Shipping</option><option selected>Sold</option>
+          </select>
+        </label>
+        <label class="span2">
+          <span class="field-label">Notes</span>
+          <textarea class="textarea" placeholder="Optional internal notes">Full starter-deck showcase set sold as one lot to a repeat buyer.</textarea>
+        </label>
+
+        <!-- SOLD-ONLY block (shows when status = Sold) — same convention as Add Inventory -->
+        <div class="sold-block">
+          <div class="sold-head">
+            <span class="sh-ttl">Sale info</span>
+            <span class="conditional-tag green">shows when status = sold</span>
+          </div>
+          <div class="subgrid3">
+            <label>
+              <span class="field-label">Sold At</span>
+              <select class="select">
+                <option>----</option><option selected>Ebay</option><option>FB</option><option>Instagram</option><option>In Person</option><option>Traded</option>
+              </select>
+            </label>
+            <label>
+              <span class="field-label">Sold Date</span>
+              <input class="input" type="date" value="2026-05-09" />
+            </label>
+            <label>
+              <span class="field-label">Sold Price</span>
+              <input class="input" type="text" placeholder="0.00" value="540.00" />
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DUAL PANE: search available  →  bundle items -->
+    <div class="dual">
+
+      <!-- LEFT: inventory search -->
+      <div class="pane">
+        <div class="pane-head">
+          <span class="pane-title">Inventory Search</span>
+          <span class="pane-count">24 Available</span>
+        </div>
+        <div class="pane-search">
+          <input class="input" type="text" placeholder="Search card, set, nickname, cert, or inventory id" />
+        </div>
+        <div class="pick-list">
+          <div class="pick added">
+            <span class="pick-thumb" style="background:#7C2A1E;">L</span>
+            <span class="pick-info"><span class="pick-name">Luffy — Romance Dawn</span><span class="pick-meta">OP01 / OP01-024 / Raw / L</span></span>
+            <button class="pick-btn added">Added ✓</button>
+          </div>
+          <div class="pick added">
+            <span class="pick-thumb" style="background:#2D6E4E;">Z</span>
+            <span class="pick-info"><span class="pick-name">Zoro — Three Sword Style</span><span class="pick-meta">OP01 / OP01-025 / Raw / SR</span></span>
+            <button class="pick-btn added">Added ✓</button>
+          </div>
+          <div class="pick added">
+            <span class="pick-thumb" style="background:#4A2A52;">N</span>
+            <span class="pick-info"><span class="pick-name">Nami — Cat Burglar</span><span class="pick-meta">OP01 / OP01-016 / Raw / R</span></span>
+            <button class="pick-btn added">Added ✓</button>
+          </div>
+          <div class="pick">
+            <span class="pick-thumb" style="background:#7A4B1C;">G</span>
+            <span class="pick-info"><span class="pick-name">Garp — Galaxy Impact</span><span class="pick-meta">OP06 / OP06-098 / Graded / PSA 9 / Cert 71244019</span></span>
+            <button class="pick-btn add">Add</button>
+          </div>
+          <div class="pick">
+            <span class="pick-thumb" style="background:#8B2A2A;">M</span>
+            <span class="pick-info"><span class="pick-name">Mihawk — Black Blade</span><span class="pick-meta">OP02 / OP02-088 / Raw / AA</span></span>
+            <button class="pick-btn add">Add</button>
+          </div>
+          <div class="pick">
+            <span class="pick-thumb box">BOX</span>
+            <span class="pick-info"><span class="pick-name">OP05 Booster Box</span><span class="pick-meta">OP05 / Sealed</span></span>
+            <button class="pick-btn add">Add</button>
+          </div>
+          <div class="pick">
+            <span class="pick-thumb" style="background:#6B3F8A;">L</span>
+            <span class="pick-info"><span class="pick-name">Law — Room</span><span class="pick-meta">OP05 / OP05-069 / Raw / SR</span></span>
+            <button class="pick-btn add">Add</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: bundle items (grouped by Type / Set) -->
+      <div class="pane">
+        <div class="pane-head">
+          <span class="pane-title">Bundle Items</span>
+          <span class="pane-count">6 In Bundle</span>
+        </div>
+
+        <div class="group">
+          <div class="group-head">Raw / OP01 <span class="gcount">5</span></div>
+          <div class="sel-item">
+            <span class="pick-thumb" style="background:#7C2A1E;">L</span>
+            <span class="pick-info"><span class="pick-name">Luffy — Romance Dawn</span><span class="pick-meta">OP01 / OP01-024 / Raw / L</span></span>
+            <button class="sel-rm">Remove</button>
+          </div>
+          <div class="sel-item">
+            <span class="pick-thumb" style="background:#2D6E4E;">Z</span>
+            <span class="pick-info"><span class="pick-name">Zoro — Three Sword Style</span><span class="pick-meta">OP01 / OP01-025 / Raw / SR</span></span>
+            <button class="sel-rm">Remove</button>
+          </div>
+          <div class="sel-item">
+            <span class="pick-thumb" style="background:#4A2A52;">N</span>
+            <span class="pick-info"><span class="pick-name">Nami — Cat Burglar</span><span class="pick-meta">OP01 / OP01-016 / Raw / R</span></span>
+            <button class="sel-rm">Remove</button>
+          </div>
+          <div class="sel-item">
+            <span class="pick-thumb" style="background:#594229;">U</span>
+            <span class="pick-info"><span class="pick-name">Usopp — Sniper King</span><span class="pick-meta">OP01 / OP01-013 / Raw / UC</span></span>
+            <button class="sel-rm">Remove</button>
+          </div>
+          <div class="sel-item">
+            <span class="pick-thumb" style="background:#6B3F8A;">S</span>
+            <span class="pick-info"><span class="pick-name">Sanji — Black Leg</span><span class="pick-meta">OP01 / OP01-014 / Raw / R</span></span>
+            <button class="sel-rm">Remove</button>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="group-head">Sealed / ST01 <span class="gcount">1</span></div>
+          <div class="sel-item">
+            <span class="pick-thumb box">BOX</span>
+            <span class="pick-info"><span class="pick-name">OP01 Starter — ST01</span><span class="pick-meta">ST01 / Sealed</span></span>
+            <button class="sel-rm">Remove</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div class="form-footer">
+      <button class="btn btn-danger">Delete Bundle</button>
+      <div class="footer-right">
+        <a href="#" class="btn btn-ghost">Cancel</a>
+        <button class="btn btn-primary">Save Bundle</button>
+      </div>
+    </div>
+
+    <div class="mock-note">
+      MOCKUP · /admin/bundles/[id] + /new · C1.5 · v1.0 · 2026-05-20 · ONE SHARED COMPONENT (BundleForm)<br>
+      MATCHES REAL: BUNDLE META (NAME / STATUS / NOTES + [SOLD: SOLD-AT · SOLD-DATE · SOLD-PRICE]) · DUAL-PANE TRANSFER LIST → LEFT "INVENTORY SEARCH" ({N} AVAILABLE + SEARCH + ADD/ADDED) · RIGHT "BUNDLE ITEMS" (GROUPED BY TYPE / SET, REMOVE) · FOOTER DELETE (edit only) + SAVE/CREATE<br>
+      NEW PATTERN LOCKED: TRANSFER-LIST · ADDED ROW = COBALT LEFT-BORDER + ADDED BTN (multi-select variant of selection) · DELETE = CORAL DESTRUCTIVE · SAVE = INK · NEW VIEW = SAME MINUS TITLE-AS-NAME & DELETE BTN
+    </div>
+
+  </main>
+
+</body>
+</html>

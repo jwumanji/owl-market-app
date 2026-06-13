@@ -21,14 +21,18 @@ type ApiErrorCode =
   | "CARD_NOT_DETECTED"
   | "MEASUREMENT_FAILED";
 
-type ApiErrorBody = {
-  error?: {
-    code?: ApiErrorCode;
-    message?: string;
-    details?: Record<string, unknown>;
-  };
+type ApiError = {
+  code?: ApiErrorCode;
+  message?: string;
+  details?: Record<string, unknown>;
 };
-type CenteringError = ApiErrorBody["error"] | null;
+
+type ApiErrorBody = {
+  error?: ApiError | string;
+  detail?: string | { msg?: string }[];
+  message?: string;
+};
+type CenteringError = ApiError | null;
 
 export type CardIdentity = {
   name: string;
@@ -38,8 +42,11 @@ export type CardIdentity = {
 };
 
 export type CenteringWorkspaceProps = {
+  gameSlug?: string | null;
   inventoryItemId?: string | null;
   preloadImageUrl?: string | null;
+  adminActionToken?: string | null;
+  intakeMode?: "single" | "frontBack";
   cardIdentity: CardIdentity;
 };
 
@@ -84,25 +91,25 @@ const TONE_STYLES: Record<
   }
 > = {
   green: {
-    stroke: "#00D68F",
-    bgClass: "bg-gain",
-    borderClass: "border-gain/40",
-    textClass: "text-gain",
-    softClass: "bg-gain/10",
+    stroke: "#2D9961",
+    bgClass: "bg-gain-2",
+    borderClass: "border-gain-2/50",
+    textClass: "text-gain-2",
+    softClass: "bg-[#DCF1E6]",
   },
   yellow: {
-    stroke: "#E8A020",
-    bgClass: "bg-owl",
-    borderClass: "border-owl/40",
-    textClass: "text-owl",
-    softClass: "bg-owl/10",
+    stroke: "#E89512",
+    bgClass: "bg-gold",
+    borderClass: "border-gold/50",
+    textClass: "text-gold",
+    softClass: "bg-[#FCEBCF]",
   },
   red: {
-    stroke: "#FF4560",
-    bgClass: "bg-loss",
-    borderClass: "border-loss/40",
-    textClass: "text-loss",
-    softClass: "bg-loss/10",
+    stroke: "#E04E4E",
+    bgClass: "bg-loss-2",
+    borderClass: "border-loss-2/50",
+    textClass: "text-loss-2",
+    softClass: "bg-[#FBE3E3]",
   },
 };
 
@@ -224,19 +231,29 @@ export function moveManualCorner({
 }
 
 export function buildMeasurementFormData({
+  gameSlug,
   inventoryItemId,
   file,
+  backFile,
   manualOverlay,
 }: {
+  gameSlug?: string | null;
   inventoryItemId?: string | null;
   file: File;
+  backFile?: File | null;
   manualOverlay?: MeasurementOverlay | null;
 }) {
   const formData = new FormData();
+  if (gameSlug) {
+    formData.set("game", gameSlug);
+  }
   if (inventoryItemId) {
     formData.set("inventoryItemId", inventoryItemId);
   }
   formData.set("file", file);
+  if (backFile) {
+    formData.set("backFile", backFile);
+  }
 
   if (manualOverlay) {
     formData.set("manual_adjustment", "true");
@@ -285,7 +302,7 @@ export async function downloadReportElement({
   const dataUrl = await toPngImpl(element, {
     cacheBust: true,
     pixelRatio: 2,
-    backgroundColor: "#03050D",
+    backgroundColor: "#FFF5E4",
   });
   const link = document.createElement("a");
   link.href = dataUrl;
@@ -299,10 +316,46 @@ function delay(ms: number) {
   });
 }
 
+function isApiErrorCode(value: unknown): value is ApiErrorCode {
+  return typeof value === "string" && (
+    value === "INVALID_UPLOAD" ||
+    value === "FILE_TOO_LARGE" ||
+    value === "UNSUPPORTED_MEDIA_TYPE" ||
+    value === "IMAGE_UNREADABLE" ||
+    value === "CARD_NOT_DETECTED" ||
+    value === "MEASUREMENT_FAILED"
+  );
+}
+
+function detailMessage(detail: ApiErrorBody["detail"]) {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((entry) => entry?.msg).filter(Boolean).join(" ");
+  }
+  return null;
+}
+
 function readErrorBody(body: unknown): CenteringError {
-  if (!body || typeof body !== "object" || !("error" in body)) return null;
-  const error = (body as ApiErrorBody).error;
-  return error && typeof error === "object" ? error : null;
+  if (!body || typeof body !== "object") return null;
+  const payload = body as ApiErrorBody;
+  const error = payload.error;
+  if (error && typeof error === "object") {
+    return {
+      code: isApiErrorCode(error.code) ? error.code : "MEASUREMENT_FAILED",
+      message: error.message || "Measurement failed.",
+      details: error.details,
+    };
+  }
+  if (typeof error === "string" && error.trim()) {
+    return { code: "MEASUREMENT_FAILED", message: error.trim() };
+  }
+  const message = detailMessage(payload.detail) ?? payload.message;
+  return message ? { code: "MEASUREMENT_FAILED", message } : null;
+}
+
+function readErrorText(text: string | null): CenteringError {
+  const message = text?.trim();
+  return message ? { code: "MEASUREMENT_FAILED", message } : null;
 }
 
 function extensionForContentType(contentType: string) {
@@ -346,21 +399,36 @@ export async function fetchPreloadedImageFile({
 }
 
 export async function submitMeasurementRequest({
+  gameSlug,
   inventoryItemId,
   file,
+  backFile,
   manualOverlay,
+  adminActionToken,
   fetchImpl = fetch,
 }: {
+  gameSlug?: string | null;
   inventoryItemId?: string | null;
   file: File;
+  backFile?: File | null;
   manualOverlay?: MeasurementOverlay | null;
+  adminActionToken?: string | null;
   fetchImpl?: typeof fetch;
 }): Promise<{ ok: true; result: MeasurementResponse } | { ok: false; error: CenteringError }> {
+  const headers = new Headers();
+  if (adminActionToken) {
+    headers.set("x-admin-action-token", adminActionToken);
+  }
+
   const response = await fetchImpl("/api/centering/measure", {
     method: "POST",
+    credentials: "same-origin",
+    headers,
     body: buildMeasurementFormData({
+      gameSlug,
       inventoryItemId,
       file,
+      backFile,
       manualOverlay,
     }),
   }).catch(() => null);
@@ -372,11 +440,24 @@ export async function submitMeasurementRequest({
     };
   }
 
-  const body = await response.json().catch(() => null);
+  const contentType = response.headers.get("content-type") ?? "";
+  const isJson = contentType.toLowerCase().includes("application/json");
+  const body = isJson ? await response.json().catch(() => null) : null;
+  const text = isJson ? null : await response.text().catch(() => null);
   if (!response.ok) {
+    if (response.status === 401) {
+      return {
+        ok: false,
+        error: {
+          code: "MEASUREMENT_FAILED",
+          message: "Your admin session expired. Sign in again, then retry the measurement.",
+        },
+      };
+    }
+
     return {
       ok: false,
-      error: readErrorBody(body) ?? { code: "MEASUREMENT_FAILED", message: "Measurement failed." },
+      error: readErrorBody(body) ?? readErrorText(text) ?? { code: "MEASUREMENT_FAILED", message: "Measurement failed." },
     };
   }
 
@@ -385,14 +466,18 @@ export async function submitMeasurementRequest({
 
 export async function measurePreloadedImage({
   imageUrl,
+  gameSlug,
   inventoryItemId,
+  adminActionToken,
   dispatchAction,
   onFile,
   fetchImpl = fetch,
   wait = delay,
 }: {
   imageUrl: string;
+  gameSlug?: string | null;
   inventoryItemId?: string | null;
+  adminActionToken?: string | null;
   dispatchAction: (action: WorkspaceAction) => void;
   onFile: (file: File) => void;
   fetchImpl?: typeof fetch;
@@ -420,8 +505,10 @@ export async function measurePreloadedImage({
   dispatchAction({ type: "startProcessing" });
 
   const outcome = await submitMeasurementRequest({
+    gameSlug,
     inventoryItemId,
     file,
+    adminActionToken,
     fetchImpl,
   });
 
@@ -446,28 +533,28 @@ function StatusPanel({ status }: { status: WorkspaceStatus }) {
   const activeIndex = status === "uploading" ? 0 : status === "processing" ? 2 : -1;
 
   return (
-    <div className="rounded-lg border border-border bg-surface p-5">
+    <div className="admin-card p-5">
       <div className="flex items-center gap-3">
-        <div className="h-7 w-7 animate-spin rounded-full border-2 border-border-2 border-t-owl" />
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-ink/30 border-t-coral" />
         <div>
-          <div className="font-mono text-xs font-bold uppercase text-owl">
+          <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-coral">
             {status === "uploading" ? "Uploading" : "Processing"}
           </div>
-          <div className="mt-1 text-sm text-text-2">Expected processing time is 1-3 seconds.</div>
+          <div className="mt-1 text-sm text-ink-2">Expected processing time is 1-3 seconds.</div>
         </div>
       </div>
       <ol className="mt-5 grid gap-2">
         {PROCESSING_STEPS.map((step, index) => (
           <li
             key={step}
-            className={`flex items-center gap-3 rounded-md border px-3 py-2 text-sm ${
+            className={`flex items-center gap-3 rounded-md border-[1.5px] px-3 py-2 text-sm ${
               index <= activeIndex
-                ? "border-owl/40 bg-owl/10 text-text"
-                : "border-border bg-deep text-text-2"
+                ? "border-coral bg-bg-3 text-ink"
+                : "border-ink/20 bg-bg-2 text-ink-3"
             }`}
           >
             <span
-              className={`h-2 w-2 rounded-full ${index <= activeIndex ? "bg-owl" : "bg-text-3"}`}
+              className={`h-2 w-2 rounded-full ${index <= activeIndex ? "bg-coral" : "bg-ink-3"}`}
               aria-hidden="true"
             />
             {step}
@@ -492,15 +579,15 @@ function UploadZone({
   return (
     <div
       {...getRootProps()}
-      className={`flex min-h-[560px] cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center outline-none transition-colors ${
-        isDragActive ? "border-owl bg-owl/10" : "border-border-2 bg-surface hover:border-owl/50 hover:bg-surf2"
+      className={`flex min-h-[560px] cursor-pointer flex-col items-center justify-center rounded-c-md border-[1.5px] border-dashed p-8 text-center outline-none transition-colors ${
+        isDragActive ? "border-coral bg-bg-3" : "border-ink/40 bg-bg-2 hover:border-coral hover:bg-bg-3"
       }`}
     >
       <input {...getInputProps()} />
       {imageSrc ? (
         <div className="w-full">
-          <div className="mb-4 font-mono text-xs font-bold uppercase text-text-2">Ready to measure</div>
-          <div className="mx-auto flex aspect-[5/7] max-h-[420px] max-w-[300px] items-center justify-center rounded-md border border-border bg-deep">
+          <div className="mb-4 font-mono-2 text-xs font-bold uppercase tracking-wider text-ink-2">Ready to measure</div>
+          <div className="mx-auto flex aspect-[5/7] max-h-[420px] max-w-[300px] items-center justify-center rounded-c-sm border-[1.5px] border-ink bg-bg-3">
             <svg viewBox="0 0 100 140" role="img" aria-label="Selected card image preview" className="h-full w-full">
               <image href={imageSrc} x="0" y="0" width="100" height="140" preserveAspectRatio="xMidYMid meet" />
             </svg>
@@ -508,7 +595,7 @@ function UploadZone({
         </div>
       ) : (
         <div className="max-w-xl">
-          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-md border border-owl/40 bg-owl/10 text-owl">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-c-sm border-[1.5px] border-coral bg-bg-3 text-coral">
             <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7" fill="none">
               <path
                 d="M12 16V4m0 0 4 4m-4-4-4 4M5 16v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"
@@ -519,16 +606,136 @@ function UploadZone({
               />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-text">Upload a front scan</h2>
-          <p className="mt-3 text-sm leading-6 text-text-2">
+          <h2 className="font-grotesk text-2xl font-bold text-ink">Upload card image</h2>
+          <p className="mt-3 text-sm leading-6 text-ink-2">
             Drop, paste, or browse for a JPEG, PNG, or WEBP image. The browser sends it through the
             authenticated OWL proxy, never directly to the CV service.
           </p>
-          <div className="mt-6 inline-flex rounded-md border border-owl/40 bg-owl px-4 py-2.5 font-mono text-xs font-bold uppercase text-void">
-            Browse scan
+          <div className="admin-btn admin-btn-primary mt-6">Browse image</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type DropzoneBindings = {
+  getRootProps: ReturnType<typeof useDropzone>["getRootProps"];
+  getInputProps: ReturnType<typeof useDropzone>["getInputProps"];
+  isDragActive: boolean;
+};
+
+function SideUploadZone({
+  label,
+  title,
+  actionLabel,
+  imageSrc,
+  fileName,
+  dropzone,
+}: {
+  label: string;
+  title: string;
+  actionLabel: string;
+  imageSrc: string | null;
+  fileName: string | null;
+  dropzone: DropzoneBindings;
+}) {
+  return (
+    <div
+      {...dropzone.getRootProps()}
+      className={`flex min-h-[340px] cursor-pointer flex-col justify-between rounded-c-md border-[1.5px] border-dashed p-5 outline-none transition-colors ${
+        dropzone.isDragActive ? "border-coral bg-bg-3" : "border-ink/40 bg-bg-2 hover:border-coral hover:bg-bg-3"
+      }`}
+    >
+      <input {...dropzone.getInputProps()} />
+      <div>
+        <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-coral">{label}</div>
+        <h3 className="mt-2 font-grotesk text-2xl font-bold text-ink">{title}</h3>
+      </div>
+
+      {imageSrc ? (
+        <div className="my-5">
+          <div className="mx-auto flex aspect-[5/7] max-h-[230px] max-w-[170px] items-center justify-center overflow-hidden rounded-c-sm border-[1.5px] border-ink bg-bg-3">
+            <svg viewBox="0 0 100 140" role="img" aria-label={`${label} selected card image preview`} className="h-full w-full">
+              <image href={imageSrc} x="0" y="0" width="100" height="140" preserveAspectRatio="xMidYMid meet" />
+            </svg>
+          </div>
+          {fileName && (
+            <div className="mt-3 truncate text-center font-mono-2 text-xs font-semibold text-ink-2">{fileName}</div>
+          )}
+        </div>
+      ) : (
+        <div className="my-8 flex items-center justify-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-c-sm border-[1.5px] border-coral bg-bg-3 text-coral">
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+              <path
+                d="M12 16V4m0 0 4 4m-4-4-4 4M5 16v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+              />
+            </svg>
           </div>
         </div>
       )}
+
+      <div className="admin-btn admin-btn-ghost w-full justify-center">{actionLabel}</div>
+    </div>
+  );
+}
+
+function FrontBackUploadPanel({
+  frontDropzone,
+  backDropzone,
+  frontImageSrc,
+  backImageSrc,
+  frontFileName,
+  backFileName,
+  onMeasure,
+  canMeasure,
+}: {
+  frontDropzone: DropzoneBindings;
+  backDropzone: DropzoneBindings;
+  frontImageSrc: string | null;
+  backImageSrc: string | null;
+  frontFileName: string | null;
+  backFileName: string | null;
+  onMeasure: () => void;
+  canMeasure: boolean;
+}) {
+  return (
+    <div className="admin-card p-5">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <SideUploadZone
+          label="Front"
+          title="Front scan"
+          actionLabel={frontImageSrc ? "Replace front" : "Upload front"}
+          imageSrc={frontImageSrc}
+          fileName={frontFileName}
+          dropzone={frontDropzone}
+        />
+        <SideUploadZone
+          label="Back"
+          title="Back scan"
+          actionLabel={backImageSrc ? "Replace back" : "Upload back"}
+          imageSrc={backImageSrc}
+          fileName={backFileName}
+          dropzone={backDropzone}
+        />
+      </div>
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="font-mono-2 text-xs font-semibold uppercase tracking-wider text-ink-2">
+          Upload both sides before measuring.
+        </div>
+        <button
+          type="button"
+          onClick={onMeasure}
+          disabled={!canMeasure}
+          className="admin-btn admin-btn-primary justify-center disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Measure card
+        </button>
+      </div>
     </div>
   );
 }
@@ -543,27 +750,19 @@ function PreloadedImagePanel({
   onUploadDifferent: () => void;
 }) {
   return (
-    <div className="flex min-h-[560px] flex-col items-center justify-center rounded-lg border border-border bg-surface p-8 text-center">
+    <div className="admin-card flex min-h-[560px] flex-col items-center justify-center p-8 text-center">
       <div className="w-full">
-        <div className="mb-4 font-mono text-xs font-bold uppercase text-text-2">Ready to measure</div>
-        <div className="mx-auto flex aspect-[5/7] max-h-[420px] max-w-[300px] items-center justify-center rounded-md border border-border bg-deep">
+        <div className="mb-4 font-mono-2 text-xs font-bold uppercase tracking-wider text-ink-2">Ready to measure</div>
+        <div className="mx-auto flex aspect-[5/7] max-h-[420px] max-w-[300px] items-center justify-center rounded-c-sm border-[1.5px] border-ink bg-bg-3">
           <svg viewBox="0 0 100 140" role="img" aria-label="Saved card image preview" className="h-full w-full">
             <image href={imageSrc} x="0" y="0" width="100" height="140" preserveAspectRatio="xMidYMid meet" />
           </svg>
         </div>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <button
-            type="button"
-            onClick={onMeasure}
-            className="rounded-md border border-owl/40 bg-owl px-4 py-2.5 font-mono text-xs font-bold uppercase text-void transition-colors hover:bg-owl-light"
-          >
+          <button type="button" onClick={onMeasure} className="admin-btn admin-btn-primary">
             Measure this card
           </button>
-          <button
-            type="button"
-            onClick={onUploadDifferent}
-            className="rounded-md border border-border bg-deep px-4 py-2.5 font-mono text-xs font-bold uppercase text-text transition-colors hover:border-border-2 hover:bg-surf2"
-          >
+          <button type="button" onClick={onUploadDifferent} className="admin-btn admin-btn-ghost">
             Upload a different image
           </button>
         </div>
@@ -591,7 +790,7 @@ function OverlaySvg({
       viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}
       role="img"
       aria-label="Measured card centering overlay"
-      className="h-full max-h-[720px] w-full rounded-md bg-black/30"
+      className="h-full max-h-[720px] w-full rounded-c-sm bg-bg-3"
     >
       {imageSrc && (
         <image
@@ -622,8 +821,8 @@ function OverlaySvg({
         y={innerFrame.y}
         width={innerFrame.width}
         height={innerFrame.height}
-        fill="rgba(0,0,0,0.10)"
-        stroke="#E4EAF6"
+        fill="rgba(26,15,8,0.06)"
+        stroke="#1A0F08"
         strokeDasharray="14 10"
         strokeWidth="3"
       />
@@ -691,70 +890,62 @@ function ResultPanel({
 
   return (
     <div ref={reportRef} className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
-      <section className="rounded-lg border border-border bg-surface p-4">
+      <section className="admin-card p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <div className="font-mono text-xs font-bold uppercase text-owl">Measured Overlay</div>
-            <h2 className="mt-1 text-xl font-bold text-text">{cardIdentity.name}</h2>
+            <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-coral">Measured Overlay</div>
+            <h2 className="mt-1 font-grotesk text-xl font-bold text-ink">{cardIdentity.name}</h2>
           </div>
           {cardIdentity.rarity && (
-            <span className="rounded-md border border-owl/40 bg-owl/10 px-3 py-1.5 font-mono text-xs font-bold uppercase text-owl">
+            <span className="inline-flex items-center rounded-c-pill border-[1.2px] border-coral bg-bg-3 px-3 py-1 font-mono-2 text-xs font-bold uppercase tracking-wider text-coral">
               {cardIdentity.rarity}
             </span>
           )}
         </div>
-        <div className="flex min-h-[520px] items-center justify-center rounded-md border border-border bg-deep p-3">
+        <div className="admin-card-inset flex min-h-[520px] items-center justify-center p-3">
           <OverlaySvg imageSrc={imageSrc} overlay={result.overlay} imageSize={imageSize} tone={viewModel.tone} />
         </div>
       </section>
 
-      <section className="rounded-lg border border-border bg-surface p-5">
-        <div className={`inline-flex rounded-md border px-3 py-2 font-mono text-xs font-bold uppercase ${tone.borderClass} ${tone.softClass} ${tone.textClass}`}>
+      <section className="admin-card p-5">
+        <div className={`inline-flex rounded-c-sm border-[1.5px] px-3 py-2 font-mono-2 text-xs font-bold uppercase tracking-wider ${tone.borderClass} ${tone.softClass} ${tone.textClass}`}>
           {viewModel.ceilingLabel}
         </div>
         <div className="mt-5 grid grid-cols-2 gap-3">
           <RatioBox label="Left / Right" value={viewModel.leftRight} tone={viewModel.tone} />
           <RatioBox label="Top / Bottom" value={viewModel.topBottom} tone={viewModel.tone} />
         </div>
-        <div className={`mt-4 rounded-md border p-4 ${tone.borderClass} ${tone.softClass}`}>
-          <div className="font-mono text-xs font-bold uppercase text-text-2">Worst axis</div>
+        <div className={`mt-4 rounded-c-sm border-[1.5px] p-4 ${tone.borderClass} ${tone.softClass}`}>
+          <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-ink-2">Worst axis</div>
           <div className={`mt-2 text-lg font-bold ${tone.textClass}`}>
             {viewModel.worstAxisLabel} at {viewModel.worstAxisValue}
           </div>
         </div>
-        <div className="mt-5 overflow-hidden rounded-md border border-border">
+        <div className="mt-5 overflow-hidden rounded-c-sm border-[1.5px] border-ink">
           <table className="w-full text-left text-sm">
-            <thead className="bg-deep font-mono text-xs uppercase text-text-2">
+            <thead className="bg-bg-3 font-mono-2 text-xs uppercase tracking-wider text-ink-2">
               <tr>
-                <th className="px-3 py-2">Ceiling</th>
-                <th className="px-3 py-2">Ratio</th>
-                <th className="px-3 py-2 text-right">Max major</th>
+                <th className="px-3 py-2 font-semibold">Ceiling</th>
+                <th className="px-3 py-2 font-semibold">Ratio</th>
+                <th className="px-3 py-2 text-right font-semibold">Max major</th>
               </tr>
             </thead>
             <tbody>
               {viewModel.thresholds.map((threshold) => (
-                <tr key={threshold.ceiling} className="border-t border-border">
-                  <td className="px-3 py-2 font-semibold text-text">{threshold.label}</td>
-                  <td className="px-3 py-2 font-mono text-text-2">{threshold.ratioLabel}</td>
-                  <td className="px-3 py-2 text-right font-mono text-text">{threshold.maxMajorPercent}%</td>
+                <tr key={threshold.ceiling} className="border-t border-bg-3">
+                  <td className="px-3 py-2 font-semibold text-ink">{threshold.label}</td>
+                  <td className="px-3 py-2 font-mono-2 text-ink-2">{threshold.ratioLabel}</td>
+                  <td className="px-3 py-2 text-right font-mono-2 text-ink">{threshold.maxMajorPercent}%</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         <div className="mt-5 flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={onDownload}
-            className="rounded-md border border-owl/40 bg-owl px-4 py-2.5 font-mono text-xs font-bold uppercase text-void transition-colors hover:bg-owl-light"
-          >
+          <button type="button" onClick={onDownload} className="admin-btn admin-btn-primary">
             Download report
           </button>
-          <button
-            type="button"
-            onClick={onReset}
-            className="rounded-md border border-border bg-deep px-4 py-2.5 font-mono text-xs font-bold uppercase text-text transition-colors hover:border-border-2 hover:bg-surf2"
-          >
+          <button type="button" onClick={onReset} className="admin-btn admin-btn-ghost">
             Measure another
           </button>
         </div>
@@ -774,9 +965,9 @@ function RatioBox({
 }) {
   const style = TONE_STYLES[tone];
   return (
-    <div className={`rounded-md border p-4 ${style.borderClass} ${style.softClass}`}>
-      <div className="font-mono text-xs font-bold uppercase text-text-2">{label}</div>
-      <div className={`mt-2 font-mono text-2xl font-bold ${style.textClass}`}>{value}</div>
+    <div className={`rounded-c-sm border-[1.5px] p-4 ${style.borderClass} ${style.softClass}`}>
+      <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-ink-2">{label}</div>
+      <div className={`mt-2 font-mono-2 text-2xl font-bold ${style.textClass}`}>{value}</div>
     </div>
   );
 }
@@ -828,7 +1019,7 @@ function ManualOverlayEditor({
   return (
     <svg
       viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}
-      className="h-full max-h-[620px] w-full rounded-md bg-black/30"
+      className="h-full max-h-[620px] w-full rounded-c-sm bg-bg-3"
       onPointerMove={onPointerMove}
       onPointerUp={() => setActiveHandle(null)}
       onPointerLeave={() => setActiveHandle(null)}
@@ -841,13 +1032,13 @@ function ManualOverlayEditor({
       <EditableRect
         rect={overlay.outerCard}
         target="outerCard"
-        stroke="#E8A020"
+        stroke="#E89512"
         onHandlePointerDown={(target, corner) => setActiveHandle({ target, corner })}
       />
       <EditableRect
         rect={overlay.innerFrame}
         target="innerFrame"
-        stroke="#00D68F"
+        stroke="#2D9961"
         onHandlePointerDown={(target, corner) => setActiveHandle({ target, corner })}
       />
     </svg>
@@ -879,7 +1070,7 @@ function EditableRect({
         y={rect.y}
         width={rect.width}
         height={rect.height}
-        fill="rgba(0,0,0,0.10)"
+        fill="rgba(26,15,8,0.06)"
         stroke={stroke}
         strokeWidth="4"
       />
@@ -890,7 +1081,7 @@ function EditableRect({
           cy={handle.y}
           r="12"
           fill={stroke}
-          stroke="#03050D"
+          stroke="#1A0F08"
           strokeWidth="4"
           className="cursor-move"
           onPointerDown={(event) => {
@@ -926,24 +1117,24 @@ function FailurePanel({
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
-      <section className="rounded-lg border border-loss/40 bg-loss/10 p-4">
-        <div className="font-mono text-xs font-bold uppercase text-loss">{error?.code ?? "MEASUREMENT_FAILED"}</div>
-        <h2 className="mt-2 text-2xl font-bold text-text">{error?.message ?? "Measurement failed."}</h2>
+      <section className="rounded-c-md border-[1.5px] border-loss-2 bg-[#FBE3E3] p-4">
+        <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-loss-2">{error?.code ?? "MEASUREMENT_FAILED"}</div>
+        <h2 className="mt-2 font-grotesk text-2xl font-bold text-ink">{error?.message ?? "Measurement failed."}</h2>
         {showManualCorrection ? (
-          <p className="mt-2 text-sm leading-6 text-text-2">
+          <p className="mt-2 text-sm leading-6 text-ink-2">
             Drag the outer card and inner frame corners, then re-measure with those corrections.
           </p>
         ) : (
-          <p className="mt-2 text-sm leading-6 text-text-2">
+          <p className="mt-2 text-sm leading-6 text-ink-2">
             Try another image or return to the upload state.
           </p>
         )}
       </section>
 
-      <section className="rounded-lg border border-border bg-surface p-4 lg:col-span-2">
+      <section className="admin-card p-4 lg:col-span-2">
         {showManualCorrection ? (
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-            <div className="flex min-h-[520px] items-center justify-center rounded-md border border-border bg-deep p-3">
+            <div className="admin-card-inset flex min-h-[520px] items-center justify-center p-3">
               <ManualOverlayEditor
                 imageSrc={imageSrc}
                 imageSize={imageSize}
@@ -952,9 +1143,9 @@ function FailurePanel({
               />
             </div>
             <div className="space-y-4">
-              <div className="rounded-md border border-border bg-deep p-4">
-                <div className="font-mono text-xs font-bold uppercase text-text-2">Manual correction</div>
-                <div className="mt-3 grid grid-cols-2 gap-3 font-mono text-xs text-text">
+              <div className="admin-card-inset p-4">
+                <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-ink-2">Manual correction</div>
+                <div className="mt-3 grid grid-cols-2 gap-3 font-mono-2 text-xs text-ink">
                   <div>Outer X {Math.round(manualOverlay.outerCard.x)}</div>
                   <div>Outer Y {Math.round(manualOverlay.outerCard.y)}</div>
                   <div>Inner X {Math.round(manualOverlay.innerFrame.x)}</div>
@@ -965,25 +1156,21 @@ function FailurePanel({
                 type="button"
                 onClick={onRetry}
                 disabled={!canRetry}
-                className="w-full rounded-md border border-owl/40 bg-owl px-4 py-2.5 font-mono text-xs font-bold uppercase text-void transition-colors hover:bg-owl-light disabled:cursor-not-allowed disabled:opacity-50"
+                className="admin-btn admin-btn-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Re-measure with my corrections
               </button>
               <button
                 type="button"
                 onClick={onReset}
-                className="w-full rounded-md border border-border bg-deep px-4 py-2.5 font-mono text-xs font-bold uppercase text-text transition-colors hover:border-border-2 hover:bg-surf2"
+                className="admin-btn admin-btn-ghost w-full justify-center"
               >
                 Measure another
               </button>
             </div>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={onReset}
-            className="rounded-md border border-border bg-deep px-4 py-2.5 font-mono text-xs font-bold uppercase text-text transition-colors hover:border-border-2 hover:bg-surf2"
-          >
+          <button type="button" onClick={onReset} className="admin-btn admin-btn-ghost">
             Measure another
           </button>
         )}
@@ -993,14 +1180,19 @@ function FailurePanel({
 }
 
 export default function CenteringWorkspace({
+  gameSlug = null,
   inventoryItemId,
   preloadImageUrl = null,
+  adminActionToken = null,
+  intakeMode = "single",
   cardIdentity,
 }: CenteringWorkspaceProps) {
   const [state, dispatch] = useReducer(centeringReducer, INITIAL_STATE);
   const preloadImageSrc = inventoryItemId ? preloadImageUrl : null;
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedBackFile, setSelectedBackFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [backPreviewUrl, setBackPreviewUrl] = useState<string | null>(null);
   const [showUploadZone, setShowUploadZone] = useState(!preloadImageSrc);
   const [preloadFetchError, setPreloadFetchError] = useState<string | null>(null);
   const [manualOverlay, setManualOverlay] = useState<MeasurementOverlay>(() => defaultManualOverlay(1024, 1428));
@@ -1008,6 +1200,7 @@ export default function CenteringWorkspace({
   const reportRef = useRef<HTMLDivElement>(null);
   const imageSrc = previewUrl ?? preloadImageSrc ?? null;
   const showPreloadedPanel = Boolean(preloadImageSrc && !showUploadZone && !selectedFile);
+  const usesFrontBackIntake = intakeMode === "frontBack" && !preloadImageSrc;
 
   useEffect(() => {
     if (!selectedFile) return;
@@ -1017,6 +1210,15 @@ export default function CenteringWorkspace({
       URL.revokeObjectURL(objectUrl);
     };
   }, [selectedFile]);
+
+  useEffect(() => {
+    if (!selectedBackFile) return;
+    const objectUrl = URL.createObjectURL(selectedBackFile);
+    setBackPreviewUrl(objectUrl);
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [selectedBackFile]);
 
   useEffect(() => {
     if (!imageSrc) return;
@@ -1038,15 +1240,18 @@ export default function CenteringWorkspace({
   }, [preloadImageSrc]);
 
   const submitMeasurement = useCallback(
-    async (file: File, overlay?: MeasurementOverlay | null) => {
+    async (file: File, overlay?: MeasurementOverlay | null, backFile?: File | null) => {
       dispatch({ type: "startUpload" });
       await delay(250);
       dispatch({ type: "startProcessing" });
 
       const outcome = await submitMeasurementRequest({
+        gameSlug,
         inventoryItemId,
         file,
+        backFile,
         manualOverlay: overlay,
+        adminActionToken,
       });
 
       if (!outcome.ok) {
@@ -1056,7 +1261,7 @@ export default function CenteringWorkspace({
 
       dispatch({ type: "success", result: outcome.result });
     },
-    [inventoryItemId]
+    [adminActionToken, gameSlug, inventoryItemId]
   );
 
   const measureFile = useCallback(
@@ -1068,6 +1273,29 @@ export default function CenteringWorkspace({
     [submitMeasurement]
   );
 
+  const selectFrontFile = useCallback((file: File) => {
+    setPreloadFetchError(null);
+    setSelectedFile(file);
+  }, []);
+
+  const selectBackFile = useCallback((file: File) => {
+    setPreloadFetchError(null);
+    setSelectedBackFile(file);
+  }, []);
+
+  const clearSelectedFiles = useCallback(() => {
+    setSelectedFile(null);
+    setSelectedBackFile(null);
+    setPreviewUrl(null);
+    setBackPreviewUrl(null);
+  }, []);
+
+  const measureSelectedCardFiles = useCallback(() => {
+    if (selectedFile && selectedBackFile) {
+      void submitMeasurement(selectedFile, null, selectedBackFile);
+    }
+  }, [selectedBackFile, selectedFile, submitMeasurement]);
+
   const measurePreloadedFile = useCallback(() => {
     if (!preloadImageSrc) return;
 
@@ -1075,6 +1303,8 @@ export default function CenteringWorkspace({
     void measurePreloadedImage({
       imageUrl: preloadImageSrc,
       inventoryItemId,
+      gameSlug,
+      adminActionToken,
       dispatchAction: dispatch,
       onFile: setSelectedFile,
     }).then((outcome) => {
@@ -1083,7 +1313,7 @@ export default function CenteringWorkspace({
         setShowUploadZone(true);
       }
     });
-  }, [inventoryItemId, preloadImageSrc]);
+  }, [adminActionToken, gameSlug, inventoryItemId, preloadImageSrc]);
 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
@@ -1091,6 +1321,22 @@ export default function CenteringWorkspace({
       if (file) measureFile(file);
     },
     [measureFile]
+  );
+
+  const onFrontDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      const [file] = acceptedFiles;
+      if (file) selectFrontFile(file);
+    },
+    [selectFrontFile]
+  );
+
+  const onBackDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      const [file] = acceptedFiles;
+      if (file) selectBackFile(file);
+    },
+    [selectBackFile]
   );
 
   const dropzone = useDropzone({
@@ -1103,18 +1349,46 @@ export default function CenteringWorkspace({
     onDrop,
   });
 
+  const frontDropzone = useDropzone({
+    accept: {
+      "image/jpeg": [".jpg", ".jpeg"],
+      "image/png": [".png"],
+      "image/webp": [".webp"],
+    },
+    multiple: false,
+    onDrop: onFrontDrop,
+  });
+
+  const backDropzone = useDropzone({
+    accept: {
+      "image/jpeg": [".jpg", ".jpeg"],
+      "image/png": [".png"],
+      "image/webp": [".webp"],
+    },
+    multiple: false,
+    onDrop: onBackDrop,
+  });
+
   useEffect(() => {
     function onPaste(event: ClipboardEvent) {
       const file = Array.from(event.clipboardData?.files ?? []).find((candidate) => candidate.type.startsWith("image/"));
       if (file) {
         event.preventDefault();
-        measureFile(file);
+        if (usesFrontBackIntake) {
+          if (selectedFile) {
+            selectBackFile(file);
+          } else {
+            selectFrontFile(file);
+          }
+        } else {
+          measureFile(file);
+        }
       }
     }
 
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  }, [measureFile]);
+  }, [measureFile, selectBackFile, selectFrontFile, selectedFile, usesFrontBackIntake]);
 
   const canRetryWithCorrections = Boolean(selectedFile);
   const headerMeta = useMemo(
@@ -1129,11 +1403,11 @@ export default function CenteringWorkspace({
     <section className="space-y-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="font-mono text-xs font-bold uppercase text-owl">Owl Lens</div>
-          <h2 className="mt-2 text-3xl font-bold text-text">{cardIdentity.name}</h2>
-          {headerMeta && <div className="mt-2 font-mono text-xs font-semibold uppercase text-text-2">{headerMeta}</div>}
+          <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-coral">Owl Lens</div>
+          <h2 className="mt-2 font-grotesk text-3xl font-bold text-ink">{cardIdentity.name}</h2>
+          {headerMeta && <div className="mt-2 font-mono-2 text-xs font-semibold uppercase tracking-wider text-ink-2">{headerMeta}</div>}
         </div>
-        <div className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs font-semibold uppercase text-text-2">
+        <div className="admin-card px-3 py-2 font-mono-2 text-xs font-semibold uppercase tracking-wider text-ink-2">
           {state.status}
         </div>
       </div>
@@ -1141,7 +1415,7 @@ export default function CenteringWorkspace({
       {state.status === "idle" && (
         <>
           {preloadFetchError && (
-            <div className="rounded-md border border-loss/40 bg-loss/10 px-4 py-3 text-sm font-semibold text-text">
+            <div className="rounded-c-sm border-[1.5px] border-loss-2 bg-[#FBE3E3] px-4 py-3 text-sm font-semibold text-ink">
               {preloadFetchError}
             </div>
           )}
@@ -1153,6 +1427,17 @@ export default function CenteringWorkspace({
                 setPreloadFetchError(null);
                 setShowUploadZone(true);
               }}
+            />
+          ) : usesFrontBackIntake ? (
+            <FrontBackUploadPanel
+              frontDropzone={frontDropzone}
+              backDropzone={backDropzone}
+              frontImageSrc={previewUrl}
+              backImageSrc={backPreviewUrl}
+              frontFileName={selectedFile?.name ?? null}
+              backFileName={selectedBackFile?.name ?? null}
+              canMeasure={Boolean(selectedFile && selectedBackFile)}
+              onMeasure={measureSelectedCardFiles}
             />
           ) : (
             <UploadZone
@@ -1182,8 +1467,7 @@ export default function CenteringWorkspace({
             }
           }}
           onReset={() => {
-            setSelectedFile(null);
-            setPreviewUrl(null);
+            clearSelectedFiles();
             dispatch({ type: "reset" });
           }}
         />
@@ -1198,11 +1482,10 @@ export default function CenteringWorkspace({
           onManualOverlayChange={setManualOverlay}
           canRetry={canRetryWithCorrections}
           onRetry={() => {
-            if (selectedFile) void submitMeasurement(selectedFile, manualOverlay);
+            if (selectedFile) void submitMeasurement(selectedFile, manualOverlay, selectedBackFile);
           }}
           onReset={() => {
-            setSelectedFile(null);
-            setPreviewUrl(null);
+            clearSelectedFiles();
             dispatch({ type: "reset" });
           }}
         />

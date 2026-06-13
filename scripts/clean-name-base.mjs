@@ -10,6 +10,8 @@
 //   SUPABASE_SERVICE_ROLE_KEY=... node scripts/clean-name-base.mjs
 //   SUPABASE_SERVICE_ROLE_KEY=... node scripts/clean-name-base.mjs --apply
 
+import { loadGameScope, scriptGameSlug, withGameFilter } from "./lib/supabase-game-scope.mjs";
+
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://kiquytaevufssveqmqix.supabase.co";
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!KEY) {
@@ -18,6 +20,7 @@ if (!KEY) {
 }
 const APPLY = process.argv.includes("--apply");
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" };
+const GAME_SLUG = scriptGameSlug();
 
 function nameBase(name) {
   if (!name) return null;
@@ -40,8 +43,8 @@ async function fetchAll(path) {
   return all;
 }
 
-async function patch(id, body) {
-  const r = await fetch(`${SB_URL}/rest/v1/cards?id=eq.${id}`, {
+async function patch(id, gameId, body) {
+  const r = await fetch(`${SB_URL}/rest/v1/cards?id=eq.${id}&game_id=eq.${encodeURIComponent(gameId)}`, {
     method: "PATCH",
     headers: { ...H, Prefer: "return=minimal" },
     body: JSON.stringify(body),
@@ -53,7 +56,10 @@ async function patch(id, body) {
   return true;
 }
 
-const cards = await fetchAll("cards?select=id,name,name_base,card_number");
+const GAME = await loadGameScope({ supabaseUrl: SB_URL, supabaseKey: KEY, gameSlug: GAME_SLUG });
+console.log(`Using game scope: ${GAME.slug}`);
+
+const cards = await fetchAll(withGameFilter("cards?select=id,name,name_base,card_number", GAME.id));
 console.log(`Loaded ${cards.length} cards.`);
 
 const diffs = [];
@@ -90,7 +96,7 @@ let ok = 0;
 let fail = 0;
 for (let i = 0; i < diffs.length; i += CHUNK) {
   const slice = diffs.slice(i, i + CHUNK);
-  const results = await Promise.all(slice.map((d) => patch(d.id, { name_base: d.should })));
+  const results = await Promise.all(slice.map((d) => patch(d.id, GAME.id, { name_base: d.should })));
   for (const r of results) (r ? ok++ : fail++);
   if ((i / CHUNK) % 4 === 0) {
     process.stdout.write(`  ${Math.min(i + CHUNK, diffs.length)}/${diffs.length}\r`);

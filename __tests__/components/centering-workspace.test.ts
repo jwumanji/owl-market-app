@@ -24,9 +24,16 @@ type Exports = {
   default: React.ComponentType<{
     inventoryItemId?: string | null;
     preloadImageUrl?: string | null;
+    adminActionToken?: string | null;
+    intakeMode?: "single" | "frontBack";
     cardIdentity: { name: string; setCode?: string | null; cardNumber?: string | null; rarity?: string | null };
   }>;
-  buildMeasurementFormData: (input: { inventoryItemId?: string | null; file: File; manualOverlay?: unknown }) => FormData;
+  buildMeasurementFormData: (input: {
+    inventoryItemId?: string | null;
+    file: File;
+    backFile?: File | null;
+    manualOverlay?: unknown;
+  }) => FormData;
   buildResultViewModel: (result: Record<string, unknown>) => Record<string, unknown>;
   centeringReducer: (state: Record<string, unknown>, action: Record<string, unknown>) => Record<string, unknown>;
   defaultManualOverlay: (width: number, height: number) => Record<string, unknown>;
@@ -36,6 +43,7 @@ type Exports = {
   measurePreloadedImage: (input: {
     imageUrl: string;
     inventoryItemId?: string | null;
+    adminActionToken?: string | null;
     dispatchAction: (action: { type: string; result?: unknown; error?: unknown }) => void;
     onFile: (file: File) => void;
     fetchImpl: typeof fetch;
@@ -45,6 +53,13 @@ type Exports = {
   PRELOAD_FETCH_ERROR_MESSAGE: string;
   psaTone: (ceiling: string) => string;
   reportFileName: (cardName: string) => string;
+  submitMeasurementRequest: (input: {
+    inventoryItemId?: string | null;
+    file: File;
+    backFile?: File | null;
+    adminActionToken?: string | null;
+    fetchImpl: typeof fetch;
+  }) => Promise<{ ok: true; result: unknown } | { ok: false; error: { code?: string; message?: string } | null }>;
 };
 
 function loadComponent() {
@@ -99,6 +114,7 @@ function loadComponent() {
     exports: moduleStub.exports,
     File,
     FormData,
+    Headers,
     Image: class {},
     module: moduleStub,
     process,
@@ -170,9 +186,11 @@ function measurementResponse() {
 function renderWorkspace({
   preloadImageUrl = null,
   inventoryItemId = "inventory-1",
+  intakeMode,
 }: {
   preloadImageUrl?: string | null;
   inventoryItemId?: string | null;
+  intakeMode?: "single" | "frontBack";
 } = {}) {
   const { exports } = loadComponent();
 
@@ -180,6 +198,7 @@ function renderWorkspace({
     React.createElement(exports.default, {
       inventoryItemId,
       preloadImageUrl,
+      intakeMode,
       cardIdentity: {
         name: "Nami",
         setCode: "OP01",
@@ -217,6 +236,9 @@ function responseLike({
     async json() {
       return body ?? null;
     },
+    async text() {
+      return typeof body === "string" ? body : JSON.stringify(body ?? null);
+    },
   } as Response;
 }
 
@@ -226,22 +248,35 @@ test("workspace renders measure-this-card button when preload URL is passed", ()
   assert.match(html, /Ready to measure/);
   assert.match(html, /Measure this card/);
   assert.match(html, /Upload a different image/);
-  assert.doesNotMatch(html, /Upload a front scan/);
+  assert.doesNotMatch(html, /Upload card image/);
 });
 
 test("workspace renders upload zone when no preload URL is passed", () => {
   const html = renderWorkspace();
 
-  assert.match(html, /Upload a front scan/);
-  assert.match(html, /Browse scan/);
+  assert.match(html, /Upload card image/);
+  assert.match(html, /Browse image/);
   assert.doesNotMatch(html, /Measure this card/);
+});
+
+test("workspace renders front and back intake when requested", () => {
+  const html = renderWorkspace({ inventoryItemId: null, intakeMode: "frontBack" });
+
+  assert.match(html, /Front scan/);
+  assert.match(html, /Back scan/);
+  assert.match(html, /Upload front/);
+  assert.match(html, /Upload back/);
+  assert.match(html, /Upload both sides before measuring/);
+  assert.match(html, /Measure card/);
+  assert.doesNotMatch(html, /Upload a front scan/);
+  assert.doesNotMatch(html, /Measure front scan/);
 });
 
 test("workspace renders standalone mode without inventory item context", () => {
   const html = renderWorkspace({ inventoryItemId: null, preloadImageUrl: "https://cdn.example/cards/front.png" });
 
-  assert.match(html, /Upload a front scan/);
-  assert.match(html, /Browse scan/);
+  assert.match(html, /Upload card image/);
+  assert.match(html, /Browse image/);
   assert.doesNotMatch(html, /Ready to measure/);
   assert.doesNotMatch(html, /Measure this card/);
 });
@@ -330,11 +365,80 @@ test("standalone measurement payload omits inventoryItemId", () => {
   assert.equal(formData.get("file"), file);
 });
 
+test("paired pregrade payload includes front and back files", () => {
+  const { exports } = loadComponent();
+  const frontFile = new File(["front"], "front.jpg", { type: "image/jpeg" });
+  const backFile = new File(["back"], "back.jpg", { type: "image/jpeg" });
+
+  const formData = exports.buildMeasurementFormData({
+    file: frontFile,
+    backFile,
+  });
+
+  assert.equal(formData.get("file"), frontFile);
+  assert.equal(formData.get("backFile"), backFile);
+});
+
+test("measurement request preserves string API errors", async () => {
+  const { exports } = loadComponent();
+  const file = new File(["image"], "card.jpg", { type: "image/jpeg" });
+  const fetchImpl = async () => responseLike({
+    ok: false,
+    status: 500,
+    body: { error: "OWL_LENS_CV_URL is not configured" },
+  });
+
+  const outcome = await exports.submitMeasurementRequest({ file, fetchImpl });
+
+  assert.equal(outcome.ok, false);
+  if (!outcome.ok) {
+    assert.equal(outcome.error?.code, "MEASUREMENT_FAILED");
+    assert.equal(outcome.error?.message, "OWL_LENS_CV_URL is not configured");
+  }
+});
+
+test("measurement request turns unauthorized responses into a sign-in prompt", async () => {
+  const { exports } = loadComponent();
+  const file = new File(["image"], "card.jpg", { type: "image/jpeg" });
+  const fetchImpl = async () => responseLike({
+    ok: false,
+    status: 401,
+    body: { error: "Unauthorized" },
+  });
+
+  const outcome = await exports.submitMeasurementRequest({ file, fetchImpl });
+
+  assert.equal(outcome.ok, false);
+  if (!outcome.ok) {
+    assert.equal(outcome.error?.message, "Your admin session expired. Sign in again, then retry the measurement.");
+  }
+});
+
+test("measurement request sends admin action token header", async () => {
+  const { exports } = loadComponent();
+  const file = new File(["image"], "card.jpg", { type: "image/jpeg" });
+  let tokenHeader: string | null = null;
+  const fetchImpl = async (_input: RequestInfo | URL, init?: RequestInit) => {
+    tokenHeader = new Headers(init?.headers).get("x-admin-action-token");
+    return responseLike({ ok: true, body: measurementResponse() });
+  };
+
+  const outcome = await exports.submitMeasurementRequest({
+    file,
+    adminActionToken: "signed-admin-token",
+    fetchImpl,
+  });
+
+  assert.equal(outcome.ok, true);
+  assert.equal(tokenHeader, "signed-admin-token");
+});
+
 test("measure-this-card action fetches the preloaded image and posts it for measurement", async () => {
   const { exports } = loadComponent();
   const actions: string[] = [];
   const files: File[] = [];
   const postBodies: FormData[] = [];
+  const postTokenHeaders: Array<string | null> = [];
   const fetchCalls: string[] = [];
   const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
@@ -350,6 +454,7 @@ test("measure-this-card action fetches the preloaded image and posts it for meas
 
     if (url === "/api/centering/measure") {
       postBodies.push(init?.body as FormData);
+      postTokenHeaders.push(new Headers(init?.headers).get("x-admin-action-token"));
       return responseLike({ ok: true, body: measurementResponse() });
     }
 
@@ -359,6 +464,7 @@ test("measure-this-card action fetches the preloaded image and posts it for meas
   const outcome = await exports.measurePreloadedImage({
     imageUrl: "https://cdn.example/cards/front.png",
     inventoryItemId: "inventory-1",
+    adminActionToken: "preloaded-admin-token",
     dispatchAction(action) {
       actions.push(action.type);
     },
@@ -376,6 +482,7 @@ test("measure-this-card action fetches the preloaded image and posts it for meas
   assert.equal(files[0].type, "image/png");
   assert.equal(postBodies[0].get("inventoryItemId"), "inventory-1");
   assert.equal(postBodies[0].get("file"), files[0]);
+  assert.equal(postTokenHeaders[0], "preloaded-admin-token");
 });
 
 test("preloaded image fetch failure returns inline error path and leaves upload zone available", async () => {
@@ -401,7 +508,7 @@ test("preloaded image fetch failure returns inline error path and leaves upload 
   assert.equal(outcome.preloadError, exports.PRELOAD_FETCH_ERROR_MESSAGE);
   assert.equal(exports.PRELOAD_FETCH_ERROR_MESSAGE, "Couldn't load saved scan. Upload a fresh image instead.");
   assert.deepEqual(actions, ["startUpload", "reset"]);
-  assert.match(uploadZoneHtml, /Upload a front scan/);
+  assert.match(uploadZoneHtml, /Upload card image/);
 });
 
 test("download report trigger writes a PNG filename and clicks a download link", async () => {

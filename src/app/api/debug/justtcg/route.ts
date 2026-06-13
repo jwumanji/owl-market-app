@@ -1,18 +1,21 @@
 import { NextResponse } from "next/server";
 import { JustTCG } from "justtcg-js";
+import { ONE_PIECE_JUSTTCG_GAME_SLUG } from "@/lib/games/one-piece";
+import { authorizeInternalRequest } from "@/lib/internal-api-auth";
 
-const GAME = "one-piece-card-game";
+const GAME = ONE_PIECE_JUSTTCG_GAME_SLUG;
 
 // Debug endpoint to inspect raw JustTCG API data for a set
 // Usage: /api/debug/justtcg?set=awakening-of-the-new-era-one-piece-card-game&search=luffy
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const token = searchParams.get("token");
   const setSlug = searchParams.get("set");
   const search = searchParams.get("search")?.toLowerCase();
 
-  // Auth disabled for debugging
-  void token;
+  const auth = authorizeInternalRequest(request);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
 
   if (!setSlug) {
     return NextResponse.json({ error: "Provide ?set=<justtcg-slug>" }, { status: 400 });

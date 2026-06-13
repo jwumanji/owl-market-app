@@ -1,6 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import CenteringWorkspace from "@/components/centering/CenteringWorkspace";
+import { CENTERING_MEASURE_ACTION, createAdminActionToken } from "@/lib/admin-action-token";
+import { getCurrentAdminUser } from "@/lib/admin-user";
+import { resolveGameScope } from "@/lib/game-scope";
 import { createServiceClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -66,12 +69,22 @@ function firstRelation<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
 }
 
-function measurementPageFromSearchParams(searchParams?: { measurementPage?: string | string[] }) {
+type CenteringSearchParams = {
+  measurementPage?: string | string[];
+  game?: string | string[];
+};
+
+function measurementPageFromSearchParams(searchParams?: CenteringSearchParams) {
   const raw = Array.isArray(searchParams?.measurementPage)
     ? searchParams?.measurementPage[0]
     : searchParams?.measurementPage;
   const page = Number(raw ?? 1);
   return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function gameFromSearchParams(searchParams?: CenteringSearchParams) {
+  const game = Array.isArray(searchParams?.game) ? searchParams?.game[0] : searchParams?.game;
+  return game?.trim() || null;
 }
 
 function formatPercent(value: string | number | null | undefined) {
@@ -88,22 +101,28 @@ function formatMeasurementDate(value: string | null | undefined) {
 
 function ceilingClassName(ceiling: CenteringMeasurementRow["psa_ceiling"]) {
   if (ceiling === "PSA_10") {
-    return "border-gain/40 bg-gain/10 text-gain";
+    return "border-gain-2/50 bg-[#DCF1E6] text-gain-2";
   }
   if (ceiling === "PSA_9" || ceiling === "PSA_8") {
-    return "border-owl/40 bg-owl/10 text-owl";
+    return "border-gold/50 bg-[#FCEBCF] text-gold";
   }
-  return "border-loss/40 bg-loss/10 text-loss";
+  return "border-loss-2/50 bg-[#FBE3E3] text-loss-2";
 }
 
-async function loadInventoryItem(id: string, measurementPage: number) {
+async function loadInventoryItem(id: string, measurementPage: number, gameSlug: string | null) {
   const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, gameSlug, { defaultToOnePiece: true });
+  if (gameResult.error) {
+    notFound();
+  }
+  const { game } = gameResult;
   const itemRes = await supabase
     .from("inventory_items")
     .select(
       "id, card_id, manual_card_name, manual_card_number, manual_set_code, item_nickname, inventory_type, status, quantity, graded_rating, certification_number, custom_image_front_url, custom_image_back_url"
     )
     .eq("id", id)
+    .eq("game_id", game.id)
     .single();
 
   if (itemRes.error || !itemRes.data) {
@@ -116,8 +135,9 @@ async function loadInventoryItem(id: string, measurementPage: number) {
   if (item.card_id) {
     const cardRes = await supabase
       .from("cards")
-      .select("id, name, card_number, rarity, image_url, image_url_small, sets (code, name)")
+      .select("id, name, card_number, rarity, image_url, image_url_small, sets!cards_set_game_fk (code, name)")
       .eq("id", item.card_id)
+      .eq("game_id", game.id)
       .single();
 
     if (!cardRes.error && cardRes.data) {
@@ -134,6 +154,7 @@ async function loadInventoryItem(id: string, measurementPage: number) {
       { count: "exact" }
     )
     .eq("inventory_item_id", id)
+    .eq("game_id", game.id)
     .order("created_at", { ascending: false })
     .range(from, to);
 
@@ -144,6 +165,7 @@ async function loadInventoryItem(id: string, measurementPage: number) {
   return {
     item,
     card,
+    gameSlug: game.slug,
     measurements: {
       rows: (measurementRes.error ? [] : measurementRes.data ?? []) as CenteringMeasurementRow[],
       count,
@@ -155,81 +177,84 @@ async function loadInventoryItem(id: string, measurementPage: number) {
   };
 }
 
-function measurementHref(itemId: string, page: number) {
-  return `/admin/inventory/${itemId}/centering?measurementPage=${page}`;
+function measurementHref(itemId: string, page: number, gameSlug: string) {
+  const params = new URLSearchParams({ game: gameSlug, measurementPage: String(page) });
+  return `/admin/inventory/${itemId}/centering?${params}`;
 }
 
 function MeasurementHistory({
   itemId,
   measurements,
+  gameSlug,
 }: {
   itemId: string;
   measurements: MeasurementPage;
+  gameSlug: string;
 }) {
   return (
-    <section className="mt-6 rounded-lg border border-border bg-surface p-5">
+    <section className="admin-card mt-6 p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="font-mono text-xs font-bold uppercase text-owl">Past Measurements</div>
-          <h2 className="mt-1 text-2xl font-bold text-text">Centering history</h2>
+          <div className="font-mono-2 text-xs font-bold uppercase tracking-wider text-coral">Past Measurements</div>
+          <h2 className="mt-1 font-grotesk text-2xl font-bold text-ink">Centering history</h2>
         </div>
-        <div className="font-mono text-xs font-semibold uppercase text-text-2">
+        <div className="font-mono-2 text-xs font-semibold uppercase tracking-wider text-ink-2">
           Page {measurements.page} of {measurements.pageCount}
         </div>
       </div>
 
       {measurements.rows.length === 0 ? (
-        <div className="mt-5 rounded-md border border-dashed border-border-2 bg-deep p-6 text-sm text-text-2">
+        <div className="mt-5 rounded-c-sm border-[1.5px] border-dashed border-ink/30 bg-bg-3 p-6 text-sm text-ink-2">
           No centering measurements yet.
         </div>
       ) : (
-        <div className="mt-5 overflow-x-auto rounded-md border border-border">
+        <div className="mt-5 overflow-x-auto rounded-c-sm border-[1.5px] border-ink">
           <table className="w-full min-w-[880px] text-left text-sm">
-            <thead className="bg-deep font-mono text-xs uppercase text-text-2">
+            <thead className="bg-bg-3 font-mono-2 text-xs uppercase tracking-wider text-ink-2">
               <tr>
-                <th className="px-3 py-2">Measured</th>
-                <th className="px-3 py-2">Ceiling</th>
-                <th className="px-3 py-2">L / R</th>
-                <th className="px-3 py-2">T / B</th>
-                <th className="px-3 py-2">Worst axis</th>
-                <th className="px-3 py-2">Pipeline</th>
-                <th className="px-3 py-2 text-right">Processing</th>
+                <th className="px-3 py-2 font-semibold">Measured</th>
+                <th className="px-3 py-2 font-semibold">Ceiling</th>
+                <th className="px-3 py-2 font-semibold">L / R</th>
+                <th className="px-3 py-2 font-semibold">T / B</th>
+                <th className="px-3 py-2 font-semibold">Worst axis</th>
+                <th className="px-3 py-2 font-semibold">Pipeline</th>
+                <th className="px-3 py-2 text-right font-semibold">Processing</th>
               </tr>
             </thead>
             <tbody>
               {measurements.rows.map((measurement) => (
-                <tr key={measurement.id} className="border-t border-border">
-                  <td className="px-3 py-3 font-mono text-xs text-text-2">
+                <tr key={measurement.id} className="border-t border-bg-3">
+                  <td className="px-3 py-3 font-mono-2 text-xs text-ink-2">
                     {formatMeasurementDate(measurement.created_at)}
                   </td>
                   <td className="px-3 py-3">
                     <span
-                      className={`inline-flex rounded-md border px-2.5 py-1.5 font-mono text-xs font-bold uppercase ${ceilingClassName(
+                      className={`inline-flex rounded-c-sm border-[1.5px] px-2.5 py-1.5 font-mono-2 text-xs font-bold uppercase tracking-wider ${ceilingClassName(
                         measurement.psa_ceiling
                       )}`}
                     >
                       {measurement.psa_ceiling}
                     </span>
                   </td>
-                  <td className="px-3 py-3 font-mono text-text">
+                  <td className="px-3 py-3 font-mono-2 text-ink">
                     {formatPercent(measurement.left_pct)} / {formatPercent(measurement.right_pct)}
                   </td>
-                  <td className="px-3 py-3 font-mono text-text">
+                  <td className="px-3 py-3 font-mono-2 text-ink">
                     {formatPercent(measurement.top_pct)} / {formatPercent(measurement.bottom_pct)}
                   </td>
-                  <td className="px-3 py-3 text-text">
+                  <td className="px-3 py-3 text-ink">
                     {measurement.worst_axis === "leftRight" ? "Left/right" : "Top/bottom"} at{" "}
                     {formatPercent(measurement.worst_axis_max_pct)}
                     {measurement.manual_adjustment && (
-                      <span className="ml-2 rounded-md border border-blue/40 bg-blue/10 px-2 py-1 font-mono text-[11px] font-bold uppercase text-blue">
+                      <span className="ml-2 rounded-c-sm border-[1.5px] border-select/50 bg-select/10 px-2 py-1 font-mono-2 text-[11px] font-bold uppercase tracking-wider text-select">
                         Manual
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-3 font-mono text-xs uppercase text-text-2">
+                  <td className="px-3 py-3 font-mono-2 text-xs uppercase text-ink-2">
                     {measurement.pipeline_mode} {measurement.pipeline_version}
                   </td>
-                  <td className="px-3 py-3 text-right font-mono text-text">
+                  <td className="px-3 py-3 text-right font-mono-2 text-ink">
                     {measurement.processing_ms ?? "--"}ms
                   </td>
                 </tr>
@@ -241,20 +266,14 @@ function MeasurementHistory({
 
       <div className="mt-4 flex items-center justify-between gap-3">
         {measurements.hasPrevious ? (
-          <Link
-            href={measurementHref(itemId, measurements.page - 1)}
-            className="rounded-md border border-border bg-deep px-4 py-2.5 font-mono text-xs font-bold uppercase text-text transition-colors hover:border-border-2 hover:bg-surf2"
-          >
+          <Link href={measurementHref(itemId, measurements.page - 1, gameSlug)} className="admin-btn admin-btn-ghost">
             Previous measurements
           </Link>
         ) : (
           <span />
         )}
         {measurements.hasNext ? (
-          <Link
-            href={measurementHref(itemId, measurements.page + 1)}
-            className="rounded-md border border-border bg-deep px-4 py-2.5 font-mono text-xs font-bold uppercase text-text transition-colors hover:border-border-2 hover:bg-surf2"
-          >
+          <Link href={measurementHref(itemId, measurements.page + 1, gameSlug)} className="admin-btn admin-btn-ghost">
             Next measurements
           </Link>
         ) : (
@@ -270,10 +289,20 @@ export default async function InventoryCenteringPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams?: { measurementPage?: string | string[] };
+  searchParams?: CenteringSearchParams;
 }) {
+  const currentUser = await getCurrentAdminUser();
+  if (!currentUser) {
+    redirect(`/login?redirect=${encodeURIComponent(`/admin/inventory/${params.id}/centering`)}`);
+  }
+  const adminActionToken = createAdminActionToken({
+    user: currentUser,
+    action: CENTERING_MEASURE_ACTION,
+  });
+
   const measurementPage = measurementPageFromSearchParams(searchParams);
-  const { item, card, measurements } = await loadInventoryItem(params.id, measurementPage);
+  const requestedGame = gameFromSearchParams(searchParams);
+  const { item, card, measurements, gameSlug } = await loadInventoryItem(params.id, measurementPage, requestedGame);
   const set = firstRelation(card?.sets);
   const cardName = card?.name ?? item.manual_card_name ?? "Unknown Card";
   const cardNumber = card?.card_number ?? item.manual_card_number;
@@ -281,29 +310,26 @@ export default async function InventoryCenteringPage({
   const rarity = card?.rarity;
 
   return (
-    <section className="mx-auto max-w-[1280px] px-4 py-8">
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <section className="admin-page admin-container">
+      <div className="admin-page-head">
         <div>
-          <p className="mb-2 font-mono text-sm font-semibold uppercase text-owl">
-            Inventory Tool
-          </p>
-          <h1 className="text-4xl font-bold text-text">Card Centering Measurement</h1>
-          <p className="mt-2 max-w-3xl text-base leading-7 text-text-2">
+          <p className="admin-eyebrow">Inventory Tool</p>
+          <h1 className="admin-title">Card Centering Measurement</h1>
+          <p className="admin-subline">
             Measure centering against the Owl Lens CV service and keep the latest grade ceiling tied
             to this inventory item.
           </p>
         </div>
-        <Link
-          href="/admin/inventory"
-          className="rounded-md border border-border bg-surface px-4 py-2.5 text-center font-mono text-sm font-bold uppercase text-text transition-colors hover:border-border-2 hover:text-owl"
-        >
+        <Link href={`/admin/inventory?game=${encodeURIComponent(gameSlug)}`} className="admin-btn admin-btn-ghost">
           Back to Inventory
         </Link>
       </div>
 
       <CenteringWorkspace
+        gameSlug={gameSlug}
         inventoryItemId={item.id}
         preloadImageUrl={item.custom_image_front_url}
+        adminActionToken={adminActionToken}
         cardIdentity={{
           name: cardName,
           setCode,
@@ -312,7 +338,7 @@ export default async function InventoryCenteringPage({
         }}
       />
 
-      <MeasurementHistory itemId={item.id} measurements={measurements} />
+      <MeasurementHistory itemId={item.id} measurements={measurements} gameSlug={gameSlug} />
     </section>
   );
 }

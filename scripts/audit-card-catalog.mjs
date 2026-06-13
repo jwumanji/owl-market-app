@@ -4,6 +4,7 @@
 // - Does not mutate the database.
 
 import fs from "node:fs";
+import { loadGameScope, scriptGameSlug, withGameFilter } from "./lib/supabase-game-scope.mjs";
 
 const OPT_BASE = "https://optcgapi.com/api";
 const OPT_IMAGE_BASE = "https://optcgapi.com/media/static/Card_Images";
@@ -57,6 +58,7 @@ loadEnvFile();
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const JUSTTCG_KEY = process.env.JUSTTCG_API_KEY;
+const GAME_SLUG = scriptGameSlug();
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
@@ -815,8 +817,8 @@ function sample(items, count = 20) {
   return items.slice(0, count);
 }
 
-async function tryPromoSegmentProbe() {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/cards?select=id,promo_segment&limit=1`, {
+async function tryPromoSegmentProbe(gameId) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${withGameFilter("cards?select=id,promo_segment&limit=1", gameId)}`, {
     headers: restHeaders(),
   });
   return res.ok ? null : await res.text();
@@ -824,11 +826,12 @@ async function tryPromoSegmentProbe() {
 
 async function main() {
   const started = new Date();
-  console.log("Loading Supabase sets/cards...");
+  const game = await loadGameScope({ supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_KEY, gameSlug: GAME_SLUG });
+  console.log(`Loading Supabase sets/cards for game scope: ${game.slug}...`);
   const [dbSets, dbCards, promoSegmentError] = await Promise.all([
-    sbFetchAll("sets?select=id,slug,code,name,card_count,series,year"),
-    sbFetchAll("cards?select=id,card_image_id,card_number,name,name_base,variant_label,set_id,rarity,card_type,color,power,counter,life,cost,attribute,types,effect,trigger,image_url,image_url_small,tcg_product_id,price_stats(tcg_market,market_avg,updated_at)"),
-    tryPromoSegmentProbe(),
+    sbFetchAll(withGameFilter("sets?select=id,slug,code,name,card_count,series,year", game.id)),
+    sbFetchAll(withGameFilter("cards?select=id,card_image_id,card_number,name,name_base,variant_label,set_id,rarity,card_type,color,power,counter,life,cost,attribute,types,effect,trigger,image_url,image_url_small,tcg_product_id,price_stats(tcg_market,market_avg,updated_at)", game.id)),
+    tryPromoSegmentProbe(game.id),
   ]);
 
   const setById = new Map(dbSets.map((set) => [set.id, set]));
@@ -1150,6 +1153,7 @@ async function main() {
   report.push(`# One Piece Catalog Audit`);
   report.push("");
   report.push(`Generated: ${started.toISOString()}`);
+  report.push(`Game: ${game.name ?? game.slug} (${game.slug})`);
   report.push("");
   report.push(`## Scope`);
   report.push("");

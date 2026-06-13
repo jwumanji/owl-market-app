@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { SALE_CHANNELS, type SaleChannel } from "@/lib/sale-options";
+import {
+  gameParamFromBody,
+  gameParamFromRequest,
+  resolveGameScope,
+} from "@/lib/game-scope";
 import { createServiceClient } from "@/lib/supabase-server";
 
 type RequestBody = Record<string, unknown>;
@@ -70,6 +75,7 @@ function inventoryItemIds(body: RequestBody) {
 
 async function validateInventoryItems(
   supabase: ReturnType<typeof createServiceClient>,
+  gameId: string,
   orderId: string,
   ids: string[]
 ) {
@@ -80,6 +86,7 @@ async function validateInventoryItems(
   const inventoryRes = await supabase
     .from("inventory_items")
     .select("id")
+    .eq("game_id", gameId)
     .in("id", ids);
 
   if (inventoryRes.error) {
@@ -93,6 +100,7 @@ async function validateInventoryItems(
   const assignedRes = await supabase
     .from("customer_order_items")
     .select("order_id, inventory_item_id")
+    .eq("game_id", gameId)
     .in("inventory_item_id", ids);
 
   if (assignedRes.error) {
@@ -107,10 +115,11 @@ async function validateInventoryItems(
   return { error: null };
 }
 
-async function currentInventoryIds(supabase: ReturnType<typeof createServiceClient>, orderId: string) {
+async function currentInventoryIds(supabase: ReturnType<typeof createServiceClient>, gameId: string, orderId: string) {
   const linksRes = await supabase
     .from("customer_order_items")
     .select("inventory_item_id")
+    .eq("game_id", gameId)
     .eq("order_id", orderId);
 
   if (linksRes.error) {
@@ -135,12 +144,22 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   const supabase = createServiceClient();
-  const inventoryValidation = await validateInventoryItems(supabase, params.id, ids);
+  const gameResult = await resolveGameScope(
+    supabase,
+    gameParamFromBody(requestBody) ?? gameParamFromRequest(request)
+  );
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
+
+  const inventoryValidation = await validateInventoryItems(supabase, game.id, params.id, ids);
   if (inventoryValidation.error) {
     return NextResponse.json({ error: inventoryValidation.error }, { status: 400 });
   }
 
-  const existingIds = await currentInventoryIds(supabase, params.id);
+  const existingIds = await currentInventoryIds(supabase, game.id, params.id);
   const nextIds = new Set(ids);
   const previousIds = new Set(existingIds);
   const removedIds = existingIds.filter((id) => !nextIds.has(id));
@@ -186,6 +205,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   let orderRes = await supabase
     .from("customer_orders")
     .update(orderUpdates)
+    .eq("game_id", game.id)
     .eq("id", params.id);
 
   if (missingOrderSaleColumns(orderRes.error)) {
@@ -196,6 +216,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     orderRes = await supabase
       .from("customer_orders")
       .update(legacyOrderUpdates)
+      .eq("game_id", game.id)
       .eq("id", params.id);
   }
 
@@ -207,6 +228,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const { error: deleteError } = await supabase
       .from("customer_order_items")
       .delete()
+      .eq("game_id", game.id)
       .eq("order_id", params.id)
       .in("inventory_item_id", removedIds);
 
@@ -223,13 +245,18 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         shipping_tracking: null,
         shipped_at: null,
       })
+      .eq("game_id", game.id)
       .in("id", removedIds);
   }
 
   if (addedIds.length > 0) {
     const { error: addError } = await supabase
       .from("customer_order_items")
-      .insert(addedIds.map((inventoryItemId) => ({ order_id: params.id, inventory_item_id: inventoryItemId })));
+      .insert(addedIds.map((inventoryItemId) => ({
+        game_id: game.id,
+        order_id: params.id,
+        inventory_item_id: inventoryItemId,
+      })));
 
     if (addError) {
       return NextResponse.json({ error: addError.message }, { status: 500 });
@@ -255,6 +282,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const { error: inventoryError } = await supabase
     .from("inventory_items")
     .update(inventoryUpdates)
+    .eq("game_id", game.id)
     .in("id", ids);
 
   if (inventoryError) {
@@ -264,13 +292,21 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   return NextResponse.json({ id: params.id });
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   const supabase = createServiceClient();
-  const existingIds = await currentInventoryIds(supabase, params.id);
+  const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request));
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
+
+  const existingIds = await currentInventoryIds(supabase, game.id, params.id);
 
   const { error } = await supabase
     .from("customer_orders")
     .delete()
+    .eq("game_id", game.id)
     .eq("id", params.id);
 
   if (error) {
@@ -287,6 +323,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
         shipping_tracking: null,
         shipped_at: null,
       })
+      .eq("game_id", game.id)
       .in("id", existingIds);
   }
 

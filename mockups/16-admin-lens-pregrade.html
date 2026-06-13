@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OwlMarket — Admin · Pre-grade (C1.5 mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Caveat:wght@700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #FFF5E4; --bg-2: #FFFFFF; --bg-3: #FCE6BE;
+      --ink: #1A0F08; --ink-2: #5C4534; --ink-3: #9A8475;
+      --pink: #FF6BB8; --coral: #FF4936; --gold: #E89512;
+      --gain: #2D9961; --loss: #E04E4E; --select: #1F47A1;
+      --grad-brand: linear-gradient(135deg, #FF6BB8 0%, #FF4936 50%, #E89512 100%);
+      --r-sm: 8px; --r-md: 14px; --r-lg: 22px; --r-pill: 999px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: var(--bg); color: var(--ink); font-family: 'Space Grotesk', system-ui, sans-serif; font-weight: 500; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+    .container { max-width: 1280px; margin: 0 auto; padding-left: 28px; padding-right: 28px; }
+    a { color: inherit; }
+
+    .topnav { position: sticky; top: 0; z-index: 50; background: rgba(255, 245, 228, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1.5px solid rgba(26, 15, 8, 0.08); }
+    .topnav-inner { display: flex; align-items: center; gap: 22px; padding: 14px 28px; max-width: 1680px; margin: 0 auto; }
+    .lockup { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; flex-shrink: 0; }
+    .lockup-wm { font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: var(--ink); font-size: 22px; display: inline-flex; align-items: baseline; }
+    .lockup-wm em { font-family: 'Caveat', cursive; font-style: normal; font-weight: 700; font-size: 28px; margin-left: -2px; padding-right: 8px; padding-bottom: 2px; display: inline-block; background: var(--grad-brand); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+    .internal-chip { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--coral); background: #FFE2DD; border: 1.5px solid var(--coral); border-radius: var(--r-pill); padding: 3px 9px; flex-shrink: 0; }
+    .nav-links { display: inline-flex; gap: 22px; list-style: none; margin-left: 6px; }
+    .nav-links a { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: var(--ink-2); text-decoration: none; padding: 4px 0; position: relative; white-space: nowrap; }
+    .nav-links a.active { color: var(--ink); }
+    .nav-links a.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 2px; background: var(--grad-brand); border-radius: 2px; }
+    .nav-right { margin-left: auto; display: inline-flex; align-items: center; gap: 16px; }
+    .nav-view { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; color: var(--ink-2); text-decoration: none; letter-spacing: 0.04em; }
+    .nav-view:hover { color: var(--ink); }
+    .nav-signout { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; color: var(--ink); background: transparent; border: 1.5px solid var(--ink); border-radius: var(--r-pill); padding: 7px 16px; text-decoration: none; }
+    .nav-signout:hover { background: var(--ink); color: var(--bg); }
+
+    main { padding: 32px 0 96px; }
+    .crumb { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; letter-spacing: 0.04em; color: var(--ink-2); text-decoration: none; display: inline-flex; gap: 6px; margin-bottom: 18px; }
+    .crumb:hover { color: var(--ink); }
+    .page-head { margin-bottom: 22px; display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+    .eyebrow { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; color: var(--coral); letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 10px; }
+    h1.title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; letter-spacing: -0.025em; line-height: 1; color: var(--ink); }
+    .subline { margin-top: 10px; font-size: 14px; color: var(--ink-2); max-width: 620px; line-height: 1.6; }
+    .btn { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; padding: 0 16px; height: 42px; border-radius: var(--r-sm); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 7px; text-decoration: none; border: 1.5px solid transparent; white-space: nowrap; }
+    .btn-primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+    .btn-primary:hover { background: #2E1C10; }
+    .btn-ghost { background: var(--bg-2); color: var(--ink); border-color: var(--ink); }
+    .btn-ghost:hover { background: var(--bg-3); }
+
+    /* ===== CENTERING WORKSPACE (result state) ===== */
+    .workspace { background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-md); padding: 22px; }
+    .ws-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(360px, 0.78fr); gap: 24px; align-items: start; }
+    .ws-eyebrow { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 12px; }
+
+    /* scan + overlay */
+    .scan-wrap { position: relative; background: var(--bg-3); border: 1.5px solid var(--ink); border-radius: var(--r-md); padding: 18px; display: flex; justify-content: center; }
+    .scan-svg { width: 100%; max-width: 410px; height: auto; }
+    .overlay-key { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 16px; font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-2); }
+    .overlay-key span { display: inline-flex; align-items: center; gap: 6px; }
+    .overlay-key .ln { width: 16px; height: 0; border-top: 3px dotted; border-radius: 2px; }
+    .overlay-key .ln.coral { border-color: var(--coral); }
+    .overlay-key .ln.cobalt { border-color: var(--select); }
+    .overlay-key .sw { width: 11px; height: 11px; border-radius: 3px; background: #FFE2DD; border: 1.5px solid var(--coral); }
+
+    /* measurements */
+    .ceiling-badge { display: inline-flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; border: 1.5px solid; border-radius: var(--r-sm); padding: 9px 14px; }
+    .cb-10 { color: #2D9961; border-color: #2D9961; background: #DCF1E6; }
+    .ceil-label { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+
+    .measure-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 18px; }
+    .measure { border: 1.5px solid var(--ink); border-radius: var(--r-sm); padding: 13px 14px; }
+    .measure .m-lbl { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+    .measure .m-val { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 18px; color: var(--ink); margin-top: 4px; }
+    .worst { margin-top: 12px; border: 1.5px solid var(--coral); background: #FFE2DD; border-radius: var(--r-sm); padding: 12px 14px; }
+    .worst .m-lbl { color: var(--coral); }
+    .worst .m-val { color: var(--coral); }
+    .measure.rot { margin-top: 12px; border-color: var(--select); }
+    .measure.rot .m-lbl { color: var(--select); }
+    .measure.rot .m-val { color: var(--select); font-size: 24px; }
+    .measure .m-sub { font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10.5px; color: var(--ink-3); margin-top: 4px; }
+
+    .ratio-table { margin-top: 14px; border: 1.5px solid var(--ink); border-radius: var(--r-sm); overflow: hidden; }
+    .ratio-table table { width: 100%; border-collapse: collapse; }
+    .ratio-table thead tr { background: var(--bg-3); border-bottom: 1.5px solid var(--ink); font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-2); text-align: left; }
+    .ratio-table th, .ratio-table td { padding: 9px 12px; }
+    .ratio-table td { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; color: var(--ink); }
+    .ratio-table .r { text-align: right; }
+
+    .ws-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+    .manual-note { margin-top: 14px; display: flex; align-items: center; gap: 9px; font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 11px; letter-spacing: 0.04em; color: var(--ink-2); border: 1.5px dashed var(--select); background: #F2F5FB; border-radius: var(--r-sm); padding: 11px 13px; }
+    .manual-note .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--select); flex-shrink: 0; }
+
+    /* HISTORY */
+    .history { margin-top: 22px; background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-md); overflow: hidden; }
+    .history-head { padding: 18px 22px; border-bottom: 1.5px solid var(--ink); background: var(--bg-3); display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+    .history-title { font-family: 'Space Grotesk'; font-weight: 700; font-size: 18px; color: var(--ink); }
+    .history-eyebrow { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 4px; }
+    .history-page { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-2); }
+    table.h-table { width: 100%; border-collapse: collapse; }
+    .h-table thead tr { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-2); text-align: left; border-bottom: 1.5px solid var(--bg-3); }
+    .h-table th { padding: 12px 18px; }
+    .h-table tbody tr { border-top: 1px solid var(--bg-3); }
+    .h-table td { padding: 12px 18px; font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; color: var(--ink); }
+    .h-table .when { color: var(--ink-2); font-weight: 500; }
+    /* history thumbnail + name + hover preview */
+    .h-thumb-cell { position: relative; width: 56px; }
+    .h-thumb { width: 38px; height: 53px; border-radius: 5px; border: 1.5px solid var(--ink); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk'; font-weight: 700; font-size: 14px; color: var(--bg); cursor: zoom-in; }
+    .thumb-preview { display: none; position: absolute; left: 54px; top: 50%; transform: translateY(-50%); z-index: 60; width: 132px; height: 184px; border-radius: 9px; border: 1.5px solid var(--ink); box-shadow: 0 16px 44px rgba(26,15,8,0.32); align-items: center; justify-content: center; font-family: 'Space Grotesk'; font-weight: 700; font-size: 46px; color: var(--bg); pointer-events: none; }
+    .h-thumb-cell:hover .thumb-preview { display: flex; }
+    .h-name { font-family: 'Space Grotesk'; font-weight: 700; font-size: 13px; color: var(--ink); }
+    .h-name .sub { display: block; margin-top: 2px; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10.5px; color: var(--ink-2); }
+    .ceilpill { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 0.05em; padding: 4px 9px; border-radius: var(--r-pill); border: 1.5px solid; }
+    .ceilpill.c10 { color: #2D9961; border-color: #2D9961; background: #DCF1E6; }
+    .ceilpill.c9 { color: #5F8E2A; border-color: #5F8E2A; background: #ECF2D9; }
+    .ceilpill.c7 { color: #D9641A; border-color: #D9641A; background: #FBE6D6; }
+
+    .mock-note { margin-top: 28px; padding: 14px 20px; background: var(--bg-2); border: 1.5px dashed var(--ink-3); border-radius: var(--r-md); font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em; color: var(--ink-2); text-align: center; text-transform: uppercase; font-weight: 600; line-height: 1.7; }
+  </style>
+</head>
+<body>
+
+  <header class="topnav">
+    <div class="topnav-inner">
+      <a href="#" class="lockup">
+        <svg width="34" height="34" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="og-adm" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FF6BB8"/><stop offset="50%" stop-color="#FF4936"/><stop offset="100%" stop-color="#E89512"/></linearGradient>
+            <mask id="om-adm"><rect width="120" height="120" fill="white"/><circle cx="70" cy="56" r="20" fill="black"/></mask>
+          </defs>
+          <circle cx="60" cy="60" r="52" fill="url(#og-adm)" stroke="#1A0F08" stroke-width="5"/>
+          <circle cx="60" cy="60" r="38" fill="#1A0F08"/>
+          <circle cx="58" cy="60" r="26" fill="#FFF5E4" mask="url(#om-adm)"/>
+          <g transform="translate(80 60)"><path d="M 0,-11 Q 1.65,-1.65 11,0 Q 1.65,1.65 0,11 Q -1.65,1.65 -11,0 Q -1.65,-1.65 0,-11 Z" fill="#FFF5E4"/></g>
+        </svg>
+        <span class="lockup-wm">Owl<em>Market</em></span>
+      </a>
+      <span class="internal-chip">Internal</span>
+      <nav><ul class="nav-links">
+        <li><a href="#">Inventory</a></li>
+        <li><a href="#">Bundles</a></li>
+        <li><a href="#">Orders</a></li>
+        <li><a href="#" class="active">Lens</a></li>
+        <li><a href="#">PSA</a></li>
+      </ul></nav>
+      <div class="nav-right">
+        <a href="#" class="nav-view">View site ↗</a>
+        <a href="#" class="nav-signout">Sign out</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <a href="#" class="crumb">← Owl Lens</a>
+
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Owl Lens</div>
+        <h1 class="title">Pre-grade</h1>
+        <p class="subline">Measure centering before the card becomes inventory. Results are stored without image bytes or an inventory link.</p>
+      </div>
+      <a href="#" class="btn btn-ghost">Back to Owl Lens</a>
+    </div>
+
+    <!-- ===== CENTERING WORKSPACE (result state) ===== -->
+    <div class="workspace">
+      <div class="ws-grid">
+
+        <!-- scan + measured overlay -->
+        <div>
+          <div class="ws-eyebrow">Measured Overlay</div>
+          <div class="scan-wrap">
+            <svg class="scan-svg" viewBox="0 0 440 520" xmlns="http://www.w3.org/2000/svg" font-family="'JetBrains Mono', monospace">
+              <!-- card scan -->
+              <rect x="85" y="55" width="270" height="378" rx="10" fill="#2A1810" stroke="#1A0F08" stroke-width="2"/>
+              <rect x="100" y="70" width="240" height="250" rx="6" fill="#5C3A26" opacity="0.9"/>
+              <text x="220" y="205" text-anchor="middle" font-family="'Space Grotesk'" font-weight="700" font-size="40" fill="#FFF5E4" opacity="0.45">L</text>
+
+              <!-- outer card detected — coral DOTTED -->
+              <rect x="85" y="55" width="270" height="378" rx="10" fill="none" stroke="#FF4936" stroke-width="3" stroke-linecap="round" stroke-dasharray="1 8"/>
+              <!-- inner frame detected — cobalt DOTTED -->
+              <rect x="115" y="83" width="207" height="320" rx="5" fill="none" stroke="#1F47A1" stroke-width="3" stroke-linecap="round" stroke-dasharray="1 8"/>
+              <!-- corner handles -->
+              <g fill="#1F47A1" stroke="#FFF5E4" stroke-width="1.5">
+                <rect x="109" y="77" width="12" height="12" rx="2"/>
+                <rect x="316" y="77" width="12" height="12" rx="2"/>
+                <rect x="109" y="397" width="12" height="12" rx="2"/>
+                <rect x="316" y="397" width="12" height="12" rx="2"/>
+              </g>
+
+              <!-- leader lines into each gap -->
+              <g stroke="#1A0F08" stroke-width="1.3">
+                <line x1="72" y1="244" x2="101" y2="244"/>
+                <line x1="339" y1="244" x2="368" y2="244"/>
+                <line x1="220" y1="38" x2="220" y2="69"/>
+                <line x1="220" y1="466" x2="220" y2="418"/>
+              </g>
+
+              <!-- pixel gap callout chips (large) -->
+              <!-- left -->
+              <g><rect x="12" y="231" width="58" height="26" rx="5" fill="#FFF5E4" stroke="#1A0F08" stroke-width="1.5"/><text x="41" y="249" text-anchor="middle" font-weight="700" font-size="15" fill="#1A0F08">124px</text></g>
+              <!-- right (worst axis → coral) -->
+              <g><rect x="370" y="231" width="58" height="26" rx="5" fill="#FFE2DD" stroke="#FF4936" stroke-width="1.5"/><text x="399" y="249" text-anchor="middle" font-weight="700" font-size="15" fill="#FF4936">133px</text></g>
+              <!-- top -->
+              <g><rect x="191" y="12" width="58" height="26" rx="5" fill="#FFF5E4" stroke="#1A0F08" stroke-width="1.5"/><text x="220" y="30" text-anchor="middle" font-weight="700" font-size="15" fill="#1A0F08">118px</text></g>
+              <!-- bottom -->
+              <g><rect x="191" y="466" width="58" height="26" rx="5" fill="#FFF5E4" stroke="#1A0F08" stroke-width="1.5"/><text x="220" y="484" text-anchor="middle" font-weight="700" font-size="15" fill="#1A0F08">122px</text></g>
+
+              <!-- rotation readout chip (cobalt) -->
+              <g><rect x="12" y="10" width="104" height="28" rx="6" fill="#1F47A1"/><text x="64" y="29" text-anchor="middle" font-weight="700" font-size="14" fill="#FFF5E4">↻ 0.4°</text></g>
+            </svg>
+          </div>
+          <div class="overlay-key">
+            <span><i class="ln coral"></i> Outer card</span>
+            <span><i class="ln cobalt"></i> Inner frame · drag corners</span>
+            <span><i class="sw worst"></i> Worst-axis gap</span>
+          </div>
+        </div>
+
+        <!-- measurements -->
+        <div>
+          <div class="ws-eyebrow">Result</div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span class="ceil-label">PSA Ceiling</span>
+            <span class="ceiling-badge cb-10">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg>
+              PSA 10
+            </span>
+          </div>
+
+          <div class="measure-grid">
+            <div class="measure"><div class="m-lbl">Left / Right</div><div class="m-val">48.2 / 51.8%</div><div class="m-sub">124px / 133px</div></div>
+            <div class="measure"><div class="m-lbl">Top / Bottom</div><div class="m-val">49.1 / 50.9%</div><div class="m-sub">118px / 122px</div></div>
+          </div>
+          <div class="measure rot"><div class="m-lbl">Card rotation / skew</div><div class="m-val">0.4°</div></div>
+          <div class="worst">
+            <div class="m-lbl">Worst axis</div>
+            <div class="m-val">Left / right · 51.8%</div>
+          </div>
+
+          <div class="ratio-table">
+            <table>
+              <thead><tr><th>Ceiling</th><th>Ratio</th><th class="r">Max major</th></tr></thead>
+              <tbody><tr><td>PSA 10</td><td>48/52</td><td class="r">51.8%</td></tr></tbody>
+            </table>
+          </div>
+
+          <div class="manual-note">
+            <span class="dot"></span>
+            Drag the cobalt corners to manually correct the detected frame, then re-measure.
+          </div>
+
+          <div class="ws-actions">
+            <button class="btn btn-ghost">Upload different</button>
+            <button class="btn btn-primary">Measure again</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- HISTORY -->
+    <div class="history">
+      <div class="history-head">
+        <div>
+          <div class="history-eyebrow">Pre-grade History</div>
+          <div class="history-title">Standalone measurements</div>
+        </div>
+        <div class="history-page">Page 1 of 4</div>
+      </div>
+      <table class="h-table">
+        <thead><tr><th></th><th>Card / Submission</th><th>Measured</th><th>Ceiling</th><th>L / R</th><th>T / B</th><th>Worst axis</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="h-thumb-cell">
+              <span class="h-thumb" style="background:#C53A2A;">L</span>
+              <span class="thumb-preview" style="background:#C53A2A;">L</span>
+            </td>
+            <td><span class="h-name">Luffy — Gear Fifth<span class="sub">OP05 · OP05-119</span></span></td>
+            <td class="when">2026-05-20 09:14 UTC</td>
+            <td><span class="ceilpill c10">PSA 10</span></td>
+            <td>48.20% / 51.80%</td>
+            <td>49.10% / 50.90%</td>
+            <td>Left/right at 51.80%</td>
+          </tr>
+          <tr>
+            <td class="h-thumb-cell">
+              <span class="h-thumb" style="background:#7C2A1E;">S</span>
+              <span class="thumb-preview" style="background:#7C2A1E;">S</span>
+            </td>
+            <td><span class="h-name">Shanks — Red Hair<span class="sub">OP01 · OP01-120</span></span></td>
+            <td class="when">2026-05-19 16:42 UTC</td>
+            <td><span class="ceilpill c9">PSA 9</span></td>
+            <td>44.60% / 55.40%</td>
+            <td>47.90% / 52.10%</td>
+            <td>Left/right at 55.40%</td>
+          </tr>
+          <tr>
+            <td class="h-thumb-cell">
+              <span class="h-thumb" style="background:#2D6E4E;">Z</span>
+              <span class="thumb-preview" style="background:#2D6E4E;">Z</span>
+            </td>
+            <td><span class="h-name">Zoro — King of Hell<span class="sub">OP06 · OP06-022</span></span></td>
+            <td class="when">2026-05-19 11:08 UTC</td>
+            <td><span class="ceilpill c7">PSA 7</span></td>
+            <td>39.10% / 60.90%</td>
+            <td>43.20% / 56.80%</td>
+            <td>Left/right at 60.90%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mock-note">
+      MOCKUP · /admin/lens/pregrade · C1.5 · v2.0 · 2026-05-20 · WRAPS SHARED CenteringWorkspace (CV — chrome reskin only)<br>
+      MATCHES REAL: SCAN + MEASURED OVERLAY (both frames DOTTED · draggable corners) · PSA CEILING BADGE · L/R · T/B (% + px) · ROTATION · WORST AXIS · RATIO TABLE · UPLOAD DIFFERENT / MEASURE AGAIN · MANUAL CORRECTION · PRE-GRADE HISTORY (paginated)<br>
+      v2 OVERLAY REVAMP: OUTER CARD = CORAL DOTTED · INNER FRAME = COBALT DOTTED + CORNER HANDLES · LARGE PIXEL CALLOUT CHIPS (worst gap = coral) · ROTATION READOUT (cobalt) · KEY LEGEND · CEILING USES GRADE-BAND COLORS (parked unify)<br>
+      v3 HISTORY: THUMBNAIL (leftmost) + CARD / SUBMISSION NAME COLUMN · HOVER → ENLARGED PREVIEW [NOTE: pre-grade currently stores no image/card link — needs association to support thumbnails]
+    </div>
+
+  </main>
+
+</body>
+</html>

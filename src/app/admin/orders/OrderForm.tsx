@@ -3,6 +3,7 @@
 import { type FormEvent, type MouseEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { displayCustomerOrderNumber } from "@/lib/customer-orders";
+import { DEFAULT_PUBLIC_GAME_DB_SLUG } from "@/lib/game-scope";
 import { SALE_CHANNEL_LABELS, SALE_CHANNELS, type SaleChannel } from "@/lib/sale-options";
 import type { CustomerOrderFormValue, OrderInventoryItem } from "./order-types";
 
@@ -24,6 +25,7 @@ const TYPE_LABELS: Record<string, string> = {
 type Props = {
   inventoryItems: OrderInventoryItem[];
   initialOrder?: CustomerOrderFormValue | null;
+  gameSlug?: string;
 };
 
 type HoverPreview = {
@@ -88,7 +90,11 @@ function todayDateString() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function OrderForm({ inventoryItems, initialOrder }: Props) {
+export default function OrderForm({
+  inventoryItems,
+  initialOrder,
+  gameSlug = DEFAULT_PUBLIC_GAME_DB_SLUG,
+}: Props) {
   const router = useRouter();
   const [nickname, setNickname] = useState(initialOrder?.nickname ?? "");
   const [customerName, setCustomerName] = useState(initialOrder?.customer_name ?? "");
@@ -160,10 +166,14 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
     }
 
     setSaving(true);
-    const res = await fetch(initialOrder ? `/api/admin/orders/${initialOrder.id}` : "/api/admin/orders", {
+    const endpoint = initialOrder
+      ? `/api/admin/orders/${initialOrder.id}?game=${encodeURIComponent(gameSlug)}`
+      : "/api/admin/orders";
+    const res = await fetch(endpoint, {
       method: initialOrder ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        game: gameSlug,
         nickname,
         customer_name: customerName,
         shipping_label: shippingLabel,
@@ -184,7 +194,7 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
       return;
     }
 
-    router.push(`/admin/orders/${payload.id}`);
+    router.push(`/admin/orders/${payload.id}?game=${encodeURIComponent(gameSlug)}`);
     router.refresh();
   }
 
@@ -193,7 +203,7 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
 
     setDeleting(true);
     setError(null);
-    const res = await fetch(`/api/admin/orders/${initialOrder.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/admin/orders/${initialOrder.id}?game=${encodeURIComponent(gameSlug)}`, { method: "DELETE" });
     const payload = await res.json().catch(() => null);
     setDeleting(false);
 
@@ -202,7 +212,7 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
       return;
     }
 
-    router.push("/admin/inventory?status=ship");
+    router.push(`/admin/inventory?game=${encodeURIComponent(gameSlug)}&status=ship`);
     router.refresh();
   }
 
@@ -210,7 +220,7 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
     <form onSubmit={onSubmit} className="grid gap-5">
       {hoverPreview && (
         <div
-          className="pointer-events-none fixed z-50 hidden w-56 rounded-lg border border-border-2 bg-surface p-2 shadow-2xl shadow-black/50 lg:block"
+          className="pointer-events-none fixed z-50 hidden w-56 rounded-c-md border-[1.5px] border-ink bg-bg-2 p-2 shadow-[0_12px_32px_rgba(26,15,8,0.18)] lg:block"
           style={{
             left: hoverPreview.x,
             top: hoverPreview.y,
@@ -220,85 +230,110 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
                 : "translate(18px, -35%)",
           }}
         >
-          <div className="overflow-hidden rounded-md border border-border bg-deep">
+          <div className="overflow-hidden rounded border-[1.5px] border-ink bg-bg-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={hoverPreview.src} alt={hoverPreview.title} className="max-h-80 w-full object-contain" />
           </div>
-          <div className="mt-2 line-clamp-2 text-xs font-bold leading-snug text-text">{hoverPreview.title}</div>
+          <div className="mt-2 line-clamp-2 font-grotesk text-xs font-bold leading-snug text-ink">
+            {hoverPreview.title}
+          </div>
         </div>
       )}
 
-      <div className="grid gap-4 rounded-lg border border-border bg-surface p-4">
+      <div className="admin-card p-6">
+        <div className="mb-4 font-grotesk text-xl font-bold tracking-tight text-ink">Order details</div>
         <div className="grid gap-4 lg:grid-cols-2">
-          <label>
-            <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">Customer Order #</span>
+          <label className="block">
+            <span className="admin-field-label block">
+              Customer Order #
+              <span className="ml-2 inline-flex items-center rounded border-[1.2px] border-ink-3 bg-bg-2 px-1.5 py-0 font-mono text-[9px] font-semibold uppercase tracking-wider text-ink-3">
+                auto
+              </span>
+            </span>
             <input
               value={initialOrder ? displayCustomerOrderNumber(initialOrder.id) : "Generated when saved"}
               readOnly
-              className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-3 font-mono text-sm text-text-2 outline-none"
+              className="admin-input mt-2 w-full cursor-default !border-ink-3 !bg-bg-3 !text-ink-2"
             />
           </label>
-          <label>
-            <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">Nickname Order</span>
+          <label className="block">
+            <span className="admin-field-label block">Nickname Order</span>
             <input
               value={nickname}
               onChange={(event) => setNickname(event.target.value)}
               maxLength={120}
-              className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-3 text-text outline-none focus:border-owl"
+              className="admin-input mt-2 w-full"
             />
           </label>
-          <label>
-            <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">Customer Name</span>
+          <label className="block">
+            <span className="admin-field-label block">
+              Customer Name <span className="admin-required">*</span>
+            </span>
             <input
               value={customerName}
               onChange={(event) => setCustomerName(event.target.value)}
               required
               maxLength={160}
-              className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-3 text-text outline-none focus:border-owl"
+              className="admin-input mt-2 w-full"
             />
           </label>
-          <label>
-            <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">Tracking #</span>
+          <label className="block">
+            <span className="admin-field-label block">Tracking #</span>
             <input
               value={trackingNumber}
               onChange={(event) => setTrackingNumber(event.target.value)}
               maxLength={180}
-              className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-3 text-text outline-none focus:border-owl"
+              className="admin-input mt-2 w-full"
             />
           </label>
         </div>
 
-        <label>
-          <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">Shipping Label</span>
+        <label className="mt-4 block">
+          <span className="admin-field-label block">Shipping Label</span>
           <textarea
             value={shippingLabel}
             onChange={(event) => setShippingLabel(event.target.value)}
             rows={4}
-            className="mt-2 w-full rounded-md border border-border bg-deep px-3 py-3 text-text outline-none focus:border-owl"
+            className="admin-input mt-2 min-h-[84px] w-full resize-y py-3 leading-snug"
           />
         </label>
 
-        <label className="flex items-center gap-3 rounded-md border border-border bg-deep px-3 py-3">
+        <label
+          className={`mt-4 flex cursor-pointer items-center gap-3 rounded-c-sm border-[1.5px] px-4 py-3 transition-colors ${
+            markedShipped ? "border-gain-2 bg-[#DCF1E6]" : "border-ink bg-bg-2"
+          }`}
+        >
           <input
             type="checkbox"
             checked={markedShipped}
             onChange={(event) => setMarkedShipped(event.target.checked)}
-            className="h-4 w-4 accent-owl"
+            className="sr-only"
           />
-          <span className="font-mono text-sm font-bold uppercase tracking-wider text-text">Marked Shipped</span>
+          <span
+            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-[1.5px] ${
+              markedShipped ? "border-gain-2 bg-gain-2 text-bg" : "border-ink bg-bg-2 text-transparent"
+            }`}
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m5 12 5 5 9-11" />
+            </svg>
+          </span>
+          <span className={`font-mono text-xs font-bold uppercase tracking-[0.07em] ${markedShipped ? "text-gain-2" : "text-ink"}`}>
+            Marked Shipped
+          </span>
         </label>
 
-        <div className="rounded-md border border-border bg-deep p-3">
-          <div className="mb-3 font-mono text-xs font-bold uppercase tracking-wider text-owl">
+        <div className="admin-card-inset mt-4 p-5">
+          <div className="mb-3 font-mono text-[11px] font-bold uppercase tracking-[0.1em] text-ink-2">
             Order Sale Details
           </div>
-          <div className="grid gap-4 lg:grid-cols-3">
-            <label>
-              <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">Sold At</span>
+          <div className="grid gap-3.5 lg:grid-cols-3">
+            <label className="block">
+              <span className="admin-field-label block">Sold At</span>
               <select
                 value={saleChannel}
                 onChange={(event) => updateSaleChannel(event.target.value as SaleChannel)}
-                className="mt-2 w-full rounded-md border border-border bg-surface px-3 py-3 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
+                className="admin-input mt-2 w-full cursor-pointer"
               >
                 {SALE_CHANNELS.map((channel) => (
                   <option key={channel} value={channel}>
@@ -307,24 +342,24 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
                 ))}
               </select>
             </label>
-            <label>
-              <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">Sold Date</span>
+            <label className="block">
+              <span className="admin-field-label block">Sold Date</span>
               <input
                 type="date"
                 value={soldDate}
                 onChange={(event) => setSoldDate(event.target.value)}
-                className="mt-2 w-full rounded-md border border-border bg-surface px-3 py-3 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
+                className="admin-input mt-2 w-full"
               />
             </label>
-            <label>
-              <span className="font-mono text-xs font-bold uppercase tracking-wider text-text-2">Sold Price</span>
+            <label className="block">
+              <span className="admin-field-label block">Sold Price</span>
               <input
                 type="text"
                 inputMode="decimal"
                 value={soldPrice}
                 onChange={(event) => setSoldPrice(event.target.value)}
                 placeholder="0.00"
-                className="mt-2 w-full rounded-md border border-border bg-surface px-3 py-3 font-mono text-sm font-semibold text-text outline-none focus:border-owl"
+                className="admin-input mt-2 w-full"
               />
             </label>
           </div>
@@ -332,71 +367,77 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
       </div>
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.78fr)]">
-        <section className="min-w-0 rounded-lg border border-border bg-surface">
-          <div className="border-b border-border p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-text">Inventory Search</h2>
-                <p className="mt-1 text-sm text-text-2">Search existing product inventory and add cards to the order.</p>
-              </div>
-              <div className="rounded-md border border-border bg-deep px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-text-2">
-                {inventoryItems.length} Available
-              </div>
+        <section className="admin-card min-w-0 p-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="font-grotesk text-lg font-bold tracking-tight text-ink">Inventory Search</h2>
+              <p className="mt-1 font-grotesk text-[12.5px] text-ink-2">
+                Search existing product inventory and add cards to the order.
+              </p>
             </div>
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search card, set, nickname, cert, or inventory id"
-              className="mt-4 w-full rounded-md border border-border bg-deep px-3 py-3 text-text outline-none focus:border-owl"
-            />
+            <div className="inline-flex shrink-0 items-center rounded-c-sm border-[1.5px] border-ink bg-bg-3 px-2.5 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-ink-2">
+              {inventoryItems.length} Available
+            </div>
           </div>
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search card, set, nickname, cert, or inventory id"
+            className="admin-input mt-3 w-full"
+          />
 
-          <div className="max-h-[620px] overflow-y-auto p-3">
-            <div className="grid gap-2">
-              {filteredItems.map((item) => {
+          <div className="mt-3 max-h-[480px] overflow-hidden overflow-y-auto rounded-c-sm border-[1.5px] border-ink">
+            <div className="flex flex-col">
+              {filteredItems.map((item, index) => {
                 const imageUrl = cardImageUrl(item);
                 const selected = selectedIdSet.has(item.id);
                 return (
-                  <button
+                  <div
                     key={item.id}
-                    type="button"
-                    onClick={() => addItem(item.id)}
-                    disabled={selected}
-                    className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
-                      selected
-                        ? "cursor-not-allowed border-owl/30 bg-owl/10 opacity-70"
-                        : "border-border bg-deep hover:border-border-2 hover:bg-surf2"
-                    }`}
+                    className={`flex items-center gap-3 border-l-[3px] px-3 py-2.5 ${
+                      index === 0 ? "" : "border-t border-t-bg-3"
+                    } ${selected ? "border-l-select bg-[#F2F5FB]" : "border-l-transparent bg-bg-2"}`}
                   >
-                    <div className="flex h-16 w-12 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-surf3">
+                    <div className="flex h-[53px] w-[38px] shrink-0 items-center justify-center overflow-hidden rounded border-[1.5px] border-ink bg-bg-2">
                       {imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+                        <img src={imageUrl} alt="" className="h-full w-full object-contain" />
                       ) : (
-                        <span className="font-mono text-[10px] text-text-3">NO IMG</span>
+                        <span className="font-mono text-[9px] uppercase text-ink-3">No img</span>
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-semibold text-text">{cardTitle(item)}</div>
-                      <div className="mt-1 truncate font-mono text-xs text-text-2">{cardMeta(item)}</div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <span className="rounded border border-border bg-surface px-2 py-1 font-mono text-[10px] font-bold uppercase text-text-2">
+                      <div className="truncate font-grotesk text-[13px] font-bold text-ink">{cardTitle(item)}</div>
+                      <div className="mt-0.5 truncate font-mono text-[10.5px] font-medium text-ink-2">
+                        {cardMeta(item)}
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        <span className="rounded border-[1.2px] border-ink-3 bg-bg-2 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-ink-2">
                           {STATUS_LABELS[item.status]}
                         </span>
-                        <span className="rounded border border-border bg-surface px-2 py-1 font-mono text-[10px] font-bold uppercase text-text-2">
+                        <span className="rounded border-[1.2px] border-ink-3 bg-bg-2 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-ink-2">
                           {item.id.slice(0, 8)}
                         </span>
                       </div>
                     </div>
-                    <span className={`font-mono text-xs font-bold uppercase ${selected ? "text-owl" : "text-gain"}`}>
+                    <button
+                      type="button"
+                      onClick={() => addItem(item.id)}
+                      disabled={selected}
+                      className={`shrink-0 rounded-c-sm border-[1.5px] px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider transition-colors ${
+                        selected
+                          ? "cursor-not-allowed border-select bg-select text-bg"
+                          : "border-ink bg-bg-2 text-ink hover:bg-bg-3"
+                      }`}
+                    >
                       {selected ? "Added" : "Add"}
-                    </span>
-                  </button>
+                    </button>
+                  </div>
                 );
               })}
 
               {filteredItems.length === 0 && (
-                <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-text-2">
+                <div className="border-[1.5px] border-dashed border-ink-3 p-8 text-center font-mono text-[11px] font-semibold uppercase tracking-wider text-ink-3">
                   No inventory items match that search.
                 </div>
               )}
@@ -404,35 +445,31 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
           </div>
         </section>
 
-        <section className="min-w-0 overflow-hidden rounded-lg border border-border bg-surface">
-          <div className="border-b border-border p-4">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-xl font-bold text-text">Order Bundle</h2>
-              <span className="rounded-md border border-owl/30 bg-owl/10 px-3 py-1 font-mono text-xs font-bold uppercase text-owl">
-                {selectedItems.length} Cards
-              </span>
-            </div>
+        <section className="admin-card min-w-0 overflow-hidden p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="font-grotesk text-lg font-bold tracking-tight text-ink">Order Bundle</h2>
+            <span className="inline-flex shrink-0 items-center rounded-c-sm border-[1.5px] border-ink bg-bg-3 px-2.5 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-ink-2">
+              {selectedItems.length} In Order
+            </span>
           </div>
 
-          <div className="grid min-w-0 gap-3 p-3">
+          <div className="grid min-w-0 gap-3.5">
             {groupSelectedItems(selectedItems).map(([group, items]) => (
-              <div key={group} className="min-w-0 overflow-hidden rounded-lg border border-border bg-deep">
-                <div className="flex min-w-0 items-center justify-between gap-3 border-b border-border px-3 py-2">
-                  <div className="min-w-0 truncate font-mono text-xs font-bold uppercase tracking-wider text-text-2">
-                    {group}
-                  </div>
-                  <div className="shrink-0 font-mono text-xs font-bold text-text">{items.length}</div>
+              <div key={group} className="min-w-0">
+                <div className="mb-2 flex items-center justify-between gap-2 font-mono text-[11px] font-bold uppercase tracking-wider text-ink-2">
+                  <div className="min-w-0 truncate">{group}</div>
+                  <div className="shrink-0 text-ink-3">{items.length}</div>
                 </div>
-                <div className="grid min-w-0 gap-2 p-2">
+                <div className="grid min-w-0 gap-2">
                   {items.map((item) => {
                     const imageUrl = cardImageUrl(item);
                     return (
                       <div
                         key={item.id}
-                        className="flex min-w-0 items-center gap-3 overflow-hidden rounded-md border border-border bg-surface p-2"
+                        className="flex min-w-0 items-center gap-3 rounded-c-sm border-[1.5px] border-ink bg-bg px-3 py-2.5"
                       >
                         <div
-                          className="flex h-24 w-16 shrink-0 cursor-zoom-in items-center justify-center overflow-hidden rounded border border-border bg-surf3"
+                          className="flex h-[66px] w-12 shrink-0 cursor-zoom-in items-center justify-center overflow-hidden rounded border-[1.5px] border-ink bg-bg-2"
                           onMouseEnter={(event) => updateHoverPreview(item, event)}
                           onMouseMove={(event) => updateHoverPreview(item, event)}
                           onMouseLeave={() => setHoverPreview(null)}
@@ -441,19 +478,21 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={imageUrl} alt="" className="h-full w-full object-contain" />
                           ) : (
-                            <span className="font-mono text-[10px] text-text-3">NO IMG</span>
+                            <span className="font-mono text-[10px] uppercase text-ink-3">No img</span>
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-base font-bold text-text">{cardTitle(item)}</div>
-                          <div className="mt-1 truncate font-mono text-sm font-semibold text-owl">
+                          <div className="truncate font-grotesk text-[13px] font-bold text-ink">
+                            {cardTitle(item)}
+                          </div>
+                          <div className="mt-0.5 truncate font-mono text-[10.5px] font-medium text-ink-2">
                             {cardMeta(item)}
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => removeItem(item.id)}
-                          className="shrink-0 rounded border border-loss/30 px-2 py-1 font-mono text-[10px] font-bold uppercase text-loss transition-colors hover:bg-loss/10"
+                          className="shrink-0 rounded-c-sm border-[1.5px] border-coral bg-bg-2 px-2.5 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-coral transition-colors hover:bg-[#FFE2DD]"
                         >
                           Remove
                         </button>
@@ -465,7 +504,7 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
             ))}
 
             {selectedItems.length === 0 && (
-              <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-text-2">
+              <div className="rounded-c-sm border-[1.5px] border-dashed border-ink-3 p-7 text-center font-mono text-[11px] font-semibold uppercase tracking-wider text-ink-3">
                 No cards selected yet.
               </div>
             )}
@@ -473,7 +512,11 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
         </section>
       </div>
 
-      {error && <div className="rounded-md border border-loss/30 bg-loss/10 p-3 text-sm text-text">{error}</div>}
+      {error && (
+        <div className="rounded-c-md border-[1.5px] border-coral bg-[#FFE2DD] px-4 py-3 font-grotesk text-sm font-semibold text-ink">
+          {error}
+        </div>
+      )}
 
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -482,7 +525,7 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
               type="button"
               onClick={deleteOrder}
               disabled={deleting || saving}
-              className="rounded-md border border-loss/30 px-4 py-3 font-mono text-sm font-bold uppercase tracking-wider text-loss transition-colors hover:bg-loss/10 disabled:cursor-wait disabled:opacity-60"
+              className="admin-btn admin-btn-danger disabled:cursor-not-allowed disabled:opacity-60"
             >
               {deleting ? "Deleting..." : "Delete Order"}
             </button>
@@ -491,7 +534,7 @@ export default function OrderForm({ inventoryItems, initialOrder }: Props) {
         <button
           type="submit"
           disabled={saving || deleting}
-          className="rounded-md bg-owl px-5 py-3 font-mono text-sm font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light disabled:cursor-wait disabled:bg-surf3 disabled:text-text-3"
+          className="admin-btn admin-btn-primary disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving ? "Saving..." : initialOrder ? "Save Order" : "Create Order"}
         </button>

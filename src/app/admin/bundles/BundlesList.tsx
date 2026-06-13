@@ -2,6 +2,7 @@
 
 import { type MouseEvent, useState } from "react";
 import Link from "next/link";
+import { DEFAULT_PUBLIC_GAME_DB_SLUG } from "@/lib/game-scope";
 import { SALE_CHANNEL_LABELS } from "@/lib/sale-options";
 import type { BundleInventoryItem, InventoryBundleSummary } from "./bundle-types";
 
@@ -11,6 +12,14 @@ const STATUS_LABELS: Record<string, string> = {
   sale: "For Sale",
   ship: "Need Shipping",
   sold: "Sold",
+};
+
+const STATUS_CHIP: Record<string, string> = {
+  new: "border-ink-2 bg-bg-2 text-ink-2",
+  grading: "border-gold bg-[#FBF0DA] text-gold",
+  sale: "border-gain-2 bg-[#DCF1E6] text-gain-2",
+  ship: "border-coral bg-[#FFE2DD] text-coral",
+  sold: "border-ink-3 bg-bg-2 text-ink-3",
 };
 
 type HoverPreview = {
@@ -54,51 +63,65 @@ function sampleThumbnails(items: BundleInventoryItem[]) {
 
 function BundleCard({
   bundle,
+  gameSlug,
   onPreview,
   onClearPreview,
 }: {
   bundle: InventoryBundleSummary;
+  gameSlug: string;
   onPreview: (item: BundleInventoryItem, event: MouseEvent<HTMLElement>) => void;
   onClearPreview: () => void;
 }) {
   const thumbnails = sampleThumbnails(bundle.items);
   const saleLabel = bundle.sale_channel ? SALE_CHANNEL_LABELS[bundle.sale_channel] : "----";
+  const statusChipClass = STATUS_CHIP[bundle.status] ?? "border-ink-2 bg-bg-2 text-ink-2";
 
   return (
-    <article className="rounded-lg border border-border bg-surface p-5">
+    <article className="admin-card p-6">
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
         <div className="min-w-0">
-          <div className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
+          <div className="font-mono text-xs font-semibold uppercase tracking-wider text-ink-2">
             Updated {formatDate(bundle.updated_at ?? bundle.created_at)}
           </div>
-          <h2 className="mt-1 truncate text-2xl font-bold text-owl">{bundle.name}</h2>
-          {bundle.notes && <p className="mt-2 line-clamp-2 max-w-4xl text-sm text-text-2">{bundle.notes}</p>}
+          <h2 className="mt-1 truncate font-grotesk text-2xl font-bold tracking-tight text-ink">
+            {bundle.name}
+          </h2>
+          {bundle.notes && (
+            <p className="mt-2 line-clamp-2 max-w-4xl font-grotesk text-sm text-ink-2">
+              {bundle.notes}
+            </p>
+          )}
           <div className="mt-4 flex flex-wrap gap-2">
-            <span className="rounded-md border border-blue/40 bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-blue">
-              Cards <span className="text-text">{bundle.items.length}</span>
+            <span className="inline-flex items-center gap-1.5 rounded-c-sm border-[1.5px] border-ink bg-bg-3 px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-ink-2">
+              Cards <span className="text-ink">{bundle.items.length}</span>
             </span>
-            <span className="rounded-md border border-owl/40 bg-owl/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-owl">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-c-sm border-[1.5px] px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider ${statusChipClass}`}
+            >
               {STATUS_LABELS[bundle.status] ?? bundle.status}
             </span>
             {bundle.status === "sold" && (
               <>
-                <span className="rounded-md border border-gain/40 bg-gain/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-gain">
-                  Sold At <span className="text-text">{saleLabel}</span>
+                <span className="inline-flex items-center gap-1.5 rounded-c-sm border-[1.5px] border-gain-2 bg-[#DCF1E6] px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-gain-2">
+                  Sold At <span className="text-ink">{saleLabel}</span>
                 </span>
-                <span className="rounded-md border border-border bg-deep px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-text-2">
-                  Sold Date <span className="text-text">{formatDate(bundle.sold_date)}</span>
+                <span className="inline-flex items-center gap-1.5 rounded-c-sm border-[1.5px] border-ink-3 bg-bg-2 px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-ink-2">
+                  Sold Date <span className="text-ink">{formatDate(bundle.sold_date)}</span>
                 </span>
               </>
             )}
           </div>
-          <div className="mt-4 grid max-w-5xl gap-2 md:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-4 grid gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(250px,1fr))]">
             {bundle.items.slice(0, 6).map((item) => {
               const imageUrl = cardImageUrl(item);
 
               return (
-                <div key={item.id} className="grid min-w-0 grid-cols-[3.25rem_minmax(0,1fr)] gap-3 rounded-md border border-border bg-deep p-2">
+                <div
+                  key={item.id}
+                  className="grid min-w-0 grid-cols-[3rem_minmax(0,1fr)] items-center gap-3 rounded-c-sm border-[1.5px] border-ink bg-bg p-2"
+                >
                   <div
-                    className="h-16 w-12 overflow-hidden rounded-md border border-border-2 bg-surface"
+                    className="h-[66px] w-12 overflow-hidden rounded border-[1.5px] border-ink bg-bg-2"
                     onMouseMove={(event) => onPreview(item, event)}
                     onMouseLeave={onClearPreview}
                   >
@@ -106,12 +129,18 @@ function BundleCard({
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={imageUrl} alt={cardTitle(item)} className="h-full w-full object-contain" />
                     ) : (
-                      <div className="flex h-full items-center justify-center px-1 text-center font-mono text-[9px] uppercase text-text-3">No Image</div>
+                      <div className="flex h-full items-center justify-center px-1 text-center font-mono text-[9px] uppercase text-ink-3">
+                        No Image
+                      </div>
                     )}
                   </div>
-                  <div className="min-w-0 self-center">
-                    <div className="truncate text-sm font-bold text-text">{cardTitle(item)}</div>
-                    <div className="mt-1 truncate font-mono text-xs font-semibold text-owl">{cardMeta(item)}</div>
+                  <div className="min-w-0">
+                    <div className="truncate font-grotesk text-sm font-bold text-ink">
+                      {cardTitle(item)}
+                    </div>
+                    <div className="mt-1 truncate font-mono text-[10.5px] font-medium text-ink-2">
+                      {cardMeta(item)}
+                    </div>
                   </div>
                 </div>
               );
@@ -119,14 +148,15 @@ function BundleCard({
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 xl:items-end">
-          <div className="flex h-20 items-center justify-start xl:justify-end">
+        <div className="flex flex-col items-start gap-3.5 xl:items-end">
+          <div className="flex h-[74px] items-center justify-start xl:justify-end">
             {thumbnails.length > 0 ? (
-              <div className="flex -space-x-2">
-                {thumbnails.map((item) => (
+              <div className="flex">
+                {thumbnails.map((item, index) => (
                   <div
                     key={item.id}
-                    className="h-20 w-14 overflow-hidden rounded-md border border-border-2 bg-deep"
+                    className="h-[74px] w-[52px] overflow-hidden rounded-md border-[1.5px] border-ink bg-bg-2 shadow-[0_0_0_2.5px_var(--bg-2)]"
+                    style={{ marginLeft: index === 0 ? 0 : -12 }}
                     onMouseMove={(event) => onPreview(item, event)}
                     onMouseLeave={onClearPreview}
                   >
@@ -136,15 +166,12 @@ function BundleCard({
                 ))}
               </div>
             ) : (
-              <div className="rounded-md border border-dashed border-border px-4 py-3 font-mono text-xs uppercase tracking-wider text-text-2">
+              <div className="rounded-c-sm border-[1.5px] border-dashed border-ink-3 px-4 py-3 font-mono text-[11px] font-semibold uppercase tracking-wider text-ink-3">
                 No Images
               </div>
             )}
           </div>
-          <Link
-            href={`/admin/bundles/${bundle.id}`}
-            className="rounded-md border border-owl bg-owl/10 px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/15"
-          >
+          <Link href={`/admin/bundles/${bundle.id}?game=${encodeURIComponent(gameSlug)}`} className="admin-btn admin-btn-ghost">
             View Bundle
           </Link>
         </div>
@@ -153,7 +180,13 @@ function BundleCard({
   );
 }
 
-export function BundlesList({ bundles }: { bundles: InventoryBundleSummary[] }) {
+export function BundlesList({
+  bundles,
+  gameSlug = DEFAULT_PUBLIC_GAME_DB_SLUG,
+}: {
+  bundles: InventoryBundleSummary[];
+  gameSlug?: string;
+}) {
   const [hoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
 
   function updateHoverPreview(item: BundleInventoryItem, event: MouseEvent<HTMLElement>) {
@@ -173,7 +206,7 @@ export function BundlesList({ bundles }: { bundles: InventoryBundleSummary[] }) 
     <>
       {hoverPreview && (
         <div
-          className="pointer-events-none fixed z-50 hidden w-56 rounded-lg border border-border-2 bg-surface p-2 shadow-2xl shadow-black/50 lg:block"
+          className="pointer-events-none fixed z-50 hidden w-56 rounded-c-md border-[1.5px] border-ink bg-bg-2 p-2 shadow-[0_12px_32px_rgba(26,15,8,0.18)] lg:block"
           style={{
             left: hoverPreview.x,
             top: hoverPreview.y,
@@ -183,11 +216,13 @@ export function BundlesList({ bundles }: { bundles: InventoryBundleSummary[] }) 
                 : "translate(18px, -35%)",
           }}
         >
-          <div className="overflow-hidden rounded-md border border-border bg-deep">
+          <div className="overflow-hidden rounded border-[1.5px] border-ink bg-bg-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={hoverPreview.src} alt={hoverPreview.title} className="max-h-80 w-full object-contain" />
           </div>
-          <div className="mt-2 line-clamp-2 text-xs font-bold leading-snug text-text">{hoverPreview.title}</div>
+          <div className="mt-2 line-clamp-2 font-grotesk text-xs font-bold leading-snug text-ink">
+            {hoverPreview.title}
+          </div>
         </div>
       )}
 
@@ -196,6 +231,7 @@ export function BundlesList({ bundles }: { bundles: InventoryBundleSummary[] }) 
           <BundleCard
             key={bundle.id}
             bundle={bundle}
+            gameSlug={gameSlug}
             onPreview={updateHoverPreview}
             onClearPreview={() => setHoverPreview(null)}
           />

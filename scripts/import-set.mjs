@@ -8,8 +8,8 @@
 //
 // Behavior:
 // - Fetches https://optcgapi.com/api/sets/{HYPHENATED_ID}/
-// - Upserts the set row in `sets` table on `slug`
-// - For each card: upserts on `card_image_id`, backfilling NULL fields
+// - Upserts the set row in `sets` table on `game_id,slug`
+// - For each card: upserts on `game_id,card_image_id`, backfilling NULL fields
 //   only on existing rows (never overwrites existing values).
 // - Routes the set FK by the requested set code, NOT by per-card prefix.
 //   (Decision: a card with card_image_id "OP02-004_r1" in PRB01 gets
@@ -39,6 +39,9 @@ const SB_HEADERS = {
 
 const OPT_BASE = "https://optcgapi.com/api";
 const OPT_IMAGE_BASE = "https://optcgapi.com/media/static/Card_Images";
+const ONE_PIECE_DB_SLUG = "one_piece";
+const SET_UPSERT_CONFLICT = "game_id,slug";
+const CARD_UPSERT_CONFLICT = "game_id,card_image_id";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -110,7 +113,7 @@ async function sbGet(path) {
 async function sbUpsert(table, rows, onConflict) {
   if (rows.length === 0) return true;
   const r = await fetch(
-    `${SUPABASE_URL}/rest/v1/${table}?on_conflict=${onConflict}`,
+    `${SUPABASE_URL}/rest/v1/${table}?on_conflict=${encodeURIComponent(onConflict)}`,
     {
       method: "POST",
       headers: { ...SB_HEADERS, Prefer: "resolution=merge-duplicates,return=minimal" },
@@ -122,6 +125,17 @@ async function sbUpsert(table, rows, onConflict) {
     return false;
   }
   return true;
+}
+
+async function loadOnePieceGame() {
+  const data = await sbGet(
+    `games?select=id,slug,name&slug=eq.${encodeURIComponent(ONE_PIECE_DB_SLUG)}`
+  );
+  const game = data[0] ?? null;
+  if (!game?.id) {
+    throw new Error("One Piece game row is missing. Run the multi-TCG game migration before importing cards.");
+  }
+  return game;
 }
 
 async function sbPatch(table, filter, body) {
@@ -137,8 +151,10 @@ async function sbPatch(table, filter, body) {
   return true;
 }
 
-async function getSetUuid(setCode) {
-  const data = await sbGet(`sets?code=eq.${setCode}&select=id`);
+async function getSetUuid(setCode, gameId) {
+  const data = await sbGet(
+    `sets?game_id=eq.${encodeURIComponent(gameId)}&code=eq.${encodeURIComponent(setCode)}&select=id`
+  );
   return data[0]?.id ?? null;
 }
 
@@ -146,9 +162,10 @@ async function getSetUuid(setCode) {
 // Card transform
 // ---------------------------------------------------------------------------
 
-function buildInsertRow(c, setUuid) {
+function buildInsertRow(c, setUuid, gameId) {
   const color = nullIfNullStr(c.card_color);
   return {
+    game_id: gameId,
     card_image_id: c.card_image_id,
     card_number: c.card_set_id,
     name: c.card_name,
@@ -227,13 +244,13 @@ function buildBackfillPatch(c, existing, setUuid) {
 
 // Page through the existing cards table to load ALL rows (PostgREST defaults
 // to 1000-row limit; we need to chunk to avoid that bug).
-async function loadAllExistingCards() {
+async function loadAllExistingCards(gameId) {
   const all = [];
   const PAGE = 1000;
   let offset = 0;
   while (true) {
     const r = await fetch(
-      `${SUPABASE_URL}/rest/v1/cards?select=id,card_image_id,set_id,rarity,card_type,power,counter,life,cost,attribute,effect,color,types,image_url&limit=${PAGE}&offset=${offset}`,
+      `${SUPABASE_URL}/rest/v1/cards?select=id,game_id,card_image_id,set_id,rarity,card_type,power,counter,life,cost,attribute,effect,color,types,image_url&game_id=eq.${encodeURIComponent(gameId)}&limit=${PAGE}&offset=${offset}`,
       { headers: SB_HEADERS },
     );
     if (!r.ok) throw new Error(`load existing cards: ${r.status} ${await r.text()}`);
@@ -246,26 +263,27 @@ async function loadAllExistingCards() {
 }
 
 async function main() {
+  const game = await loadOnePieceGame();
   const apiId = toApiId(SET_CODE);
-  console.log(`Importing set ${SET_CODE} from ${OPT_BASE}/sets/${apiId}/`);
+  console.log(`Importing set ${SET_CODE} for ${game.slug} from ${OPT_BASE}/sets/${apiId}/`);
 
   // 1. Fetch cards from optcgapi.
   const cards = await fetchJson(`${OPT_BASE}/sets/${apiId}/`);
   console.log(`Fetched ${cards.length} card records.`);
 
   // 2. Ensure the set row exists. Look up by `code` first — the upsert
-  //    `on_conflict=slug` doesn't conflict with rows that use a different
-  //    slug format (e.g. existing "op-07" vs. new "op07"), so guarding by
-  //    code prevents creating a duplicate set row per import.
+  //    `on_conflict=game_id,slug` doesn't conflict with rows that use a
+  //    different slug format (e.g. existing "op-07" vs. new "op07"), so
+  //    guarding by code prevents creating a duplicate set row per import.
   const setName = cards[0]?.set_name ?? SET_CODE;
-  let setUuid = await getSetUuid(SET_CODE);
+  let setUuid = await getSetUuid(SET_CODE, game.id);
   if (!setUuid) {
     await sbUpsert(
       "sets",
-      [{ slug: SET_CODE.toLowerCase(), code: SET_CODE, name: setName }],
-      "slug",
+      [{ game_id: game.id, slug: SET_CODE.toLowerCase(), code: SET_CODE, name: setName }],
+      SET_UPSERT_CONFLICT,
     );
-    setUuid = await getSetUuid(SET_CODE);
+    setUuid = await getSetUuid(SET_CODE, game.id);
   }
   if (!setUuid) {
     console.error(`Set ${SET_CODE} not found after upsert — aborting.`);
@@ -275,7 +293,7 @@ async function main() {
   // 3. Pre-load existing rows so we can decide insert-vs-patch without
   //    per-row queries.
   console.log("Loading existing cards (paged)...");
-  const existing = await loadAllExistingCards();
+  const existing = await loadAllExistingCards(game.id);
   console.log(`Loaded ${existing.length} existing rows.`);
   const byCardImageId = new Map();
   for (const row of existing) if (row.card_image_id) byCardImageId.set(row.card_image_id, row);
@@ -303,14 +321,14 @@ async function main() {
     if (match) {
       const patch = buildBackfillPatch(c, match, setUuid);
       if (patch) {
-        const ok = await sbPatch("cards", `id=eq.${match.id}`, patch);
+        const ok = await sbPatch("cards", `id=eq.${match.id}&game_id=eq.${encodeURIComponent(game.id)}`, patch);
         if (ok) patches++;
       } else {
         noOps++;
       }
     } else {
       // Dedupe inserts by card_image_id (some scrape rows duplicate).
-      insertBatch.set(c.card_image_id, buildInsertRow(c, setUuid));
+      insertBatch.set(c.card_image_id, buildInsertRow(c, setUuid, game.id));
     }
   }
 
@@ -320,7 +338,7 @@ async function main() {
     const CHUNK = 200;
     for (let i = 0; i < rows.length; i += CHUNK) {
       const slice = rows.slice(i, i + CHUNK);
-      const ok = await sbUpsert("cards", slice, "card_image_id");
+      const ok = await sbUpsert("cards", slice, CARD_UPSERT_CONFLICT);
       if (ok) inserts += slice.length;
     }
   }

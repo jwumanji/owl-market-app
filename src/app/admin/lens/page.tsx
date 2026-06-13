@@ -36,12 +36,14 @@ const TOOLS = [
 export default function AdminLensPage() {
   return (
     <section className="mx-auto max-w-[1280px] px-4 py-8">
-      <div className="mb-6">
-        <p className="mb-2 font-mono text-sm font-semibold uppercase tracking-wider text-owl">Internal Tool</p>
-        <h1 className="text-4xl font-bold tracking-tight text-text">Owl Lens</h1>
-        <p className="mt-2 max-w-3xl text-base leading-7 text-text-2">
-          A suite of scan-based tools for pre-grading, inventory intake, and centering review.
-        </p>
+      <div className="admin-page-head">
+        <div>
+          <p className="admin-eyebrow">Internal Tool</p>
+          <h1 className="admin-title">Owl Lens</h1>
+          <p className="admin-subline">
+            A suite of scan-based tools for pre-grading, inventory intake, and centering review.
+          </p>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -49,18 +51,18 @@ export default function AdminLensPage() {
           const content = (
             <>
               <div className="flex items-start justify-between gap-3">
-                <h2 className="text-2xl font-bold text-text">{tool.title}</h2>
+                <h2 className="font-grotesk text-[22px] font-bold tracking-tight text-ink">{tool.title}</h2>
                 <span
-                  className={`rounded-md border px-2.5 py-1.5 font-mono text-xs font-bold uppercase ${
+                  className={`inline-flex shrink-0 items-center rounded-c-sm border-[1.5px] px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.07em] ${
                     tool.active
-                      ? "border-owl/40 bg-owl/10 text-owl"
-                      : "border-border bg-deep text-text-2"
+                      ? "border-gain-2 bg-[#DCF1E6] text-gain-2"
+                      : "border-ink-3 bg-bg-3 text-ink-2"
                   }`}
                 >
                   {tool.badge}
                 </span>
               </div>
-              <p className="mt-3 text-sm leading-6 text-text-2">{tool.description}</p>
+              <p className="mt-3 font-grotesk text-[13.5px] leading-[1.55] text-ink-2">{tool.description}</p>
             </>
           );
 
@@ -68,15 +70,17 @@ export default function AdminLensPage() {
             <Link
               key={tool.title}
               href={tool.href}
-              className="rounded-lg border border-owl/50 bg-surface p-5 transition-colors hover:border-owl hover:bg-surf2"
+              className="admin-card block p-6 transition-colors hover:bg-bg-3/40"
             >
               {content}
-              <div className="mt-5 inline-flex rounded-md bg-owl px-4 py-2.5 font-mono text-xs font-bold uppercase text-void">
-                Open tool
-              </div>
+              <span className="admin-btn admin-btn-primary mt-5">Open tool →</span>
             </Link>
           ) : (
-            <div key={tool.title} aria-disabled="true" className="rounded-lg border border-border bg-surface p-5 opacity-70">
+            <div
+              key={tool.title}
+              aria-disabled="true"
+              className="rounded-c-md border-[1.5px] border-ink-3 bg-bg-2 p-6 opacity-[0.66]"
+            >
               {content}
             </div>
           );

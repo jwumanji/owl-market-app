@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { CENTERING_MEASURE_ACTION, verifyAdminActionToken } from "@/lib/admin-action-token";
 import { isAllowedAdminEmail } from "@/lib/admin-auth";
 import {
   bgsCeilingBack,
@@ -11,6 +12,7 @@ import {
   tagCeilingBack,
   tagCeilingFront,
 } from "@/lib/centering-math";
+import { resolveGameScope } from "@/lib/game-scope";
 import { isUploadFile } from "@/lib/inventory-scans";
 import { createServiceClient } from "@/lib/supabase-server";
 import type { operations } from "@/lib/owl-lens/openapi.generated";
@@ -33,30 +35,45 @@ function createAuthClient() {
   const cookieStore = cookies();
   return createServerClient(url, anonKey, {
     cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
+      getAll() {
+        return cookieStore.getAll().map(({ name, value }) => ({ name, value }));
       },
-      set(name: string, value: string, options) {
-        cookieStore.set({ name, value, ...options });
-      },
-      remove(name: string, options) {
-        cookieStore.set({ name, value: "", ...options });
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) => {
+          cookieStore.set({ name, value, ...options });
+        });
       },
     },
   });
 }
 
-async function requireAdminUser() {
+async function requireAdminUser(request: Request) {
   const supabase = createAuthClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user || !isAllowedAdminEmail(user.email)) {
-    return null;
+  if (!user) {
+    const actionToken = verifyAdminActionToken(
+      request.headers.get("x-admin-action-token"),
+      CENTERING_MEASURE_ACTION
+    );
+    if (actionToken.ok && isAllowedAdminEmail(actionToken.user.email)) {
+      return { ok: true as const, user: actionToken.user };
+    }
+
+    return { ok: false as const, status: 401, error: "Unauthorized" };
   }
 
-  return user;
+  if (!isAllowedAdminEmail(user.email)) {
+    return {
+      ok: false as const,
+      status: 403,
+      error: "This account is not allowed to access internal tools.",
+    };
+  }
+
+  return { ok: true as const, user };
 }
 
 function cvMeasureUrl() {
@@ -102,6 +119,7 @@ function parsePersist(value: FormDataEntryValue | null) {
 }
 
 function measurementRow({
+  gameId,
   inventoryItemId,
   response,
   face,
@@ -109,6 +127,7 @@ function measurementRow({
   cardIdentity,
   manualAdjustment,
 }: {
+  gameId: string;
   inventoryItemId: string | null;
   response: MeasurementResponse;
   face: CenteringFace;
@@ -117,6 +136,7 @@ function measurementRow({
   manualAdjustment: boolean;
 }) {
   return {
+    game_id: gameId,
     inventory_item_id: inventoryItemId,
     request_id: crypto.randomUUID(),
     left_pct: response.centering.leftRight.leftPercent,
@@ -153,14 +173,14 @@ function measurementRow({
 export async function POST(request: Request) {
   let adminUser;
   try {
-    adminUser = await requireAdminUser();
+    adminUser = await requireAdminUser(request);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Authentication is not configured.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  if (!adminUser) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!adminUser.ok) {
+    return NextResponse.json({ error: adminUser.error }, { status: adminUser.status });
   }
 
   const formData = await request.formData().catch(() => null);
@@ -187,17 +207,27 @@ export async function POST(request: Request) {
   const manualAdjustment = parseManualAdjustment(formData.get("manual_adjustment"));
   const persistResult = parsePersist(formData.get("persist"));
 
+  const gameEntry = formData.get("game");
+  const requestedGame = typeof gameEntry === "string" && gameEntry.trim() ? gameEntry.trim() : null;
+
   const file = formData.get("file");
   if (!isUploadFile(file)) {
     return NextResponse.json({ error: "Choose a card image to measure" }, { status: 400 });
   }
 
-  const supabase = inventoryItemId || persistResult ? createServiceClient() : null;
+  const supabase = createServiceClient();
+  const gameResult = await resolveGameScope(supabase, requestedGame);
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
+
   if (inventoryItemId) {
     const { data: inventoryItem, error: inventoryError } = await supabase!
       .from("inventory_items")
-      .select("id")
+      .select("id, game_id")
       .eq("id", inventoryItemId)
+      .eq("game_id", game.id)
       .single();
 
     if (inventoryError || !inventoryItem) {
@@ -245,10 +275,11 @@ export async function POST(request: Request) {
   }
 
   if (persistResult) {
-    const { error: insertError } = await supabase!
+    const { error: insertError } = await supabase
       .from("centering_measurements")
       .insert(
         measurementRow({
+          gameId: game.id,
           inventoryItemId,
           response: measurement,
           face,

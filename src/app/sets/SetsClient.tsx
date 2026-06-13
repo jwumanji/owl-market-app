@@ -3,24 +3,34 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { gamePath } from "@/lib/game-routes";
 import type { SetData } from "./sets-data";
 import SetThumb from "./SetThumb";
 import "./sets.css";
 
 type SortKey = "rank" | "code" | "name" | "price" | "chg1d" | "chg7d" | "chg30d" | "cards";
 type SortDir = "asc" | "desc";
-type TypeFilter = "all" | "op" | "eb" | "prb" | "st" | "promo";
+type SetType = NonNullable<SetData["type"]>;
+type TypeFilter = "all" | SetType;
 
-const TYPE_TABS: Array<{ key: TypeFilter; label: string }> = [
-  { key: "all", label: "All" },
-  { key: "op", label: "Booster" },
-  { key: "eb", label: "Extra Booster" },
-  { key: "prb", label: "Premium" },
-  { key: "st", label: "Starter Deck" },
-  { key: "promo", label: "Promo" },
-];
+const TYPE_LABELS: Record<SetType, string> = {
+  op: "Booster",
+  eb: "Extra Booster",
+  prb: "Premium",
+  st: "Starter Deck",
+  promo: "Promo",
+  main: "Main",
+  organized: "Organized Play",
+  judge: "Judge",
+};
 
-function classify(code: string): TypeFilter {
+const TYPE_ORDER: SetType[] = ["op", "eb", "prb", "main", "st", "promo", "organized", "judge"];
+
+function classify(code: string): SetType {
+  if (["OGN", "SFD", "UNL"].includes(code)) return "main";
+  if (code === "OGS") return "st";
+  if (code === "OPP") return "organized";
+  if (code === "JDG") return "judge";
   if (code === "P" || code === "N") return "promo";
   if (code.startsWith("PRB")) return "prb";
   if (code.startsWith("OP")) return "op";
@@ -37,6 +47,18 @@ function fmtPct(v: number) {
   if (v === 0) return <span className="sv2-pct flat">0%</span>;
   const up = v > 0;
   return <span className={`sv2-pct ${up ? "up" : "dn"}`}>{`${up ? "+" : ""}${v}%`}</span>;
+}
+
+function isCatalogOnly(set: SetData) {
+  return set.pricingStatus === "catalog_only";
+}
+
+function hasLivePricing(set: SetData) {
+  return !isCatalogOnly(set) && !set.comingSoon && set.cards > 0;
+}
+
+function setCardCount(set: SetData) {
+  return set.cardsTotal ?? set.cards;
 }
 
 function SparkSVG({ data, up, w, h }: { data: number[]; up: boolean; w: number; h: number }) {
@@ -56,8 +78,8 @@ function SparkSVG({ data, up, w, h }: { data: number[]; up: boolean; w: number; 
   const last = pts[pts.length - 1]!;
   const first = pts[0]!;
   const fillPoly = `${first[0]},${h} ${poly} ${last[0]},${h}`;
-  const stroke = up ? "#00D68F" : "#FF4560";
-  const fillCol = up ? "rgba(0,214,143,0.13)" : "rgba(255,69,96,0.11)";
+  const stroke = up ? "#2D9961" : "#E04E4E";
+  const fillCol = up ? "rgba(45,153,97,0.16)" : "rgba(224,78,78,0.12)";
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", overflow: "visible" }}>
       <polygon points={fillPoly} fill={fillCol} />
@@ -72,20 +94,29 @@ function HeadlineCard({
   label,
   icon,
   metric,
+  gameRouteSlug,
 }: {
   set: SetData;
   label: string;
   icon: string;
-  metric: "30d" | "val" | "year";
+  metric: "30d" | "val" | "year" | "cards";
+  gameRouteSlug?: string | null;
 }) {
   const colorD = set.color + "22";
+  const catalogOnly = isCatalogOnly(set);
   let footer: React.ReactNode;
-  if (metric === "30d" || metric === "val") {
+  if (catalogOnly || metric === "cards") {
+    footer = (
+      <span className="sets-v2-hl-pct neutral" style={{ fontSize: 12 }}>
+        Catalog only
+      </span>
+    );
+  } else if (metric === "30d" || metric === "val") {
     const cls = set.chg30d === 0 ? "neutral" : set.chg30d >= 0 ? "up" : "dn";
     footer = (
       <span className={`sets-v2-hl-pct ${cls}`}>
-        {set.chg30d >= 0 ? "+" : ""}{set.chg30d}%{" "}
-        <span style={{ fontSize: 10, color: "var(--text2)", marginLeft: 4 }}>30D</span>
+        {set.chg30d === 0 ? "" : set.chg30d > 0 ? "+" : ""}{set.chg30d}%{" "}
+        <span style={{ fontSize: 10, color: "var(--ink-3)", marginLeft: 4 }}>30D</span>
       </span>
     );
   } else {
@@ -97,7 +128,7 @@ function HeadlineCard({
   }
   const style = { ["--hl-color" as string]: set.color, ["--hl-color-d" as string]: colorD } as React.CSSProperties;
   return (
-    <Link href={`/sets/${set.slug}`} className="sets-v2-hl" style={style}>
+    <Link href={gamePath(gameRouteSlug, `/sets/${set.slug}`)} className="sets-v2-hl" style={style}>
       <div className="sets-v2-hl-glow" />
       <div className="sets-v2-hl-head">
         <span className="sets-v2-hl-label">{label}</span>
@@ -112,7 +143,9 @@ function HeadlineCard({
         <div className="sets-v2-hl-name">{set.name}</div>
       </div>
       <div className="sets-v2-hl-stat-row">
-        <span className="sets-v2-hl-value">{fmtUsd(set.price)}</span>
+        <span className="sets-v2-hl-value">
+          {catalogOnly || metric === "cards" ? `${setCardCount(set).toLocaleString()} cards` : fmtUsd(set.price)}
+        </span>
         {footer}
       </div>
       <div className="sets-v2-hl-spark">
@@ -122,7 +155,17 @@ function HeadlineCard({
   );
 }
 
-export default function SetsClient({ initialSets }: { initialSets: SetData[] }) {
+export default function SetsClient({
+  initialSets,
+  gameRouteSlug,
+  gameName = "One Piece TCG",
+  loadError = null,
+}: {
+  initialSets: SetData[];
+  gameRouteSlug?: string | null;
+  gameName?: string;
+  loadError?: string | null;
+}) {
   const router = useRouter();
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [yearFilter, setYearFilter] = useState<string>("all");
@@ -132,6 +175,18 @@ export default function SetsClient({ initialSets }: { initialSets: SetData[] }) 
 
   const sets = initialSets;
   const totalCards = useMemo(() => sets.reduce((acc, s) => acc + (s.cardsTotal ?? s.cards), 0), [sets]);
+  const hasPricedSets = useMemo(() => sets.some(hasLivePricing), [sets]);
+  const pricingLabel = hasPricedSets ? <>Pricing via <b>JustTCG</b></> : <>Catalog preview</>;
+
+  const typeTabs = useMemo(() => {
+    const present = new Set<SetType>();
+    for (const s of sets) present.add(s.type ?? classify(s.code));
+    const tabs: Array<{ key: TypeFilter; label: string }> = [{ key: "all", label: "All" }];
+    for (const type of TYPE_ORDER) {
+      if (present.has(type)) tabs.push({ key: type, label: TYPE_LABELS[type] });
+    }
+    return tabs;
+  }, [sets]);
 
   const years = useMemo(() => {
     const ys = new Set<number>();
@@ -159,6 +214,7 @@ export default function SetsClient({ initialSets }: { initialSets: SetData[] }) 
       if (sort === "code") return a.code.localeCompare(b.code) * mult;
       if (sort === "name") return a.name.localeCompare(b.name) * mult;
       if (sort === "rank") return 0;
+      if (sort === "cards") return (setCardCount(a) - setCardCount(b)) * mult;
       const av = (a[sort] as number | undefined) ?? 0;
       const bv = (b[sort] as number | undefined) ?? 0;
       return (av - bv) * mult;
@@ -168,10 +224,16 @@ export default function SetsClient({ initialSets }: { initialSets: SetData[] }) 
 
   const headlineCards = useMemo(() => {
     if (sets.length === 0) return null;
-    const live = sets.filter((s) => !s.comingSoon && s.cards > 0);
+    const live = sets.filter(hasLivePricing);
     const pool = live.length > 0 ? live : sets;
-    const bigMover = [...pool].sort((a, b) => Math.abs(b.chg30d) - Math.abs(a.chg30d))[0]!;
-    const mostValuable = [...pool].sort((a, b) => b.price - a.price)[0]!;
+    const bigMover = [...pool].sort((a, b) => {
+      if (live.length === 0) return setCardCount(b) - setCardCount(a);
+      return Math.abs(b.chg30d) - Math.abs(a.chg30d);
+    })[0]!;
+    const mostValuable = [...pool].sort((a, b) => {
+      if (live.length === 0) return setCardCount(b) - setCardCount(a);
+      return b.price - a.price;
+    })[0]!;
     const newest = [...pool].sort((a, b) => {
       const ay = a.year ?? 0;
       const by = b.year ?? 0;
@@ -205,7 +267,7 @@ export default function SetsClient({ initialSets }: { initialSets: SetData[] }) 
 
       <div className="sets-v2-head">
         <div>
-          <div className="sets-v2-head-eyebrow">One Piece TCG</div>
+          <div className="sets-v2-head-eyebrow">{gameName}</div>
           <div className="sets-v2-head-title">
             Set <span>Index</span>
           </div>
@@ -214,7 +276,7 @@ export default function SetsClient({ initialSets }: { initialSets: SetData[] }) 
           </div>
         </div>
         <div className="sets-v2-head-meta">
-          Pricing via <b>JustTCG</b>
+          {pricingLabel}
           <br />
           {totalCards.toLocaleString()} cards tracked
         </div>
@@ -222,16 +284,28 @@ export default function SetsClient({ initialSets }: { initialSets: SetData[] }) 
 
       {headlineCards && (
         <div className="sets-v2-hl-row">
-          <HeadlineCard set={headlineCards.bigMover} label="Biggest Mover · 30D" icon="📈" metric="30d" />
-          <HeadlineCard set={headlineCards.mostValuable} label="Highest Index Value" icon="💎" metric="val" />
-          <HeadlineCard set={headlineCards.newest} label="Newest Release" icon="🆕" metric="year" />
+          <HeadlineCard
+            set={headlineCards.bigMover}
+            label={hasPricedSets ? "Biggest Mover · 30D" : "Largest Catalog"}
+            icon="📈"
+            metric={hasPricedSets ? "30d" : "cards"}
+            gameRouteSlug={gameRouteSlug}
+          />
+          <HeadlineCard
+            set={headlineCards.mostValuable}
+            label={hasPricedSets ? "Highest Index Value" : "Most Cards"}
+            icon="💎"
+            metric={hasPricedSets ? "val" : "cards"}
+            gameRouteSlug={gameRouteSlug}
+          />
+          <HeadlineCard set={headlineCards.newest} label="Newest Release" icon="🆕" metric="year" gameRouteSlug={gameRouteSlug} />
         </div>
       )}
 
       <div className="sets-v2-filter">
         <div className="sets-v2-filter-left">
           <div className="sets-v2-f-group">
-            {TYPE_TABS.map((t) => (
+            {typeTabs.map((t) => (
               <button
                 key={t.key}
                 type="button"
@@ -312,15 +386,17 @@ export default function SetsClient({ initialSets }: { initialSets: SetData[] }) 
           <tbody>
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={10} style={{ textAlign: "center", color: "var(--text3)", padding: 40 }}>
-                  No sets match these filters.
+                <td colSpan={10} style={{ textAlign: "center", color: "var(--ink-3)", padding: 40 }}>
+                  {loadError ?? "No sets match these filters."}
                 </td>
               </tr>
             ) : (
               sorted.map((s, i) => {
-                const empty = s.comingSoon || s.cards === 0;
+                const catalogOnly = isCatalogOnly(s);
+                const empty = !hasLivePricing(s);
+                const cardCount = setCardCount(s);
                 return (
-                  <tr key={s.code} onClick={() => router.push(`/sets/${s.slug}`)}>
+                  <tr key={s.code} onClick={() => router.push(gamePath(gameRouteSlug, `/sets/${s.slug}`))}>
                     <td className="sv2-rank">{i + 1}</td>
                     <td className="sv2-thumb-cell">
                       <SetThumb slug={s.slug} code={s.code} color={s.color} variant="table" />
@@ -335,7 +411,11 @@ export default function SetsClient({ initialSets }: { initialSets: SetData[] }) 
                     <td>
                       <div className="sv2-name">
                         {s.name}
-                        {empty && <span className="sv2-coming-soon">Coming Soon</span>}
+                        {catalogOnly ? (
+                          <span className="sv2-coming-soon">Catalog only</span>
+                        ) : (
+                          empty && <span className="sv2-coming-soon">Coming Soon</span>
+                        )}
                         <span className="sv2-row-arrow">→</span>
                       </div>
                     </td>
@@ -343,9 +423,9 @@ export default function SetsClient({ initialSets }: { initialSets: SetData[] }) 
                     <td>{empty ? <span className="sv2-pct flat">—</span> : fmtPct(s.chg1d)}</td>
                     <td>{empty ? <span className="sv2-pct flat">—</span> : fmtPct(s.chg7d)}</td>
                     <td>{empty ? <span className="sv2-pct flat">—</span> : fmtPct(s.chg30d)}</td>
-                    <td className="sv2-cards">{empty ? "—" : s.cards}</td>
+                    <td className="sv2-cards">{cardCount.toLocaleString()}</td>
                     <td className="sv2-spark">
-                      {empty ? <span style={{ color: "var(--text3)" }}>—</span> : <SparkSVG data={s.spark} up={s.chg30d >= 0} w={100} h={22} />}
+                      {empty ? <span style={{ color: "var(--ink-3)" }}>—</span> : <SparkSVG data={s.spark} up={s.chg30d >= 0} w={100} h={22} />}
                     </td>
                   </tr>
                 );
@@ -357,8 +437,16 @@ export default function SetsClient({ initialSets }: { initialSets: SetData[] }) 
 
       <div className="sets-v2-note">
         <div>
-          Index Value = sum of average market prices for every priced card in the set. Skewed by chase-card concentration.{" "}
-          <a href="#">Read methodology →</a>
+          {loadError ? (
+            loadError
+          ) : hasPricedSets ? (
+            <>
+              Index Value = sum of average market prices for every priced card in the set. Skewed by chase-card concentration.{" "}
+              <a href="#">Read methodology →</a>
+            </>
+          ) : (
+            "Catalog-only preview shows imported set and card counts. Pricing and market movement stay hidden until a provider is enabled."
+          )}
         </div>
         <div>
           {sets.length} sets · {totalCards.toLocaleString()} cards tracked

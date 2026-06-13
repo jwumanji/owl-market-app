@@ -9,6 +9,7 @@
 // expected for chase/variant rows.
 
 import fs from "node:fs";
+import { loadGameScope, scriptGameSlug, withGameFilter } from "./lib/supabase-game-scope.mjs";
 
 const BANDai_BASE = "https://en.onepiece-cardgame.com";
 const CARDLIST_URL = `${BANDai_BASE}/cardlist/`;
@@ -31,6 +32,7 @@ loadEnvFile();
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const GAME_SLUG = scriptGameSlug();
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
 }
@@ -268,8 +270,11 @@ function mdTable(headers, rows) {
   ].join("\n");
 }
 
-const sets = await sbFetchAll("sets?select=id,code,slug,name");
-const cards = await sbFetchAll("cards?select=id,set_id,card_image_id,card_number,name,rarity,variant_label");
+const GAME = await loadGameScope({ supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_KEY, gameSlug: GAME_SLUG });
+console.log(`Using game scope: ${GAME.slug}`);
+
+const sets = await sbFetchAll(withGameFilter("sets?select=id,code,slug,name", GAME.id));
+const cards = await sbFetchAll(withGameFilter("cards?select=id,set_id,card_image_id,card_number,name,rarity,variant_label", GAME.id));
 const setById = new Map(sets.map((set) => [set.id, set]));
 const dbByImageId = new Map();
 const dbBySetCode = new Map();
@@ -390,6 +395,7 @@ const report = [];
 report.push("# Bandai Rarity Comparison");
 report.push("");
 report.push(`Generated: ${generated}`);
+report.push(`Game: ${GAME.name ?? GAME.slug} (${GAME.slug})`);
 report.push("");
 report.push("## Scope");
 report.push("");

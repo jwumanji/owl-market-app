@@ -1,4 +1,5 @@
 import InventoryShell from "./InventoryShell";
+import AdminGameSwitcher from "../AdminGameSwitcher";
 import type { CenteringCeiling, InventoryRow } from "./InventoryTabs";
 import { loadBundleSummaries } from "../bundles/bundle-data";
 import { loadOrderSummaries } from "../orders/order-data";
@@ -8,6 +9,8 @@ import {
   loadPrivateCustomCardsByIds,
   type PrivateCustomCardRow,
 } from "@/lib/private-custom-cards";
+import { resolveGameScope } from "@/lib/game-scope";
+import { loadAdminGameOptions, type AdminGameOption } from "@/lib/admin-games";
 import { createServiceClient } from "@/lib/supabase-server";
 import { CATALOG_MATCH_STATUSES, type CatalogMatchStatus, type GradedRating } from "@/lib/inventory-options";
 
@@ -66,6 +69,7 @@ type CardLookupRow = {
 type InventoryPageSearchParams = {
   status?: string | string[];
   centering?: string | string[];
+  game?: string | string[];
 };
 
 const INVENTORY_STATUS_FILTERS = ["new", "grading", "sale", "ship", "sold"] as const;
@@ -82,6 +86,11 @@ function getInitialPsa10CandidatesOnly(searchParams?: InventoryPageSearchParams)
   const centering = Array.isArray(searchParams?.centering) ? searchParams?.centering[0] : searchParams?.centering;
 
   return centering === "psa10";
+}
+
+function getInitialGame(searchParams?: InventoryPageSearchParams) {
+  const game = Array.isArray(searchParams?.game) ? searchParams?.game[0] : searchParams?.game;
+  return game?.trim() || null;
 }
 
 const INVENTORY_SELECT_WITH_PSA = `
@@ -113,9 +122,11 @@ const INVENTORY_SELECT_BASE_LEGACY_MATCH = `
 `;
 
 const CATALOG_MATCH_STATUS_VALUES = new Set<string>(CATALOG_MATCH_STATUSES);
+const INVENTORY_CENTERING_LATEST_RELATION =
+  "inventory_centering_latest!centering_measurements_inventory_item_game_fk";
 
 function inventorySelectWithCentering(columns: string, psa10CandidatesOnly: boolean) {
-  return `${columns}, inventory_centering_latest${psa10CandidatesOnly ? "!inner" : ""}(psa_ceiling)`;
+  return `${columns}, ${INVENTORY_CENTERING_LATEST_RELATION}${psa10CandidatesOnly ? "!inner" : ""}(psa_ceiling)`;
 }
 
 function isMissingPsaColumnsError(error: { message?: string } | null) {
@@ -213,6 +224,7 @@ export default async function AdminInventoryPage({
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const initialStatusFilter = getInitialStatusFilter(resolvedSearchParams);
   const initialPsa10CandidatesOnly = getInitialPsa10CandidatesOnly(resolvedSearchParams);
+  const initialGame = getInitialGame(resolvedSearchParams);
   let supabase;
   let configError: string | null = null;
 
@@ -223,11 +235,31 @@ export default async function AdminInventoryPage({
   }
 
   let migrationWarning: string | null = null;
-  const inventoryResult = supabase
+  let gameScopeError: string | null = null;
+  let gameId: string | null = null;
+  let gameSlug: string | null = null;
+  let gameOptions: AdminGameOption[] = [];
+
+  if (supabase) {
+    const [gameResult, gamesResult] = await Promise.all([
+      resolveGameScope(supabase, initialGame, { defaultToOnePiece: true }),
+      loadAdminGameOptions(supabase).catch(() => [] as AdminGameOption[]),
+    ]);
+    gameOptions = gamesResult;
+    if (gameResult.error) {
+      gameScopeError = gameResult.error.message;
+    } else {
+      gameId = gameResult.game.id;
+      gameSlug = gameResult.game.slug;
+    }
+  }
+
+  const inventoryResult = supabase && gameId
     ? await (() => {
         let query = supabase
           .from("inventory_items")
-          .select(inventorySelectWithCentering(INVENTORY_SELECT_WITH_PSA, initialPsa10CandidatesOnly));
+          .select(inventorySelectWithCentering(INVENTORY_SELECT_WITH_PSA, initialPsa10CandidatesOnly))
+          .eq("game_id", gameId);
 
         if (initialPsa10CandidatesOnly) {
           query = query.eq("inventory_centering_latest.psa_ceiling", "PSA_10");
@@ -242,6 +274,7 @@ export default async function AdminInventoryPage({
 
   if (
     supabase &&
+    gameId &&
     (
       isMissingPsaColumnsError(inventoryResult.error) ||
       isMissingCatalogMatchStatusError(inventoryResult.error) ||
@@ -274,7 +307,8 @@ export default async function AdminInventoryPage({
       : fallbackInventorySelectBase;
     let fallbackQuery = supabase
       .from("inventory_items")
-      .select(inventorySelectWithCentering(fallbackInventorySelect, initialPsa10CandidatesOnly));
+      .select(inventorySelectWithCentering(fallbackInventorySelect, initialPsa10CandidatesOnly))
+      .eq("game_id", gameId);
 
     if (initialPsa10CandidatesOnly) {
       fallbackQuery = fallbackQuery.eq("inventory_centering_latest.psa_ceiling", "PSA_10");
@@ -303,22 +337,23 @@ export default async function AdminInventoryPage({
   let customCardMap = new Map<string, PrivateCustomCardRow>();
   let cardError: { message: string } | null = null;
 
-  if (supabase && cardIds.length > 0) {
+  if (supabase && gameId && cardIds.length > 0) {
     const cardsRes = await supabase
       .from("cards")
       .select(`
         id, name, image_url, image_url_small, card_number,
-        sets (code)
+        sets!cards_set_game_fk (code)
       `)
-      .in("id", cardIds);
+      .in("id", cardIds)
+      .eq("game_id", gameId);
 
     cardError = cardsRes.error;
     cardMap = new Map(((cardsRes.data ?? []) as unknown as CardLookupRow[]).map((card) => [card.id, card]));
   }
 
-  if (supabase && customCardIds.length > 0) {
+  if (supabase && gameId && customCardIds.length > 0) {
     const currentUser = await getCurrentAdminUser();
-    const customCardsRes = await loadPrivateCustomCardsByIds(supabase, currentUser?.id ?? null, customCardIds);
+    const customCardsRes = await loadPrivateCustomCardsByIds(supabase, currentUser?.id ?? null, customCardIds, gameId);
     if (customCardsRes.error && !isMissingPrivateCustomCardsError(customCardsRes.error)) {
       cardError = customCardsRes.error;
     } else {
@@ -328,39 +363,45 @@ export default async function AdminInventoryPage({
 
   const items = inventoryRows.map((row) => toInventoryRow(row, cardMap, customCardMap));
   const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
-  const orderResult = supabase
-    ? await loadOrderSummaries()
+  const orderResult = supabase && gameSlug
+    ? await loadOrderSummaries(gameSlug)
     : { data: [], error: null };
-  const bundleResult = supabase
-    ? await loadBundleSummaries()
+  const bundleResult = supabase && gameSlug
+    ? await loadBundleSummaries(gameSlug)
     : { data: [], error: null };
 
   return (
     <section className="mx-auto max-w-[1920px] px-5 py-8 sm:px-7 lg:px-10 xl:px-12">
-      <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div className="admin-page-head">
         <div>
-          <p className="mb-2 font-mono text-sm font-semibold uppercase tracking-wider text-owl">Internal Tool</p>
-          <h1 className="text-4xl font-bold tracking-tight text-text">Inventory</h1>
-          <p className="mt-2 max-w-2xl text-base text-text">
+          <p className="admin-eyebrow">Internal Tool</p>
+          <h1 className="admin-title">Inventory</h1>
+          <p className="admin-subline">
             Track cards by condition and movement stage: New, Grading, For Sale, Need Shipping, and Sold.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-3">
-          <div className="rounded-lg border border-border bg-surface px-4 py-3 text-right">
-            <div className="font-mono text-sm font-semibold uppercase tracking-wider text-text">Total Quantity</div>
-            <div className="mt-1 text-3xl font-bold text-text">{totalQuantity}</div>
+          {gameSlug && (
+            <AdminGameSwitcher
+              activeGameSlug={gameSlug}
+              games={gameOptions}
+            />
+          )}
+          <div className="admin-stat-card">
+            <div className="lbl">Total Quantity</div>
+            <div className="val">{totalQuantity}</div>
           </div>
         </div>
       </div>
 
-      {configError || error || cardError ? (
-        <div className="rounded-lg border border-loss/30 bg-loss/10 p-4 text-base text-text">
-          Inventory query failed: {configError ?? error?.message ?? cardError?.message}
+      {configError || gameScopeError || error || cardError ? (
+        <div className="rounded-lg border border-loss-2/40 bg-[#FBE3E3] p-4 text-base text-ink">
+          Inventory query failed: {configError ?? gameScopeError ?? error?.message ?? cardError?.message}
         </div>
       ) : (
         <>
           {migrationWarning && (
-            <div className="mb-4 rounded-lg border border-owl/40 bg-owl/10 p-4 text-sm font-semibold text-text">
+            <div className="mb-4 rounded-lg border border-gold bg-[#FBF0DA] p-4 text-sm font-semibold text-ink">
               {migrationWarning}
             </div>
           )}
@@ -372,6 +413,7 @@ export default async function AdminInventoryPage({
             bundlesError={bundleResult.error}
             initialStatusFilter={initialStatusFilter}
             initialPsa10CandidatesOnly={initialPsa10CandidatesOnly}
+            gameSlug={gameSlug ?? undefined}
           />
         </>
       )}

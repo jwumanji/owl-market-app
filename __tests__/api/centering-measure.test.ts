@@ -15,6 +15,15 @@ type LoadRouteOptions = {
   insertError?: DbError | null;
 };
 
+const onePieceGame = {
+  id: "game-one-piece",
+  slug: "one_piece",
+  name: "One Piece Card Game",
+  is_active: true,
+  is_public: true,
+  metadata: { route_slug: "one-piece" },
+};
+
 const requireFromTest = createRequire(import.meta.url);
 const routePath = path.resolve("src/app/api/centering/measure/route.ts");
 const routeSource = fs.readFileSync(routePath, "utf8");
@@ -114,10 +123,25 @@ function measurementResponse({
   };
 }
 
+type MeasurementRequestOptions = {
+  face?: string;
+  cardSessionId?: string;
+  cardIdentity?: string;
+  game?: string;
+  headers?: HeadersInit;
+};
+
+// Supports both calling conventions merged from the two branches:
+//   measurementRequest(id, "one_piece", headers)          — game-scope tests (main)
+//   measurementRequest(id, { face, cardSessionId, ... })  — Owl Lens tests (HEAD)
 function measurementRequest(
   inventoryItemId = "inventory-1",
-  options: { face?: string; cardSessionId?: string; cardIdentity?: string } = {}
+  gameOrOptions: string | MeasurementRequestOptions = {},
+  headers?: HeadersInit
 ) {
+  const options: MeasurementRequestOptions =
+    typeof gameOrOptions === "string" ? { game: gameOrOptions, headers } : gameOrOptions;
+
   const formData = new FormData();
   if (inventoryItemId) {
     formData.set("inventoryItemId", inventoryItemId);
@@ -125,10 +149,12 @@ function measurementRequest(
   if (options.face !== undefined) formData.set("face", options.face);
   if (options.cardSessionId !== undefined) formData.set("cardSessionId", options.cardSessionId);
   if (options.cardIdentity !== undefined) formData.set("cardIdentity", options.cardIdentity);
+  formData.set("game", options.game ?? "one_piece");
   formData.set("file", new File(["fake image"], "card.jpg", { type: "image/jpeg" }));
 
   return new Request("http://localhost/api/centering/measure", {
     method: "POST",
+    headers: options.headers,
     body: formData,
   });
 }
@@ -146,23 +172,55 @@ function loadRoute({
 
   const supabase = {
     from(table: string) {
-      if (table === "inventory_items") {
-        let selectedId = "";
+      if (table === "games") {
+        let matched = true;
         const query = {
           select(_columns: string) {
             return query;
           },
-          eq(_column: string, value: string) {
-            selectedId = value;
+          eq(column: string, value: string | boolean) {
+            if (column === "slug") {
+              matched = value === onePieceGame.slug;
+            } else if (column === "id") {
+              matched = value === onePieceGame.id;
+            }
+            return query;
+          },
+          filter(column: string, _operator: string, value: string) {
+            if (column === "metadata->>route_slug") {
+              matched = value === onePieceGame.metadata.route_slug;
+            }
+            return query;
+          },
+          maybeSingle() {
+            return Promise.resolve({ data: matched ? onePieceGame : null, error: null });
+          },
+        };
+        return query;
+      }
+
+      if (table === "inventory_items") {
+        let selectedId = "";
+        let selectedGameId = "";
+        const query = {
+          select(_columns: string) {
+            return query;
+          },
+          eq(column: string, value: string) {
+            if (column === "id") {
+              selectedId = value;
+            } else if (column === "game_id") {
+              selectedGameId = value;
+            }
             return query;
           },
           async single() {
             inventoryLookups.push(selectedId);
-            if (!inventoryFound) {
+            if (!inventoryFound || selectedGameId !== onePieceGame.id) {
               return { data: null, error: { message: "not found" } };
             }
 
-            return { data: { id: selectedId }, error: null };
+            return { data: { id: selectedId, game_id: selectedGameId }, error: null };
           },
         };
 
@@ -211,6 +269,15 @@ function loadRoute({
             },
           },
         };
+      },
+    },
+    "@/lib/admin-action-token": {
+      CENTERING_MEASURE_ACTION: "centering:measure",
+      verifyAdminActionToken(token: string | null, action: string) {
+        if (token === "valid-admin-action-token" && action === "centering:measure") {
+          return { ok: true, user: { id: "token-admin", email: "admin@example.com" } };
+        }
+        return { ok: false, reason: "invalid" };
       },
     },
     "@/lib/admin-auth": {
@@ -296,6 +363,43 @@ test("anonymous request returns 401 without DB write or CV call", async () => {
   assert.equal(route.insertedRows.length, 0);
 });
 
+test("non-admin authenticated request returns 403 without DB write or CV call", async () => {
+  const route = loadRoute({ user: { email: "not-admin@example.com" } });
+
+  const response = await route.POST(measurementRequest());
+
+  assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), { error: "This account is not allowed to access internal tools." });
+  assert.equal(route.serviceClientCalls, 0);
+  assert.equal(route.cvCalls.length, 0);
+  assert.equal(route.insertedRows.length, 0);
+});
+
+test("valid admin action token authorizes when Supabase session is not visible to the POST", async () => {
+  const cvBody = measurementResponse();
+  const cvText = JSON.stringify(cvBody);
+  const route = loadRoute({
+    user: null,
+    cvResponse: new Response(cvText, {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }),
+  });
+
+  const response = await route.POST(
+    measurementRequest("", "one_piece", {
+      "x-admin-action-token": "valid-admin-action-token",
+    })
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), cvText);
+  assert.equal(route.serviceClientCalls, 1);
+  assert.equal(route.cvCalls.length, 1);
+  assert.equal(route.insertedRows.length, 1);
+  assert.equal(route.insertedRows[0].inventory_item_id, null);
+});
+
 test("authenticated request with invalid inventoryItemId returns 404", async () => {
   const route = loadRoute({ inventoryFound: false });
 
@@ -327,6 +431,7 @@ test("happy path forwards CV response and inserts centering measurement", async 
   assert.deepEqual(route.inventoryLookups, ["inventory-1"]);
   assert.equal(route.insertedRows.length, 1);
   assert.deepEqual(JSON.parse(JSON.stringify(route.insertedRows[0])), {
+    game_id: "game-one-piece",
     inventory_item_id: "inventory-1",
     request_id: "00000000-0000-4000-8000-000000000001",
     left_pct: 52,
@@ -426,6 +531,7 @@ test("standalone request without inventoryItemId persists a null inventory link"
   assert.deepEqual(route.inventoryLookups, []);
   assert.equal(route.cvCalls.length, 1);
   assert.equal(route.insertedRows.length, 1);
+  assert.equal(route.insertedRows[0].game_id, "game-one-piece");
   assert.equal(route.insertedRows[0].inventory_item_id, null);
   assert.equal(route.insertedRows[0].psa_ceiling, "PSA_10");
 });

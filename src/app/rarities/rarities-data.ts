@@ -1,4 +1,5 @@
 export interface RarityCard {
+  cardId?: string;
   name: string;
   set: string;
   rarity: string;
@@ -10,6 +11,7 @@ export interface RarityCard {
   spark: number[];
   cardImageId?: string;
   imageSmall?: string | null;
+  imagePreview?: string | null;
 }
 
 export interface RarityData {
@@ -28,6 +30,7 @@ export interface RarityData {
   up: boolean;
   spark: number[];
   topCards: RarityCard[];
+  pricingStatus?: "priced" | "catalog_only";
 }
 
 /* ── Fixed tier ordering ── */

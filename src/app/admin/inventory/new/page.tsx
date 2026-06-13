@@ -4,18 +4,36 @@ export const metadata = {
   title: "Add Inventory - OWL Market",
 };
 
-export default function NewInventoryPage() {
+type NewInventorySearchParams = {
+  game?: string | string[];
+};
+
+function getInitialGame(searchParams?: NewInventorySearchParams) {
+  const game = Array.isArray(searchParams?.game) ? searchParams?.game[0] : searchParams?.game;
+  return game?.trim() || undefined;
+}
+
+export default async function NewInventoryPage({
+  searchParams,
+}: {
+  searchParams?: NewInventorySearchParams | Promise<NewInventorySearchParams>;
+}) {
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const gameSlug = getInitialGame(resolvedSearchParams);
+
   return (
-    <section className="mx-auto max-w-[1280px] px-4 py-8">
-      <div className="mb-6">
-        <p className="mb-2 font-mono text-sm font-semibold uppercase tracking-wider text-owl">Internal Tool</p>
-        <h1 className="text-4xl font-bold tracking-tight text-text">Add Inventory</h1>
-        <p className="mt-2 max-w-2xl text-base text-text">
-          Search the card catalog, then create itemized inventory entries for your store.
-        </p>
+    <section className="mx-auto max-w-[1100px] pl-7 pr-7 py-8">
+      <div className="admin-page-head">
+        <div>
+          <p className="admin-eyebrow">Internal Tool</p>
+          <h1 className="admin-title">Add Inventory</h1>
+          <p className="admin-subline">
+            Search the card catalog, then create itemized inventory entries for your store.
+          </p>
+        </div>
       </div>
 
-      <NewInventoryForm />
+      <NewInventoryForm gameSlug={gameSlug} />
     </section>
   );
 }

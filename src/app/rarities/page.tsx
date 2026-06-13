@@ -2,17 +2,31 @@
 
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
+import FastCardImage from "@/components/ui/FastCardImage";
+import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
+import { gamePath, gameQueryValue } from "@/lib/game-routes";
 import {
   RARITIES as FALLBACK_RARITIES,
   TOP_5_SLUGS,
   TIER_2_SLUGS,
+  type RarityCard,
   type RarityData,
 } from "./rarities-data";
 
-/* ── Helpers ── */
+type RarityViewMode = "list" | "grid";
 
-function rarityClass(rarity: string): string {
-  const r = rarity.toUpperCase();
+function safeNumber(value: number | string | null | undefined) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function safeCards(rarity: RarityData) {
+  return Array.isArray(rarity.topCards) ? rarity.topCards : [];
+}
+
+function rarityClass(rarity: string | null | undefined): string {
+  const r = (rarity ?? "").toUpperCase();
   if (r.includes("MANGA") || r === "MR") return "rb-mr";
   if (r.includes("GOLDEN") || r === "GMR") return "rb-gmr";
   if (r.includes("SECRET") || r === "SEC") return "rb-sec";
@@ -27,7 +41,12 @@ function rarityClass(rarity: string): string {
   return "rb-r";
 }
 
-function buildTieredRarities(apiData: RarityData[], fallback: RarityData[]) {
+function buildTieredRarities(apiData: RarityData[], fallback: RarityData[], useFallbackOrdering: boolean) {
+  if (!useFallbackOrdering) {
+    const all = apiData;
+    return { top5: all.slice(0, 5), tier2: all.slice(5, 10), all };
+  }
+
   const lookup = new Map<string, RarityData>();
   for (const r of apiData) lookup.set(r.slug, r);
   for (const r of fallback) if (!lookup.has(r.slug)) lookup.set(r.slug, r);
@@ -37,196 +56,537 @@ function buildTieredRarities(apiData: RarityData[], fallback: RarityData[]) {
   return { top5, tier2, all: [...top5, ...tier2] };
 }
 
-/* ── Rarity Ranking Card (top 5) ── */
-function RankCard({ r, rank, active, onClick }: { r: RarityData; rank: number; active: boolean; onClick: () => void }) {
+function routeParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function gameDisplayName(gameRouteSlug: string) {
+  if (gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG) return "One Piece TCG";
+  return gameRouteSlug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatCurrency(value: number | string | null | undefined, options: { compact?: boolean; decimals?: number } = {}) {
+  const amount = safeNumber(value);
+  if (amount <= 0) return "\u2014";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: options.compact ? "compact" : "standard",
+    maximumFractionDigits: options.decimals ?? (amount >= 100 ? 0 : 2),
+    minimumFractionDigits: options.decimals ?? 0,
+  }).format(amount);
+}
+
+function formatChange(value: number | string | null | undefined) {
+  const amount = safeNumber(value);
+  if (amount === 0) return "0%";
+  return `${amount > 0 ? "+" : ""}${amount}%`;
+}
+
+function changeClass(value: number | string | null | undefined) {
+  const amount = safeNumber(value);
+  if (amount === 0) return "flat";
+  return amount > 0 ? "up" : "dn";
+}
+
+function cardHref(card: RarityCard, catalogOnly: boolean, gameRouteSlug: string) {
+  if (catalogOnly && card.cardId) return gamePath(gameRouteSlug, `/catalog/${card.cardId}`);
+  if (card.cardImageId) return gamePath(gameRouteSlug, `/card/${card.cardImageId}`);
+  return undefined;
+}
+
+function ViewIcon({ type }: { type: RarityViewMode }) {
   return (
-    <div
-      className="ch-rank-card"
-      style={{
-        ["--ch-color" as string]: r.color,
-        ...(active ? { borderColor: r.color, boxShadow: `0 0 0 1px ${r.color}, 0 6px 20px rgba(0,0,0,0.35)` } : {}),
-      }}
-      onClick={onClick}
+    <span className={`rar-view-icon ${type}`} aria-hidden="true">
+      <span />
+      <span />
+      <span />
+      <span />
+    </span>
+  );
+}
+
+function RarityPerformanceCard({
+  rarity,
+  rank,
+  active,
+  onSelect,
+}: {
+  rarity: RarityData;
+  rank: number;
+  active: boolean;
+  onSelect: (slug: string) => void;
+}) {
+  const catalogOnly = rarity.pricingStatus === "catalog_only";
+  const cardCount = safeNumber(rarity.cardCount);
+
+  return (
+    <button
+      type="button"
+      className={`rar-rarity-card${active ? " active" : ""}`}
+      style={{ ["--rar-card-color" as string]: rarity.color || "var(--gold)" }}
+      onClick={() => onSelect(rarity.slug)}
     >
-      <div className="ch-rank-top">
-        <span className="ch-rank-num">#{rank}</span>
-        <span className={`rb ${rarityClass(r.code)}`} style={{ fontSize: 10 }}>{r.code}</span>
+      <div className="rar-card-topline">
+        <span className="rank-n">#{rank}</span>
+        <span className={`rb ${rarityClass(rarity.code)}`}>{rarity.code}</span>
       </div>
-      <div className="ch-rank-name">{r.name}</div>
-      <div className="ch-rank-sub">{r.cardCount > 0 ? `${r.cardCount} cards tracked` : "Coming soon"}</div>
-      <div className="ch-rank-price">
-        {r.indexValue > 0 ? `$${r.indexValue.toLocaleString()}` : "\u2014"}
-      </div>
-      <div className="ch-rank-chg" style={{ color: r.indexValue > 0 ? (r.up ? "var(--green)" : "var(--red)") : "var(--text2)" }}>
-        {r.indexValue > 0 ? (
-          <>
-            {r.up ? "\u2191" : "\u2193"} {Math.abs(r.chg7d)}% <span className="ch-rank-period">7D</span>
-          </>
-        ) : (
-          "\u00A0"
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ── Small Rank Card (tier 2, #6-10) ── */
-function SmallRankCard({ r, rank, active, onClick }: { r: RarityData; rank: number; active: boolean; onClick: () => void }) {
-  return (
-    <div
-      className="ch-rank-card ch-rank-card-sm"
-      style={{
-        ["--ch-color" as string]: r.color,
-        ...(active ? { borderColor: r.color, boxShadow: `0 0 0 1px ${r.color}, 0 4px 14px rgba(0,0,0,0.3)` } : {}),
-      }}
-      onClick={onClick}
-    >
-      <div className="ch-rank-top">
-        <span className="ch-rank-num">#{rank}</span>
-        <span className={`rb ${rarityClass(r.code)}`} style={{ fontSize: 9 }}>{r.code}</span>
-      </div>
-      <div className="ch-rank-name">{r.name}</div>
-      <div className="ch-rank-price">${r.indexValue.toLocaleString()}</div>
-      <div className="ch-rank-chg" style={{ color: r.up ? "var(--green)" : "var(--red)" }}>
-        {r.up ? "\u2191" : "\u2193"} {Math.abs(r.chg7d)}% <span className="ch-rank-period">7D</span>
-      </div>
-    </div>
-  );
-}
-
-/* ── Rarity Detail Panel ── */
-function RarityDetail({ r }: { r: RarityData }) {
-  return (
-    <div className="ch-detail">
-      <div className="ch-detail-header" style={{ background: `linear-gradient(135deg,${r.colorD},transparent)` }}>
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,transparent,${r.color},transparent)` }} />
-        <div className="rar-code-display" style={{ color: r.color }}>{r.code}</div>
-        <div className="ch-detail-badges">
-          <span className={`rb ${rarityClass(r.code)}`}>{r.code}</span>
-          <span className="ch-faction-badge">{r.cardCount > 0 ? `${r.cardCount} cards` : "Coming soon"}</span>
-        </div>
-        <div className="ch-detail-name">{r.name}</div>
-        <div className="ch-detail-sub">{r.subtitle}</div>
-      </div>
-      <div className="ch-detail-stats">
-        {r.indexValue > 0 ? (
-          [
-            ["Rarity Index", `$${r.indexValue.toLocaleString()}`, r.color],
-            ["Avg Card Price", `$${r.avgCardPrice.toFixed(2)}`, undefined],
-            ["7D Change", `${r.up ? "+" : ""}${r.chg7d}%`, r.up ? "var(--green)" : "var(--red)"],
-            ["30D Change", `${r.chg30d >= 0 ? "+" : ""}${r.chg30d}%`, r.chg30d >= 0 ? "var(--green)" : "var(--red)"],
-            ["Cards Tracked", String(r.cardCount), undefined],
-          ].map(([k, v, clr]) => (
-            <div className="ch-stat-row" key={k}>
-              <span className="ch-stat-key">{k}</span>
-              <span className="ch-stat-val" style={clr ? { color: clr } : undefined}>{v}</span>
-            </div>
-          ))
-        ) : (
-          <div className="ch-stat-row" style={{ justifyContent: "center", padding: "24px 0", color: "var(--text2)" }}>
-            Data coming soon
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ── Rarity Cards Table ── */
-function RarityCards({ r }: { r: RarityData }) {
-  return (
-    <div className="ch-cards-section">
-      <div className="section-header">
+      <div className="rar-card-name">{rarity.name}</div>
+      <div className="rar-card-sub">{catalogOnly ? "Catalog only" : rarity.subtitle}</div>
+      <div className="rar-card-value">{catalogOnly ? "\u2014" : formatCurrency(rarity.indexValue, { compact: true })}</div>
+      <div className="rar-card-metrics">
         <div>
-          <div className="section-title">Top Cards &mdash; <span style={{ color: r.color }}>{r.name}</span></div>
-          <div className="section-sub">
-            {r.topCards.length > 0
-              ? `${r.topCards.length} highest value ${r.code} cards across all sets`
-              : "No card data available yet"}
+          <span>Avg</span>
+          <strong>{catalogOnly ? "\u2014" : formatCurrency(rarity.avgCardPrice)}</strong>
+        </div>
+        <div>
+          <span>Cards</span>
+          <strong>{cardCount.toLocaleString()}</strong>
+        </div>
+        <div>
+          <span>7D</span>
+          <strong className={changeClass(rarity.chg7d)}>{catalogOnly ? "\u2014" : formatChange(rarity.chg7d)}</strong>
+        </div>
+        <div>
+          <span>30D</span>
+          <strong className={changeClass(rarity.chg30d)}>{catalogOnly ? "\u2014" : formatChange(rarity.chg30d)}</strong>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function RarityPerformanceTable({
+  rows,
+  activeSlug,
+  onSelect,
+  viewMode,
+  onViewModeChange,
+}: {
+  rows: RarityData[];
+  activeSlug: string;
+  onSelect: (slug: string) => void;
+  viewMode: RarityViewMode;
+  onViewModeChange: (mode: RarityViewMode) => void;
+}) {
+  const rankedRows = [...rows].sort((a, b) => {
+    const valueA = safeNumber(a.indexValue);
+    const valueB = safeNumber(b.indexValue);
+    const pricedA = valueA > 0 ? 1 : 0;
+    const pricedB = valueB > 0 ? 1 : 0;
+    if (pricedA !== pricedB) return pricedB - pricedA;
+    return valueB - valueA;
+  });
+
+  return (
+    <section className="rar-panel rar-performance-panel">
+      <div className="rar-panel-head">
+        <div>
+          <div className="section-title">Rarity Performance</div>
+          <div className="section-sub">Compare value, card count, and growth across rarity groups</div>
+        </div>
+        <div className="rar-panel-controls">
+          <div className="rar-view-toggle" aria-label="Rarity display mode">
+            <button
+              type="button"
+              className={viewMode === "list" ? "active" : undefined}
+              aria-label="List view"
+              aria-pressed={viewMode === "list"}
+              title="List view"
+              onClick={() => onViewModeChange("list")}
+            >
+              <ViewIcon type="list" />
+            </button>
+            <button
+              type="button"
+              className={viewMode === "grid" ? "active" : undefined}
+              aria-label="Card view"
+              aria-pressed={viewMode === "grid"}
+              title="Card view"
+              onClick={() => onViewModeChange("grid")}
+            >
+              <ViewIcon type="grid" />
+            </button>
+          </div>
+          <div className="rar-timeframe-pills" aria-label="Timeframe options">
+            <span>24H</span>
+            <span className="active">7D</span>
+            <span>30D</span>
+            <span>90D</span>
           </div>
         </div>
-        <Link href="/markets" className="section-action">View all in markets &rarr;</Link>
       </div>
-      {r.topCards.length > 0 ? (
-        <div className="cards-table-wrap">
-          <table className="cards-table">
-            <colgroup>
-              <col className="c0" /><col className="c1" /><col className="c2" /><col className="c3" />
-              <col className="c4" /><col className="c5" /><col className="c6" /><col className="c7" />
-            </colgroup>
-            <thead>
-              <tr>
-                <th>#</th><th>Card</th><th>Rarity</th><th className="r">Avg Price</th>
-                <th className="r">TCGPlayer</th><th className="r">24H</th><th className="r">7D</th>
-                <th className="r">30D</th>
-              </tr>
-            </thead>
-            <tbody>
-              {r.topCards.map((card, i) => {
-                const href = card.cardImageId ? `/card/${card.cardImageId}` : undefined;
-                return (
-                <tr key={i} onClick={href ? () => window.location.href = href : undefined} style={href ? { cursor: "pointer" } : undefined} className={href ? "tr-link" : undefined}>
-                  <td className="rank-n">{i + 1}</td>
+
+      {viewMode === "list" ? (
+      <div className="rar-table-wrap">
+        <table className="rar-performance-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Rarity</th>
+              <th className="r">Index Value</th>
+              <th className="r">Avg Card</th>
+              <th className="r">Cards</th>
+              <th className="r">7D</th>
+              <th className="r">30D</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rankedRows.map((rarity, index) => {
+              const active = rarity.slug === activeSlug;
+              const catalogOnly = rarity.pricingStatus === "catalog_only";
+              const cardCount = safeNumber(rarity.cardCount);
+
+              return (
+                <tr
+                  key={rarity.slug}
+                  className={active ? "active" : undefined}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onSelect(rarity.slug)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onSelect(rarity.slug);
+                    }
+                  }}
+                >
+                  <td className="rank-n">{index + 1}</td>
                   <td>
-                    <div className="card-cell">
-                      {card.imageSmall && (
-                        <img src={card.imageSmall} alt="" className="card-thumb" loading="lazy" />
-                      )}
-                      <div style={{ minWidth: 0 }}>
-                        <div className="card-name">{card.name}</div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 1 }}>
-                          <span className="card-set-tag">{card.set}</span>
-                        </div>
+                    <div className="rar-rarity-cell">
+                      <span className={`rb ${rarityClass(rarity.code)}`}>{rarity.code}</span>
+                      <div>
+                        <div className="rar-rarity-name">{rarity.name}</div>
+                        <div className="rar-rarity-sub">{catalogOnly ? "Catalog only" : rarity.subtitle}</div>
                       </div>
                     </div>
                   </td>
-                  <td><span className={`rb ${rarityClass(card.rarity)}`}>{card.rarity}</span></td>
-                  <td className="price-r">${card.avg.toFixed(2)}</td>
-                  <td className="price-r">${card.tcg}</td>
-                  <td className={`chg-r ${card.chg1d >= 0 ? "up" : "dn"}`}>{card.chg1d >= 0 ? "+" : ""}{card.chg1d}%</td>
-                  <td className={`chg-r ${card.chg7d >= 0 ? "up" : "dn"}`}>{card.chg7d >= 0 ? "+" : ""}{card.chg7d}%</td>
-                  <td className={`chg-r ${card.chg30d >= 0 ? "up" : "dn"}`}>{card.chg30d >= 0 ? "+" : ""}{card.chg30d}%</td>
+                  <td className="r rar-num">{catalogOnly ? "\u2014" : formatCurrency(rarity.indexValue, { compact: true })}</td>
+                  <td className="r rar-num">{catalogOnly ? "\u2014" : formatCurrency(rarity.avgCardPrice)}</td>
+                  <td className="r rar-num">{cardCount.toLocaleString()}</td>
+                  <td className={`r rar-change ${changeClass(rarity.chg7d)}`}>{catalogOnly ? "\u2014" : formatChange(rarity.chg7d)}</td>
+                  <td className={`r rar-change ${changeClass(rarity.chg30d)}`}>{catalogOnly ? "\u2014" : formatChange(rarity.chg30d)}</td>
                 </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
       ) : (
-        <div className="rar-coming-soon">
-          <p>Data for <strong>{r.name}</strong> is coming soon.</p>
+        <div className="rar-performance-grid">
+          {rankedRows.map((rarity, index) => (
+            <RarityPerformanceCard
+              key={rarity.slug}
+              rarity={rarity}
+              rank={index + 1}
+              active={rarity.slug === activeSlug}
+              onSelect={onSelect}
+            />
+          ))}
         </div>
       )}
+    </section>
+  );
+}
+
+function SelectedRarityHero({ rarity }: { rarity: RarityData }) {
+  const catalogOnly = rarity.pricingStatus === "catalog_only";
+  const indexValue = safeNumber(rarity.indexValue);
+  const hasPricing = indexValue > 0 && !catalogOnly;
+  const cardCount = safeNumber(rarity.cardCount);
+
+  return (
+    <section className="rar-index-hero" style={{ ["--rar-color" as string]: rarity.color || "var(--gold)", ["--rar-glow" as string]: rarity.colorD || "rgba(232,160,32,0.18)" }}>
+      <div className="rar-index-main">
+        <div className="rar-index-label">
+          <span className={`rb ${rarityClass(rarity.code)}`}>{rarity.code}</span>
+          <span>{rarity.name} Index Value</span>
+        </div>
+        <div className="rar-index-value">{hasPricing ? formatCurrency(indexValue, { decimals: 2 }) : "\u2014"}</div>
+        <div className="rar-index-sub">{rarity.subtitle}</div>
+      </div>
+      <div className="rar-index-metrics">
+        <div className="rar-metric-card">
+          <span>Avg Card</span>
+          <strong>{hasPricing ? formatCurrency(rarity.avgCardPrice) : "\u2014"}</strong>
+        </div>
+        <div className="rar-metric-card">
+          <span>7D</span>
+          <strong className={changeClass(rarity.chg7d)}>{hasPricing ? formatChange(rarity.chg7d) : "\u2014"}</strong>
+        </div>
+        <div className="rar-metric-card">
+          <span>30D</span>
+          <strong className={changeClass(rarity.chg30d)}>{hasPricing ? formatChange(rarity.chg30d) : "\u2014"}</strong>
+        </div>
+        <div className="rar-metric-card">
+          <span>Cards</span>
+          <strong>{cardCount.toLocaleString()}</strong>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FeaturedCard({
+  card,
+  index,
+  rarity,
+  catalogOnly,
+  gameRouteSlug,
+}: {
+  card: RarityCard;
+  index: number;
+  rarity: RarityData;
+  catalogOnly: boolean;
+  gameRouteSlug: string;
+}) {
+  const href = cardHref(card, catalogOnly, gameRouteSlug);
+  const indexValue = safeNumber(rarity.indexValue);
+  const share = indexValue > 0 ? (safeNumber(card.avg) / indexValue) * 100 : 0;
+  const content = (
+    <>
+      <div className="rar-feature-top">
+        <span>#{index + 1} highest value</span>
+        <span className={`rb ${rarityClass(card.rarity)}`}>{card.rarity}</span>
+      </div>
+      <div className="rar-feature-main">
+        {card.imageSmall ? (
+          <FastCardImage src={card.imageSmall} alt="" className="rar-feature-img" width={56} height={78} sizes="56px" loading="lazy" fetchPriority="low" />
+        ) : (
+          <span className="rar-feature-placeholder" />
+        )}
+        <div className="rar-feature-copy">
+          <div className="rar-feature-name">{card.name}</div>
+          <span className="card-set-tag">{card.set}</span>
+        </div>
+      </div>
+      <div className="rar-feature-bottom">
+        <div>
+          <div className="rar-feature-price">{catalogOnly ? "\u2014" : formatCurrency(card.avg)}</div>
+          <div className="rar-feature-share">{share > 0 ? `${share.toFixed(1)}% of ${rarity.code} index` : "Catalog preview"}</div>
+        </div>
+        <span className={`rar-change ${changeClass(card.chg30d)}`}>{catalogOnly ? "\u2014" : formatChange(card.chg30d)}</span>
+      </div>
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className="rar-feature-card">
+        {content}
+      </Link>
+    );
+  }
+
+  return <div className="rar-feature-card">{content}</div>;
+}
+
+function FullRankingTable({
+  rarity,
+  catalogOnly,
+  gameRouteSlug,
+}: {
+  rarity: RarityData;
+  catalogOnly: boolean;
+  gameRouteSlug: string;
+}) {
+  const cards = safeCards(rarity);
+
+  return (
+    <div className="cards-table-wrap rar-full-ranking">
+      <table className="cards-table">
+        <colgroup>
+          <col className="c0" />
+          <col className="c1" />
+          <col className="c2" />
+          <col className="c3" />
+          <col className="c4" />
+          <col className="c5" />
+          <col className="c6" />
+          <col className="c7" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Card</th>
+            <th>Rarity</th>
+            <th className="r">Avg Price</th>
+            <th className="r">TCGPlayer</th>
+            <th className="r">24H</th>
+            <th className="r">7D</th>
+            <th className="r">30D</th>
+          </tr>
+        </thead>
+        <tbody>
+          {cards.map((card, i) => {
+            const href = cardHref(card, catalogOnly, gameRouteSlug);
+            return (
+              <tr key={`${card.name}-${i}`} className={href ? "tr-link" : undefined}>
+                <td className="rank-n">{i + 1}</td>
+                <td>
+                  <div className="card-cell">
+                    {card.imageSmall ? (
+                      <FastCardImage src={card.imageSmall} alt="" className="card-thumb" width={28} height={38} sizes="28px" loading="lazy" fetchPriority="low" />
+                    ) : (
+                      <span className="card-art" />
+                    )}
+                    <div style={{ minWidth: 0 }}>
+                      {href ? (
+                        <Link href={href} className="rar-card-name-link">
+                          {card.name}
+                        </Link>
+                      ) : (
+                        <div className="card-name">{card.name}</div>
+                      )}
+                      <div className="rar-card-meta">
+                        <span className="card-set-tag">{card.set}</span>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <span className={`rb ${rarityClass(card.rarity)}`}>{card.rarity}</span>
+                </td>
+                <td className="price-r">{catalogOnly ? "\u2014" : formatCurrency(card.avg)}</td>
+                <td className="price-r">{catalogOnly ? "\u2014" : formatCurrency(card.tcg)}</td>
+                <td className={`chg-r ${changeClass(card.chg1d)}`}>{catalogOnly ? "\u2014" : formatChange(card.chg1d)}</td>
+                <td className={`chg-r ${changeClass(card.chg7d)}`}>{catalogOnly ? "\u2014" : formatChange(card.chg7d)}</td>
+                <td className={`chg-r ${changeClass(card.chg30d)}`}>{catalogOnly ? "\u2014" : formatChange(card.chg30d)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
 
-/* ── Main Page ── */
+function SelectedRarityCards({
+  rarity,
+  gameRouteSlug,
+  showFullRanking,
+  onToggleFullRanking,
+}: {
+  rarity: RarityData;
+  gameRouteSlug: string;
+  showFullRanking: boolean;
+  onToggleFullRanking: () => void;
+}) {
+  const catalogOnly = rarity.pricingStatus === "catalog_only";
+  const topCards = safeCards(rarity);
+  const featuredCards = topCards.slice(0, 3);
+
+  return (
+    <section className="rar-panel rar-top-cards-panel">
+      <div className="rar-panel-head">
+        <div>
+          <div className="section-title">
+            Top Cards <span>Within {rarity.name}</span>
+          </div>
+          <div className="section-sub">
+            {featuredCards.length > 0
+              ? `Showing the top ${featuredCards.length} ${rarity.code} cards by average market price`
+              : "No card ranking data is available yet"}
+          </div>
+        </div>
+        <Link href={gamePath(gameRouteSlug, catalogOnly ? "/catalog" : "/markets")} className="section-action">
+          Open {catalogOnly ? "catalog" : "markets"} &rarr;
+        </Link>
+      </div>
+
+      {featuredCards.length > 0 ? (
+        <>
+          <div className="rar-feature-grid">
+            {featuredCards.map((card, index) => (
+              <FeaturedCard
+                key={`${card.name}-${index}`}
+                card={card}
+                index={index}
+                rarity={rarity}
+                catalogOnly={catalogOnly}
+                gameRouteSlug={gameRouteSlug}
+              />
+            ))}
+          </div>
+
+          {topCards.length > 3 && !showFullRanking ? (
+            <div className="rar-ranking-preview">
+              {topCards.slice(3, 6).map((card, index) => (
+                <div className="rar-preview-row" key={`${card.name}-${index}`}>
+                  <span className="rank-n">{index + 4}</span>
+                  <span className="rar-preview-name">{card.name}</span>
+                  <span className="rar-num">{catalogOnly ? "\u2014" : formatCurrency(card.avg)}</span>
+                  <span className={`rar-change ${changeClass(card.chg30d)}`}>{catalogOnly ? "\u2014" : formatChange(card.chg30d)}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {topCards.length > 3 ? (
+            <div className="rar-ranking-actions">
+              <button type="button" className="rar-see-all-btn" onClick={onToggleFullRanking}>
+                {showFullRanking ? "Hide Full Ranking" : `View Full Ranking (${topCards.length} cards)`}
+              </button>
+            </div>
+          ) : null}
+
+          {showFullRanking ? (
+            <FullRankingTable rarity={rarity} catalogOnly={catalogOnly} gameRouteSlug={gameRouteSlug} />
+          ) : null}
+        </>
+      ) : (
+        <div className="rar-coming-soon">
+          <p>Card ranking for <strong>{rarity.name}</strong> is coming soon.</p>
+        </div>
+      )}
+    </section>
+  );
+}
 
 export default function RaritiesPage() {
-  const [allRarities, setAllRarities] = useState<RarityData[]>([]);
+  const params = useParams<{ game?: string | string[] }>();
+  const gameRouteSlug = routeParam(params.game) ?? DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
+  const isDefaultGame = gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
+  const [allRarities, setAllRarities] = useState<RarityData[]>(() => isDefaultGame ? FALLBACK_RARITIES : []);
   const [activeRarity, setActiveRarity] = useState<string>(TOP_5_SLUGS[0]);
+  const [rarityViewMode, setRarityViewMode] = useState<RarityViewMode>("list");
+  const [showFullRanking, setShowFullRanking] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/rarities", { cache: "no-store" })
+    if (isDefaultGame) {
+      setAllRarities(FALLBACK_RARITIES);
+      setActiveRarity(TOP_5_SLUGS[0]);
+    } else {
+      setAllRarities([]);
+    }
+    setShowFullRanking(false);
+    setLoading(true);
+    const query = new URLSearchParams({ game: gameQueryValue(gameRouteSlug) });
+    fetch(`/api/rarities?${query}`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
           setAllRarities(data);
+          if (!isDefaultGame) setActiveRarity(data[0].slug);
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [gameRouteSlug, isDefaultGame]);
 
-  const { top5, tier2, all } = buildTieredRarities(allRarities, FALLBACK_RARITIES);
-  const r = all.find((x) => x.slug === activeRarity) || top5[0];
-  const showSkeleton = loading || allRarities.length === 0 || !r;
+  const { top5, all } = buildTieredRarities(allRarities, FALLBACK_RARITIES, isDefaultGame);
+  const active = all.find((x) => x.slug === activeRarity) || top5[0];
+  const showSkeleton = !isDefaultGame && (loading || allRarities.length === 0 || !active);
+  const showEmpty = !loading && !isDefaultGame && all.length === 0;
 
   const selectRarity = useCallback((slug: string) => {
     setActiveRarity(slug);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setShowFullRanking(false);
   }, []);
 
   return (
@@ -234,72 +594,51 @@ export default function RaritiesPage() {
       <div className="breadcrumb">
         <Link href="/">OWL Market</Link>
         <span className="bsep"> &rsaquo; </span>
-        <span style={{ color: "var(--text)" }}>Rarities</span>
+        <span style={{ color: "var(--ink)" }}>Rarities</span>
       </div>
-      <div className="ph-eyebrow">One Piece TCG</div>
+      <div className="ph-eyebrow">{gameDisplayName(gameRouteSlug)}</div>
       <div className="ph-title">
         Rarity <span>Index</span>
       </div>
       <div className="ph-sub">
         {showSkeleton
           ? "Loading live data..."
-          : `${all.length} categories tracked \u00B7 Ranked by total card value \u00B7 Updates with live data`}
+          : `${all.length} categories tracked \u00B7 Compare rarity growth \u00B7 Drill into top cards`}
       </div>
 
-      {showSkeleton ? (
+      {showEmpty ? (
+        <div className="rar-coming-soon">
+          <p>
+            No rarity taxonomy is available for <strong>{gameDisplayName(gameRouteSlug)}</strong> yet.
+          </p>
+          <Link href={gamePath(gameRouteSlug, "/catalog")} className="section-action">
+            Open catalog &rarr;
+          </Link>
+        </div>
+      ) : showSkeleton ? (
+        <div className="rar-skeleton-grid">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rar-skeleton-card" />
+          ))}
+        </div>
+      ) : active ? (
         <>
-          <div className="ch-rank-row">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="ch-rank-card" style={{ opacity: 0.5 }}>
-                <div className="ch-rank-top"><span className="ch-rank-num">#{i + 1}</span></div>
-                <div className="ch-rank-name">&nbsp;</div>
-                <div className="ch-rank-sub">&nbsp;</div>
-                <div className="ch-rank-price">&mdash;</div>
-                <div className="ch-rank-chg">&nbsp;</div>
-              </div>
-            ))}
-          </div>
-          <div className="ch-rank-row ch-rank-row-sm">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="ch-rank-card ch-rank-card-sm" style={{ opacity: 0.5 }}>
-                <div className="ch-rank-top"><span className="ch-rank-num">#{i + 6}</span></div>
-                <div className="ch-rank-name">&nbsp;</div>
-                <div className="ch-rank-price">&mdash;</div>
-                <div className="ch-rank-chg">&nbsp;</div>
-              </div>
-            ))}
-          </div>
+          <RarityPerformanceTable
+            rows={all}
+            activeSlug={active.slug}
+            onSelect={selectRarity}
+            viewMode={rarityViewMode}
+            onViewModeChange={setRarityViewMode}
+          />
+          <SelectedRarityHero rarity={active} />
+          <SelectedRarityCards
+            rarity={active}
+            gameRouteSlug={gameRouteSlug}
+            showFullRanking={showFullRanking}
+            onToggleFullRanking={() => setShowFullRanking((value) => !value)}
+          />
         </>
-      ) : (
-        <>
-          {/* Top 5 large cards */}
-          <div className="ch-rank-row">
-            {top5.map((rar, i) => (
-              <RankCard key={rar.slug} r={rar} rank={i + 1} active={activeRarity === rar.slug} onClick={() => selectRarity(rar.slug)} />
-            ))}
-          </div>
-
-          {/* Tier 2 smaller cards (#6-10) */}
-          <div className="ch-rank-row ch-rank-row-sm">
-            {tier2.map((rar, i) => (
-              <SmallRankCard key={rar.slug} r={rar} rank={i + 6} active={activeRarity === rar.slug} onClick={() => selectRarity(rar.slug)} />
-            ))}
-          </div>
-
-          {/* Detail + Cards table */}
-          <div className="ch-detail-section">
-            <RarityDetail r={r} />
-            <RarityCards r={r} />
-          </div>
-        </>
-      )}
-
-      {/* See All Cards */}
-      <div className="rar-see-all">
-        <Link href="/markets" className="rar-see-all-btn">
-          See All Cards &rarr;
-        </Link>
-      </div>
+      ) : null}
     </section>
   );
 }

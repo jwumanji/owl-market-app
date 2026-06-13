@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { DEFAULT_PUBLIC_GAME_DB_SLUG } from "@/lib/game-scope";
 
 export type PsaSubmissionItemView = {
   row_number: number | null;
@@ -33,6 +34,7 @@ export type PsaSubmissionView = {
 
 type Props = {
   initialSubmissions: PsaSubmissionView[];
+  gameSlug?: string;
 };
 
 type GradeCount = {
@@ -158,11 +160,29 @@ function resultLabel(item: PsaSubmissionItemView) {
 }
 
 function resultClassName(item: PsaSubmissionItemView) {
-  if (item.result_status === "already_in_inventory") return "border-blue/50 bg-blue/10 text-blue";
-  if (item.skipped_duplicate) return "border-border bg-surf2 text-text-2";
-  if (item.result_status === "needs_match" || !item.matched) return "border-owl/50 bg-owl/10 text-owl";
-  return "border-gain/50 bg-gain/10 text-gain";
+  if (item.result_status === "already_in_inventory") return "border-select bg-[#F2F5FB] text-select";
+  if (item.skipped_duplicate) return "border-ink-3 bg-bg-2 text-ink-3";
+  if (item.result_status === "needs_match" || !item.matched) return "border-coral bg-[#FFE2DD] text-coral";
+  return "border-gain-2 bg-[#DCF1E6] text-gain-2";
 }
+
+function gradeBucket(label: string): "g10" | "g9" | "g8" | "g7" | "glow" {
+  const number = Number(label.match(/\d+(?:\.\d+)?/)?.[0]);
+  if (!Number.isFinite(number)) return "glow";
+  if (number >= 10) return "g10";
+  if (number >= 9) return "g9";
+  if (number >= 8) return "g8";
+  if (number >= 7) return "g7";
+  return "glow";
+}
+
+const GRADE_PILL_CLASS: Record<"g10" | "g9" | "g8" | "g7" | "glow", string> = {
+  g10: "border-grade-10 bg-[#DCF1E6] text-grade-10",
+  g9: "border-grade-9 bg-[#ECF2D9] text-grade-9",
+  g8: "border-grade-8 bg-[#FBF0DA] text-grade-8b",
+  g7: "border-grade-7 bg-[#FBE6D6] text-grade-7",
+  glow: "border-grade-low bg-[#FBE3E3] text-grade-low",
+};
 
 function sampleThumbnails(items: PsaSubmissionItemView[]) {
   return items.filter((item) => item.thumbnail_url).slice(0, 5);
@@ -189,23 +209,32 @@ function EditIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
 function GradePills({ counts }: { counts: GradeCount[] }) {
   if (counts.length === 0) {
     return (
-      <span className="rounded-md border border-border bg-deep px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-text-2">
+      <span className="inline-flex items-center rounded-c-sm border-[1.5px] border-ink-3 bg-bg-2 px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.07em] text-ink-3">
         No Grades
       </span>
     );
   }
 
-  return counts.map((grade) => (
-    <span
-      key={grade.label}
-      className="rounded-md border border-owl/40 bg-owl/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-owl"
-    >
-      {grade.label} <span className="text-text">{grade.count}</span>
-    </span>
-  ));
+  return counts.map((grade) => {
+    const bucket = gradeBucket(grade.label);
+    return (
+      <span
+        key={grade.label}
+        className={`inline-flex items-center gap-2 rounded-c-pill border-[1.5px] px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.05em] ${GRADE_PILL_CLASS[bucket]}`}
+      >
+        {grade.label}
+        <span className="inline-flex h-[19px] min-w-[19px] items-center justify-center rounded-c-pill bg-ink px-1.5 font-mono text-[10.5px] font-extrabold leading-none text-bg">
+          {grade.count}
+        </span>
+      </span>
+    );
+  });
 }
 
-export default function PsaSubmissionsClient({ initialSubmissions }: Props) {
+export default function PsaSubmissionsClient({
+  initialSubmissions,
+  gameSlug = DEFAULT_PUBLIC_GAME_DB_SLUG,
+}: Props) {
   const [submissions, setSubmissions] = useState(initialSubmissions);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -235,10 +264,10 @@ export default function PsaSubmissionsClient({ initialSubmissions }: Props) {
 
     setSavingId(submission.id);
     setError(null);
-    const res = await fetch(`/api/admin/psa-submissions/${submission.id}`, {
+    const res = await fetch(`/api/admin/psa-submissions/${submission.id}?game=${encodeURIComponent(gameSlug)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: nextName }),
+      body: JSON.stringify({ name: nextName, game: gameSlug }),
     });
     const payload = await res.json().catch(() => null);
     setSavingId(null);
@@ -257,7 +286,7 @@ export default function PsaSubmissionsClient({ initialSubmissions }: Props) {
   return (
     <>
       {error && (
-        <div className="mb-4 rounded-md border border-loss/30 bg-loss/10 p-3 text-sm font-semibold text-text">
+        <div className="mb-4 rounded-c-md border-[1.5px] border-coral bg-[#FFE2DD] px-4 py-3 font-grotesk text-sm font-semibold text-ink">
           {error}
         </div>
       )}
@@ -273,11 +302,11 @@ export default function PsaSubmissionsClient({ initialSubmissions }: Props) {
             <article
               key={submission.id}
               id={`submission-${submission.id}`}
-              className="rounded-lg border border-border bg-surface p-5"
+              className="admin-card p-6"
             >
               <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
                 <div className="min-w-0">
-                  <div className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
+                  <div className="font-mono text-[11px] font-semibold uppercase tracking-wider text-ink-2">
                     {formatDate(submission.submitted_at)}
                   </div>
                   {isEditing ? (
@@ -285,32 +314,34 @@ export default function PsaSubmissionsClient({ initialSubmissions }: Props) {
                       <input
                         value={draftName}
                         onChange={(event) => setDraftName(event.target.value)}
-                        className="min-w-0 flex-1 rounded-md border border-owl bg-deep px-3 py-2.5 text-lg font-bold text-text outline-none"
+                        className="admin-input min-w-0 flex-1 !h-auto !py-2.5 text-lg font-bold"
                         autoFocus
                       />
                       <button
                         type="button"
                         onClick={() => saveRename(submission)}
                         disabled={!draftName.trim() || savingId === submission.id}
-                        className="rounded-md bg-owl px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-void disabled:cursor-not-allowed disabled:bg-surf3 disabled:text-text-3"
+                        className="admin-btn admin-btn-primary disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {savingId === submission.id ? "Saving" : "Save"}
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditingId(null)}
-                        className="rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text hover:border-border-2 hover:text-owl"
+                        className="admin-btn admin-btn-ghost"
                       >
                         Cancel
                       </button>
                     </div>
                   ) : (
                     <div className="mt-1 flex min-w-0 items-center gap-2">
-                      <h2 className="truncate text-2xl font-bold text-owl">{submission.name}</h2>
+                      <h2 className="truncate font-grotesk text-2xl font-bold tracking-tight text-ink">
+                        {submission.name}
+                      </h2>
                       <button
                         type="button"
                         onClick={() => beginRename(submission)}
-                        className="rounded-md border border-border bg-deep p-2 text-text-2 transition-colors hover:border-border-2 hover:text-owl"
+                        className="flex h-8 w-8 items-center justify-center rounded-c-sm border-[1.5px] border-ink-3 bg-bg-2 text-ink-2 transition-colors hover:border-ink hover:text-ink"
                         aria-label={`Rename ${submission.name}`}
                       >
                         <EditIcon />
@@ -318,30 +349,31 @@ export default function PsaSubmissionsClient({ initialSubmissions }: Props) {
                     </div>
                   )}
                   {orderNumber && (
-                    <div className="mt-1 font-mono text-sm font-extrabold uppercase tracking-wider text-blue">
-                      ORDER # <span className="text-owl">{orderNumber}</span>
+                    <div className="mt-1.5 font-mono text-xs font-bold uppercase tracking-[0.08em] text-ink-2">
+                      Order # <span className="text-coral">{orderNumber}</span>
                     </div>
                   )}
-                  <div className="mt-2 flex flex-wrap gap-2 font-mono text-xs text-text-2">
+                  <div className="mt-2 flex flex-wrap gap-3.5 font-mono text-[11px] font-medium text-ink-2">
                     {submission.source_filename && <span>Source: {submission.source_filename}</span>}
                     <span>Created: {formatDate(submission.created_at)}</span>
                   </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <span className="rounded-md border border-blue/40 bg-blue/10 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wider text-blue">
-                      Cards <span className="text-text">{submission.total_rows ?? submission.items.length}</span>
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-c-sm border-[1.5px] border-ink bg-bg-3 px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.07em] text-ink-2">
+                      Cards <span className="text-ink">{submission.total_rows ?? submission.items.length}</span>
                     </span>
                     <GradePills counts={grades} />
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-3 xl:items-end">
-                  <div className="flex h-16 items-center justify-start xl:justify-end">
+                <div className="flex flex-col items-start gap-3.5 xl:items-end">
+                  <div className="flex h-[70px] items-center justify-start xl:justify-end">
                     {thumbnails.length > 0 ? (
-                      <div className="flex -space-x-2">
-                        {thumbnails.map((item) => (
+                      <div className="flex">
+                        {thumbnails.map((item, index) => (
                           <div
                             key={`${submission.id}-${item.row_number}-${item.certification_number}`}
-                            className="h-16 w-12 overflow-hidden rounded-md border border-border-2 bg-deep"
+                            className="h-[70px] w-[50px] overflow-hidden rounded-md border-[1.5px] border-ink bg-bg-2 shadow-[0_0_0_2.5px_var(--bg-2)]"
+                            style={{ marginLeft: index === 0 ? 0 : -12 }}
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
@@ -353,7 +385,7 @@ export default function PsaSubmissionsClient({ initialSubmissions }: Props) {
                         ))}
                       </div>
                     ) : (
-                      <div className="rounded-md border border-dashed border-border px-4 py-3 font-mono text-xs uppercase tracking-wider text-text-2">
+                      <div className="rounded-c-sm border-[1.5px] border-dashed border-ink-3 px-4 py-3 font-mono text-[11px] font-semibold uppercase tracking-wider text-ink-3">
                         No Images
                       </div>
                     )}
@@ -361,7 +393,7 @@ export default function PsaSubmissionsClient({ initialSubmissions }: Props) {
                   <button
                     type="button"
                     onClick={() => setSelectedId(submission.id)}
-                    className="rounded-md border border-owl bg-owl/10 px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/15"
+                    className="admin-btn admin-btn-ghost"
                   >
                     View Items
                   </button>
@@ -373,17 +405,19 @@ export default function PsaSubmissionsClient({ initialSubmissions }: Props) {
       </div>
 
       {selectedSubmission && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="flex max-h-[90vh] w-full max-w-[1480px] flex-col overflow-hidden rounded-lg border border-border-2 bg-surface shadow-2xl shadow-black/50">
-            <div className="flex flex-col gap-3 border-b border-border p-5 md:flex-row md:items-start md:justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4">
+          <div className="flex max-h-[90vh] w-full max-w-[1480px] flex-col overflow-hidden rounded-c-md border-[1.5px] border-ink bg-bg-2 shadow-[0_24px_64px_rgba(26,15,8,0.32)]">
+            <div className="flex flex-col gap-3 border-b-[1.5px] border-ink bg-bg-3 px-6 py-5 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0">
-                <div className="font-mono text-xs font-semibold uppercase tracking-wider text-text-2">
+                <div className="font-mono text-[11px] font-semibold uppercase tracking-wider text-ink-2">
                   {formatDate(selectedSubmission.submitted_at)}
                 </div>
-                <h2 className="mt-1 text-2xl font-bold text-owl">{selectedSubmission.name}</h2>
+                <h2 className="mt-1 font-grotesk text-xl font-bold tracking-tight text-ink">
+                  {selectedSubmission.name}
+                </h2>
                 {selectedOrderNumber && (
-                  <div className="mt-1 font-mono text-sm font-extrabold uppercase tracking-wider text-blue">
-                    ORDER # <span className="text-owl">{selectedOrderNumber}</span>
+                  <div className="mt-1 font-mono text-xs font-bold uppercase tracking-[0.08em] text-ink-2">
+                    Order # <span className="text-coral">{selectedOrderNumber}</span>
                   </div>
                 )}
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -393,35 +427,35 @@ export default function PsaSubmissionsClient({ initialSubmissions }: Props) {
               <button
                 type="button"
                 onClick={() => setSelectedId(null)}
-                className="rounded-md border border-border bg-surf2 px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text hover:border-border-2 hover:text-owl"
+                className="admin-btn admin-btn-ghost"
               >
                 Close
               </button>
             </div>
             <div className="overflow-auto">
               <table className="w-full min-w-[1080px] border-collapse text-left">
-                <thead className="sticky top-0 bg-surf2">
-                  <tr className="font-mono text-xs font-bold uppercase tracking-wider text-text">
-                    <th className="px-4 py-3">Image</th>
-                    <th className="px-4 py-3">Row</th>
-                    <th className="px-4 py-3">Result</th>
-                    <th className="px-4 py-3">Card</th>
-                    <th className="px-4 py-3">Set</th>
-                    <th className="px-4 py-3">Card #</th>
-                    <th className="px-4 py-3">Grade</th>
-                    <th className="px-4 py-3">Certification</th>
-                    <th className="px-4 py-3">Images</th>
+                <thead className="sticky top-0 bg-bg-3">
+                  <tr className="font-mono text-[11px] font-semibold uppercase tracking-[0.07em] text-ink-2">
+                    <th className="px-4 py-3 font-semibold">Image</th>
+                    <th className="px-4 py-3 font-semibold">Row</th>
+                    <th className="px-4 py-3 font-semibold">Result</th>
+                    <th className="px-4 py-3 font-semibold">Card</th>
+                    <th className="px-4 py-3 font-semibold">Set</th>
+                    <th className="px-4 py-3 font-semibold">Card #</th>
+                    <th className="px-4 py-3 font-semibold">Grade</th>
+                    <th className="px-4 py-3 font-semibold">Certification</th>
+                    <th className="px-4 py-3 font-semibold">Images</th>
                   </tr>
                 </thead>
                 <tbody>
                   {selectedSubmission.items.map((item) => (
                     <tr
                       key={`${selectedSubmission.id}-${item.row_number}-${item.certification_number}`}
-                      className="border-t border-border text-sm text-text"
+                      className="border-t border-t-bg-3 text-sm text-ink"
                     >
                       <td className="px-4 py-3">
                         {item.thumbnail_url ? (
-                          <div className="h-20 w-14 overflow-hidden rounded-md border border-border bg-deep">
+                          <div className="h-20 w-14 overflow-hidden rounded-md border-[1.5px] border-ink bg-bg-2">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={item.thumbnail_url}
@@ -430,27 +464,29 @@ export default function PsaSubmissionsClient({ initialSubmissions }: Props) {
                             />
                           </div>
                         ) : (
-                          <div className="flex h-20 w-14 items-center justify-center rounded-md border border-dashed border-border bg-deep font-mono text-[10px] uppercase text-text-2">
+                          <div className="flex h-20 w-14 items-center justify-center rounded-md border-[1.5px] border-dashed border-ink-3 bg-bg-2 font-mono text-[10px] uppercase text-ink-3">
                             No Img
                           </div>
                         )}
                       </td>
-                      <td className="px-4 py-3 font-mono text-text-2">{item.row_number ?? "-"}</td>
+                      <td className="px-4 py-3 font-mono text-xs font-semibold text-ink-2">{item.row_number ?? "-"}</td>
                       <td className="px-4 py-3">
                         <span
-                          className={`inline-flex rounded border px-2 py-1 font-mono text-xs font-bold uppercase tracking-wider ${resultClassName(
+                          className={`inline-flex rounded-c-pill border-[1.5px] px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.06em] ${resultClassName(
                             item
                           )}`}
                         >
                           {resultLabel(item)}
                         </span>
                       </td>
-                      <td className="max-w-[360px] px-4 py-3 font-bold text-text">{item.card_name ?? "Unknown Card"}</td>
-                      <td className="px-4 py-3 font-mono text-text-2">{item.set_code ?? "-"}</td>
-                      <td className="px-4 py-3 font-mono text-text-2">{item.card_number ?? "-"}</td>
-                      <td className="px-4 py-3 font-mono font-bold text-owl">{item.graded_rating ?? "-"}</td>
-                      <td className="px-4 py-3 font-mono text-text">{item.certification_number ?? "-"}</td>
-                      <td className="px-4 py-3 text-xs text-text-2">{item.image_status ?? "-"}</td>
+                      <td className="max-w-[360px] px-4 py-3 font-grotesk text-[13px] font-bold text-ink">
+                        {item.card_name ?? "Unknown Card"}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs font-semibold text-ink-2">{item.set_code ?? "-"}</td>
+                      <td className="px-4 py-3 font-mono text-xs font-semibold text-ink-2">{item.card_number ?? "-"}</td>
+                      <td className="px-4 py-3 font-mono text-xs font-bold text-ink">{item.graded_rating ?? "-"}</td>
+                      <td className="px-4 py-3 font-mono text-xs font-semibold text-ink">{item.certification_number ?? "-"}</td>
+                      <td className="px-4 py-3 font-mono text-[11px] font-medium text-ink-2">{item.image_status ?? "-"}</td>
                     </tr>
                   ))}
                 </tbody>

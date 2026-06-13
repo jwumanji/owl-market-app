@@ -16,19 +16,14 @@ export async function getCurrentAdminUser(): Promise<CurrentAdminUser | null> {
   const cookieStore = cookies();
   const supabase = createServerClient(url, anonKey, {
     cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
+      getAll() {
+        return cookieStore.getAll().map(({ name, value }) => ({ name, value }));
       },
-      set(name: string, value: string, options) {
+      setAll(cookiesToSet) {
         try {
-          cookieStore.set({ name, value, ...options });
-        } catch {
-          // Server components cannot set cookies; API routes can.
-        }
-      },
-      remove(name: string, options) {
-        try {
-          cookieStore.set({ name, value: "", ...options });
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set({ name, value, ...options });
+          });
         } catch {
           // Server components cannot set cookies; API routes can.
         }

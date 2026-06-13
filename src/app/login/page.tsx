@@ -7,7 +7,7 @@ export const metadata = {
 
 export default function LoginPage() {
   return (
-    <section className="mx-auto flex min-h-[calc(100vh-var(--top))] max-w-[1280px] items-center justify-center px-4 py-10">
+    <section className="login-page flex min-h-[calc(100vh-var(--top))] w-full items-center justify-center px-6 py-12">
       <Suspense>
         <LoginForm />
       </Suspense>

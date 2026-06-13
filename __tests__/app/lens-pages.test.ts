@@ -102,6 +102,7 @@ test("pregrade page renders the standalone pregrade workspace", () => {
       module: moduleStub,
       process,
       require: localRequire,
+      URLSearchParams,
     }),
     { filename: pagePath }
   );

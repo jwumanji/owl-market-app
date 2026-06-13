@@ -27,8 +27,11 @@ export interface CardRow {
   rarity: string | null;
   card_type: string | null;
   color: string[];
+  game_payload?: Record<string, unknown> | null;
+  printed_set_code?: string | null;
   image_url: string | null;
   image_url_small: string | null;
+  image_url_preview?: string | null;
   price_stats: PriceStats | null;
   sets: SetInfo | null;
 }
@@ -44,7 +47,9 @@ export interface DashboardCard {
   card_image_id: string;
   name: string;
   rarity: string | null;
+  image_url: string | null;
   image_url_small: string | null;
+  image_url_preview?: string | null;
   set_code: string | null;
   market_avg: number | null;
   chg_1d: number | null;

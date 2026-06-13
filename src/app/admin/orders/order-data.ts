@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase-server";
 import { getCurrentAdminUser } from "@/lib/admin-user";
+import { resolveGameScope } from "@/lib/game-scope";
 import {
   isMissingPrivateCustomCardsError,
   loadPrivateCustomCardsByIds,
@@ -79,6 +80,12 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unknown error";
 }
 
+async function resolveDefaultGameId(supabase: ReturnType<typeof createServiceClient>, game?: string | null) {
+  const gameResult = await resolveGameScope(supabase, game, { defaultToOnePiece: true });
+  if (gameResult.error) throw new Error(gameResult.error.message);
+  return gameResult.game.id;
+}
+
 function toOrderFormValue(order: OrderRow, inventoryItemIds: string[]): CustomerOrderFormValue {
   return {
     id: order.id,
@@ -129,7 +136,7 @@ function toInventoryItem(
   };
 }
 
-async function hydrateInventoryRows(rows: InventoryQueryRow[]): Promise<OrderInventoryItem[]> {
+async function hydrateInventoryRows(rows: InventoryQueryRow[], gameId: string): Promise<OrderInventoryItem[]> {
   const cardIds = Array.from(new Set(rows.map((row) => row.card_id).filter(Boolean))) as string[];
   const customCardIds = Array.from(new Set(rows.map((row) => row.custom_card_id).filter(Boolean))) as string[];
   const supabase = createServiceClient();
@@ -141,8 +148,9 @@ async function hydrateInventoryRows(rows: InventoryQueryRow[]): Promise<OrderInv
       .from("cards")
       .select(`
         id, name, image_url, image_url_small, card_number,
-        sets (code)
+        sets!cards_set_game_fk (code)
       `)
+      .eq("game_id", gameId)
       .in("id", cardIds);
 
     if (cardsRes.error) {
@@ -154,7 +162,7 @@ async function hydrateInventoryRows(rows: InventoryQueryRow[]): Promise<OrderInv
 
   if (customCardIds.length > 0) {
     const currentUser = await getCurrentAdminUser();
-    const customCardsRes = await loadPrivateCustomCardsByIds(supabase, currentUser?.id ?? null, customCardIds);
+    const customCardsRes = await loadPrivateCustomCardsByIds(supabase, currentUser?.id ?? null, customCardIds, gameId);
     if (customCardsRes.error && !isMissingPrivateCustomCardsError(customCardsRes.error)) {
       throw new Error(customCardsRes.error.message);
     }
@@ -164,12 +172,14 @@ async function hydrateInventoryRows(rows: InventoryQueryRow[]): Promise<OrderInv
   return rows.map((row) => toInventoryItem(row, cardMap, customCardMap));
 }
 
-export async function loadOrderInventory(currentOrderId?: string): Promise<LoadResult<OrderInventoryItem[]>> {
+export async function loadOrderInventory(currentOrderId?: string, game?: string | null): Promise<LoadResult<OrderInventoryItem[]>> {
   try {
     const supabase = createServiceClient();
+    const gameId = await resolveDefaultGameId(supabase, game);
     const assignedRes = await supabase
       .from("customer_order_items")
-      .select("order_id, inventory_item_id");
+      .select("order_id, inventory_item_id")
+      .eq("game_id", gameId);
 
     if (assignedRes.error) {
       return { data: [], error: assignedRes.error.message };
@@ -186,6 +196,7 @@ export async function loadOrderInventory(currentOrderId?: string): Promise<LoadR
     const inventoryRes = await supabase
       .from("inventory_items")
       .select(INVENTORY_SELECT)
+      .eq("game_id", gameId)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false });
 
@@ -198,7 +209,7 @@ export async function loadOrderInventory(currentOrderId?: string): Promise<LoadR
       if (currentOrderItemIds.has(row.id)) return true;
       return row.status !== "sold";
     });
-    const items = await hydrateInventoryRows(rows);
+    const items = await hydrateInventoryRows(rows, gameId);
 
     return { data: items, error: null };
   } catch (error) {
@@ -206,12 +217,14 @@ export async function loadOrderInventory(currentOrderId?: string): Promise<LoadR
   }
 }
 
-export async function loadOrderSummaries(): Promise<LoadResult<CustomerOrderSummary[]>> {
+export async function loadOrderSummaries(game?: string | null): Promise<LoadResult<CustomerOrderSummary[]>> {
   try {
     const supabase = createServiceClient();
+    const gameId = await resolveDefaultGameId(supabase, game);
     const ordersRes = await supabase
       .from("customer_orders")
       .select(ORDER_SELECT)
+      .eq("game_id", gameId)
       .order("created_at", { ascending: false });
     let orderRows = ordersRes.data as OrderRow[] | null;
     let orderError = ordersRes.error;
@@ -220,6 +233,7 @@ export async function loadOrderSummaries(): Promise<LoadResult<CustomerOrderSumm
       const legacyOrdersRes = await supabase
         .from("customer_orders")
         .select(LEGACY_ORDER_SELECT)
+        .eq("game_id", gameId)
         .order("created_at", { ascending: false });
       orderRows = legacyOrdersRes.data as OrderRow[] | null;
       orderError = legacyOrdersRes.error;
@@ -238,6 +252,7 @@ export async function loadOrderSummaries(): Promise<LoadResult<CustomerOrderSumm
     const linksRes = await supabase
       .from("customer_order_items")
       .select("order_id, inventory_item_id")
+      .eq("game_id", gameId)
       .in("order_id", orderIds);
 
     if (linksRes.error) {
@@ -252,13 +267,14 @@ export async function loadOrderSummaries(): Promise<LoadResult<CustomerOrderSumm
       const inventoryRes = await supabase
         .from("inventory_items")
         .select(INVENTORY_SELECT)
+        .eq("game_id", gameId)
         .in("id", inventoryIds);
 
       if (inventoryRes.error) {
         return { data: [], error: inventoryRes.error.message };
       }
 
-      inventoryItems = await hydrateInventoryRows((inventoryRes.data ?? []) as InventoryQueryRow[]);
+      inventoryItems = await hydrateInventoryRows((inventoryRes.data ?? []) as InventoryQueryRow[], gameId);
     }
 
     const inventoryMap = new Map(inventoryItems.map((item) => [item.id, item]));
@@ -283,13 +299,15 @@ export async function loadOrderSummaries(): Promise<LoadResult<CustomerOrderSumm
   }
 }
 
-export async function loadOrderForEdit(orderId: string): Promise<LoadResult<CustomerOrderFormValue | null>> {
+export async function loadOrderForEdit(orderId: string, game?: string | null): Promise<LoadResult<CustomerOrderFormValue | null>> {
   try {
     const supabase = createServiceClient();
+    const gameId = await resolveDefaultGameId(supabase, game);
     const orderRes = await supabase
       .from("customer_orders")
       .select(ORDER_SELECT)
       .eq("id", orderId)
+      .eq("game_id", gameId)
       .single();
     let orderRow = orderRes.data as OrderRow | null;
     let orderError = orderRes.error;
@@ -299,6 +317,7 @@ export async function loadOrderForEdit(orderId: string): Promise<LoadResult<Cust
         .from("customer_orders")
         .select(LEGACY_ORDER_SELECT)
         .eq("id", orderId)
+        .eq("game_id", gameId)
         .single();
       orderRow = legacyOrderRes.data as OrderRow | null;
       orderError = legacyOrderRes.error;
@@ -311,7 +330,8 @@ export async function loadOrderForEdit(orderId: string): Promise<LoadResult<Cust
     const linksRes = await supabase
       .from("customer_order_items")
       .select("inventory_item_id")
-      .eq("order_id", orderId);
+      .eq("order_id", orderId)
+      .eq("game_id", gameId);
 
     if (linksRes.error) {
       return { data: null, error: linksRes.error.message };

@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase-server";
+import { createCachedServiceClient } from "@/lib/supabase-server";
+import { withOnePiecePayloadFallbacksList } from "@/lib/game-payload";
+import { gameParamFromRequest, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
+import { cachedPublicData, PUBLIC_DATA_CACHE_HEADERS, publicDataCacheKey } from "@/lib/public-data-cache";
+import { firstRelation, flattenPriceStatsCardRow } from "@/lib/supabase-relations";
+
+export const revalidate = 300;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -7,7 +13,16 @@ export async function GET(request: Request) {
   const sort = searchParams.get("sort") ?? "value";
   const limit = Math.min(parseInt(searchParams.get("limit") ?? "20", 10), 100);
 
-  const supabase = createServiceClient();
+  const supabase = createCachedServiceClient();
+  const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request), {
+    defaultToOnePiece: true,
+    publicOnly: publicOnlyForCatalogPreview(),
+  });
+
+  if (gameResult.error) {
+    return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
+  }
+  const { game } = gameResult;
 
   // Map sort key to column
   const sortCol: Record<string, string> = {
@@ -19,57 +34,76 @@ export async function GET(request: Request) {
   const orderBy = sortCol[sort] ?? "market_avg";
 
   let query = supabase
-    .from("cards")
+    .from("price_stats")
     .select(`
-      id,
-      card_image_id,
-      card_number,
-      name,
-      name_base,
-      variant_label,
-      rarity,
-      card_type,
-      color,
-      image_url,
-      image_url_small,
-      price_stats (
-        market_avg,
-        tcg_market,
-        ebay_avg,
-        chg_1d,
-        chg_7d,
-        chg_30d
-      ),
-      sets (
+      market_avg,
+      tcg_market,
+      ebay_avg,
+      chg_1d,
+      chg_7d,
+      chg_30d,
+      cards!price_stats_card_game_fk!inner (
         id,
-        slug,
-        code,
+        card_image_id,
+        card_number,
         name,
-        series,
+        name_base,
+        variant_label,
+        rarity,
+        card_type,
         color,
-        year
+        game_payload,
+        image_url,
+        image_url_small,
+        image_url_preview,
+        sets!cards_set_game_fk (
+          id,
+          slug,
+          code,
+          name,
+          series,
+          color,
+          year
+        )
       )
     `)
-    .not("price_stats", "is", null)
-    .order(orderBy, { referencedTable: "price_stats", ascending: false })
+    .eq("game_id", game.id)
+    .not(orderBy, "is", null)
+    .order(orderBy, { ascending: false })
     .limit(limit);
 
   if (setId && setId !== "all") {
-    query = query.eq("set_id", setId);
+    query = query.eq("cards.set_id", setId);
   }
 
-  const { data, error } = await query;
+  try {
+    const sorted = await cachedPublicData(
+      publicDataCacheKey("api-markets-v3", game.id, setId ?? "all", sort, limit),
+      async () => {
+        const { data, error } = await query;
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        // Fallback JS sort in case referencedTable ordering doesn't work
+        const normalized = ((data ?? []) as Record<string, unknown>[])
+          .map(flattenPriceStatsCardRow)
+          .filter((row): row is Record<string, unknown> => row != null);
+
+        return withOnePiecePayloadFallbacksList(normalized).sort((a, b) => {
+          const pa = firstRelation(a.price_stats as Record<string, number> | Record<string, number>[] | null);
+          const pb = firstRelation(b.price_stats as Record<string, number> | Record<string, number>[] | null);
+          return (pb?.[orderBy] ?? 0) - (pa?.[orderBy] ?? 0);
+        });
+      }
+    );
+
+    return NextResponse.json(sorted, { headers: PUBLIC_DATA_CACHE_HEADERS });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to load market cards." },
+      { status: 500 }
+    );
   }
-
-  // Fallback JS sort in case referencedTable ordering doesn't work
-  const sorted = (data ?? []).sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
-    const pa = a.price_stats as Record<string, number> | null;
-    const pb = b.price_stats as Record<string, number> | null;
-    return (pb?.[orderBy] ?? 0) - (pa?.[orderBy] ?? 0);
-  });
-
-  return NextResponse.json(sorted);
 }

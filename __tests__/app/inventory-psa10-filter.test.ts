@@ -180,6 +180,12 @@ function loadPage(rows = [
   };
 
   const mocks: Record<string, unknown> = {
+    "../AdminGameSwitcher": {
+      __esModule: true,
+      default() {
+        return React.createElement("div", { "data-testid": "admin-game-switcher" });
+      },
+    },
     "./InventoryShell": {
       __esModule: true,
       default(props: InventoryShellProps) {
@@ -197,6 +203,45 @@ function loadPage(rows = [
     "../orders/order-data": {
       loadOrderSummaries() {
         return Promise.resolve({ data: [], error: null });
+      },
+    },
+    "../bundles/bundle-data": {
+      loadBundleSummaries() {
+        return Promise.resolve({ data: [], error: null });
+      },
+    },
+    "@/lib/admin-games": {
+      loadAdminGameOptions() {
+        return Promise.resolve([{ slug: "one_piece", name: "One Piece Card Game", isPublic: true }]);
+      },
+    },
+    "@/lib/admin-user": {
+      getCurrentAdminUser() {
+        return Promise.resolve(null);
+      },
+    },
+    "@/lib/game-scope": {
+      resolveGameScope() {
+        return Promise.resolve({
+          game: {
+            id: "game-one-piece",
+            slug: "one_piece",
+            routeSlug: "one-piece",
+            name: "One Piece Card Game",
+            isActive: true,
+            isPublic: true,
+            metadata: { route_slug: "one-piece" },
+          },
+          error: null,
+        });
+      },
+    },
+    "@/lib/private-custom-cards": {
+      isMissingPrivateCustomCardsError() {
+        return false;
+      },
+      loadPrivateCustomCardsByIds() {
+        return Promise.resolve({ cards: new Map(), error: null });
       },
     },
     "@/lib/inventory-options": {
@@ -294,7 +339,14 @@ test("inventory page leaves PSA 10 candidate filter off and attaches latest cent
     "psa9:PSA_9",
     "unmeasured:none",
   ]);
-  assert.ok(calls.some((call) => call.columns?.includes("inventory_centering_latest(psa_ceiling)")));
+  assert.ok(
+    calls.some((call) =>
+      call.columns?.includes(
+        "inventory_centering_latest!centering_measurements_inventory_item_game_fk(psa_ceiling)"
+      )
+    )
+  );
+  assert.ok(calls.some((call) => call.column === "game_id" && call.value === "game-one-piece"));
   assert.ok(!calls.some((call) => call.column === "inventory_centering_latest.psa_ceiling"));
 });
 
@@ -306,7 +358,13 @@ test("inventory page applies PSA 10 candidate filter with an inner latest-view j
 
   assert.match(html, /data-candidate-filter="true"/);
   assert.deepEqual(shellProps[0].items.map((item) => item.id), ["psa10"]);
-  assert.ok(calls.some((call) => call.columns?.includes("inventory_centering_latest!inner(psa_ceiling)")));
+  assert.ok(
+    calls.some((call) =>
+      call.columns?.includes(
+        "inventory_centering_latest!centering_measurements_inventory_item_game_fk!inner(psa_ceiling)"
+      )
+    )
+  );
   assert.ok(
     calls.some((call) => call.column === "inventory_centering_latest.psa_ceiling" && call.value === "PSA_10")
   );

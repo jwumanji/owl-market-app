@@ -2,8 +2,11 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import FastCardImage from "@/components/ui/FastCardImage";
 import { CHARACTERS as FALLBACK_CHARS, TIER_LABELS } from "./characters-data";
+import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
+import { gamePath, gameQueryValue } from "@/lib/game-routes";
 
 /* ── Types ── */
 interface CharacterCard {
@@ -18,6 +21,7 @@ interface CharacterCard {
   spark: number[];
   imageUrl?: string | null;
   imageUrlSmall?: string | null;
+  imageUrlPreview?: string | null;
   cardImageId?: string | null;
 }
 
@@ -40,15 +44,16 @@ interface CharacterData {
   spark?: number[];
 }
 
-// Assign colors based on index position for API data
+// Per-character accent palette — dynamic, not semantic. Hues shifted to
+// read well on cream (closer to brand sunset stops + Option-A jewel tones).
 const PALETTE = [
-  { color: "#FF4560", colorD: "rgba(255,69,96,0.14)", colorBd: "rgba(255,69,96,0.3)" },
-  { color: "#00D68F", colorD: "rgba(0,214,143,0.14)", colorBd: "rgba(0,214,143,0.3)" },
-  { color: "#4F8EF7", colorD: "rgba(79,142,247,0.14)", colorBd: "rgba(79,142,247,0.3)" },
-  { color: "#E8A020", colorD: "rgba(232,160,32,0.18)", colorBd: "rgba(232,160,32,0.38)" },
-  { color: "#9B72FF", colorD: "rgba(155,114,255,0.14)", colorBd: "rgba(155,114,255,0.3)" },
-  { color: "#F472B6", colorD: "rgba(244,114,182,0.14)", colorBd: "rgba(244,114,182,0.3)" },
-  { color: "#00C9A7", colorD: "rgba(0,201,167,0.14)", colorBd: "rgba(0,201,167,0.3)" },
+  { color: "#C42A45", colorD: "rgba(196,42,69,0.14)",  colorBd: "rgba(196,42,69,0.32)"  }, // secret-red
+  { color: "#2D8A57", colorD: "rgba(45,138,87,0.16)",  colorBd: "rgba(45,138,87,0.32)"  }, // sr-green
+  { color: "#2E6FD6", colorD: "rgba(46,111,214,0.14)", colorBd: "rgba(46,111,214,0.32)" }, // aa-blue
+  { color: "#E89512", colorD: "rgba(232,149,18,0.16)", colorBd: "rgba(232,149,18,0.38)" }, // gold
+  { color: "#6E3AA6", colorD: "rgba(110,58,166,0.14)", colorBd: "rgba(110,58,166,0.32)" }, // sp-purple
+  { color: "#C43F7E", colorD: "rgba(196,63,126,0.14)", colorBd: "rgba(196,63,126,0.32)" }, // sar-pink
+  { color: "#137A8C", colorD: "rgba(19,122,140,0.14)", colorBd: "rgba(19,122,140,0.32)" }, // l-teal
 ];
 
 function assignColors(chars: CharacterData[]): CharacterData[] {
@@ -59,6 +64,19 @@ function assignColors(chars: CharacterData[]): CharacterData[] {
     colorBd: c.colorBd || PALETTE[i % PALETTE.length].colorBd,
     spark: c.spark || generateSparkFromChange(c.chg7d, c.chg30d),
   }));
+}
+
+function routeParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function gameDisplayName(gameRouteSlug: string) {
+  if (gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG) return "One Piece TCG";
+  return gameRouteSlug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function generateSparkFromChange(chg7d: number, chg30d: number): number[] {
@@ -91,7 +109,7 @@ function rarityClass(rarity: string): string {
 /** Get character avatar from their top card image */
 function getCharAvatar(c: CharacterData): string | null {
   const firstCard = c.topCards?.[0];
-  return firstCard?.imageUrlSmall ?? firstCard?.imageUrl ?? null;
+  return firstCard?.imageUrlSmall ?? firstCard?.imageUrlPreview ?? firstCard?.imageUrl ?? null;
 }
 
 /* ── SVG Sparkline ── */
@@ -110,8 +128,8 @@ function SparkSvg({ data, up, w, h, pad }: { data: number[]; up: boolean; w: num
   const pts = sparkPoints(data, w, h, pad);
   const poly = pts.map((p) => p.join(",")).join(" ");
   const fill = `${pts[0][0]},${h} ${poly} ${pts[pts.length - 1][0]},${h}`;
-  const s = up ? "#00D68F" : "#FF4560";
-  const f = up ? "rgba(0,214,143,0.13)" : "rgba(255,69,96,0.11)";
+  const s = up ? "#2D9961" : "#E04E4E";
+  const f = up ? "rgba(45,153,97,0.16)" : "rgba(224,78,78,0.12)";
   const [lx, ly] = pts[pts.length - 1];
   return (
     <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ display: "block", overflow: "visible" }}>
@@ -126,8 +144,8 @@ function RowSpark({ data, up }: { data: number[]; up: boolean }) {
   const pts = sparkPoints(data, 88, 22, 2);
   const poly = pts.map((p) => p.join(",")).join(" ");
   const fill = `${pts[0][0]},22 ${poly} ${pts[pts.length - 1][0]},22`;
-  const s = up ? "#00D68F" : "#FF4560";
-  const f = up ? "rgba(0,214,143,0.13)" : "rgba(255,69,96,0.11)";
+  const s = up ? "#2D9961" : "#E04E4E";
+  const f = up ? "rgba(45,153,97,0.16)" : "rgba(224,78,78,0.12)";
   const [lx, ly] = pts[pts.length - 1];
   return (
     <div style={{ display: "flex", justifyContent: "flex-end" }}>
@@ -145,12 +163,14 @@ function CharAvatar({ src, name, size = 28 }: { src: string | null; name: string
   const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
   if (src) {
     return (
-      <img
+      <FastCardImage
         src={src}
         alt={name}
         width={size}
         height={Math.round(size * 1.4)}
         loading="lazy"
+        fetchPriority="low"
+        sizes={`${size}px`}
         className="ch-avatar-img"
         style={{ width: size, height: Math.round(size * 1.4) }}
       />
@@ -168,7 +188,6 @@ function CharAvatar({ src, name, size = 28 }: { src: string | null; name: string
 
 /* ── Card Image with Hover Preview ── */
 function CardImageCell({ card }: { card: CharacterCard }) {
-  const router = useRouter();
   const [showPreview, setShowPreview] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -179,31 +198,23 @@ function CardImageCell({ card }: { card: CharacterCard }) {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     setShowPreview(false);
   };
-  const handleClick = () => {
-    if (card.cardImageId) {
-      router.push(`/card/${card.cardImageId}`);
-    }
-  };
-
   const imgSrc = card.imageUrlSmall ?? card.imageUrl;
-  const fullSrc = card.imageUrl ?? card.imageUrlSmall;
+  const fullSrc = card.imageUrlPreview ?? card.imageUrl ?? card.imageUrlSmall;
 
   return (
     <div
       className="ch-card-img-cell"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      onClick={handleClick}
-      style={{ cursor: card.cardImageId ? "pointer" : undefined }}
     >
       {imgSrc ? (
-        <img src={imgSrc} alt={card.name} width={32} height={45} loading="lazy" className="ch-card-thumb" />
+        <FastCardImage src={imgSrc} alt={card.name} width={32} height={45} sizes="32px" loading="lazy" fetchPriority="low" className="ch-card-thumb" />
       ) : (
         <div className="ch-card-thumb-placeholder" />
       )}
       {showPreview && fullSrc && (
         <div className="ch-card-hover-preview">
-          <img src={fullSrc} alt={card.name} width={200} height={280} loading="lazy" />
+          <FastCardImage src={fullSrc} alt={card.name} width={200} height={280} sizes="200px" loading="lazy" />
         </div>
       )}
     </div>
@@ -213,7 +224,7 @@ function CardImageCell({ card }: { card: CharacterCard }) {
 /* ── Character Ranking Card (top row) ── */
 function RankCard({ c, rank, active, onClick }: { c: CharacterData; rank: number; active: boolean; onClick: () => void }) {
   const tier = TIER_LABELS[c.tier] || TIER_LABELS[3];
-  const color = c.color || "#E8A020";
+  const color = c.color || "#E89512";
   const avatar = getCharAvatar(c);
   return (
     <div
@@ -236,8 +247,11 @@ function RankCard({ c, rank, active, onClick }: { c: CharacterData; rank: number
         </div>
       </div>
       <div className="ch-rank-price">${c.indexValue.toLocaleString()}</div>
-      <div className="ch-rank-chg" style={{ color: c.up ? "var(--green)" : "var(--red)" }}>
-        {c.up ? "\u2191" : "\u2193"} {Math.abs(c.chg7d)}% <span className="ch-rank-period">7D</span>
+      <div
+        className="ch-rank-chg"
+        style={{ color: c.chg7d === 0 ? "var(--ink-3)" : c.up ? "var(--gain-2)" : "var(--loss-2)" }}
+      >
+        {c.chg7d === 0 ? "" : c.up ? "\u2191" : "\u2193"} {Math.abs(c.chg7d)}% <span className="ch-rank-period">7D</span>
       </div>
       <div className="ch-rank-spark">
         <SparkSvg data={c.spark || [0, 0]} up={c.up} w={200} h={28} pad={3} />
@@ -343,18 +357,18 @@ function CharToolbar({
 /* ── Character Detail Panel ── */
 function CharacterDetail({ c }: { c: CharacterData }) {
   const tier = TIER_LABELS[c.tier] || TIER_LABELS[3];
-  const color = c.color || "#E8A020";
+  const color = c.color || "#E89512";
   const avatar = getCharAvatar(c);
-  const fullImg = c.topCards?.[0]?.imageUrl ?? c.topCards?.[0]?.imageUrlSmall ?? null;
+  const fullImg = c.topCards?.[0]?.imageUrlPreview ?? c.topCards?.[0]?.imageUrl ?? c.topCards?.[0]?.imageUrlSmall ?? null;
   return (
     <div className="ch-detail">
-      <div className="ch-detail-header" style={{ background: `linear-gradient(135deg,${c.colorD || "rgba(232,160,32,0.18)"},transparent)` }}>
+      <div className="ch-detail-header" style={{ background: `linear-gradient(135deg,${c.colorD || "rgba(232,149,18,0.16)"},transparent)` }}>
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,transparent,${color},transparent)` }} />
         <div className="ch-detail-header-inner">
           {fullImg ? (
-            <img src={fullImg} alt={c.name} className="ch-detail-avatar" width={80} height={112} loading="lazy" />
+            <FastCardImage src={fullImg} alt={c.name} className="ch-detail-avatar" width={80} height={112} sizes="80px" loading="lazy" />
           ) : avatar ? (
-            <img src={avatar} alt={c.name} className="ch-detail-avatar" width={80} height={112} loading="lazy" />
+            <FastCardImage src={avatar} alt={c.name} className="ch-detail-avatar" width={80} height={112} sizes="80px" loading="lazy" />
           ) : (
             <div className="ch-detail-avatar-placeholder">
               {c.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
@@ -373,8 +387,8 @@ function CharacterDetail({ c }: { c: CharacterData }) {
       <div className="ch-detail-stats">
         {[
           ["Character Index", `$${c.indexValue.toLocaleString()}`, color],
-          ["7D Change", `${c.up ? "+" : ""}${c.chg7d}%`, c.up ? "var(--green)" : "var(--red)"],
-          ["30D Change", `${c.chg30d >= 0 ? "+" : ""}${c.chg30d}%`, c.chg30d >= 0 ? "var(--green)" : "var(--red)"],
+          ["7D Change", `${c.chg7d === 0 ? "" : c.up ? "+" : ""}${c.chg7d}%`, c.chg7d === 0 ? "var(--ink-3)" : c.up ? "var(--gain-2)" : "var(--loss-2)"],
+          ["30D Change", `${c.chg30d === 0 ? "" : c.chg30d > 0 ? "+" : ""}${c.chg30d}%`, c.chg30d === 0 ? "var(--ink-3)" : c.chg30d > 0 ? "var(--gain-2)" : "var(--loss-2)"],
           ["Cards Tracked", String(c.cardCount), undefined],
         ].map(([k, v, clr]) => (
           <div className="ch-stat-row" key={k}>
@@ -388,7 +402,18 @@ function CharacterDetail({ c }: { c: CharacterData }) {
 }
 
 /* ── Character Cards Table ── */
-function CharacterCards({ c }: { c: CharacterData }) {
+function CharacterCards({ c, gameRouteSlug }: { c: CharacterData; gameRouteSlug: string }) {
+  const router = useRouter();
+
+  const openCard = useCallback(
+    (card: CharacterCard) => {
+      if (card.cardImageId) {
+        router.push(gamePath(gameRouteSlug, `/card/${card.cardImageId}`));
+      }
+    },
+    [gameRouteSlug, router]
+  );
+
   return (
     <div className="ch-cards-section">
       <div className="section-header">
@@ -396,7 +421,7 @@ function CharacterCards({ c }: { c: CharacterData }) {
           <div className="section-title">Top Cards &mdash; <span style={{ color: c.color }}>{c.name}</span></div>
           <div className="section-sub">Top {c.topCards.length} highest value cards across all sets</div>
         </div>
-        <Link href="/markets" className="section-action">View all in markets &rarr;</Link>
+        <Link href={gamePath(gameRouteSlug, "/markets")} className="section-action">View all in markets &rarr;</Link>
       </div>
       <div className="cards-table-wrap">
         <table className="cards-table">
@@ -413,7 +438,23 @@ function CharacterCards({ c }: { c: CharacterData }) {
           </thead>
           <tbody>
             {c.topCards.map((card, i) => (
-              <tr key={i} className={card.cardImageId ? "ch-card-clickable" : ""}>
+              <tr
+                key={i}
+                className={card.cardImageId ? "ch-card-clickable" : ""}
+                onClick={card.cardImageId ? () => openCard(card) : undefined}
+                onKeyDown={
+                  card.cardImageId
+                    ? (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          openCard(card);
+                        }
+                      }
+                    : undefined
+                }
+                role={card.cardImageId ? "link" : undefined}
+                tabIndex={card.cardImageId ? 0 : undefined}
+              >
                 <td className="rank-n">{i + 1}</td>
                 <td className="ch-card-img-td">
                   <CardImageCell card={card} />
@@ -470,8 +511,11 @@ function AllCharactersGrid({ chars, activeSlug, onSelect }: { chars: CharacterDa
                   <span className="ch-grid-rank">#{i + 1}</span>
                   <span className="ch-tier-badge" style={{ background: tier.bg, color: tier.color }}>{tier.label}</span>
                 </div>
-                <span className="ch-grid-chg" style={{ color: c.chg30d >= 0 ? "var(--green)" : "var(--red)" }}>
-                  {c.chg30d >= 0 ? "+" : ""}{c.chg30d}%
+                <span
+                  className="ch-grid-chg"
+                  style={{ color: c.chg30d === 0 ? "var(--ink-3)" : c.chg30d > 0 ? "var(--gain-2)" : "var(--loss-2)" }}
+                >
+                  {c.chg30d === 0 ? "" : c.chg30d > 0 ? "+" : ""}{c.chg30d}%
                 </span>
               </div>
               <div className="ch-grid-name-row">
@@ -487,8 +531,8 @@ function AllCharactersGrid({ chars, activeSlug, onSelect }: { chars: CharacterDa
                 <SparkSvg data={c.spark || [0, 0]} up={c.up} w={200} h={48} pad={4} />
               </div>
               <div className="ch-grid-footer">
-                <div className="ch-grid-stat">7D <span style={{ color: c.up ? "var(--green)" : "var(--red)" }}>{c.up ? "+" : ""}{c.chg7d}%</span></div>
-                <div className="ch-grid-stat">30D <span style={{ color: c.chg30d >= 0 ? "var(--green)" : "var(--red)" }}>{c.chg30d >= 0 ? "+" : ""}{c.chg30d}%</span></div>
+                <div className="ch-grid-stat">7D <span style={{ color: c.chg7d === 0 ? "var(--ink-3)" : c.up ? "var(--gain-2)" : "var(--loss-2)" }}>{c.chg7d === 0 ? "" : c.up ? "+" : ""}{c.chg7d}%</span></div>
+                <div className="ch-grid-stat">30D <span style={{ color: c.chg30d === 0 ? "var(--ink-3)" : c.chg30d > 0 ? "var(--gain-2)" : "var(--loss-2)" }}>{c.chg30d === 0 ? "" : c.chg30d > 0 ? "+" : ""}{c.chg30d}%</span></div>
               </div>
             </div>
           );
@@ -501,28 +545,48 @@ function AllCharactersGrid({ chars, activeSlug, onSelect }: { chars: CharacterDa
 /* ── Main Page ── */
 
 export default function CharactersPage() {
-  const [characters, setCharacters] = useState<CharacterData[]>(() => assignColors(FALLBACK_CHARS));
-  const [activeChar, setActiveChar] = useState(FALLBACK_CHARS[0].slug);
+  const params = useParams<{ game?: string | string[] }>();
+  const gameRouteSlug = routeParam(params.game) ?? DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
+  const isDefaultGame = gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
+  const [characters, setCharacters] = useState<CharacterData[]>(() => isDefaultGame ? assignColors(FALLBACK_CHARS) : []);
+  const [activeChar, setActiveChar] = useState(isDefaultGame ? FALLBACK_CHARS[0].slug : "");
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
-    fetch("/api/characters")
+    if (isDefaultGame) {
+      setCharacters(assignColors(FALLBACK_CHARS));
+      setActiveChar(FALLBACK_CHARS[0].slug);
+    } else {
+      setCharacters([]);
+      setActiveChar("");
+    }
+    setLoading(true);
+
+    const query = new URLSearchParams({ game: gameQueryValue(gameRouteSlug) });
+    fetch(`/api/characters?${query}`)
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
           setCharacters(assignColors(data));
           setActiveChar(data[0].slug);
+        } else if (!isDefaultGame) {
+          setCharacters([]);
+          setActiveChar("");
         }
       })
       .catch(() => {
-        // keep fallback data
+        if (!isDefaultGame) {
+          setCharacters([]);
+          setActiveChar("");
+        }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [gameRouteSlug, isDefaultGame]);
 
   const c = characters.find((x) => x.slug === activeChar) || characters[0];
+  const hasCharacters = Boolean(c);
 
   const selectChar = useCallback((slug: string) => {
     setActiveChar(slug);
@@ -551,9 +615,9 @@ export default function CharactersPage() {
       <div className="breadcrumb">
         <Link href="/">OWL Market</Link>
         <span className="bsep"> &rsaquo; </span>
-        <span style={{ color: "var(--text)" }}>Characters</span>
+        <span style={{ color: "var(--ink)" }}>Characters</span>
       </div>
-      <div className="ph-eyebrow">One Piece TCG</div>
+      <div className="ph-eyebrow">{gameDisplayName(gameRouteSlug)}</div>
       <div className="ph-title">
         Character <span>Index</span>
       </div>
@@ -562,50 +626,70 @@ export default function CharactersPage() {
         {loading ? " Loading live data..." : " Updates with live data"}
       </div>
 
-      {/* Search + All Characters Dropdown */}
-      <CharToolbar
-        search={search}
-        onSearchChange={setSearch}
-        characters={characters}
-        activeSlug={activeChar}
-        onSelect={selectChar}
-      />
-
-      {/* Top 10 Rank Cards */}
-      <div className="ch-rank-row">
-        {top10.map((ch, i) => (
-          <RankCard key={ch.slug} c={ch} rank={i + 1} active={activeChar === ch.slug} onClick={() => selectChar(ch.slug)} />
-        ))}
-      </div>
-
-      {/* Detail + Cards */}
-      <div className="ch-detail-section">
-        <CharacterDetail c={c} />
-        <CharacterCards c={c} />
-      </div>
-
-      {/* See All Characters Button / Grid */}
-      {!showAll ? (
-        <div className="ch-see-all-wrap">
-          <button className="ch-see-all-btn" onClick={() => setShowAll(true)}>
-            See All Characters
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </button>
-        </div>
-      ) : (
-        <>
-          <AllCharactersGrid chars={filteredChars} activeSlug={activeChar} onSelect={selectChar} />
-          <div className="ch-see-all-wrap">
-            <button className="ch-see-all-btn" onClick={() => setShowAll(false)}>
-              Collapse
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="18 15 12 9 6 15" />
-              </svg>
-            </button>
+      {!hasCharacters && !loading ? (
+        <div className="ch-detail" style={{ padding: 28, textAlign: "center" }}>
+          <div className="ch-detail-name">No character index yet</div>
+          <div className="ch-detail-sub" style={{ marginTop: 8 }}>
+            {gameDisplayName(gameRouteSlug)} has catalog data loaded, but no character taxonomy or pricing index is enabled yet.
           </div>
+          <div style={{ marginTop: 18 }}>
+            <Link href={gamePath(gameRouteSlug, "/catalog")} className="section-action">
+              Open catalog &rarr;
+            </Link>
+          </div>
+        </div>
+      ) : hasCharacters ? (
+        <>
+          {/* Search + All Characters Dropdown */}
+          <CharToolbar
+            search={search}
+            onSearchChange={setSearch}
+            characters={characters}
+            activeSlug={activeChar}
+            onSelect={selectChar}
+          />
+
+          {/* Top 10 Rank Cards */}
+          <div className="ch-rank-row">
+            {top10.map((ch, i) => (
+              <RankCard key={ch.slug} c={ch} rank={i + 1} active={activeChar === ch.slug} onClick={() => selectChar(ch.slug)} />
+            ))}
+          </div>
+
+          {/* Detail + Cards */}
+          <div className="ch-detail-section">
+            <CharacterDetail c={c} />
+            <CharacterCards c={c} gameRouteSlug={gameRouteSlug} />
+          </div>
+
+          {/* See All Characters Button / Grid */}
+          {!showAll ? (
+            <div className="ch-see-all-wrap">
+              <button className="ch-see-all-btn" onClick={() => setShowAll(true)}>
+                See All Characters
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <>
+              <AllCharactersGrid chars={filteredChars} activeSlug={activeChar} onSelect={selectChar} />
+              <div className="ch-see-all-wrap">
+                <button className="ch-see-all-btn" onClick={() => setShowAll(false)}>
+                  Collapse
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="18 15 12 9 6 15" />
+                  </svg>
+                </button>
+              </div>
+            </>
+          )}
         </>
+      ) : (
+        <div className="ch-detail" style={{ padding: 28, textAlign: "center" }}>
+          <div className="ch-detail-sub">Loading character data...</div>
+        </div>
       )}
     </section>
   );

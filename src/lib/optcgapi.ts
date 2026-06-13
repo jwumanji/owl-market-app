@@ -1,4 +1,6 @@
-const BASE_URL = "https://optcgapi.com/api";
+import { ONE_PIECE_OPTCGAPI_BASE_URL } from "@/lib/games/one-piece";
+
+const BASE_URL = ONE_PIECE_OPTCGAPI_BASE_URL;
 
 async function safeFetch<T>(url: string, label: string): Promise<T[]> {
   try {

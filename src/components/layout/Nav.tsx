@@ -1,84 +1,162 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import OwlMark from "@/components/brand/OwlMark";
+import Wordmark from "@/components/brand/Wordmark";
+import { DEFAULT_PUBLIC_GAME_DB_SLUG, DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
+import { gamePath, gameQueryValue } from "@/lib/game-routes";
 import Ticker from "./Ticker";
 
-const NAV_LINKS = [
-  { label: "HOME", href: "/" },
-  { label: "MARKETS", href: "/markets" },
-  { label: "RARITIES", href: "/rarities" },
-  { label: "SETS", href: "/sets" },
-  { label: "CHARACTERS", href: "/characters" },
-  { label: "PORTFOLIO", href: "/portfolio" },
-  { label: "INVENTORY", href: "/admin/inventory" },
-  { label: "OWL LENS", href: "/admin/lens" },
-];
+type NavVariant = "public" | "admin";
 
-const ADMIN_NAV_LINKS = [
-  { label: "INVENTORY", href: "/admin/inventory" },
-  { label: "ORDERS", href: "/admin/orders" },
-  { label: "BUNDLES", href: "/admin/bundles" },
-  { label: "PSA", href: "/admin/psa-submissions" },
-  { label: "OWL LENS", href: "/admin/lens" },
-];
+type NavProps = {
+  variant?: NavVariant;
+};
 
-function isActivePath(pathname: string, href: string) {
-  if (href === "/") {
-    return pathname === href;
-  }
+type NavLink = {
+  label: string;
+  href: string;
+  exact?: boolean;
+};
 
-  return pathname === href || pathname.startsWith(`${href}/`);
+function publicLinks(gameRouteSlug: string): NavLink[] {
+  const isDefaultPublicGame = gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
+
+  return [
+    { label: "Home", href: isDefaultPublicGame ? "/" : gamePath(gameRouteSlug), exact: true },
+    { label: "Markets", href: gamePath(gameRouteSlug, "/markets") },
+    { label: "Catalog", href: gamePath(gameRouteSlug, "/catalog") },
+    { label: "Rarities", href: gamePath(gameRouteSlug, "/rarities") },
+    { label: "Sets", href: gamePath(gameRouteSlug, "/sets") },
+    { label: "Characters", href: gamePath(gameRouteSlug, "/characters") },
+  ];
 }
 
-export default function Nav() {
+function adminLinks(gameSlug: string): NavLink[] {
+  const game = encodeURIComponent(gameSlug || DEFAULT_PUBLIC_GAME_DB_SLUG);
+
+  return [
+    { label: "Inventory", href: `/admin/inventory?game=${game}` },
+    { label: "Bundles", href: `/admin/bundles?game=${game}` },
+    { label: "Orders", href: `/admin/orders?game=${game}` },
+    { label: "Lens", href: "/admin/lens" },
+    { label: "PSA", href: `/admin/psa-submissions?game=${game}` },
+  ];
+}
+
+function isActivePath(pathname: string, href: string, exact = false) {
+  const hrefPath = href.split("?")[0];
+  if (exact || hrefPath === "/") return pathname === hrefPath;
+  return pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
+}
+
+function gameRouteSlugFromPath(pathname: string) {
+  const [, root, game] = pathname.split("/");
+  if (root !== "games" || !game) return DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
+
+  try {
+    return decodeURIComponent(game);
+  } catch {
+    return game;
+  }
+}
+
+function adminGameSlugFromSearchParams(searchParams: { get(name: string): string | null }) {
+  return searchParams.get("game")?.trim() || DEFAULT_PUBLIC_GAME_DB_SLUG;
+}
+
+function gameRouteSlugFromAdminGame(gameSlug: string) {
+  return gameSlug.replace(/_/g, "-");
+}
+
+export default function Nav({ variant }: NavProps) {
+  const router = useRouter();
   const pathname = usePathname();
-  const isAdmin = pathname.startsWith("/admin");
-  const links = isAdmin ? ADMIN_NAV_LINKS : NAV_LINKS;
+  const searchParams = useSearchParams();
+  const resolvedVariant: NavVariant =
+    variant ?? (pathname.startsWith("/admin") ? "admin" : "public");
+  const isAdmin = resolvedVariant === "admin";
+  const activeAdminGameSlug = adminGameSlugFromSearchParams(searchParams);
+  const activeAdminGameRouteSlug = gameRouteSlugFromAdminGame(activeAdminGameSlug);
+  const activeGameRouteSlug = gameRouteSlugFromPath(pathname);
+  const isDefaultPublicGame = activeGameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
+  const links = useMemo(
+    () => (isAdmin ? adminLinks(activeAdminGameSlug) : publicLinks(activeGameRouteSlug)),
+    [activeAdminGameSlug, activeGameRouteSlug, isAdmin]
+  );
+  const viewSiteHref = activeAdminGameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG
+    ? "/"
+    : gamePath(activeAdminGameRouteSlug);
+
+  useEffect(() => {
+    if (isAdmin) return;
+
+    const timeout = window.setTimeout(() => {
+      for (const link of links) {
+        router.prefetch(link.href);
+      }
+
+      const game = encodeURIComponent(gameQueryValue(activeGameRouteSlug));
+      void fetch(`/api/rarities?game=${game}`, { cache: "force-cache" }).catch(() => {});
+      void fetch(`/api/characters?game=${game}`, { cache: "force-cache" }).catch(() => {});
+      void fetch(`/api/markets?game=${game}&limit=20`, { cache: "force-cache" }).catch(() => {});
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [activeGameRouteSlug, isAdmin, links, router]);
 
   return (
-    <nav className={isAdmin ? "admin-nav" : undefined}>
-      <div className="nav-row">
-        <Link href="/" className="logo">
-          <div className="logo-owl">🦉</div>
-          <span className="logo-name">
-            OWL<span> Market</span>
-          </span>
-        </Link>
+    <nav className="c-topnav" aria-label="Primary">
+      <div className={`c-topnav-inner${isAdmin ? " is-admin" : ""}`}>
+        <div className="c-nav-left">
+          <Link href="/" className="c-lockup">
+            <OwlMark size={36} />
+            <Wordmark />
+          </Link>
 
-        <div className="nav-mid">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`nav-link${isActivePath(pathname, link.href) ? " active" : ""}`}
-            >
-              {link.label}
-            </Link>
-          ))}
+          {isAdmin ? <span className="c-internal-chip">INTERNAL</span> : null}
         </div>
 
-        <div className="nav-right">
+        <ul className="c-nav-links">
+          {links.map((link) => (
+            <li key={link.href}>
+              <Link
+                href={link.href}
+                className={`c-nav-link${isActivePath(pathname, link.href, link.exact) ? " active" : ""}`}
+              >
+                {link.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+
+        <div className="c-nav-right">
           {isAdmin ? (
-            <div className="live-badge admin-badge">INTERNAL</div>
+            <>
+              <Link href={viewSiteHref} className="c-nav-view">
+                View site ↗
+              </Link>
+              <Link href="/logout" className="c-signin-btn">
+                Sign out
+              </Link>
+            </>
           ) : (
             <>
-              <div className="live-badge">
-                <span className="live-dot" />
-                LIVE
-              </div>
-              <Link href="/login" className="btn-login">
-                Login
+              <span className="c-live-chip">
+                <span className="c-live-dot" />
+                {isDefaultPublicGame ? "LIVE" : "CATALOG"}
+              </span>
+              <Link href="/login" className="c-signin-btn">
+                Sign in
               </Link>
             </>
           )}
-          <Link href="/logout" className="btn-login">
-            Logout
-          </Link>
         </div>
       </div>
 
-      {!isAdmin && <Ticker />}
+      {!isAdmin && isDefaultPublicGame && <Ticker />}
     </nav>
   );
 }

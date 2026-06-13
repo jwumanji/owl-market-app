@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OwlMarket — Admin · Add Inventory (C1.5 mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Caveat:wght@700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #FFF5E4; --bg-2: #FFFFFF; --bg-3: #FCE6BE;
+      --ink: #1A0F08; --ink-2: #5C4534; --ink-3: #9A8475;
+      --pink: #FF6BB8; --coral: #FF4936; --gold: #E89512;
+      --gain: #2D9961; --loss: #E04E4E;
+      --select: #1F47A1; /* deep cobalt — list-pick "selected" state (bold full fill, not confirmation green) */
+      --grad-brand: linear-gradient(135deg, #FF6BB8 0%, #FF4936 50%, #E89512 100%);
+      --r-sm: 8px; --r-md: 14px; --r-lg: 22px; --r-pill: 999px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      background: var(--bg); color: var(--ink);
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-weight: 500; -webkit-font-smoothing: antialiased; min-height: 100vh;
+    }
+    /* forms read tighter than the wide list view */
+    .container { max-width: 1100px; margin: 0 auto; padding-left: 28px; padding-right: 28px; }
+    a { color: inherit; }
+
+    /* ===== NAV (ADMIN) ===== */
+    .topnav {
+      position: sticky; top: 0; z-index: 50; background: rgba(255, 245, 228, 0.85);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      border-bottom: 1.5px solid rgba(26, 15, 8, 0.08);
+    }
+    .topnav-inner { display: flex; align-items: center; gap: 22px; padding: 14px 28px; max-width: 1680px; margin: 0 auto; }
+    .lockup { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; flex-shrink: 0; }
+    .lockup-wm { font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: var(--ink); font-size: 22px; display: inline-flex; align-items: baseline; }
+    .lockup-wm em {
+      font-family: 'Caveat', cursive; font-style: normal; font-weight: 700; font-size: 28px;
+      margin-left: -2px; padding-right: 8px; padding-bottom: 2px; display: inline-block;
+      background: var(--grad-brand); -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: transparent;
+    }
+    .internal-chip {
+      font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 10px;
+      letter-spacing: 0.12em; text-transform: uppercase; color: var(--coral); background: #FFE2DD;
+      border: 1.5px solid var(--coral); border-radius: var(--r-pill); padding: 3px 9px; flex-shrink: 0;
+    }
+    .nav-links { display: inline-flex; gap: 22px; list-style: none; margin-left: 6px; }
+    .nav-links a { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: var(--ink-2); text-decoration: none; padding: 4px 0; position: relative; white-space: nowrap; }
+    .nav-links a.active { color: var(--ink); }
+    .nav-links a.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 2px; background: var(--grad-brand); border-radius: 2px; }
+    .nav-right { margin-left: auto; display: inline-flex; align-items: center; gap: 16px; }
+    .nav-view { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 12px; color: var(--ink-2); text-decoration: none; letter-spacing: 0.04em; }
+    .nav-view:hover { color: var(--ink); }
+    .nav-signout { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; color: var(--ink); background: transparent; border: 1.5px solid var(--ink); border-radius: var(--r-pill); padding: 7px 16px; cursor: pointer; text-decoration: none; transition: all 0.15s ease; }
+    .nav-signout:hover { background: var(--ink); color: var(--bg); }
+
+    main { padding: 32px 0 96px; }
+
+    /* breadcrumb + head */
+    .crumb { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 12px; letter-spacing: 0.04em; color: var(--ink-2); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 18px; }
+    .crumb:hover { color: var(--ink); }
+    .eyebrow { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 12px; color: var(--coral); letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 10px; }
+    h1.title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 40px; letter-spacing: -0.025em; line-height: 1; color: var(--ink); }
+    .subline { margin-top: 10px; font-size: 14px; color: var(--ink-2); max-width: 560px; }
+    .page-head { margin-bottom: 26px; }
+
+    /* ===== PANEL (card surface) ===== */
+    .panel { background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-md); padding: 24px; margin-bottom: 18px; }
+    .panel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+    .panel-step {
+      font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 700; font-size: 12px;
+      width: 26px; height: 26px; border-radius: var(--r-pill); border: 1.5px solid var(--ink);
+      display: inline-flex; align-items: center; justify-content: center; color: var(--ink); flex-shrink: 0;
+    }
+    .panel-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 20px; color: var(--ink); letter-spacing: -0.01em; }
+
+    /* ===== FORM PRIMITIVES (the convention being locked) ===== */
+    .field { display: block; }
+    .field-label { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 600; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2); display: block; margin-bottom: 8px; }
+    .field-label .req { color: var(--coral); margin-left: 3px; }
+    .field-hint { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 500; font-size: 10px; letter-spacing: 0.04em; color: var(--ink-3); margin-top: 6px; }
+    .input, .select, .textarea {
+      font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 14px; color: var(--ink);
+      background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-sm);
+      padding: 10px 12px; width: 100%; outline: none; transition: border-color 0.12s, box-shadow 0.12s;
+    }
+    .input::placeholder, .textarea::placeholder { color: var(--ink-3); }
+    .input:focus, .select:focus, .textarea:focus { border-color: var(--coral); box-shadow: 0 0 0 3px rgba(255,73,54,0.14); }
+    .input[type="number"] { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .input[type="date"] { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .textarea { resize: vertical; min-height: 84px; }
+    .select {
+      appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 34px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%231A0F08' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center;
+    }
+
+    /* search results */
+    .search-row { display: flex; gap: 8px; }
+    .results { margin-top: 14px; border: 1.5px solid var(--ink); border-radius: var(--r-md); overflow: hidden; }
+    .result {
+      display: flex; align-items: center; gap: 14px; padding: 12px 14px; cursor: pointer;
+      border-top: 1px solid var(--bg-3); border-left: 3px solid transparent; background: var(--bg-2);
+      transition: background 0.1s; width: 100%; text-align: left; font: inherit;
+    }
+    .result:first-child { border-top: none; }
+    .result:hover { background: var(--bg-3); }
+    .result.selected { border-left-color: var(--ink); background: var(--select); }
+    .result.selected:hover { background: #1B3F8F; }
+    .result.selected .result-name { color: var(--bg); }
+    .result.selected .result-meta { color: rgba(255,245,228,0.78); }
+    .result.selected .result-meta span { color: rgba(255,245,228,0.78); }
+    .result.selected .result-thumb { box-shadow: 0 0 0 2px var(--bg); }
+    .result.selected .result-sel-tag { color: var(--bg); }
+    .result-thumb { width: 38px; height: 53px; border-radius: 5px; border: 1.5px solid var(--ink); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk'; font-weight: 700; font-size: 13px; color: var(--bg); flex-shrink: 0; }
+    .result-info { flex: 1; min-width: 0; }
+    .result-name { font-family: 'Space Grotesk'; font-weight: 700; font-size: 14px; color: var(--ink); }
+    .result-meta { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 8px; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 11px; color: var(--ink-2); }
+    .badge-private { color: var(--gain); background: #DCF1E6; border: 1.2px solid var(--gain); border-radius: 4px; padding: 1px 6px; font-weight: 600; }
+    .result-sel-tag { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--coral); flex-shrink: 0; }
+
+    /* not-in-catalog toggle */
+    .checkbox-box { margin-top: 16px; display: flex; align-items: flex-start; gap: 12px; border: 1.5px solid var(--ink-3); border-radius: var(--r-md); padding: 14px 16px; cursor: pointer; background: var(--bg); transition: border-color 0.12s; }
+    .checkbox-box:hover { border-color: var(--ink); }
+    .checkbox-box .box { width: 20px; height: 20px; border: 1.5px solid var(--ink); border-radius: 5px; flex-shrink: 0; margin-top: 1px; background: var(--bg-2); display: inline-flex; align-items: center; justify-content: center; }
+    .checkbox-box .ttl { font-family: 'Space Grotesk'; font-weight: 600; font-size: 14px; color: var(--ink); }
+    .checkbox-box .desc { font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 11px; color: var(--ink-2); margin-top: 3px; }
+
+    /* selected-card summary chip */
+    .selected-card { display: flex; align-items: center; gap: 14px; border: 1.5px solid var(--gain); background: #DCF1E6; border-radius: var(--r-md); padding: 12px 16px; margin-top: 14px; }
+    .selected-card .sc-thumb { width: 40px; height: 56px; border-radius: 5px; border: 1.5px solid var(--ink); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk'; font-weight: 700; color: var(--bg); flex-shrink: 0; }
+    .selected-card .sc-name { font-family: 'Space Grotesk'; font-weight: 700; font-size: 15px; color: var(--ink); }
+    .selected-card .sc-meta { font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 11px; color: var(--ink-2); margin-top: 3px; }
+    .selected-card .sc-clear { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-sm); padding: 6px 12px; cursor: pointer; }
+    .selected-card .sc-clear:hover { background: var(--bg-3); }
+
+    /* details grid */
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .span2 { grid-column: 1 / -1; }
+    .subgrid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+    .conditional-tag { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); background: #FBF0DA; border: 1.2px solid var(--gold); border-radius: 4px; padding: 2px 7px; }
+    .graded-block { grid-column: 1 / -1; border: 1.5px dashed var(--gold); border-radius: var(--r-md); padding: 18px; background: #FFFBF2; }
+    .sold-block { grid-column: 1 / -1; border: 1.5px dashed var(--gain); border-radius: var(--r-md); padding: 18px; background: #F3FAF6; }
+    .graded-head { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .graded-head .gh-ttl { font-family: 'Space Grotesk'; font-weight: 700; font-size: 14px; color: var(--ink); }
+    .conditional-tag.green { color: var(--gain); background: #DCF1E6; border-color: var(--gain); }
+
+    /* file input */
+    .file-input { display: block; }
+    .file-input input[type="file"] { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-2); width: 100%; border: 1.5px solid var(--ink); border-radius: var(--r-sm); padding: 8px; background: var(--bg-2); }
+    .file-input input[type="file"]::file-selector-button { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--bg); background: var(--ink); border: none; border-radius: 5px; padding: 7px 12px; margin-right: 12px; cursor: pointer; }
+    .file-input input[type="file"]::file-selector-button:hover { background: #2E1C10; }
+
+    /* buttons */
+    .btn { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; padding: 0 18px; height: 46px; border-radius: var(--r-sm); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 7px; text-decoration: none; transition: all 0.13s ease; border: 1.5px solid transparent; }
+    .btn-sm { height: 42px; font-size: 12px; }
+    .btn-primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+    .btn-primary:hover { background: #2E1C10; }
+    .btn-ghost { background: var(--bg-2); color: var(--ink); border-color: var(--ink); }
+    .btn-ghost:hover { background: var(--bg-3); }
+    .btn-disabled { background: var(--bg-3); color: var(--ink-3); border-color: var(--bg-3); cursor: not-allowed; }
+    .submit-row { display: flex; gap: 12px; margin-top: 4px; }
+    .submit-row .btn-primary { flex: 1; }
+
+    .mock-note { margin-top: 28px; padding: 14px 20px; background: var(--bg-2); border: 1.5px dashed var(--ink-3); border-radius: var(--r-md); font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em; color: var(--ink-2); text-align: center; text-transform: uppercase; font-weight: 600; line-height: 1.7; }
+  </style>
+</head>
+<body>
+
+  <!-- NAV (ADMIN) -->
+  <header class="topnav">
+    <div class="topnav-inner">
+      <a href="#" class="lockup">
+        <svg width="34" height="34" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="og-adm" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FF6BB8"/><stop offset="50%" stop-color="#FF4936"/><stop offset="100%" stop-color="#E89512"/></linearGradient>
+            <mask id="om-adm"><rect width="120" height="120" fill="white"/><circle cx="70" cy="56" r="20" fill="black"/></mask>
+          </defs>
+          <circle cx="60" cy="60" r="52" fill="url(#og-adm)" stroke="#1A0F08" stroke-width="5"/>
+          <circle cx="60" cy="60" r="38" fill="#1A0F08"/>
+          <circle cx="58" cy="60" r="26" fill="#FFF5E4" mask="url(#om-adm)"/>
+          <g transform="translate(80 60)"><path d="M 0,-11 Q 1.65,-1.65 11,0 Q 1.65,1.65 0,11 Q -1.65,1.65 -11,0 Q -1.65,-1.65 0,-11 Z" fill="#FFF5E4"/></g>
+        </svg>
+        <span class="lockup-wm">Owl<em>Market</em></span>
+      </a>
+      <span class="internal-chip">Internal</span>
+      <nav>
+        <ul class="nav-links">
+          <li><a href="#" class="active">Inventory</a></li>
+          <li><a href="#">Bundles</a></li>
+          <li><a href="#">Orders</a></li>
+          <li><a href="#">Lens</a></li>
+          <li><a href="#">PSA</a></li>
+        </ul>
+      </nav>
+      <div class="nav-right">
+        <a href="#" class="nav-view">View site ↗</a>
+        <a href="#" class="nav-signout">Sign out</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <a href="#" class="crumb">← Inventory</a>
+
+    <div class="page-head">
+      <div class="eyebrow">Internal Tool</div>
+      <h1 class="title">Add Inventory</h1>
+      <p class="subline">Search the card catalog, then create itemized inventory entries for your store.</p>
+    </div>
+
+    <!-- ===== STEP 1: SEARCH CARD ===== -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-step">1</span>
+        <span class="panel-title">Find the card</span>
+      </div>
+
+      <label class="field">
+        <span class="field-label">Search Card</span>
+        <div class="search-row">
+          <input class="input" type="text" placeholder="Search by card name or card number" value="Luffy" />
+          <button class="btn btn-ghost btn-sm">Search</button>
+        </div>
+      </label>
+
+      <div class="results">
+        <button class="result selected">
+          <span class="result-thumb" style="background:#C53A2A;">L</span>
+          <span class="result-info">
+            <span class="result-name">Luffy — Gear Fifth</span>
+            <span class="result-meta"><span>OP05</span><span>OP05-119</span><span>SEC</span></span>
+          </span>
+          <span class="result-sel-tag">Selected ✓</span>
+        </button>
+        <button class="result">
+          <span class="result-thumb" style="background:#7C2A1E;">L</span>
+          <span class="result-info">
+            <span class="result-name">Monkey D. Luffy — Romance Dawn</span>
+            <span class="result-meta"><span>OP01</span><span>OP01-024</span><span>L</span></span>
+          </span>
+        </button>
+        <button class="result">
+          <span class="result-thumb" style="background:#4A1D5A;">L</span>
+          <span class="result-info">
+            <span class="result-name">Luffy — Straw Hat (promo)</span>
+            <span class="result-meta"><span>PROMO</span><span>P-001</span><span class="badge-private">Private</span></span>
+          </span>
+        </button>
+      </div>
+
+      <label class="checkbox-box">
+        <span class="box"></span>
+        <span>
+          <span class="ttl">Item is not in the catalog</span>
+          <span class="desc">Enter the card name, set code, and number manually.</span>
+        </span>
+      </label>
+    </div>
+
+    <!-- ===== STEP 2: INVENTORY DETAILS ===== -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-step">2</span>
+        <span class="panel-title">Inventory Details</span>
+      </div>
+
+      <!-- selected-card confirm -->
+      <div class="selected-card">
+        <span class="sc-thumb" style="background:#C53A2A;">L</span>
+        <span>
+          <div class="sc-name">Luffy — Gear Fifth</div>
+          <div class="sc-meta">OP05 · OP05-119 · SEC</div>
+        </span>
+        <button class="sc-clear">Clear</button>
+      </div>
+
+      <div class="grid2" style="margin-top:20px;">
+
+        <label class="field">
+          <span class="field-label">Condition <span class="req">*</span></span>
+          <select class="select">
+            <option>Raw</option><option>Damaged</option><option selected>Graded</option><option>Sealed</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Item Nickname</span>
+          <input class="input" type="text" placeholder="Optional searchable nickname" />
+        </label>
+
+        <!-- GRADED-ONLY block (shows only when condition = Graded) -->
+        <div class="graded-block">
+          <div class="graded-head">
+            <span class="gh-ttl">Grading info</span>
+            <span class="conditional-tag">shows when condition = graded</span>
+          </div>
+          <div class="grid2">
+            <label class="field">
+              <span class="field-label">Graded Rating</span>
+              <select class="select">
+                <option value="">Select rating</option>
+                <option>TAG 10</option><option selected>PSA 10</option><option>PSA 9</option>
+                <option>PSA 8.5</option><option>PSA 8</option><option>PSA 7</option>
+                <option>BGS 10</option><option>BGS 9.5</option><option>PSA Authentic</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="field-label">Certification Number</span>
+              <input class="input" type="text" placeholder="PSA cert number" />
+            </label>
+            <label class="field file-input">
+              <span class="field-label">Front Scan</span>
+              <input type="file" accept="image/*" />
+            </label>
+            <label class="field file-input">
+              <span class="field-label">Back Scan</span>
+              <input type="file" accept="image/*" />
+            </label>
+          </div>
+        </div>
+
+        <label class="field">
+          <span class="field-label">Starting Stage <span class="req">*</span></span>
+          <select class="select">
+            <option>New</option><option>Grading</option><option>For Sale</option><option>Need Shipping</option><option selected>Sold</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Quantity <span class="req">*</span></span>
+          <input class="input" type="number" min="1" max="100" value="1" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Acquired Date</span>
+          <input class="input" type="date" value="2026-05-20" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Cost Basis</span>
+          <input class="input" type="text" placeholder="Optional" />
+          <span class="field-hint">USD · per-item acquisition cost</span>
+        </label>
+
+        <label class="field span2">
+          <span class="field-label">Purchased From</span>
+          <select class="select">
+            <option value="">Select origin</option>
+            <option>Facebook</option><option>Ebay</option><option>Instagram</option><option>Direct Person</option><option>Event</option>
+          </select>
+        </label>
+
+        <!-- SOLD-ONLY block (shows only when starting stage = Sold) -->
+        <div class="sold-block">
+          <div class="graded-head">
+            <span class="gh-ttl">Sale info</span>
+            <span class="conditional-tag green">shows when stage = sold</span>
+          </div>
+          <div class="subgrid3">
+            <label class="field">
+              <span class="field-label">Sale Channel</span>
+              <select class="select">
+                <option>----</option><option selected>Ebay</option><option>FB</option><option>Instagram</option><option>In Person</option><option>Traded</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="field-label">Sold Date</span>
+              <input class="input" type="date" value="2026-05-20" />
+            </label>
+            <label class="field">
+              <span class="field-label">Sold Price</span>
+              <input class="input" type="text" placeholder="USD" />
+            </label>
+          </div>
+        </div>
+
+        <label class="field span2">
+          <span class="field-label">Notes</span>
+          <textarea class="textarea" placeholder="Optional"></textarea>
+        </label>
+
+      </div>
+
+      <div class="submit-row" style="margin-top:22px;">
+        <a href="#" class="btn btn-ghost">Cancel</a>
+        <button class="btn btn-primary">Add Inventory</button>
+      </div>
+    </div>
+
+    <div class="mock-note">
+      MOCKUP · /admin/inventory/new · C1.5 · v3.0 · 2026-05-20 · LOCKS ADMIN FORM CONVENTION<br>
+      MATCHES REAL: CATALOG SEARCH → SELECTABLE RESULTS (+ PRIVATE BADGE) → "NOT IN CATALOG" MANUAL TOGGLE · INVENTORY DETAILS GRID (CONDITION / NICKNAME / [GRADED: RATING + CERT + FRONT/BACK SCAN] / STARTING STAGE / QUANTITY / ACQUIRED DATE / COST BASIS / PURCHASED FROM / NOTES) · SUBMIT "ADD INVENTORY"<br>
+      FORM PRIMITIVES: MONO-UPPERCASE LABEL (INK-2) · WHITE INPUT + INK 1.5PX BORDER · CORAL FOCUS RING · INK FILE-BUTTON · INK SUBMIT (PRIMARY) · CORAL = REQUIRED * MARK<br>
+      CONDITIONAL BOXES: GRADED INFO = GOLD DASHED (shows when condition=graded) · SALE INFO = GREEN DASHED (shows when stage=sold; sale channel / sold date / sold price)<br>
+      v2: LIST-PICK SELECTED = DEEP-COBALT FULL FILL (--select #1F47A1) + CREAM TEXT · v3: ADDED SOLD CONDITIONAL BOX
+    </div>
+
+  </main>
+
+</body>
+</html>
