@@ -358,17 +358,17 @@ test("PregradeWorkspace re-measure reopens the saved session in adjust mode with
   assert.equal(next.activeResultFace, "front");
 });
 
-test("PregradeWorkspace finishMeasure lands in view on a clean measurement and adjust on a noisy one", () => {
+test("PregradeWorkspace finishMeasure always lands in adjust (border editing active by default)", () => {
   const workspace = loadModule<PregradeWorkspaceModule>("src/components/lens/PregradeWorkspace.tsx");
   const front = { face: "front", overlay, imageUrl: "blob:front", imageSize: { width: 100, height: 140 }, adjusted: false };
   const base = { ...workspace.createInitialPregradeState(), step: "measure", faces: { front } };
 
-  // Clean measurement (no notice, no placeholder) → report-first view.
+  // Clean measurement (no notice, no placeholder) now arrives editable — not gated behind "Adjust borders".
   const clean = workspace.pregradeReducer(base, { type: "finishMeasure", activeFace: "front", notice: null });
   assert.equal(clean.step, "result");
-  assert.equal(clean.resultMode, "view");
+  assert.equal(clean.resultMode, "adjust");
 
-  // A CV notice forces adjust.
+  // A CV notice still lands in adjust.
   const noisyNotice = workspace.pregradeReducer(base, {
     type: "finishMeasure",
     activeFace: "front",
@@ -376,7 +376,7 @@ test("PregradeWorkspace finishMeasure lands in view on a clean measurement and a
   });
   assert.equal(noisyNotice.resultMode, "adjust");
 
-  // A placeholder overlay (face.adjusted) forces adjust even without a notice.
+  // A placeholder overlay (face.adjusted) lands in adjust too.
   const placeholderBase = { ...base, faces: { front: { ...front, adjusted: true } } };
   const placeholder = workspace.pregradeReducer(placeholderBase, {
     type: "finishMeasure",
@@ -384,6 +384,24 @@ test("PregradeWorkspace finishMeasure lands in view on a clean measurement and a
     notice: null,
   });
   assert.equal(placeholder.resultMode, "adjust");
+});
+
+test("PregradeWorkspace switching result face keeps border editing active (resultMode unchanged)", () => {
+  const workspace = loadModule<PregradeWorkspaceModule>("src/components/lens/PregradeWorkspace.tsx");
+  const front = { face: "front", overlay, imageUrl: "blob:front", imageSize: { width: 100, height: 140 }, adjusted: false };
+  const back = { face: "back", overlay, imageUrl: "blob:back", imageSize: { width: 100, height: 140 }, adjusted: false, unviewed: true };
+  const base = {
+    ...workspace.createInitialPregradeState(),
+    step: "result",
+    resultMode: "adjust",
+    faces: { front, back },
+    activeResultFace: "front",
+  };
+
+  const switched = workspace.pregradeReducer(base, { type: "setActiveResultFace", face: "back" });
+  assert.equal(switched.activeResultFace, "back");
+  // Front↔Back must not relock the editor — both faces arrive editable.
+  assert.equal(switched.resultMode, "adjust");
 });
 
 test("uploadErrorCopy gives decode, card-not-found, and measurement-failed distinct messages", () => {

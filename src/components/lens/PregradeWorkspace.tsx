@@ -356,15 +356,15 @@ export function pregradeReducer(state: PregradeState, action: Action): PregradeS
       };
     }
     case "finishMeasure": {
-      // Report-first on a clean measurement; drop straight into adjust when the CV failed
-      // (a notice is set) or produced a placeholder overlay (face.adjusted) the user must fix.
-      const needsAdjust =
-        action.notice != null ||
-        (["front", "back"] as LensFace[]).some((face) => state.faces[face]?.adjusted);
+      // Border editing is active by default on arrival: open the overlay editor unlocked
+      // ("adjust") so the user can refine the detected borders immediately — whether the CV
+      // succeeded cleanly, raised a notice, or produced a placeholder overlay. "Done" locks
+      // it to the read-only report ("view"). resultMode is workspace-global, so Front and
+      // Back share it and both arrive editable.
       return {
         ...state,
         step: "result",
-        resultMode: needsAdjust ? "adjust" : "view",
+        resultMode: "adjust",
         activeResultFace: action.activeFace,
         resultNotice: action.notice,
         addBackMode: false,
