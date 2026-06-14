@@ -106,6 +106,8 @@ type PregradeWorkspaceModule = {
   PregradeHeader: React.ComponentType<{ isResults: boolean }>;
   createInitialPregradeState: () => Record<string, unknown>;
   pregradeReducer: (state: Record<string, unknown>, action: Record<string, unknown>) => Record<string, unknown>;
+  uploadErrorCopy: (code: string) => string;
+  jpegIsCmyk: (bytes: Uint8Array) => boolean;
   saveFace: (input: {
     face: LensFace;
     upload: Upload & {
@@ -382,6 +384,31 @@ test("PregradeWorkspace finishMeasure lands in view on a clean measurement and a
     notice: null,
   });
   assert.equal(placeholder.resultMode, "adjust");
+});
+
+test("uploadErrorCopy gives decode, card-not-found, and measurement-failed distinct messages", () => {
+  const workspace = loadModule<PregradeWorkspaceModule>("src/components/lens/PregradeWorkspace.tsx");
+  const decode = workspace.uploadErrorCopy("INVALID_UPLOAD");
+  const cardNotFound = workspace.uploadErrorCopy("CARD_NOT_DETECTED");
+  const measurementFailed = workspace.uploadErrorCopy("MEASUREMENT_FAILED");
+
+  assert.match(decode, /Try a JPG, PNG, or WebP scan under 20 MB/);
+  assert.match(cardNotFound, /Couldn't find a card in that image/);
+  assert.match(measurementFailed, /Found the card but couldn't measure centering/);
+  // All three branches are distinct — no shared catch-all.
+  assert.notEqual(decode, cardNotFound);
+  assert.notEqual(decode, measurementFailed);
+  assert.notEqual(cardNotFound, measurementFailed);
+});
+
+test("jpegIsCmyk flags 4-component (CMYK) JPEGs and clears RGB ones", () => {
+  const workspace = loadModule<PregradeWorkspaceModule>("src/components/lens/PregradeWorkspace.tsx");
+  // Minimal SOI + SOF0 header; only the component-count byte (index 11) matters to the detector.
+  const sof = (components: number) =>
+    new Uint8Array([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x00, 0x10, 0x00, 0x10, components, 0x00]);
+  assert.equal(workspace.jpegIsCmyk(sof(4)), true);
+  assert.equal(workspace.jpegIsCmyk(sof(3)), false);
+  assert.equal(workspace.jpegIsCmyk(new Uint8Array([0x89, 0x50, 0x4e, 0x47])), false); // PNG header, not a JPEG
 });
 
 test("PregradeWorkspace re-measure save targets the existing session id", async () => {

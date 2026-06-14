@@ -149,6 +149,11 @@ const COPY = {
   unsupportedFormat: "Only JPG, PNG, and WebP are supported. Convert your image and try again.",
   imageTooSmall:
     "Image is too small to measure accurately. Minimum dimension is 400px. Try a higher-resolution scan.",
+  decodeFailed: "We couldn't read that upload. Try a JPG, PNG, or WebP scan under 20 MB.",
+  cardNotFound: "Couldn't find a card in that image. Use a flat scanner shot, not a phone photo.",
+  measurementFailed: "Found the card but couldn't measure centering. Re-scan flat with the lid open.",
+  cmykUndecodable:
+    "This image couldn't be decoded. It may be corrupted or use an unsupported color profile (e.g. a CMYK JPEG) — re-export it as a standard RGB JPG or PNG and try again.",
 };
 
 function randomId() {
@@ -491,11 +496,15 @@ function delay(ms: number) {
   });
 }
 
-function uploadErrorCopy(code: ApiErrorCode) {
+export function uploadErrorCopy(code: ApiErrorCode) {
   if (code === "FILE_TOO_LARGE") return COPY.fileTooLarge;
   if (code === "UNSUPPORTED_FORMAT" || code === "UNSUPPORTED_MEDIA_TYPE") return COPY.unsupportedFormat;
   if (code === "IMAGE_TOO_SMALL") return COPY.imageTooSmall;
-  return "We couldn't read that upload. Try a JPG, PNG, or WebP scan under 20 MB.";
+  // CV measure-stage failures — each distinct, and distinct from the decode/upload copy.
+  if (code === "CARD_NOT_DETECTED") return COPY.cardNotFound;
+  if (code === "MEASUREMENT_FAILED") return COPY.measurementFailed;
+  // Decode / generic upload failure (INVALID_UPLOAD, IMAGE_UNREADABLE, anything unexpected).
+  return COPY.decodeFailed;
 }
 
 function isUploadTimeFailure(failure: MeasurementFailure) {
@@ -526,18 +535,58 @@ function cvNoticeForFailures(failures: Partial<Record<LensFace, MeasurementFailu
   return { kind: "manual", body: COPY.cardNotDetected };
 }
 
-async function readImageSize(url: string) {
-  return new Promise<{ width: number; height: number }>((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => {
-      resolve({
-        width: image.naturalWidth,
-        height: image.naturalHeight,
-      });
-    };
-    image.onerror = () => reject(new Error("Image could not be read"));
-    image.src = url;
-  });
+async function readImageSize(file: File): Promise<{ width: number; height: number }> {
+  // createImageBitmap decodes far more reliably than an <img> element: it handles
+  // CMYK JPEGs and odd color profiles that <img> silently rejects, and it throws a
+  // descriptive DOMException when a file genuinely can't be decoded — so the caller
+  // can surface a real reason instead of a blind "couldn't read it".
+  const bitmap = await createImageBitmap(file);
+  try {
+    return { width: bitmap.width, height: bitmap.height };
+  } finally {
+    bitmap.close();
+  }
+}
+
+// A JPEG is CMYK/YCCK when its Start-of-Frame marker declares 4 colour components. Browsers
+// can't decode those via createImageBitmap/<img>, which is the usual reason an otherwise-valid
+// scan fails to decode — so we surface a CMYK-specific hint rather than the generic message.
+export function jpegIsCmyk(bytes: Uint8Array): boolean {
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return false; // no SOI → not a JPEG
+  let offset = 2;
+  while (offset + 9 < bytes.length) {
+    if (bytes[offset] !== 0xff) {
+      offset += 1;
+      continue;
+    }
+    const marker = bytes[offset + 1];
+    if (marker === 0xff) {
+      offset += 1; // fill byte
+      continue;
+    }
+    // Standalone markers carry no length: TEM (01), RSTn / SOI / EOI (D0–D9).
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd9)) {
+      offset += 2;
+      continue;
+    }
+    const length = (bytes[offset + 2] << 8) | bytes[offset + 3];
+    if (length < 2) break;
+    // SOF markers (C0–CF except C4=DHT, C8=JPG, CC=DAC) carry the component count.
+    const isSof = marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+    if (isSof) return bytes[offset + 9] === 4; // length(2) precision(1) height(2) width(2) → components
+    if (marker === 0xda) break; // SOS — pixel data begins, no SOF seen
+    offset += 2 + length;
+  }
+  return false;
+}
+
+async function isCmykJpeg(file: File): Promise<boolean> {
+  if (file.type !== "image/jpeg") return false;
+  try {
+    return jpegIsCmyk(new Uint8Array(await file.arrayBuffer()));
+  } catch {
+    return false;
+  }
 }
 
 function parseErrorCode(value: unknown, status: number): ApiErrorCode {
@@ -1063,10 +1112,16 @@ export default function PregradeWorkspace() {
     const previewUrl = URL.createObjectURL(file);
     let imageSize: { width: number; height: number };
     try {
-      imageSize = await readImageSize(previewUrl);
-    } catch {
+      imageSize = await readImageSize(file);
+    } catch (error) {
+      // Surface the real decode reason (createImageBitmap's DOMException) — the old
+      // <img> path swallowed it, which is why the message had to be a vague catch-all.
+      console.warn("[lens] image decode failed", { name: file.name, type: file.type, size: file.size, error });
       URL.revokeObjectURL(previewUrl);
-      dispatch({ type: "uploadError", face, message: uploadErrorCopy("INVALID_UPLOAD") });
+      // CMYK JPEGs are a common, identifiable decode failure — give them a specific hint;
+      // every other decode failure falls back to the generic message.
+      const message = (await isCmykJpeg(file)) ? COPY.cmykUndecodable : uploadErrorCopy("INVALID_UPLOAD");
+      dispatch({ type: "uploadError", face, message });
       return;
     }
 

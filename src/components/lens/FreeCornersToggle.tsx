@@ -7,21 +7,21 @@ type FreeCornersToggleProps = {
 
 export default function FreeCornersToggle({ enabled, onChange }: FreeCornersToggleProps) {
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
+    <div className="rounded-c-sm border-[1.5px] border-ink bg-bg-2 p-3">
       <button
         type="button"
         aria-pressed={enabled}
         onClick={() => onChange(!enabled)}
-        className={`flex w-full items-center justify-between rounded-md border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors ${
+        className={`flex w-full items-center justify-between rounded-c-sm border-[1.5px] px-3 py-2 font-mono-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${
           enabled
-            ? "border-owl/50 bg-owl/10 text-owl"
-            : "border-border-2 bg-deep text-text-2 hover:text-text"
+            ? "border-coral bg-bg-3 text-coral"
+            : "border-ink-3 bg-bg-2 text-ink-2 hover:text-ink"
         }`}
       >
         <span>Free corners</span>
-        <span className={`h-2.5 w-2.5 rounded-full ${enabled ? "bg-owl" : "bg-text-3"}`} />
+        <span className={`h-2.5 w-2.5 rounded-full ${enabled ? "bg-coral" : "bg-ink-3"}`} />
       </button>
-      <div className="mt-2 font-mono text-[10px] text-text-2">
+      <div className="mt-2 font-mono-2 text-[10px] text-ink-2">
         {enabled ? "rotation off · corners drag freely" : "hold Shift to drag one freely"}
       </div>
     </div>

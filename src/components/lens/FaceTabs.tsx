@@ -25,27 +25,27 @@ export default function FaceTabs({
   onChange,
 }: FaceTabsProps) {
   return (
-    <div className={`${className} flex gap-7 border-b border-border`}>
+    <div className={`${className} flex gap-7 border-b-[1.5px] border-ink`}>
       {faces.map((face) => (
         <button
           key={face}
           type="button"
           onClick={() => onChange(face)}
-          className={`flex items-center gap-2 border-b-2 px-0 py-2.5 font-mono text-xs font-semibold uppercase tracking-wider transition-colors ${
+          className={`flex items-center gap-2 border-b-2 px-0 py-2.5 font-mono-2 text-xs font-semibold uppercase tracking-wider transition-colors ${
             activeFace === face
-              ? "border-owl text-owl"
-              : "border-transparent text-text-2 hover:text-text"
+              ? "border-coral text-coral"
+              : "border-transparent text-ink-2 hover:text-ink"
           }`}
         >
           {face}
-          {uploadedFaces[face] && <span aria-label={`${face} uploaded`} className="h-1.5 w-1.5 rounded-full bg-gain" />}
+          {uploadedFaces[face] && <span aria-label={`${face} uploaded`} className="h-1.5 w-1.5 rounded-full bg-gain-2" />}
           {!uploadedFaces[face] && emptyFaceHints[face] && (
-            <span className="text-[9px] font-medium tracking-normal text-text-3">
+            <span className="text-[9px] font-medium tracking-normal text-ink-3">
               ·{emptyFaceHints[face]}
             </span>
           )}
-          {unviewedFaces[face] && <span aria-label={`${face} unviewed`} className="h-1.5 w-1.5 rounded-full bg-owl" />}
-          {adjustedFaces[face] && <span className="text-[9px] font-medium tracking-normal text-owl">· adj</span>}
+          {unviewedFaces[face] && <span aria-label={`${face} unviewed`} className="h-1.5 w-1.5 rounded-full bg-coral" />}
+          {adjustedFaces[face] && <span className="text-[9px] font-medium tracking-normal text-coral">· adj</span>}
         </button>
       ))}
     </div>

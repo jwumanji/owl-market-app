@@ -199,8 +199,8 @@ test("ImageOverlayPanel renders 14px tone-colored axis labels", () => {
   assert.equal((html.match(/data-axis-label="/g) ?? []).length, 4);
   assert.equal((html.match(/data-screen-px="14"/g) ?? []).length, 4);
   assert.match(html, /font-size="14"/);
-  assert.match(html, /stroke="var\(--border\)"/);
-  assert.match(html, /fill="var\(--gain, var\(--green\)\)"/);
-  assert.match(html, /fill="var\(--owl\)"/);
-  assert.match(html, /fill="var\(--loss, var\(--red\)\)"/);
+  assert.match(html, /stroke="var\(--ink\)"/);
+  assert.match(html, /fill="var\(--grade-10\)"/);
+  assert.match(html, /fill="var\(--grade-8b\)"/);
+  assert.match(html, /fill="var\(--grade-low\)"/);
 });

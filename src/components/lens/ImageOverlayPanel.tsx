@@ -186,9 +186,9 @@ function cornerLabel(handle: OverlayHandle) {
 }
 
 function axisLabelColor(percentage: number) {
-  if (percentage <= 55) return "var(--gain, var(--green))";
-  if (percentage <= 60) return "var(--owl)";
-  return "var(--loss, var(--red))";
+  if (percentage <= 55) return "var(--grade-10)";
+  if (percentage <= 60) return "var(--grade-8b)";
+  return "var(--grade-low)";
 }
 
 export default function ImageOverlayPanel({
@@ -478,7 +478,7 @@ export default function ImageOverlayPanel({
 
   return (
     <div
-      className="flex min-h-[600px] flex-grow flex-col rounded-lg border border-border bg-deep p-6"
+      className="flex min-h-[600px] flex-grow flex-col rounded-c-md border-[1.5px] border-ink bg-bg-2 p-6"
       data-lens-workspace-panel="true"
       data-workspace-min-height="600"
       data-workspace-padding={WORKSPACE_PADDING_PX}
@@ -486,7 +486,7 @@ export default function ImageOverlayPanel({
       <svg
         ref={svgRef}
         viewBox={`0 ${viewBoxTop} ${imageSize.width} ${viewBoxHeight}`}
-        className="block h-full min-h-[552px] w-full flex-1 touch-none select-none rounded-md bg-void object-contain outline-none"
+        className="block h-full min-h-[552px] w-full flex-1 touch-none select-none rounded-c-sm bg-bg-3 object-contain outline-none"
         role="img"
         aria-label="Owl Lens centering overlay"
         tabIndex={0}
@@ -514,9 +514,9 @@ export default function ImageOverlayPanel({
           <image href={imageUrl} x="0" y="0" width={imageSize.width} height={imageSize.height} preserveAspectRatio="xMidYMid meet" />
         ) : (
           <g aria-hidden="true">
-            <rect x="0" y="0" width={imageSize.width} height={imageSize.height} fill="#050916" />
-            <rect x="38" y="38" width={imageSize.width - 76} height={imageSize.height - 76} rx="18" fill="#121d32" />
-            <text x={imageSize.width / 2} y={imageSize.height / 2} textAnchor="middle" fill="#3d4d6a" className="font-mono text-[18px] uppercase tracking-widest">
+            <rect x="0" y="0" width={imageSize.width} height={imageSize.height} fill="var(--bg-3)" />
+            <rect x="38" y="38" width={imageSize.width - 76} height={imageSize.height - 76} rx="18" fill="var(--bg-2)" />
+            <text x={imageSize.width / 2} y={imageSize.height / 2} textAnchor="middle" fill="var(--ink-3)" className="font-mono-2 text-[18px] uppercase tracking-widest">
               sample scan
             </text>
           </g>
@@ -529,7 +529,7 @@ export default function ImageOverlayPanel({
               y1={rotation.topMid.y}
               x2={rotation.handle.x}
               y2={rotation.handle.y}
-              stroke="var(--owl)"
+              stroke="var(--coral)"
               strokeDasharray="8 8"
               strokeOpacity="0.75"
               strokeWidth="2"
@@ -539,8 +539,8 @@ export default function ImageOverlayPanel({
               cx={rotation.handle.x}
               cy={rotation.handle.y}
               r={rotationHandleRadius}
-              fill="var(--owl)"
-              stroke="var(--void)"
+              fill="var(--coral)"
+              stroke="var(--bg)"
               strokeWidth="2"
               vectorEffect="non-scaling-stroke"
               className="cursor-grab"
@@ -553,16 +553,18 @@ export default function ImageOverlayPanel({
 
         <polygon
           points={points(overlay.outer)}
-          fill="rgba(232,160,32,0.05)"
-          stroke="var(--owl)"
+          fill="var(--coral)"
+          fillOpacity="0.05"
+          stroke="var(--coral)"
           strokeWidth="2"
           vectorEffect="non-scaling-stroke"
           strokeDasharray="6 8"
         />
         <polygon
           points={points(overlay.inner)}
-          fill="rgba(0,214,143,0.04)"
-          stroke="var(--green)"
+          fill="var(--select)"
+          fillOpacity="0.05"
+          stroke="var(--select)"
           strokeWidth="2"
           vectorEffect="non-scaling-stroke"
           strokeDasharray="6 8"
@@ -579,8 +581,8 @@ export default function ImageOverlayPanel({
                 width={axisLabelWidth}
                 height={axisLabelHeight}
                 rx={axisLabelRadius}
-                fill={active ? "rgba(232,160,32,0.18)" : "rgba(3,5,13,0.82)"}
-                stroke="var(--border)"
+                fill={active ? "var(--bg-3)" : "var(--bg-2)"}
+                stroke="var(--ink)"
                 strokeWidth="1"
                 vectorEffect="non-scaling-stroke"
               />
@@ -589,7 +591,7 @@ export default function ImageOverlayPanel({
                 y={label.position.y + axisLabelFontSize * 0.36}
                 textAnchor="middle"
                 fill={axisLabelColor(label.percentage)}
-                className="font-mono font-bold"
+                className="font-mono-2 font-bold"
                 fontSize={axisLabelFontSize}
                 data-screen-px={AXIS_LABEL_FONT_PX}
               >
@@ -607,8 +609,8 @@ export default function ImageOverlayPanel({
               width={degreeDialWidth}
               height={degreeDialHeight}
               rx={screenPxToSvgUnits(5, svgScale)}
-              fill="rgba(3,5,13,0.80)"
-              stroke="rgba(232,160,32,0.5)"
+              fill="var(--select)"
+              stroke="var(--ink)"
               strokeWidth="2"
               vectorEffect="non-scaling-stroke"
             />
@@ -616,8 +618,8 @@ export default function ImageOverlayPanel({
               x={degreeDial.x + degreeDialWidth / 2}
               y={degreeDial.y + degreeDialHeight / 2 + degreeDialFontSize * 0.36}
               textAnchor="middle"
-              fill="var(--owl)"
-              className="font-mono font-bold"
+              fill="var(--bg)"
+              className="font-mono-2 font-bold"
               fontSize={degreeDialFontSize}
               data-screen-px={DEGREE_DIAL_FONT_PX}
             >
@@ -632,7 +634,7 @@ export default function ImageOverlayPanel({
             const point = overlay[target][corner];
             const handle = { target, corner };
             const selected = selectedHandle?.target === target && selectedHandle.corner === corner;
-            const color = target === "outer" ? "var(--owl)" : "var(--green)";
+            const color = target === "outer" ? "var(--coral)" : "var(--select)";
             return (
               <g key={`${target}-${corner}`}>
                 {selected && (
@@ -656,7 +658,7 @@ export default function ImageOverlayPanel({
                   height={cornerHandleSize}
                   rx={cornerHandleRadius}
                   fill={color}
-                  stroke="var(--void)"
+                  stroke="var(--bg)"
                   strokeWidth="2"
                   vectorEffect="non-scaling-stroke"
                   data-screen-px={CORNER_HANDLE_PX}
@@ -679,11 +681,11 @@ export default function ImageOverlayPanel({
         )}
       </svg>
 
-      <div className="flex items-center gap-4 px-1 pt-3 font-mono text-[10px] uppercase tracking-wider text-text-2">
-        <span><span className="mr-1.5 inline-block h-[3px] w-3 bg-owl align-middle" />Outer</span>
-        <span><span className="mr-1.5 inline-block h-[3px] w-3 bg-gain align-middle" />Inner</span>
+      <div className="flex items-center gap-4 px-1 pt-3 font-mono-2 text-[10px] uppercase tracking-wider text-ink-2">
+        <span><span className="mr-1.5 inline-block h-[3px] w-3 bg-coral align-middle" />Outer</span>
+        <span><span className="mr-1.5 inline-block h-[3px] w-3 bg-select align-middle" />Inner</span>
         <span className="flex-1" />
-        <span className="text-owl">{isRotating ? "Dragging rotation" : status}</span>
+        <span className="text-coral">{isRotating ? "Dragging rotation" : status}</span>
       </div>
     </div>
   );

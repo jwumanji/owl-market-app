@@ -55,10 +55,10 @@ export default function FaceRatioCard({
   }
 
   const classes = [
-    "rounded-lg border bg-surface p-3",
-    isActive ? "border-owl" : "border-border",
+    "rounded-c-md border-[1.5px] bg-bg-2 p-3",
+    isActive ? "border-coral" : "border-ink",
     interactive
-      ? "cursor-pointer outline-none transition-colors hover:border-border-2 focus-visible:border-owl focus-visible:ring-2 focus-visible:ring-owl/30"
+      ? "cursor-pointer outline-none transition-colors hover:border-coral focus-visible:border-coral focus-visible:ring-2 focus-visible:ring-coral/30"
       : "",
     className,
   ]
@@ -78,10 +78,10 @@ export default function FaceRatioCard({
       onKeyDown={interactive ? handleKeyDown : undefined}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-text-2">{face}</span>
+        <span className="font-mono-2 text-[10px] font-bold uppercase tracking-widest text-ink-2">{face}</span>
         {showCeiling && (
           <span
-            className="rounded-md border px-2 py-1 font-mono text-[11px] font-bold"
+            className="rounded-c-sm border-[1.5px] px-2 py-1 font-mono-2 text-[11px] font-bold"
             style={gradeTierAccentStyleForGrade(faceCeiling)}
           >
             {bareGradeLabel(faceCeiling)}
@@ -92,8 +92,8 @@ export default function FaceRatioCard({
       {media}
 
       <div className="mt-2 grid grid-cols-2 gap-2">
-        <div className="rounded-md border border-border bg-deep p-2">
-          <div className="font-mono text-[9px] font-bold uppercase tracking-wider text-text-2">L / R</div>
+        <div className="rounded-c-sm border-[1.5px] border-ink bg-bg-3 p-2">
+          <div className="font-mono-2 text-[9px] font-bold uppercase tracking-wider text-ink-2">L / R</div>
           <AxisRatioValue
             firstLabel="L"
             firstValue={measurement.leftPct}
@@ -103,8 +103,8 @@ export default function FaceRatioCard({
             size="md"
           />
         </div>
-        <div className="rounded-md border border-border bg-deep p-2">
-          <div className="font-mono text-[9px] font-bold uppercase tracking-wider text-text-2">T / B</div>
+        <div className="rounded-c-sm border-[1.5px] border-ink bg-bg-3 p-2">
+          <div className="font-mono-2 text-[9px] font-bold uppercase tracking-wider text-ink-2">T / B</div>
           <AxisRatioValue
             firstLabel="T"
             firstValue={measurement.topPct}
@@ -116,12 +116,12 @@ export default function FaceRatioCard({
         </div>
       </div>
 
-      <div className="mt-2 font-mono text-[10px] font-bold uppercase tracking-wider text-text-2">
+      <div className="mt-2 font-mono-2 text-[10px] font-bold uppercase tracking-wider text-ink-2">
         Worst axis
         <span className={`ml-2 ${TONE_TEXT_CLASSES[worstAxisTone]}`}>
           {worstAxis} @ {measurement.worstAxisMaxPct}%
         </span>
-        {isWorst && <span className="ml-2 text-owl">worst face</span>}
+        {isWorst && <span className="ml-2 text-coral">worst face</span>}
       </div>
     </article>
   );

@@ -157,7 +157,7 @@ function ResultCardName({
 
   return (
     <div data-result-card-name="true">
-      <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-text-2">Card name</div>
+      <div className="font-mono-2 text-[10px] font-bold uppercase tracking-widest text-ink-2">Card name</div>
       {isEditing ? (
         <input
           autoFocus
@@ -180,11 +180,11 @@ function ResultCardName({
           }}
           aria-label="Card name"
           placeholder="Untitled card"
-          className="mt-1 w-full max-w-md rounded-lg border border-owl/50 bg-deep px-3 py-2 text-2xl font-semibold text-text outline-none placeholder:text-text-3 disabled:cursor-wait disabled:opacity-60"
+          className="mt-1 w-full max-w-md rounded-c-sm border-[1.5px] border-coral/60 bg-bg-2 px-3 py-2 font-grotesk text-2xl font-bold text-ink outline-none placeholder:text-ink-3 disabled:cursor-wait disabled:opacity-60"
         />
       ) : (
         <div className="mt-1 inline-flex max-w-full items-center gap-2">
-          <span className="truncate text-2xl font-semibold text-text">{reportCardNameDisplay(cardIdentity)}</span>
+          <span className="truncate font-grotesk text-2xl font-bold text-ink">{reportCardNameDisplay(cardIdentity)}</span>
           <button
             type="button"
             onClick={() => {
@@ -193,13 +193,13 @@ function ResultCardName({
             }}
             aria-label="Edit card name"
             data-card-name-edit-button="true"
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-transparent text-text-2 transition-colors hover:border-border hover:bg-surface hover:text-owl"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-c-sm border-[1.5px] border-transparent text-ink-2 transition-colors hover:border-ink hover:bg-bg-3 hover:text-coral"
           >
             <PencilIcon className="h-4 w-4" />
           </button>
         </div>
       )}
-      {error && <div className="mt-1 text-sm text-loss">{error}</div>}
+      {error && <div className="mt-1 text-sm text-loss-2">{error}</div>}
     </div>
   );
 }
@@ -210,23 +210,23 @@ function CombinedCeilingCard({ combined }: { combined: ReturnType<typeof combine
 
   return (
     <div
-      className="rounded-lg border p-4 text-center"
+      className="rounded-c-md border-[1.5px] p-4 text-center"
       style={gradeTierAccentStyleForGrade(psa.ceiling)}
       data-result-combined="true"
     >
-      <div className="font-mono text-[10px] font-bold uppercase tracking-widest text-text-2">Combined ceiling</div>
+      <div className="font-mono-2 text-[10px] font-bold uppercase tracking-widest text-ink-2">Combined ceiling</div>
       <div
-        className="mt-1 font-mono text-5xl font-bold leading-none"
+        className="mt-1 font-mono-2 text-5xl font-bold leading-none"
         style={{ color: gradeTierColorForGrade(psa.ceiling) }}
       >
         {bareGradeLabel(psa.ceiling)}
       </div>
-      <div className="mt-1 font-mono text-[10px] text-text-2">
+      <div className="mt-1 font-mono-2 text-[10px] text-ink-2">
         {back ? "worse of front · back" : "front only (back not measured)"}
       </div>
       {/* Borderline amber comes from the same owl-tone source as the per-axis band (grade-8b). */}
       {borderlineNote && (
-        <div className={`mt-1 font-mono text-[10px] font-bold uppercase tracking-wider ${TONE_TEXT_CLASSES.owl}`}>
+        <div className={`mt-1 font-mono-2 text-[10px] font-bold uppercase tracking-wider ${TONE_TEXT_CLASSES.owl}`}>
           {borderlineNote}
         </div>
       )}
@@ -263,7 +263,7 @@ export default function ResultScreen({
   const measured = measuredFaces(faces);
   if (measured.length === 0) {
     return (
-      <section className="rounded-lg border border-border bg-surface p-5 text-sm text-text-2">
+      <section className="rounded-c-md border-[1.5px] border-ink bg-bg-2 p-5 text-sm text-ink-2">
         No measurement is ready yet.
       </section>
     );
@@ -291,7 +291,7 @@ export default function ResultScreen({
       />
 
       {typeof notice === "string" ? (
-        <div className="rounded-md border border-owl/40 bg-owl/10 px-4 py-3 text-sm text-text">{notice}</div>
+        <div className="rounded-c-md border-[1.5px] border-coral/50 bg-bg-3 px-4 py-3 text-sm text-ink">{notice}</div>
       ) : (
         notice
       )}
@@ -325,7 +325,7 @@ export default function ResultScreen({
                   type="button"
                   onClick={onExitAdjust}
                   data-done-adjusting="true"
-                  className="rounded-md border border-owl/40 bg-owl px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
+                  className="rounded-c-sm bg-grad-brand px-4 py-2.5 font-mono-2 text-xs font-bold uppercase tracking-wider text-bg-2 transition-opacity hover:opacity-90"
                 >
                   Done
                 </button>
@@ -333,7 +333,7 @@ export default function ResultScreen({
                   type="button"
                   onClick={() => onResetFace(active.face)}
                   disabled={!active.adjusted}
-                  className="rounded-md border border-border bg-deep px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:bg-surf2 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="rounded-c-sm border-[1.5px] border-ink bg-bg-2 px-4 py-2.5 font-mono-2 text-xs font-bold uppercase tracking-wider text-ink transition-colors hover:bg-bg-3 disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   Reset {active.face}
                 </button>
@@ -343,7 +343,7 @@ export default function ResultScreen({
                 type="button"
                 onClick={onEnterAdjust}
                 data-adjust-borders="true"
-                className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:bg-surf2"
+                className="inline-flex items-center gap-2 rounded-c-sm border-[1.5px] border-ink bg-bg-2 px-4 py-2.5 font-mono-2 text-xs font-bold uppercase tracking-wider text-ink transition-colors hover:bg-bg-3"
               >
                 <PencilIcon className="h-4 w-4" />
                 Adjust borders
@@ -373,12 +373,12 @@ export default function ResultScreen({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
+      <div className="flex flex-wrap items-center gap-2 border-t-[1.5px] border-ink pt-4">
         {canAddBack && (
           <button
             type="button"
             onClick={onAddBack}
-            className="rounded-md border border-owl/40 bg-owl/10 px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-owl transition-colors hover:bg-owl/20"
+            className="rounded-c-sm border-[1.5px] border-coral bg-bg-3 px-4 py-2.5 font-mono-2 text-xs font-bold uppercase tracking-wider text-coral transition-opacity hover:opacity-80"
           >
             ＋ Add back image
           </button>
@@ -388,7 +388,7 @@ export default function ResultScreen({
             type="button"
             onClick={onReMeasure}
             data-re-measure="true"
-            className="rounded-md border border-border bg-deep px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:bg-surf2"
+            className="rounded-c-sm border-[1.5px] border-ink bg-bg-2 px-4 py-2.5 font-mono-2 text-xs font-bold uppercase tracking-wider text-ink transition-colors hover:bg-bg-3"
           >
             Re-measure
           </button>
@@ -397,7 +397,7 @@ export default function ResultScreen({
           type="button"
           onClick={onMeasureAnother}
           data-measure-another="true"
-          className="rounded-md border border-border bg-deep px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:bg-surf2"
+          className="rounded-c-sm border-[1.5px] border-ink bg-bg-2 px-4 py-2.5 font-mono-2 text-xs font-bold uppercase tracking-wider text-ink transition-colors hover:bg-bg-3"
         >
           ＋ Measure another
         </button>
@@ -408,7 +408,7 @@ export default function ResultScreen({
             disabled={saving}
             aria-busy={saving}
             data-save-to-inventory="true"
-            className="ml-auto rounded-md border border-owl/40 bg-owl px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light disabled:cursor-wait disabled:opacity-60"
+            className="ml-auto rounded-c-sm bg-grad-brand px-5 py-2.5 font-mono-2 text-xs font-bold uppercase tracking-wider text-bg-2 transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
           >
             {saving ? "Saving…" : saved ? "Update measurement" : "＋ Save to inventory"}
           </button>

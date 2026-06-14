@@ -99,7 +99,7 @@ test("FaceRatioCard exposes selectable button semantics and keyboard activation"
   assert.equal(element.props["aria-label"], "Switch to front face");
   assert.equal(element.props["aria-pressed"], true);
   assert.match(element.props.className, /cursor-pointer/);
-  assert.match(element.props.className, /border-owl/);
+  assert.match(element.props.className, /border-coral/);
 
   element.props.onClick();
   element.props.onKeyDown({ key: "Enter", preventDefault: () => { prevented += 1; } });
