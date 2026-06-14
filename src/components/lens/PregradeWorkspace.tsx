@@ -748,13 +748,13 @@ export function PregradeHeader({ isResults }: { isResults: boolean }) {
   return (
     <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>
-        <p className="mb-2 font-mono text-sm font-semibold uppercase tracking-wider text-owl">
+        <p className="mb-2 font-mono-2 text-sm font-semibold uppercase tracking-wider text-coral">
           Owl Lens
         </p>
-        <h1 className="text-4xl font-bold text-text">
+        <h1 className="font-grotesk text-4xl font-bold tracking-[-0.02em] text-ink">
           {isResults ? "Pre-grade report" : "Pre-grade"}
         </h1>
-        <p className="mt-2 max-w-3xl text-base leading-7 text-text-2">
+        <p className="mt-2 max-w-3xl text-base leading-7 text-ink-2">
           {isResults
             ? "Saved centering report with combined ceiling, grader readouts, and per-face ratios."
             : "Upload a front scan, add the back when you have it, then verify the overlay before saving the centering result."}
@@ -763,8 +763,8 @@ export function PregradeHeader({ isResults }: { isResults: boolean }) {
       <Link
         href={backHref}
         aria-label={backLabel}
-        className={`inline-flex h-10 items-center justify-center rounded-md border border-border bg-surface text-text-2 transition-colors hover:border-border-2 hover:text-owl focus-visible:border-owl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-owl/30 ${
-          isResults ? "gap-2 px-3 font-mono text-[11px] font-bold uppercase tracking-wider" : "w-10"
+        className={`inline-flex h-10 items-center justify-center rounded-c-sm border-[1.5px] border-ink bg-bg-2 text-ink-2 transition-colors hover:bg-bg-3 hover:text-ink focus-visible:border-coral focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/30 ${
+          isResults ? "gap-2 px-3 font-mono-2 text-[11px] font-bold uppercase tracking-wider" : "w-10"
         }`}
       >
         <ArrowLeftIcon className="h-5 w-5" />
@@ -799,7 +799,7 @@ export function PregradeUploadState({
   return (
     <section className="space-y-5" data-pregrade-upload-state="true">
       {addBackMode && !uploads.back && (
-        <div className="rounded-md border border-owl/40 bg-owl/10 px-4 py-3 text-sm text-text">
+        <div className="rounded-c-md border-[1.5px] border-coral/50 bg-bg-3 px-4 py-3 text-sm text-ink">
           {COPY.idleAddBack}
         </div>
       )}
@@ -832,7 +832,7 @@ export function PregradeUploadState({
             type="button"
             disabled={!canMeasureBack}
             onClick={onMeasureBack}
-            className="rounded-lg bg-owl px-8 py-3 font-mono text-xs font-bold uppercase tracking-widest text-void transition-colors hover:bg-owl-light disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-c-md bg-grad-brand px-8 py-3 font-mono-2 text-xs font-bold uppercase tracking-widest text-bg-2 transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Measure back →
           </button>
@@ -841,12 +841,12 @@ export function PregradeUploadState({
             type="button"
             disabled={!canContinue}
             onClick={onContinue}
-            className="rounded-lg bg-owl px-8 py-3 font-mono text-xs font-bold uppercase tracking-widest text-void transition-colors hover:bg-owl-light disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-c-md bg-grad-brand px-8 py-3 font-mono-2 text-xs font-bold uppercase tracking-widest text-bg-2 transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Continue to identify →
           </button>
         )}
-        <div className="text-center text-xs text-text-2">
+        <div className="text-center text-xs text-ink-2">
           Images are saved with your measurement so you can re-open and adjust later.
         </div>
       </div>
@@ -952,7 +952,7 @@ function stepStatus(step: WizardStep, current: WizardStep): "done" | "active" | 
   return "idle";
 }
 
-// Functional stepper; final C1.5 styling (gradient active dot, --grade-* accents) lands in the token pass.
+// C1.5 stepper: gradient active dot, coral done-state, ink-3 idle.
 function PregradeStepper({ current }: { current: WizardStep }) {
   return (
     <ol data-pregrade-stepper="true" className="mb-6 flex flex-wrap items-center gap-2">
@@ -960,25 +960,25 @@ function PregradeStepper({ current }: { current: WizardStep }) {
         const status = stepStatus(step, current);
         const dotClass =
           status === "active"
-            ? "border-owl bg-owl text-void"
+            ? "border-transparent bg-grad-brand text-bg-2"
             : status === "done"
-              ? "border-owl/50 bg-owl/10 text-owl"
-              : "border-border bg-deep text-text-3";
+              ? "border-coral bg-bg-3 text-coral"
+              : "border-ink-3 bg-bg-2 text-ink-3";
         return (
           <li key={step} data-step={step} data-step-status={status} className="flex items-center gap-2">
             <span
-              className={`flex h-6 w-6 items-center justify-center rounded-full border font-mono text-[11px] font-bold ${dotClass}`}
+              className={`flex h-6 w-6 items-center justify-center rounded-c-pill border-[1.5px] font-mono-2 text-[11px] font-bold ${dotClass}`}
             >
               {status === "done" ? "✓" : index + 1}
             </span>
             <span
-              className={`font-mono text-[11px] font-bold uppercase tracking-wider ${
-                status === "idle" ? "text-text-3" : "text-text"
+              className={`font-mono-2 text-[11px] font-bold uppercase tracking-wider ${
+                status === "idle" ? "text-ink-3" : "text-ink"
               }`}
             >
               {label}
             </span>
-            {index < STEP_SEQUENCE.length - 1 && <span className="mx-1 h-px w-6 bg-border" />}
+            {index < STEP_SEQUENCE.length - 1 && <span className="mx-1 h-px w-6 bg-ink-3/40" />}
           </li>
         );
       })}

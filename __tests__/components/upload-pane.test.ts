@@ -188,7 +188,7 @@ test("UploadPane uploaded image target exposes hover affordance styling", () => 
   );
 
   assert.match(target.props.className, /cursor-pointer/);
-  assert.match(target.props.className, /hover:border-owl/);
+  assert.match(target.props.className, /hover:border-coral/);
   assert.ok(hint);
   assert.match(hint.props.className, /group-hover:opacity-100/);
 });

@@ -12,9 +12,9 @@ type FailureNoticeProps = {
 };
 
 const TONE_CLASSES: Record<FailureNoticeTone, string> = {
-  info: "border-owl/40 bg-owl/10 text-text",
-  warning: "border-owl/40 bg-owl/10 text-text",
-  error: "border-loss/40 bg-loss/10 text-text",
+  info: "border-coral/40 bg-bg-3 text-ink",
+  warning: "border-coral/40 bg-bg-3 text-ink",
+  error: "border-loss-2/50 bg-[#FBE3E3] text-ink",
 };
 
 export default function FailureNotice({
@@ -24,9 +24,9 @@ export default function FailureNotice({
   actions,
 }: FailureNoticeProps) {
   return (
-    <div className={`rounded-md border px-4 py-3 text-sm leading-6 ${TONE_CLASSES[tone]}`}>
+    <div className={`rounded-c-md border-[1.5px] px-4 py-3 text-sm leading-6 ${TONE_CLASSES[tone]}`}>
       {title && (
-        <div className="mb-1 font-mono text-[10px] font-bold uppercase tracking-widest text-owl">
+        <div className="mb-1 font-mono-2 text-[10px] font-bold uppercase tracking-widest text-coral">
           {title}
         </div>
       )}

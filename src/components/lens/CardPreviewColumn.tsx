@@ -10,15 +10,15 @@ export default function CardPreviewColumn({
   const previewUrl = frontUpload?.previewUrl;
 
   return (
-    <aside className="space-y-2 rounded-lg border border-border bg-surface p-4" data-card-preview-column="true">
-      <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-text-2">
+    <aside className="space-y-2 rounded-c-md border-[1.5px] border-ink bg-bg-2 p-4" data-card-preview-column="true">
+      <div className="font-mono-2 text-[10px] font-bold uppercase tracking-wider text-ink-2">
         PREVIEW
       </div>
       <div
-        className={`flex aspect-[2.5/3.5] items-center justify-center overflow-hidden rounded-lg bg-deep/70 text-center ${
+        className={`flex aspect-[2.5/3.5] items-center justify-center overflow-hidden rounded-c-md bg-bg-3 text-center ${
           previewUrl
-            ? "border border-border"
-            : "border border-dashed border-border-2 p-4 font-mono text-[10px] font-semibold uppercase tracking-wider text-text-3"
+            ? "border-[1.5px] border-ink"
+            : "border-[1.5px] border-dashed border-ink-3 p-4 font-mono-2 text-[10px] font-semibold uppercase tracking-wider text-ink-3"
         }`}
         data-card-preview={previewUrl ? "front" : "empty"}
       >
