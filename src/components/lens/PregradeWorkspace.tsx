@@ -926,16 +926,16 @@ export function IdentifyStep({
   return (
     <section className="space-y-5" data-pregrade-identify-state="true">
       <div data-card-name-row="true">
-        <label className="mb-2 block font-mono text-[10px] font-bold uppercase tracking-wider text-text-2">
+        <label className="mb-2 block font-mono-2 text-[10px] font-bold uppercase tracking-wider text-ink-2">
           CARD NAME<span className="ml-1 text-coral">*</span>
         </label>
         <input
           value={cardIdentity}
           onChange={(event) => onCardIdentityChange(event.target.value)}
           placeholder="e.g. Zoro alt art, my graded Luffy…"
-          className="w-full rounded-lg border border-border bg-deep px-3.5 py-3 text-sm text-text outline-none transition-colors placeholder:text-text-3 focus:border-owl/50"
+          className="w-full rounded-c-sm border-[1.5px] border-ink bg-bg-2 px-3.5 py-3 text-sm text-ink outline-none transition-colors placeholder:text-ink-3 focus:border-coral"
         />
-        <p className="mt-2 text-xs text-text-2">
+        <p className="mt-2 text-xs text-ink-2">
           Your own label — shows in inventory. Doesn&apos;t have to match the catalog.
         </p>
       </div>
@@ -943,9 +943,9 @@ export function IdentifyStep({
       {/* Catalog seam — disabled this pass. A later focused piece wires catalog
           search + card_image_id; the catalogMatch field/action already exist on state. */}
       <div data-catalog-seam="true" aria-disabled="true" className="opacity-60">
-        <label className="mb-2 block font-mono text-[10px] font-bold uppercase tracking-wider text-text-2">
+        <label className="mb-2 block font-mono-2 text-[10px] font-bold uppercase tracking-wider text-ink-2">
           FIND IN CATALOG
-          <span className="ml-2 rounded border border-border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase text-text-2">
+          <span className="ml-2 rounded-c-sm border-[1.5px] border-ink px-1.5 py-0.5 font-mono-2 text-[9px] font-bold uppercase text-ink-2">
             Optional
           </span>
         </label>
@@ -953,14 +953,14 @@ export function IdentifyStep({
           disabled
           value={catalogMatch ? catalogMatch.name : ""}
           placeholder="Catalog search — coming in a later pass"
-          className="w-full cursor-not-allowed rounded-lg border border-border bg-deep px-3.5 py-3 text-sm text-text-3 outline-none"
+          className="w-full cursor-not-allowed rounded-c-sm border-[1.5px] border-ink-3 bg-bg-3 px-3.5 py-3 text-sm text-ink-3 outline-none"
         />
         {catalogMatch ? (
-          <p className="mt-2 text-xs text-text-2">
+          <p className="mt-2 text-xs text-ink-2">
             Linked to {catalogMatch.name} · {catalogMatch.number}
           </p>
         ) : (
-          <p className="mt-2 text-xs text-text-3">
+          <p className="mt-2 text-xs text-ink-3">
             Linking the catalog reference image (and card_image_id) lands in a later pass.
           </p>
         )}
@@ -970,7 +970,7 @@ export function IdentifyStep({
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider text-text-2 transition-colors hover:border-border-2 hover:text-owl"
+          className="inline-flex items-center gap-2 rounded-c-sm border-[1.5px] border-ink bg-bg-2 px-4 py-2.5 font-mono-2 text-xs font-bold uppercase tracking-wider text-ink-2 transition-colors hover:bg-bg-3 hover:text-ink"
         >
           <ArrowLeftIcon className="h-4 w-4" />
           Back
@@ -979,12 +979,12 @@ export function IdentifyStep({
           type="button"
           disabled={!canMeasure}
           onClick={onMeasure}
-          className="rounded-lg bg-owl px-8 py-3 font-mono text-xs font-bold uppercase tracking-widest text-void transition-colors hover:bg-owl-light disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-c-md bg-grad-brand px-8 py-3 font-mono-2 text-xs font-bold uppercase tracking-widest text-bg-2 transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Measure centering →
         </button>
       </div>
-      <p className="text-center text-xs text-text-2">Name required · catalog optional</p>
+      <p className="text-center text-xs text-ink-2">Name required · catalog optional</p>
     </section>
   );
 }
