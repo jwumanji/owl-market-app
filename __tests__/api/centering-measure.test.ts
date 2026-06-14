@@ -560,3 +560,24 @@ test("CV 422 response is forwarded without inserting a row", async () => {
   assert.equal(route.cvCalls.length, 1);
   assert.equal(route.insertedRows.length, 0);
 });
+
+test("measure requires a game scope — a request with no game returns 400 before the CV (regression: Owl Lens wizard)", async () => {
+  // The pre-grade wizard's measureFace must send `game`. Without it the merged route 400s
+  // at resolveGameScope before the CV is ever called — which previously surfaced to the user
+  // as a misleading "...under 20 MB" upload error on the Upload pane.
+  const route = loadRoute();
+  const formData = new FormData();
+  formData.set("inventoryItemId", "inventory-1");
+  formData.set("file", new File(["fake image"], "card.jpg", { type: "image/jpeg" }));
+  const request = new Request("http://localhost/api/centering/measure", {
+    method: "POST",
+    body: formData,
+  });
+
+  const response = await route.POST(request);
+
+  assert.equal(response.status, 400);
+  const body = await response.json();
+  assert.match(body.error, /game is required/i);
+  assert.equal(route.cvCalls.length, 0);
+});

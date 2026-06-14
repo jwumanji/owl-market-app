@@ -645,6 +645,9 @@ async function measureFace({
   formData.set("persist", "false");
   formData.set("cardSessionId", cardSessionId);
   if (cardIdentity.trim()) formData.set("cardIdentity", cardIdentity.trim());
+  // The merged /api/centering/measure route requires a game scope (resolveGameScope).
+  // Owl Lens is One Piece only, so scope every pre-grade measurement to it.
+  formData.set("game", "one_piece");
 
   let response: Response;
   try {
