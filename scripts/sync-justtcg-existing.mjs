@@ -541,7 +541,7 @@ async function main() {
   console.log("Loading Supabase One Piece sets/cards...");
   const [dbSets, dbCards] = await Promise.all([
     sbFetchAll(`sets?select=id,game_id,slug,code,name,card_count,series&${gameFilter}`),
-    sbFetchAll(`cards?select=id,game_id,card_image_id,card_number,name,name_base,variant_label,set_id,rarity,tcg_product_id,price_stats(tcg_market,market_avg,updated_at)&${gameFilter}`),
+    sbFetchAll(`cards?select=id,game_id,card_image_id,card_number,name,name_base,variant_label,set_id,rarity,tcg_product_id,price_stats!price_stats_card_game_fk(tcg_market,market_avg,updated_at)&${gameFilter}`),
   ]);
 
   const setById = new Map(dbSets.map((set) => [set.id, set]));
