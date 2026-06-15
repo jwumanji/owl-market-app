@@ -759,23 +759,23 @@ function ProcessingPanel({
   const activeIndex = phase === "validating" ? 0 : 1;
 
   return (
-    <section className="rounded-lg border border-border bg-surface p-8">
+    <section className="rounded-c-md border-[1.5px] border-ink bg-bg-2 p-8">
       <div className="mx-auto flex max-w-xl flex-col items-center text-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-2 border-border-2 border-t-owl" />
-        <h2 className="mt-5 text-2xl font-semibold text-text">
+        <div className="h-12 w-12 animate-spin rounded-full border-2 border-ink-3/30 border-t-coral" />
+        <h2 className="mt-5 font-grotesk text-2xl font-bold text-ink">
           {phase === "validating" ? "Validating upload" : "Measuring centering"}
         </h2>
-        <p className="mt-2 text-sm leading-6 text-text-2">
+        <p className="mt-2 text-sm leading-6 text-ink-2">
           1-3 seconds per face.
         </p>
         <div className="mt-6 w-full space-y-2 text-left">
           {steps.map((step, index) => (
             <div
               key={step}
-              className={`rounded-md border px-4 py-3 font-mono text-[11px] font-bold uppercase tracking-wider ${
+              className={`rounded-c-sm border-[1.5px] px-4 py-3 font-mono-2 text-[11px] font-bold uppercase tracking-wider ${
                 index <= activeIndex
-                  ? "border-owl/40 bg-owl/10 text-owl"
-                  : "border-border bg-deep text-text-2"
+                  ? "border-coral bg-bg-3 text-coral"
+                  : "border-ink-3 bg-bg-2 text-ink-2"
               }`}
             >
               {step}
