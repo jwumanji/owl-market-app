@@ -24,6 +24,33 @@ const CODE_TO_SLUG = buildPrimaryJustTcgSlugByCode(CODE_TO_SLUGS);
 const GAME = ONE_PIECE_JUSTTCG_GAME_SLUG;
 const CARD_UPSERT_CONFLICT = "game_id,card_image_id";
 const PRICE_STATS_UPSERT_CONFLICT = "game_id,card_id";
+const LOCK_TTL_MS = 55 * 60 * 1000;
+const DEFAULT_MAX_SETS = 4;
+const PRICE_SYNC_STATE_KEY = "justtcg_price_sync_current";
+
+interface DbSet {
+  id: string;
+  slug: string | null;
+  code: string | null;
+  name: string | null;
+  series: string | null;
+}
+
+interface CursorState {
+  nextIndex?: number;
+  completedCycles?: number;
+  totalSets?: number;
+  lastRunAt?: string;
+  lastSetCodes?: string[];
+  lastUpdated?: number;
+  lastError?: string | null;
+}
+
+interface SyncSetResult {
+  code: string;
+  updated: number;
+  errors: string[];
+}
 
 // ---------------------------------------------------------------------------
 // GET|POST /api/sync/justtcg?sets=OP01  (ONE set per request)
@@ -69,20 +96,39 @@ async function syncPrices(request: Request) {
     return NextResponse.json({ error: setsErr.message }, { status: 500 });
   }
 
-  const syncableSets = dbSets.filter((s) => s.code && CODE_TO_SLUG[s.code]);
+  const allDbSets = (dbSets ?? []) as DbSet[];
+  const syncableSets = allDbSets.filter((s) => s.code && CODE_TO_SLUG[s.code]);
+  if (syncableSets.length === 0) {
+    return NextResponse.json({ error: "No JustTCG-mapped sets found." }, { status: 500 });
+  }
 
   // If no sets param, return available sets (useful for chaining)
   const setsParam = searchParams.get("sets");
   const allowCatalogMutations = searchParams.get("allowCatalogMutations") === "1";
   if (!setsParam) {
-    // For Vercel Cron: auto-chain through sets one at a time
     const indexParam = searchParams.get("_index");
-    if (indexParam !== null || request.headers.get("authorization") === `Bearer ${cronSecret}`) {
+    if (indexParam !== null) {
       return await syncByIndex(request, syncableSets, parseInt(indexParam ?? "0", 10), allowCatalogMutations);
     }
 
+    const cursorMode =
+      searchParams.get("cursor") === "1" ||
+      request.headers.get("authorization") === `Bearer ${cronSecret}`;
+    if (cursorMode) {
+      return await syncByCursor(
+        supabase,
+        game.id,
+        game.slug,
+        allDbSets,
+        syncableSets,
+        clampInt(searchParams.get("maxSets"), DEFAULT_MAX_SETS, 1, 8),
+        searchParams.get("reset") === "1",
+        allowCatalogMutations
+      );
+    }
+
     return NextResponse.json({
-      message: "Provide ?sets=OP01 or use ?_index=0 to chain through all sets",
+      message: "Provide ?sets=OP01 or use ?cursor=1&maxSets=4 to advance the scheduled cursor",
       available: syncableSets.map((s) => s.code),
       total: syncableSets.length,
     });
@@ -90,19 +136,16 @@ async function syncPrices(request: Request) {
 
   // Sync the specified set(s)
   const allowedCodes = setsParam.split(",").map((s) => s.trim().toUpperCase());
-  const setsToSync = dbSets.filter(
+  const setsToSync = allDbSets.filter(
     (s) => s.code && allowedCodes.includes(s.code)
   );
 
   const client = new JustTCG();
-  const results: { code: string; updated: number; errors: string[] }[] = [];
+  const results: SyncSetResult[] = [];
 
   // Build a card-number-prefix → set_id map once so new-card inserts go to the
   // correct physical set, not whichever set happens to be iterating.
-  const prefixToSetId: Record<string, string> = {};
-  for (const s of dbSets) {
-    if (s.code) prefixToSetId[s.code.toUpperCase()] = s.id;
-  }
+  const prefixToSetId = buildPrefixToSetId(allDbSets);
 
   // Global card pre-load: one query for all cards, shared across every set
   // we sync. This lets matching find cross-set variants (e.g., an OP07-
@@ -129,6 +172,86 @@ async function syncPrices(request: Request) {
   });
 }
 
+async function syncByCursor(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  gameId: string,
+  gameSlug: string,
+  dbSets: DbSet[],
+  syncableSets: DbSet[],
+  maxSets: number,
+  reset: boolean,
+  allowCatalogMutations = false
+) {
+  const cursor = await acquireCursor(supabase, PRICE_SYNC_STATE_KEY, syncableSets.length, reset);
+  if (cursor.error) {
+    return NextResponse.json(cursor.error, { status: cursor.status ?? 500 });
+  }
+  if (cursor.locked) {
+    return NextResponse.json({
+      mode: "cursor",
+      message: "Current price sync is already running.",
+      lockedAt: cursor.row?.locked_at,
+    });
+  }
+
+  const startIndex = normalizeIndex(cursor.state.nextIndex ?? 0, syncableSets.length);
+  const setsToSync = pickSets(syncableSets, startIndex, maxSets);
+  const results: SyncSetResult[] = [];
+  let processedForCursor = 0;
+  let fatalError: string | null = null;
+
+  try {
+    const client = new JustTCG();
+    const prefixToSetId = buildPrefixToSetId(dbSets);
+    const allCards = await loadAllCards(supabase, gameId);
+    const cardMaps = buildCardMaps(allCards);
+
+    for (const dbSet of setsToSync) {
+      const result = await syncOneSet(client, supabase, gameId, dbSet, prefixToSetId, cardMaps, { allowCatalogMutations });
+      results.push(result);
+      processedForCursor++;
+    }
+  } catch (error) {
+    fatalError = error instanceof Error ? error.message : String(error);
+  }
+
+  if (cursor.lockOwner) {
+    await releaseCursor(
+      supabase,
+      PRICE_SYNC_STATE_KEY,
+      cursor.lockOwner,
+      advanceState(cursor.state, syncableSets.length, startIndex, processedForCursor, results, fatalError)
+    );
+  }
+
+  const synced = results.reduce((sum, result) => sum + result.updated, 0);
+  const errorCount = results.reduce((sum, result) => sum + result.errors.length, 0);
+  const completedCycle = startIndex + processedForCursor >= syncableSets.length;
+  const summaries = completedCycle && !fatalError
+    ? await tryRefreshPublicSummaries(supabase, gameId)
+    : { refreshed: false, deferred: true };
+
+  return NextResponse.json(
+    {
+      mode: "cursor",
+      game: gameSlug,
+      provider: "justtcg",
+      maxSets,
+      startIndex,
+      processedSets: processedForCursor,
+      synced,
+      errors: errorCount,
+      error: fatalError,
+      nextIndex: normalizeIndex(startIndex + processedForCursor, syncableSets.length),
+      nextSet: syncableSets[normalizeIndex(startIndex + processedForCursor, syncableSets.length)]?.code ?? null,
+      summaries,
+      sets: results,
+    },
+    { status: fatalError ? 500 : 200 }
+  );
+}
+
 // ---------------------------------------------------------------------------
 // syncByIndex — Vercel Cron auto-chain: sync set at index, then trigger next
 // ---------------------------------------------------------------------------
@@ -136,7 +259,7 @@ async function syncPrices(request: Request) {
 async function syncByIndex(
   request: Request,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  syncableSets: any[],
+  syncableSets: DbSet[],
   index: number,
   allowCatalogMutations = false
 ) {
@@ -161,10 +284,7 @@ async function syncByIndex(
     .from("sets")
     .select("id, code")
     .eq("game_id", game.id);
-  const prefixToSetId: Record<string, string> = {};
-  for (const s of allSets ?? []) {
-    if (s.code) prefixToSetId[s.code.toUpperCase()] = s.id;
-  }
+  const prefixToSetId = buildPrefixToSetId((allSets ?? []) as DbSet[]);
 
   // Global pre-load (see comment in syncPrices). Each chained Cron call
   // re-queries — that's intentional: prior sets in the chain may have
@@ -200,6 +320,154 @@ async function syncByIndex(
     summaries,
     next: nextIndex < syncableSets.length ? syncableSets[nextIndex]?.code : null,
   });
+}
+
+function buildPrefixToSetId(dbSets: Pick<DbSet, "id" | "code">[]): Record<string, string> {
+  const prefixToSetId: Record<string, string> = {};
+  for (const set of dbSets) {
+    if (set.code) prefixToSetId[set.code.toUpperCase()] = set.id;
+  }
+  return prefixToSetId;
+}
+
+async function acquireCursor(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  key: string,
+  totalSets: number,
+  reset: boolean
+): Promise<{
+  state: CursorState;
+  lockOwner: string | null;
+  locked: boolean;
+  row?: { locked_at?: string | null };
+  error?: Record<string, unknown>;
+  status?: number;
+}> {
+  const { data, error } = await supabase
+    .from("sync_state")
+    .select("key,state,locked_at,lock_owner")
+    .eq("key", key)
+    .maybeSingle();
+
+  if (error) return syncStateError(error);
+
+  const now = new Date().toISOString();
+  const existingState = (data?.state ?? {}) as CursorState;
+  const lockedAt = data?.locked_at ? new Date(data.locked_at).getTime() : 0;
+  if (!reset && lockedAt && Date.now() - lockedAt < LOCK_TTL_MS) {
+    return { state: existingState, lockOwner: null, locked: true, row: data };
+  }
+
+  const state: CursorState = reset
+    ? { nextIndex: 0, completedCycles: 0, totalSets }
+    : { ...existingState, nextIndex: normalizeIndex(existingState.nextIndex ?? 0, totalSets), totalSets };
+  const lockOwner = randomId();
+
+  const { error: upsertError } = await supabase
+    .from("sync_state")
+    .upsert(
+      {
+        key,
+        state,
+        locked_at: now,
+        lock_owner: lockOwner,
+        updated_at: now,
+      },
+      { onConflict: "key" }
+    );
+
+  if (upsertError) return syncStateError(upsertError);
+  return { state, lockOwner, locked: false };
+}
+
+async function releaseCursor(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  key: string,
+  lockOwner: string,
+  state: CursorState
+) {
+  await supabase
+    .from("sync_state")
+    .update({
+      state,
+      locked_at: null,
+      lock_owner: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("key", key)
+    .eq("lock_owner", lockOwner);
+}
+
+function syncStateError(error: { code?: string; message?: string }) {
+  const message = error.message ?? "sync_state error";
+  if (error.code === "42P01" || message.includes("sync_state")) {
+    return {
+      state: {},
+      lockOwner: null,
+      locked: false,
+      status: 500,
+      error: {
+        error: "Missing sync_state table.",
+        migration: "Run schema-migration-v15-price-history-backfill.sql or schema-migration-v16-price-history-hardening.sql in Supabase.",
+        details: message,
+      },
+    };
+  }
+  return {
+    state: {},
+    lockOwner: null,
+    locked: false,
+    status: 500,
+    error: { error: message },
+  };
+}
+
+function advanceState(
+  state: CursorState,
+  totalSets: number,
+  startIndex: number,
+  processed: number,
+  results: SyncSetResult[],
+  error: string | null
+): CursorState {
+  const nextRaw = startIndex + processed;
+  const completedCycles = (state.completedCycles ?? 0) + Math.floor(nextRaw / totalSets);
+  return {
+    ...state,
+    nextIndex: normalizeIndex(nextRaw, totalSets),
+    completedCycles,
+    totalSets,
+    lastRunAt: new Date().toISOString(),
+    lastSetCodes: results.map((result) => result.code),
+    lastUpdated: results.reduce((sum, result) => sum + result.updated, 0),
+    lastError: error,
+  };
+}
+
+function clampInt(value: string | null, fallback: number, min: number, max: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(parsed)));
+}
+
+function normalizeIndex(index: number, total: number) {
+  if (total <= 0) return 0;
+  return ((index % total) + total) % total;
+}
+
+function pickSets(sets: DbSet[], startIndex: number, count: number): DbSet[] {
+  const picked: DbSet[] = [];
+  const total = sets.length;
+  for (let i = 0; i < Math.min(count, total); i++) {
+    picked.push(sets[normalizeIndex(startIndex + i, total)]);
+  }
+  return picked;
+}
+
+function randomId() {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
 }
 
 async function tryRefreshPublicSummaries(supabase: ReturnType<typeof createServiceClient>, gameId: string) {
