@@ -1058,14 +1058,14 @@ function resultNoticeNode({
             <button
               type="button"
               onClick={onRetryBack}
-              className="rounded-md border border-owl/40 bg-owl px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wider text-void transition-colors hover:bg-owl-light"
+              className="rounded-c-sm border-[1.5px] border-coral bg-coral px-3 py-2 font-mono-2 text-[10px] font-bold uppercase tracking-wider text-bg-2 transition-opacity hover:opacity-90"
             >
               Retry back
             </button>
             <button
               type="button"
               onClick={onContinueFrontOnly}
-              className="rounded-md border border-border bg-deep px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wider text-text transition-colors hover:border-border-2 hover:bg-surf2"
+              className="rounded-c-sm border-[1.5px] border-ink bg-bg-2 px-3 py-2 font-mono-2 text-[10px] font-bold uppercase tracking-wider text-ink-2 transition-colors hover:bg-bg-3 hover:text-ink"
             >
               Continue with front only
             </button>
