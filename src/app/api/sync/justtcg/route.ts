@@ -577,6 +577,18 @@ function allowsCardNumberInSet(setCode: string, cardNumber: string | null | unde
   return prefix === setCode;
 }
 
+function shouldSyncJustTcgCard(
+  setCode: string,
+  cardNumber: string | null | undefined,
+  name: string | null | undefined
+): boolean {
+  if (allowsCardNumberInSet(setCode, cardNumber)) return true;
+
+  // Treasure/SP/etc. cards are often distributed in a later set while keeping
+  // the original card number, e.g. OP13 contains OP11-058 (TR).
+  return Boolean(prefixFromCardNumber(cardNumber) && extractVariantLabel(name ?? ""));
+}
+
 function catalogImageUrlForNewCard(
   setCode: string,
   cardNumber: string | null | undefined,
@@ -638,7 +650,7 @@ async function syncOneSet(
 
       for (const jtCard of cards) {
         try {
-          if (!allowsCardNumberInSet(setCode, jtCard.number)) continue;
+          if (!shouldSyncJustTcgCard(setCode, jtCard.number, jtCard.name)) continue;
           matchAndCollect(jtCard, byNumber, byNameLower, priceUpserts, historyInserts, rarityUpdates, matchedCardIds, gameId, dbSet.id, unmatchedCards);
         } catch (err) {
           setErrors.push(
@@ -1032,7 +1044,7 @@ function matchAndCollect(
     }
     const dbTagSet = new Set(dbTags);
     const dbStripped = stripCardNum(c.name ?? "");
-    const dbVariantKey = variantKey(c.variant_label);
+    const dbVariantKey = cardVariantKey(c);
     const exactBaseImage = Boolean(jtNumber && c.card_image_id === jtNumber);
     const sameVariant = Boolean(jtVariantKey && variantsEquivalent(jtVariantKey, dbVariantKey));
     let scoreAdjust = 0;
@@ -1069,11 +1081,16 @@ function matchAndCollect(
     const allDbCards = byNumber.get(jtCard.number);
     if (allDbCards && allDbCards.length > 0) {
       const directProductMatches = jtCard.id
-        ? allDbCards.filter((c) => String(c.tcg_product_id ?? "") === String(jtCard.id) && !matchedCardIds.has(c.id))
+        ? allDbCards.filter(
+            (c) =>
+              String(c.tcg_product_id ?? "") === String(jtCard.id) &&
+              !matchedCardIds.has(c.id) &&
+              directProductMatchAllowed(c, jtVariantKey)
+          )
         : [];
       if (directProductMatches.length === 1) {
         const direct = directProductMatches[0];
-        const variant = jtVariantKey || direct.variant_label
+        const variant = jtVariantKey || isVariantCard(direct)
           ? foilVariant ?? nmVariant
           : nmVariant ?? foilVariant;
         if (variant) {
@@ -1088,7 +1105,7 @@ function matchAndCollect(
 
       if (unmatched.length === 1) {
         const only = unmatched[0];
-        const onlyVariantKey = variantKey(only.variant_label);
+        const onlyVariantKey = cardVariantKey(only);
         const exactBaseImage = Boolean(jtNumber && only.card_image_id === jtNumber);
         const variantWouldHitBase = Boolean(jtVariantKey && !onlyVariantKey && exactBaseImage);
         const baseWouldHitVariant = Boolean(!jtVariantKey && onlyVariantKey);
@@ -1129,7 +1146,7 @@ function matchAndCollect(
       // unmatched so the insert path can create a clean row.
 
       if (chosen) {
-        const variant = chosen.card.variant_label
+        const variant = isVariantCard(chosen.card)
           ? foilVariant ?? nmVariant
           : nmVariant ?? foilVariant;
         if (variant) {
@@ -1208,6 +1225,38 @@ function variantKey(label: string | null | undefined): string {
   }
   if (normalized === "spr") return "sp";
   return normalized;
+}
+
+function rarityVariantKey(rarity: string | null | undefined): string {
+  const normalized = String(rarity ?? "").trim().toUpperCase();
+  if (normalized === "TR") return "tr";
+  if (normalized === "SP") return "sp";
+  if (normalized === "MR") return "manga";
+  if (normalized === "AA") return "altart";
+  if (normalized === "SAR") return "superalternateart";
+  return "";
+}
+
+function cardVariantKey(card: Pick<DbCard, "name" | "variant_label" | "rarity">): string {
+  return (
+    variantKey(card.variant_label) ||
+    variantKey(extractVariantLabel(card.name ?? "")) ||
+    rarityVariantKey(card.rarity)
+  );
+}
+
+function isVariantCard(card: Pick<DbCard, "name" | "variant_label" | "rarity">): boolean {
+  return Boolean(cardVariantKey(card));
+}
+
+function directProductMatchAllowed(
+  card: Pick<DbCard, "name" | "variant_label" | "rarity">,
+  jtVariantKey: string
+): boolean {
+  const dbVariantKey = cardVariantKey(card);
+  return jtVariantKey
+    ? variantsEquivalent(dbVariantKey, jtVariantKey)
+    : !dbVariantKey;
 }
 
 function variantsEquivalent(a: string, b: string): boolean {

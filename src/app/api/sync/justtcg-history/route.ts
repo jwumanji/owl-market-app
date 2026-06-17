@@ -35,6 +35,7 @@ interface DbCard {
   name: string | null;
   name_base: string | null;
   variant_label: string | null;
+  rarity: string | null;
   set_id: string;
   tcg_product_id: string | null;
 }
@@ -254,11 +255,12 @@ async function syncOneSetHistory(
     errors: [],
   };
 
+  // Use a game-wide card index so cross-set variants can be matched when
+  // JustTCG lists the product under its distribution set.
   const { data: dbCards, error: cardsError } = await supabase
     .from("cards")
-    .select("id,game_id,card_image_id,card_number,name,name_base,variant_label,set_id,tcg_product_id")
-    .eq("game_id", gameId)
-    .eq("set_id", dbSet.id);
+    .select("id,game_id,card_image_id,card_number,name,name_base,variant_label,rarity,set_id,tcg_product_id")
+    .eq("game_id", gameId);
 
   if (cardsError) {
     result.errors.push(cardsError.message);
@@ -282,8 +284,7 @@ async function syncOneSetHistory(
         }
 
         const jtVariantKey = variantKey(expectedVariantLabel(jtCard.name));
-        const dbVariantKey = variantKey(match.card.variant_label);
-        const variant = chooseVariant(jtCard, Boolean(jtVariantKey || dbVariantKey));
+        const variant = chooseVariant(jtCard, Boolean(jtVariantKey || cardVariantKey(match.card)));
         if (!variant || numeric(variant.price) === null || numeric(variant.price) === 0) {
           result.skipped.no_price++;
           continue;
@@ -416,17 +417,23 @@ function findExistingMatch(
 ): { card: DbCard | null; reason: string; score?: number } {
   const jtNumber = nullIfEmpty(jtCard.number);
   if (!jtNumber) return { card: null, reason: "no_number" };
-  if (!allowsCardNumberInSet(setCode, jtNumber)) return { card: null, reason: "prefix_mismatch" };
+  const jtVariantKey = variantKey(expectedVariantLabel(jtCard.name));
+  if (!allowsCardNumberInSet(setCode, jtNumber) && !jtVariantKey) {
+    return { card: null, reason: "prefix_mismatch" };
+  }
 
   const direct = jtCard.id
-    ? (indexes.byTcgProductId.get(String(jtCard.id)) ?? []).filter((card) => nullIfEmpty(card.card_number) === jtNumber)
+    ? (indexes.byTcgProductId.get(String(jtCard.id)) ?? []).filter(
+        (card) =>
+          nullIfEmpty(card.card_number) === jtNumber &&
+          directProductMatchAllowed(card, jtVariantKey)
+      )
     : [];
   if (direct.length === 1) return { card: direct[0], reason: "tcg_product_id", score: -100 };
 
   const candidates = indexes.bySetNumber.get(jtNumber) ?? [];
   if (candidates.length === 0) return { card: null, reason: "no_existing_card" };
 
-  const jtVariantKey = variantKey(expectedVariantLabel(jtCard.name));
   const scored = candidates
     .map((card) => ({
       card,
@@ -444,9 +451,7 @@ function findExistingMatch(
 }
 
 function scoreCandidate(card: DbCard, jtCard: JTCard, jtNumber: string, jtVariantKey: string): number {
-  const dbVariantKey = variantKey(card.variant_label);
-  const dbNameVariantKey = variantKey(expectedVariantLabel(card.name));
-  const dbAnyVariantKey = dbVariantKey || dbNameVariantKey;
+  const dbAnyVariantKey = cardVariantKey(card);
   const exactBaseImage = card.card_image_id === jtNumber;
   const cardImage = String(card.card_image_id ?? "");
   const looksLikeImageVariant = /(?:_p\d+|_r\d+|-alt|-manga|-parallel)/i.test(cardImage);
@@ -732,6 +737,34 @@ function variantKey(label: string | null | undefined): string {
   if (normalized === "alternateart" || normalized === "parallel" || normalized === "altart") return "altart";
   if (normalized === "spr") return "sp";
   return normalized;
+}
+
+function rarityVariantKey(rarity: string | null | undefined): string {
+  const normalized = String(rarity ?? "").trim().toUpperCase();
+  if (normalized === "TR") return "tr";
+  if (normalized === "SP") return "sp";
+  if (normalized === "MR") return "manga";
+  if (normalized === "AA") return "altart";
+  if (normalized === "SAR") return "superalternateart";
+  return "";
+}
+
+function cardVariantKey(card: Pick<DbCard, "name" | "variant_label" | "rarity">): string {
+  return (
+    variantKey(card.variant_label) ||
+    variantKey(expectedVariantLabel(card.name)) ||
+    rarityVariantKey(card.rarity)
+  );
+}
+
+function directProductMatchAllowed(
+  card: Pick<DbCard, "name" | "variant_label" | "rarity">,
+  jtVariantKey: string
+): boolean {
+  const dbVariantKey = cardVariantKey(card);
+  return jtVariantKey
+    ? variantsEquivalent(dbVariantKey, jtVariantKey)
+    : !dbVariantKey;
 }
 
 function variantsEquivalent(a: string, b: string): boolean {
