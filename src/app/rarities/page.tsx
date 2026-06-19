@@ -224,6 +224,15 @@ function RarityPerformanceTable({
       {viewMode === "list" ? (
       <div className="rar-table-wrap">
         <table className="rar-performance-table">
+          <colgroup>
+            <col className="rar-col-rank" />
+            <col className="rar-col-rarity" />
+            <col className="rar-col-index" />
+            <col className="rar-col-avg" />
+            <col className="rar-col-cards" />
+            <col className="rar-col-change" />
+            <col className="rar-col-change" />
+          </colgroup>
           <thead>
             <tr>
               <th>#</th>

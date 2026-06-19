@@ -570,10 +570,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .rar-performance-table {
   width: 100%;
-  min-width: 820px;
+  min-width: 900px;
   border-collapse: collapse;
   table-layout: fixed;
 }
+
+.rar-performance-table col.rar-col-rank { width: 5%; }
+.rar-performance-table col.rar-col-rarity { width: 35%; }
+.rar-performance-table col.rar-col-index { width: 14%; }
+.rar-performance-table col.rar-col-avg { width: 14%; }
+.rar-performance-table col.rar-col-cards { width: 10%; }
+.rar-performance-table col.rar-col-change { width: 11%; }
 
 .rar-performance-table th {
   height: 42px;
@@ -590,9 +597,15 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   white-space: nowrap;
 }
 
-.rar-performance-table th:first-child { width: 52px; text-align: center; }
-.rar-performance-table th:nth-child(2) { width: 280px; }
-.rar-performance-table th.r { text-align: right; }
+.rar-performance-table th:first-child,
+.rar-performance-table td:first-child {
+  text-align: center;
+}
+
+.rar-performance-table th.r,
+.rar-performance-table td.r {
+  text-align: right;
+}
 
 .rar-performance-table td {
   height: 66px;
@@ -743,6 +756,14 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   min-width: 0;
 }
 
+.rar-rarity-cell .rb {
+  flex: 0 0 auto;
+}
+
+.rar-rarity-cell > div {
+  min-width: 0;
+}
+
 .rar-rarity-name {
   font-family: var(--font-space-grotesk), system-ui, sans-serif;
   font-size: 15px;
@@ -771,6 +792,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   font-size: 14px;
   font-weight: 900;
   font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .rar-change {
@@ -778,6 +801,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   font-size: 13px;
   font-weight: 900;
   font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .flat { color: var(--ink-3); }
