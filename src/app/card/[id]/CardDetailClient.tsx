@@ -1,26 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import Link from "next/link";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Filler,
-  Tooltip,
-} from "chart.js";
-import { Line } from "react-chartjs-2";
 import { formatPrice, formatPct, pctColor, timeAgo } from "@/lib/utils";
 import RarityBadge from "@/components/ui/RarityBadge";
 import { gamePath } from "@/lib/game-routes";
 import type { CardDetailPayload, PricePoint } from "./card-detail-types";
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip);
-
 const PERIODS = ["7d", "1m", "3m", "1y", "max"] as const;
 type Period = (typeof PERIODS)[number];
+
+const PriceChart = lazy(() => import("./PriceChartClient"));
 
 function filterByPeriod(history: PricePoint[], period: Period): PricePoint[] {
   if (period === "max") return history;
@@ -35,14 +25,6 @@ function filterByPeriod(history: PricePoint[], period: Period): PricePoint[] {
   return history.filter((p) => new Date(p.recorded_at).getTime() >= cutoff);
 }
 
-function formatDate(dateStr: string, period: Period): string {
-  const d = new Date(dateStr);
-  if (period === "1y" || period === "max") {
-    return d.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-  }
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
 function formatAthDate(dateStr: string | null): string {
   if (!dateStr) return "—";
   const d = new Date(dateStr);
@@ -50,11 +32,16 @@ function formatAthDate(dateStr: string | null): string {
 }
 
 function buildCardImageSrcSet(card: CardDetailPayload["card"]): string | undefined {
-  const variants = [
-    { src: card.image_url_small, width: 96 },
-    { src: card.image_url_preview, width: 420 },
-    { src: card.image_url, width: 720 },
-  ];
+  const hasPreview = Boolean(card.image_url_preview);
+  const variants = hasPreview
+    ? [
+        { src: card.image_url_small, width: 96 },
+        { src: card.image_url_preview, width: 420 },
+      ]
+    : [
+        { src: card.image_url_small, width: 96 },
+        { src: card.image_url, width: 720 },
+      ];
   const seen = new Set<string>();
   const srcSet = variants
     .filter((variant): variant is { src: string; width: number } => Boolean(variant.src))
@@ -169,7 +156,10 @@ export default function CardDetailClient({
               srcSet={cardImageSrcSet}
               sizes="(max-width: 767px) calc(100vw - 4rem), 380px"
               alt={card.name}
+              width={380}
+              height={532}
               decoding="async"
+              loading="eager"
               fetchPriority="high"
               className="w-full aspect-[5/7] object-cover rounded-c-md border-[1.5px] border-ink shadow-[0_10px_24px_rgba(26,15,8,0.10)]"
             />
@@ -230,7 +220,9 @@ export default function CardDetailClient({
 
             {filteredHistory.length > 0 ? (
               <div style={{ height: 280 }}>
-                <PriceChart data={filteredHistory} period={chartPeriod} />
+                <Suspense fallback={<ChartLoading />}>
+                  <PriceChart data={filteredHistory} period={chartPeriod} />
+                </Suspense>
               </div>
             ) : (
               <div className="flex items-center justify-center h-[280px] text-ink-3 text-sm font-mono-2">
@@ -344,6 +336,14 @@ function DeltaPill({ value }: { value: number }) {
   );
 }
 
+function ChartLoading() {
+  return (
+    <div className="flex h-[280px] items-center justify-center text-sm font-mono-2 text-ink-3">
+      Loading price history...
+    </div>
+  );
+}
+
 function StatTile({
   label,
   value,
@@ -372,80 +372,4 @@ function StatTile({
       )}
     </div>
   );
-}
-
-function PriceChart({ data, period }: { data: PricePoint[]; period: Period }) {
-  const chartData = {
-    labels: data.map((p) => formatDate(p.recorded_at, period)),
-    datasets: [
-      {
-        data: data.map((p) => p.market_avg),
-        borderColor: "#2D9961",
-        borderWidth: 1.8,
-        fill: true,
-        backgroundColor: (ctx: { chart: { ctx: CanvasRenderingContext2D; chartArea?: { top: number; bottom: number } } }) => {
-          const { ctx: c, chartArea } = ctx.chart;
-          if (!chartArea) return "rgba(45,153,97,0.05)";
-          const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-          g.addColorStop(0, "rgba(45,153,97,0.20)");
-          g.addColorStop(1, "rgba(45,153,97,0.02)");
-          return g;
-        },
-        tension: 0.35,
-        pointRadius: 0,
-        pointHoverRadius: 5,
-        pointBackgroundColor: "#2D9961",
-        pointBorderColor: "#FFFFFF",
-        pointBorderWidth: 2,
-      },
-    ],
-  };
-
-  const options = {
-    responsive: true,
-    maintainAspectRatio: false,
-    layout: { padding: { top: 12, right: 12, bottom: 8, left: 8 } },
-    interaction: { mode: "index" as const, intersect: false },
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        backgroundColor: "rgba(26,15,8,0.95)",
-        borderColor: "rgba(26,15,8,0.10)",
-        borderWidth: 1,
-        titleFont: { family: "JetBrains Mono", size: 10 },
-        bodyFont: { family: "JetBrains Mono", size: 11 },
-        titleColor: "#9A8475",
-        bodyColor: "#FFF5E4",
-        padding: 10,
-        callbacks: {
-          label: (v: { parsed: { y: number | null } }) =>
-            `  $${(v.parsed.y ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        },
-      },
-    },
-    scales: {
-      x: {
-        grid: { color: "rgba(26,15,8,0.06)" },
-        ticks: {
-          font: { family: "JetBrains Mono", size: 10 },
-          color: "#9A8475",
-          maxTicksLimit: 8,
-          maxRotation: 0,
-        },
-        border: { display: false },
-      },
-      y: {
-        position: "right" as const,
-        grid: { color: "rgba(26,15,8,0.06)" },
-        ticks: {
-          font: { family: "JetBrains Mono", size: 10 },
-          color: "#9A8475",
-          callback: (v: number | string) => "$" + Number(v).toLocaleString(),
-        },
-        border: { display: false },
-      },
-    },
-  };
-
-  return <Line data={chartData} options={options} />;
 }
