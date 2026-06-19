@@ -343,7 +343,7 @@ async function main() {
   const [sets, cards, historyRows, syncState] = await Promise.all([
     sbFetchAll(withGameFilter("sets?select=id,code,slug,name", game.id)),
     sbFetchAll(
-      withGameFilter("cards?select=id,set_id,card_image_id,card_number,name,name_base,variant_label,rarity,tcg_product_id,price_stats(tcg_market,market_avg,tcg_low,tcg_mid,tcg_high,chg_1d,chg_7d,chg_30d,updated_at)", game.id)
+      withGameFilter("cards?select=id,set_id,card_image_id,card_number,name,name_base,variant_label,rarity,tcg_product_id,price_stats!price_stats_card_game_fk(tcg_market,market_avg,tcg_low,tcg_mid,tcg_high,chg_1d,chg_7d,chg_30d,updated_at)", game.id)
     ),
     sbFetchAll(withGameFilter("price_history?select=id,card_id,tcg_market,market_avg,recorded_at&order=recorded_at.asc,id.asc", game.id)),
     sbTryFetchAll("sync_state?select=key,state,locked_at,updated_at,created_at&order=updated_at.desc"),
