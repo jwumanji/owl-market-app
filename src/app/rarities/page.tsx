@@ -562,7 +562,7 @@ export default function RaritiesPage() {
   const isDefaultGame = gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
   const [allRarities, setAllRarities] = useState<RarityData[]>(() => isDefaultGame ? FALLBACK_RARITIES : []);
   const [activeRarity, setActiveRarity] = useState<string>(TOP_5_SLUGS[0]);
-  const [rarityViewMode, setRarityViewMode] = useState<RarityViewMode>("list");
+  const [rarityViewMode, setRarityViewMode] = useState<RarityViewMode>("grid");
   const [showFullRanking, setShowFullRanking] = useState(false);
   const [loading, setLoading] = useState(true);
 
