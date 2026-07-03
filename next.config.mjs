@@ -13,7 +13,7 @@ const supabaseStorageHostname = (() => {
 const nextConfig = {
   images: {
     formats: ["image/avif", "image/webp"],
-    // 384 gives the 380px card-detail hero a near-exact rung at 1x DPR
+    // 384 gives the 300px card-detail hero a near-exact rung at 1x DPR
     // (otherwise the srcset jumps from 256 straight to the 640 device size).
     imageSizes: [32, 48, 64, 96, 128, 256, 384],
     minimumCacheTTL: 86400,
