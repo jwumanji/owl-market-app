@@ -16,6 +16,7 @@ import {
 } from "@/lib/catalog-card-fields";
 import { catalogCardDescription } from "@/lib/game-catalog-copy";
 import { PUBLIC_DATA_CACHE_TTL_SECONDS } from "@/lib/public-data-cache";
+import FastCardImage from "@/components/ui/FastCardImage";
 import "../catalog.css";
 
 export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
@@ -216,8 +217,15 @@ export default async function GameCatalogCardPage({
       <div className="catalog-card-detail-hero">
         <div className="catalog-card-art" aria-hidden="true">
           {card.image_url_small || card.image_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={card.image_url_small ?? card.image_url ?? ""} alt="" loading="lazy" decoding="async" />
+            <FastCardImage
+              src={card.image_url_small ?? card.image_url ?? ""}
+              alt=""
+              width={190}
+              height={266}
+              sizes="(max-width: 720px) calc(100vw - 36px), 190px"
+              loading="eager"
+              fetchPriority="high"
+            />
           ) : (
             <span>{set?.code ?? "RB"}</span>
           )}

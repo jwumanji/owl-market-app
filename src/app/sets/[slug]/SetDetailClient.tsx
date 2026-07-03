@@ -1,9 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { gamePath } from "@/lib/game-routes";
+import FastCardImage from "@/components/ui/FastCardImage";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -343,8 +345,14 @@ export default function SetDetailClient({
             <div className="setd-id-glow" />
             <div className="setd-id-box">
               {imgFile ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={`/sets/${imgFile}`} alt={`${set.code} ${set.name} Booster Box`} decoding="async" fetchPriority="high" />
+                <Image
+                  src={`/sets/${imgFile}`}
+                  alt={`${set.code} ${set.name} Booster Box`}
+                  width={110}
+                  height={152}
+                  sizes="110px"
+                  priority
+                />
               ) : (
                 boxArtIcon(set.code)
               )}
@@ -510,8 +518,15 @@ export default function SetDetailClient({
                         <div className="setd-tc-card-cell">
                           <div className="setd-tc-card-art">
                             {c.img ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={c.img} alt={c.n} loading="lazy" decoding="async" />
+                              <FastCardImage
+                                src={c.img}
+                                alt={c.n}
+                                width={40}
+                                height={56}
+                                sizes="40px"
+                                loading="lazy"
+                                fetchPriority="low"
+                              />
                             ) : (
                               c.e
                             )}
@@ -591,8 +606,15 @@ function CatalogCardsTable({
                 <div className="setd-tc-card-cell">
                   <div className="setd-tc-card-art">
                     {card.img ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={card.img} alt={card.name} loading="lazy" decoding="async" />
+                      <FastCardImage
+                        src={card.img}
+                        alt={card.name}
+                        width={40}
+                        height={56}
+                        sizes="40px"
+                        loading="lazy"
+                        fetchPriority="low"
+                      />
                     ) : (
                       setCode
                     )}

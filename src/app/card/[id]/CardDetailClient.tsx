@@ -1,6 +1,7 @@
 "use client";
 
 import { lazy, Suspense, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { formatPrice, formatPct, pctColor, timeAgo } from "@/lib/utils";
 import RarityBadge from "@/components/ui/RarityBadge";
@@ -81,6 +82,10 @@ export default function CardDetailClient({
   const { card, set, priceStats, priceHistory, priceHistorySynthetic: historySynthetic } = data;
   const cardImageSrc = card.image_url_preview ?? card.image_url ?? card.image_url_small;
   const cardImageSrcSet = buildCardImageSrcSet(card);
+  // Mirrored cards carry pre-sized WebP variants — serve those directly via
+  // srcSet. Unmirrored cards only have the full-res external scan, so route
+  // them through next/image to get resizing + AVIF/WebP from the optimizer.
+  const hasMirroredVariants = Boolean(card.image_url_small || card.image_url_preview);
   const growth =
     priceStats?.market_avg != null && priceStats?.atl != null && priceStats.atl > 0
       ? ((priceStats.market_avg - priceStats.atl) / priceStats.atl) * 100
@@ -150,19 +155,31 @@ export default function CardDetailClient({
           </div>
 
           {cardImageSrc ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={cardImageSrc}
-              srcSet={cardImageSrcSet}
-              sizes="(max-width: 767px) calc(100vw - 4rem), 380px"
-              alt={card.name}
-              width={380}
-              height={532}
-              decoding="async"
-              loading="eager"
-              fetchPriority="high"
-              className="w-full aspect-[5/7] object-cover rounded-c-md border-[1.5px] border-ink shadow-[0_10px_24px_rgba(26,15,8,0.10)]"
-            />
+            hasMirroredVariants ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={cardImageSrc}
+                srcSet={cardImageSrcSet}
+                sizes="(max-width: 767px) calc(100vw - 4rem), 380px"
+                alt={card.name}
+                width={380}
+                height={532}
+                decoding="async"
+                loading="eager"
+                fetchPriority="high"
+                className="w-full aspect-[5/7] object-cover rounded-c-md border-[1.5px] border-ink shadow-[0_10px_24px_rgba(26,15,8,0.10)]"
+              />
+            ) : (
+              <Image
+                src={cardImageSrc}
+                sizes="(max-width: 767px) calc(100vw - 4rem), 380px"
+                alt={card.name}
+                width={380}
+                height={532}
+                priority
+                className="w-full aspect-[5/7] object-cover rounded-c-md border-[1.5px] border-ink shadow-[0_10px_24px_rgba(26,15,8,0.10)]"
+              />
+            )
           ) : (
             <div className="w-full aspect-[5/7] rounded-c-md border-[1.5px] border-ink bg-bg-3" />
           )}

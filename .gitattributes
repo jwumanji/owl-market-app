@@ -1,0 +1,3 @@
+# owl-lens:check-types byte-compares this generated file against fresh
+# openapi-typescript output (always LF); a CRLF checkout breaks the build.
+src/lib/owl-lens/openapi.generated.ts text eol=lf

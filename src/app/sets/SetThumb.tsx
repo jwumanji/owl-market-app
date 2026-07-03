@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import Image from "next/image";
 import { getSetImageUrl } from "./set-images";
 
 type Variant = "table" | "headline";
@@ -59,8 +60,7 @@ export default function SetThumb({
         onBlur={hidePreview}
       >
         {imgUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={imgUrl} alt={`${code} box art`} loading="lazy" decoding="async" />
+          <Image src={imgUrl} alt={`${code} box art`} width={sz.w} height={sz.h} sizes={`${sz.w}px`} loading="lazy" />
         ) : (
           <span className={sz.placeholderCls} aria-hidden>
             {code.replace(/[0-9]/g, "")[0] ?? "·"}
@@ -73,8 +73,7 @@ export default function SetThumb({
           style={{ left: pos.x, top: pos.y }}
           aria-hidden
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={imgUrl} alt="" loading="lazy" decoding="async" />
+          <Image src={imgUrl} alt="" width={232} height={160} sizes="232px" loading="lazy" />
           <div className="sv2-thumb-preview-caption">
             <span className="sv2-thumb-preview-code">{code}</span>
           </div>

@@ -43,7 +43,7 @@ function deltaState(chg: number | null | undefined): "up" | "down" | "flat" {
   return chg > 0 ? "up" : "down";
 }
 
-function CardThumb({ card, priority }: { card: TeaserCard; priority: boolean }) {
+function CardThumb({ card }: { card: TeaserCard }) {
   const imageSrc = card.image_url_small ?? card.image_url;
   if (imageSrc) {
     return (
@@ -55,8 +55,8 @@ function CardThumb({ card, priority }: { card: TeaserCard; priority: boolean }) 
           height={73}
           sizes="52px"
           className="c-teaser-thumb"
-          loading={priority ? "eager" : "lazy"}
-          fetchPriority={priority ? "high" : "low"}
+          loading="lazy"
+          fetchPriority="low"
         />
       </CardHoverZoom>
     );
@@ -107,7 +107,7 @@ export default function HomeTeaserTable({
             >
               <span className="c-teaser-rank">{String(i + 1).padStart(2, "0")}</span>
               <div className="c-teaser-card-cell">
-                <CardThumb card={card} priority={i === 0} />
+                <CardThumb card={card} />
                 <div className="c-teaser-card-meta">
                   <div className="c-teaser-card-name">{card.name}</div>
                   <div className="c-teaser-card-set">

@@ -1,3 +1,14 @@
+// Only card-art hosts that actually appear in the DB image columns or in code.
+// Keep this list explicit — a wildcard turns the image optimizer into an open proxy.
+const supabaseStorageHostname = (() => {
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    return url ? new URL(url).hostname : null;
+  } catch {
+    return null;
+  }
+})();
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
@@ -5,10 +16,19 @@ const nextConfig = {
     imageSizes: [32, 48, 64, 96, 128, 256],
     minimumCacheTTL: 86400,
     remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "**",
-      },
+      ...(supabaseStorageHostname
+        ? [
+            {
+              protocol: "https",
+              hostname: supabaseStorageHostname,
+              pathname: "/storage/v1/object/public/**",
+            },
+          ]
+        : []),
+      { protocol: "https", hostname: "optcgapi.com" },
+      { protocol: "https", hostname: "en.onepiece-cardgame.com" },
+      { protocol: "https", hostname: "product-images.tcgplayer.com" },
+      { protocol: "https", hostname: "tcgplayer-cdn.tcgplayer.com" },
     ],
   },
   async redirects() {
