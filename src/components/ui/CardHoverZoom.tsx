@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import FastCardImage from "@/components/ui/FastCardImage";
 
 const PREVIEW_W = 200;
 const PREVIEW_H = 280;
@@ -55,8 +56,14 @@ export default function CardHoverZoom({ src, alt, children, previewSrc }: Props)
           style={{ left: pos.left, top: pos.top }}
           aria-hidden="true"
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={zoomSrc} alt={alt} loading="lazy" decoding="async" />
+          <FastCardImage
+            src={zoomSrc}
+            alt={alt}
+            width={PREVIEW_W}
+            height={PREVIEW_H}
+            sizes={`${PREVIEW_W}px`}
+            loading="lazy"
+          />
         </span>
       )}
     </span>
