@@ -43,8 +43,8 @@ export default function MarketGrid({
                   alt={card.name}
                   width={256}
                   height={358}
-                  loading="lazy"
-                  fetchPriority="low"
+                  loading={i === 0 ? "eager" : "lazy"}
+                  fetchPriority={i === 0 ? "high" : "low"}
                   sizes="(max-width: 640px) 45vw, (max-width: 1024px) 22vw, 180px"
                 />
               ) : (
