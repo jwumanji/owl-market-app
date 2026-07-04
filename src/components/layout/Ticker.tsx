@@ -1,5 +1,3 @@
-"use client";
-
 const TICKER_DATA = [
   { n: "Luffy MR", p: "$1,240", c: "+8.2%", up: true },
   { n: "Shanks SEC", p: "$41.20", c: "-2.1%", up: false },
