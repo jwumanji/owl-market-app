@@ -16,12 +16,22 @@ const DEFAULT_CARD_LIMIT = 10;
 const MAX_CARD_LIMIT = 60;
 const CALL_DELAY_MS = 600;
 
+// sync_state row key for the cron cursor (shared table with the JustTCG cursor).
+const CURSOR_KEY = "ebay_sync_current";
+
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function clampInt(value: string | null, fallback: number, min: number, max: number): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(max, Math.max(min, Math.floor(parsed)));
+}
+
+// Wrap an offset into [0, total). Guards against a stale cursor pointing past a
+// shrunken card list.
+function normalizeIndex(index: number, total: number): number {
+  if (total <= 0) return 0;
+  return ((Math.floor(index) % total) + total) % total;
 }
 
 // Extract grader + numeric grade from a listing title, e.g.
@@ -79,10 +89,61 @@ interface EbaySaleUpsert {
   sold_at: string | null;
 }
 
+interface EbayCursorState {
+  nextOffset?: number;
+  totalCards?: number;
+  completedCycles?: number;
+  lastRunAt?: string;
+  lastProcessed?: number;
+  lastError?: string | null;
+}
+
+type ServiceClient = ReturnType<typeof createServiceClient>;
+
+async function readEbayCursor(
+  supabase: ServiceClient
+): Promise<{ state: EbayCursorState; error?: string }> {
+  const { data, error } = await supabase
+    .from("sync_state")
+    .select("state")
+    .eq("key", CURSOR_KEY)
+    .maybeSingle();
+
+  if (error) {
+    const message = error.message ?? "sync_state read failed";
+    if (error.code === "42P01" || message.includes("sync_state")) {
+      return {
+        state: {},
+        error:
+          "Missing sync_state table. Run schema-migration-v15-price-history-backfill.sql (or v16) in Supabase.",
+      };
+    }
+    return { state: {}, error: message };
+  }
+
+  return { state: (data?.state ?? {}) as EbayCursorState };
+}
+
+async function writeEbayCursor(
+  supabase: ServiceClient,
+  state: EbayCursorState
+): Promise<string | null> {
+  const { error } = await supabase
+    .from("sync_state")
+    .upsert(
+      { key: CURSOR_KEY, state, updated_at: new Date().toISOString() },
+      { onConflict: "key" }
+    );
+  return error ? error.message ?? "sync_state write failed" : null;
+}
+
 // ---------------------------------------------------------------------------
 // GET|POST /api/sync/ebay
 //   ?limit=N    cards to process this run (default 10, max 60)
-//   ?offset=N   starting offset into the priority-rarity card list
+//   ?cursor=1   continue from the persisted cursor; advance & wrap to 0 at the
+//               end of the priority-card list (used by the cron)
+//   ?reset=1    (cursor mode) restart the cursor at offset 0
+//   ?offset=N   stateless one-shot at an explicit offset (ignored in cursor mode)
 //   ?secret=…   or Authorization: Bearer <CRON_SECRET>
 // ---------------------------------------------------------------------------
 
@@ -112,7 +173,45 @@ async function syncEbay(request: Request) {
   const { game } = gameResult;
 
   const limit = clampInt(searchParams.get("limit"), DEFAULT_CARD_LIMIT, 1, MAX_CARD_LIMIT);
-  const offset = Math.max(0, clampInt(searchParams.get("offset"), 0, 0, Number.MAX_SAFE_INTEGER));
+  const cursorMode = searchParams.get("cursor") === "1";
+  const reset = searchParams.get("reset") === "1";
+
+  // Resolve the starting offset. Cursor mode reads the persisted offset from
+  // sync_state and counts the priority-card list so we can wrap at the end;
+  // otherwise honor an explicit ?offset= (stateless one-shot).
+  let startOffset: number;
+  let totalCards: number | null = null;
+  let cursorState: EbayCursorState = {};
+
+  if (cursorMode) {
+    const { count, error: countErr } = await supabase
+      .from("cards")
+      .select("id", { count: "exact", head: true })
+      .eq("game_id", game.id)
+      .in("rarity", PRIORITY_RARITIES);
+    if (countErr) {
+      return NextResponse.json({ error: countErr.message }, { status: 500 });
+    }
+    totalCards = count ?? 0;
+    if (totalCards === 0) {
+      return NextResponse.json({
+        provider: "scrapingdog-ebay",
+        game: game.slug,
+        mode: "cursor",
+        totalCards: 0,
+        message: "No priority-rarity cards to sync.",
+      });
+    }
+
+    const cursor = await readEbayCursor(supabase);
+    if (cursor.error) {
+      return NextResponse.json({ error: cursor.error }, { status: 500 });
+    }
+    cursorState = cursor.state;
+    startOffset = reset ? 0 : normalizeIndex(cursorState.nextOffset ?? 0, totalCards);
+  } else {
+    startOffset = Math.max(0, clampInt(searchParams.get("offset"), 0, 0, Number.MAX_SAFE_INTEGER));
+  }
 
   const { data: cards, error: cardsErr } = await supabase
     .from("cards")
@@ -120,7 +219,7 @@ async function syncEbay(request: Request) {
     .eq("game_id", game.id)
     .in("rarity", PRIORITY_RARITIES)
     .order("id")
-    .range(offset, offset + limit - 1);
+    .range(startOffset, startOffset + limit - 1);
 
   if (cardsErr) {
     return NextResponse.json({ error: cardsErr.message }, { status: 500 });
@@ -185,17 +284,46 @@ async function syncEbay(request: Request) {
     }
   }
 
-  const returnedFullPage = cardList.length === limit;
+  // Advance & persist the cursor (cursor mode only). Offset advances by the
+  // number of cards FETCHED (not just those with a valid query) so skipped
+  // rows aren't re-fetched forever; we wrap to 0 once the run reaches the end.
+  let nextOffset: number | null;
+  let wrapped = false;
+  let completedCycles = cursorState.completedCycles ?? 0;
+
+  if (cursorMode && totalCards !== null) {
+    const advanced = startOffset + cardList.length;
+    wrapped = cardList.length === 0 || advanced >= totalCards;
+    nextOffset = wrapped ? 0 : advanced;
+    if (wrapped) completedCycles += 1;
+
+    const writeErr = await writeEbayCursor(supabase, {
+      nextOffset,
+      totalCards,
+      completedCycles,
+      lastRunAt: new Date().toISOString(),
+      lastProcessed: cardsProcessed,
+      lastError: errors.length > 0 ? errors[0] : null,
+    });
+    if (writeErr) errors.push(`cursor write: ${writeErr}`);
+  } else {
+    nextOffset = cardList.length === limit ? startOffset + limit : null;
+  }
+
   return NextResponse.json({
     provider: "scrapingdog-ebay",
     game: game.slug,
     rarities: PRIORITY_RARITIES,
-    offset,
+    mode: cursorMode ? "cursor" : "manual",
+    startOffset,
     limit,
+    totalCards,
     cardsProcessed,
     salesUpserted,
     skippedLowPrice,
-    nextOffset: returnedFullPage ? offset + limit : null,
+    nextOffset,
+    wrapped,
+    completedCycles,
     errors: errors.length,
     errorSample: errors.slice(0, 10),
   });

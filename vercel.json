@@ -21,7 +21,7 @@
       "schedule": "30 7 * * *"
     },
     {
-      "path": "/api/sync/ebay?game=one_piece",
+      "path": "/api/sync/ebay?game=one_piece&cursor=1",
       "schedule": "0 */6 * * *"
     }
   ]
