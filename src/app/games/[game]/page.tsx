@@ -6,7 +6,7 @@ import {
   resolveGameScope,
   type GameScope,
 } from "@/lib/game-scope";
-import { cachedPublicData, PUBLIC_DATA_CACHE_TTL_SECONDS, publicDataCacheKey } from "@/lib/public-data-cache";
+import { cachedPublicData, PRICE_DATA_TTL_SECONDS, publicDataCacheKey } from "@/lib/public-data-cache";
 import { publicGameStaticParams } from "@/lib/static-game-params";
 import {
   catalogCardDomains,
@@ -14,7 +14,7 @@ import {
 } from "@/lib/catalog-card-fields";
 import "./game-overview.css";
 
-export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
+export const revalidate = PRICE_DATA_TTL_SECONDS;
 
 export function generateStaticParams() {
   return publicGameStaticParams();
@@ -120,7 +120,7 @@ async function loadGameOverview(gameRouteSlug: string): Promise<OverviewData> {
 
 async function loadGameOverviewUncached(gameRouteSlug: string, publicOnly: boolean): Promise<OverviewData> {
   try {
-    const supabase = createCachedServiceClient(PUBLIC_DATA_CACHE_TTL_SECONDS);
+    const supabase = createCachedServiceClient(PRICE_DATA_TTL_SECONDS);
     const gameResult = await resolveGameScope(supabase, gameRouteSlug, {
       defaultToOnePiece: false,
       publicOnly,

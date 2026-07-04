@@ -7,7 +7,7 @@ import {
 } from "@/lib/game-scope";
 import {
   cachedPublicData,
-  PUBLIC_DATA_CACHE_TTL_SECONDS,
+  CATALOG_DATA_TTL_SECONDS,
   publicDataCacheKey,
 } from "@/lib/public-data-cache";
 import type { CardDetailPayload, PriceStatsData, PricePoint } from "./card-detail-types";
@@ -60,7 +60,7 @@ async function loadCardDetailDataUncached(options: {
   id: string;
   game?: string | null;
 }): Promise<CardDetailPayload> {
-  const supabase = createCachedServiceClient(PUBLIC_DATA_CACHE_TTL_SECONDS);
+  const supabase = createCachedServiceClient(CATALOG_DATA_TTL_SECONDS);
   const gameResult = await resolveGameScope(supabase, options.game, {
     defaultToOnePiece: true,
     publicOnly: publicOnlyForCatalogPreview(),
@@ -129,11 +129,15 @@ async function loadCardDetailDataUncached(options: {
   const set = firstRelation(cardRow.sets);
   const payloadCard = withOnePiecePayloadFallbacks(cardRow as unknown as Record<string, unknown>);
 
+  // Longest chart period is 1y (the MAX tab converges with 1y as data ages),
+  // so don't ship lifetime history — the table grows daily (M5).
+  const historySinceIso = new Date(Date.now() - 365 * 86400000).toISOString();
   const { data: priceHistory } = await supabase
     .from("price_history")
     .select("tcg_market, market_avg, recorded_at")
     .eq("game_id", game.id)
     .eq("card_id", cardRow.id)
+    .gte("recorded_at", historySinceIso)
     .order("recorded_at", { ascending: true });
 
   const realHistory = (priceHistory ?? []) as PricePoint[];
@@ -185,7 +189,8 @@ export async function loadCardDetailData(options: {
     const publicOnly = publicOnlyForCatalogPreview();
     const data = await cachedPublicData(
       publicDataCacheKey("card-detail-v2", options.game ?? "default", options.id, publicOnly),
-      () => loadCardDetailDataUncached(options)
+      () => loadCardDetailDataUncached(options),
+      CATALOG_DATA_TTL_SECONDS
     );
     return { ok: true, data };
   } catch (error) {

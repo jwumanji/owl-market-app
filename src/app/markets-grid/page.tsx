@@ -1,14 +1,15 @@
-export const dynamic = "force-dynamic";
-
-import { createServiceClient } from "@/lib/supabase-server";
+import { createCachedServiceClient } from "@/lib/supabase-server";
 import MarketGrid from "@/components/market/MarketGrid";
 import { CardRow } from "@/lib/types";
 import { withOnePiecePayloadFallbacksList } from "@/lib/game-payload";
 import { resolveGameScope } from "@/lib/game-scope";
+import { PRICE_DATA_TTL_SECONDS } from "@/lib/public-data-cache";
 import { flattenPriceStatsCardRow } from "@/lib/supabase-relations";
 
+export const revalidate = PRICE_DATA_TTL_SECONDS;
+
 export default async function MarketsGridPage() {
-  const supabase = createServiceClient();
+  const supabase = createCachedServiceClient(PRICE_DATA_TTL_SECONDS);
   const gameResult = await resolveGameScope(supabase, null, {
     defaultToOnePiece: true,
     publicOnly: true,

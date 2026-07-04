@@ -8,11 +8,11 @@ import {
   resolveGameScope,
 } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
-import { cachedPublicData, PUBLIC_DATA_CACHE_TTL_SECONDS, publicDataCacheKey } from "@/lib/public-data-cache";
+import { cachedPublicData, PRICE_DATA_TTL_SECONDS, publicDataCacheKey } from "@/lib/public-data-cache";
 import { createCachedServiceClient } from "@/lib/supabase-server";
 import { firstRelation, flattenPriceStatsCardRow } from "@/lib/supabase-relations";
 
-export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
+export const revalidate = PRICE_DATA_TTL_SECONDS;
 
 export const metadata = {
   title: "OwlMarket — See what others miss",
@@ -32,7 +32,7 @@ async function fetchRiftboundTileState() {
   const privatePreview = allowsPrivateGamePreview();
   return cachedPublicData(publicDataCacheKey("home-riftbound-tile", privatePreview), async () => {
     try {
-      const supabase = createCachedServiceClient(PUBLIC_DATA_CACHE_TTL_SECONDS);
+      const supabase = createCachedServiceClient(PRICE_DATA_TTL_SECONDS);
       const gameResult = await resolveGameScope(supabase, "riftbound", {
         defaultToOnePiece: false,
         publicOnly: false,
@@ -61,7 +61,7 @@ async function fetchRiftboundTileState() {
 async function fetchTopCards(): Promise<TeaserCard[]> {
   return cachedPublicData(publicDataCacheKey("home-top-cards-v3", DEFAULT_PUBLIC_GAME_ROUTE_SLUG), async () => {
     try {
-      const supabase = createCachedServiceClient(PUBLIC_DATA_CACHE_TTL_SECONDS);
+      const supabase = createCachedServiceClient(PRICE_DATA_TTL_SECONDS);
       const gameResult = await resolveGameScope(supabase, DEFAULT_PUBLIC_GAME_ROUTE_SLUG, {
         defaultToOnePiece: true,
         publicOnly: true,
