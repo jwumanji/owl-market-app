@@ -283,6 +283,165 @@ async function loadCatalogOnlySets(
   return { sets, extraSets: [], game: gameResponsePayload(game) };
 }
 
+type CardCore = {
+  id: string;
+  name: string;
+  card_number: string | null;
+  card_image_id: string | null;
+  rarity: string;
+  variant_label: string | null;
+  image_url: string | null;
+  image_url_small: string | null;
+  ps: {
+    market_avg: number;
+    tcg_market: number;
+    chg_1d: number;
+    chg_7d: number;
+    chg_30d: number;
+    volume_7d: number;
+    ath: number;
+    atl: number;
+  };
+};
+
+function toCardCore(cardRow: Record<string, unknown>): CardCore | null {
+  const card = withOnePiecePayloadFallbacks(cardRow);
+  const ps = firstRelation(card.price_stats as Record<string, number> | Record<string, number>[] | null);
+  if (!ps || !ps.tcg_market) return null;
+
+  return {
+    id: card.id as string,
+    name: card.name as string,
+    card_number: (card.card_number as string | null) ?? null,
+    card_image_id: (card.card_image_id as string | null) ?? null,
+    rarity: (card.rarity as string) ?? "",
+    variant_label: (card.variant_label as string | null) ?? null,
+    image_url: (card.image_url as string | null) ?? null,
+    image_url_small: (card.image_url_small as string | null) ?? null,
+    ps: {
+      market_avg: ps.market_avg ?? ps.tcg_market ?? 0,
+      tcg_market: ps.tcg_market ?? 0,
+      chg_1d: ps.chg_1d ?? 0,
+      chg_7d: ps.chg_7d ?? 0,
+      chg_30d: ps.chg_30d ?? 0,
+      volume_7d: ps.volume_7d ?? 0,
+      ath: ps.ath ?? 0,
+      atl: ps.atl ?? 0,
+    },
+  };
+}
+
+// Top-card selection: per card number keep the chase-ranked variant, then the
+// SET_INDEX_TOP_CARD_LIMIT most valuable.
+const CHASE_RANK: Record<string, number> = {
+  MR: 0, GMR: 0, SAR: 1, SP: 2, AA: 3, TR: 4, SEC: 5, SR: 6, L: 7, R: 8,
+};
+const rankOf = (r: string) => CHASE_RANK[r] ?? 99;
+
+function chaseDedupeTop(cards: CardCore[]): CardCore[] {
+  const byNum = new Map<string, CardCore>();
+  for (const c of cards) {
+    const key = c.card_number ?? `id:${c.id}`;
+    const cur = byNum.get(key);
+    if (!cur) { byNum.set(key, c); continue; }
+    const a = rankOf(cur.rarity);
+    const b = rankOf(c.rarity);
+    if (b < a) byNum.set(key, c);
+    else if (b === a && c.ps.tcg_market > cur.ps.tcg_market) byNum.set(key, c);
+  }
+  return Array.from(byNum.values())
+    .sort((a, b) => b.ps.tcg_market - a.ps.tcg_market)
+    .slice(0, SET_INDEX_TOP_CARD_LIMIT);
+}
+
+// True 7-day window so the "7D Trend" column actually shows 7 days, not the
+// last 13 records (which can drift longer/shorter than a week depending on
+// sync cadence).
+const SPARK_DAYS = 7;
+
+async function fetchSparkHistoryMap(
+  supabase: ReturnType<typeof createCachedServiceClient>,
+  gameId: string,
+  cardIds: string[]
+): Promise<Record<string, number[]>> {
+  const historyMap: Record<string, number[]> = {};
+  if (cardIds.length === 0) return historyMap;
+
+  const sinceIso = new Date(Date.now() - SPARK_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const chunkSize = 200;
+  const chunks: string[][] = [];
+  for (let i = 0; i < cardIds.length; i += chunkSize) {
+    chunks.push(cardIds.slice(i, i + chunkSize));
+  }
+
+  const results = await Promise.all(
+    chunks.map((chunk) =>
+      supabase
+        .from("price_history")
+        .select("card_id, tcg_market, recorded_at")
+        .eq("game_id", gameId)
+        .in("card_id", chunk)
+        .gte("recorded_at", sinceIso)
+        .order("recorded_at", { ascending: true })
+    )
+  );
+
+  for (const { data: history } of results) {
+    for (const row of history ?? []) {
+      if (!historyMap[row.card_id]) historyMap[row.card_id] = [];
+      historyMap[row.card_id].push(row.tcg_market ?? 0);
+    }
+  }
+
+  return historyMap;
+}
+
+function composeSetSpark(top: CardCore[], historyMap: Record<string, number[]>): number[] {
+  let spark: number[] = [];
+  if (top.length > 0) {
+    const sparklines = top.map((c) => historyMap[c.id] ?? [c.ps.tcg_market]);
+    const maxLen = Math.max(...sparklines.map((s) => s.length));
+    if (maxLen > 1) {
+      spark = Array(maxLen).fill(0);
+      for (const sl of sparklines) {
+        const padded = Array(maxLen - sl.length).fill(sl[0] ?? 0).concat(sl);
+        for (let j = 0; j < maxLen; j++) spark[j] += padded[j];
+      }
+      const mn = Math.min(...spark);
+      const mx = Math.max(...spark);
+      const rng = mx - mn || 1;
+      spark = spark.map((v) => +((((v - mn) / rng) * 20)).toFixed(1));
+    }
+  }
+  if (spark.length < 2) spark = [10, 10];
+  return spark;
+}
+
+function composeTopCards(top: CardCore[], historyMap: Record<string, number[]>) {
+  return top.map((c) => {
+    const cardSpark = historyMap[c.id] ?? [c.ps.tcg_market, c.ps.tcg_market];
+    const cmn = Math.min(...cardSpark);
+    const cmx = Math.max(...cardSpark);
+    const crng = cmx - cmn || 1;
+    const normSpark = cardSpark.map((v) => +((((v - cmn) / crng) * 20)).toFixed(1));
+    return {
+      id: c.id,
+      card_image_id: c.card_image_id ?? c.card_number ?? c.id,
+      img: c.image_url_small ?? c.image_url,
+      e: RARITY_EMOJI[c.rarity] ?? "🎴",
+      n: c.name ?? "Unknown",
+      rb: `rb-${(c.rarity ?? "r").toLowerCase()}`,
+      rl: RARITY_LABELS[c.rarity] ?? c.rarity ?? "RARE",
+      tcg: +c.ps.tcg_market.toFixed(2),
+      avg: +c.ps.market_avg.toFixed(2),
+      d1: c.ps.chg_1d ?? 0,
+      d7: c.ps.chg_7d ?? 0,
+      d30: c.ps.chg_30d ?? 0,
+      sp: normSpark.length >= 2 ? normSpark : [10, 10],
+    };
+  });
+}
+
 async function loadSetsUncached(options: {
   game?: string | null;
   publicOnly?: boolean;
@@ -369,61 +528,20 @@ async function loadSetsUncached(options: {
     from += pageSize;
   }
 
-  type CardCore = {
-    id: string;
-    name: string;
-    card_number: string | null;
-    card_image_id: string | null;
-    rarity: string;
-    variant_label: string | null;
-    image_url: string | null;
-    image_url_small: string | null;
-    ps: {
-      market_avg: number;
-      tcg_market: number;
-      chg_1d: number;
-      chg_7d: number;
-      chg_30d: number;
-      volume_7d: number;
-      ath: number;
-      atl: number;
-    };
-  };
-
   const cardsByCode: Record<string, CardCore[]> = {};
   const totalRowsByCode: Record<string, number> = {};
 
   for (const cardRow of allCards) {
-    const card = withOnePiecePayloadFallbacks(cardRow);
-    const rawCode = (card.printed_set_code as string | null) ?? null;
+    const rawCode = (withOnePiecePayloadFallbacks(cardRow).printed_set_code as string | null) ?? null;
     if (!rawCode) continue;
     const code = normalizeCode(rawCode);
     totalRowsByCode[code] = (totalRowsByCode[code] ?? 0) + 1;
 
-    const ps = firstRelation(card.price_stats as Record<string, number> | Record<string, number>[] | null);
-    if (!ps || !ps.tcg_market) continue;
+    const core = toCardCore(cardRow);
+    if (!core) continue;
 
     if (!cardsByCode[code]) cardsByCode[code] = [];
-    cardsByCode[code].push({
-      id: card.id as string,
-      name: card.name as string,
-      card_number: (card.card_number as string | null) ?? null,
-      card_image_id: (card.card_image_id as string | null) ?? null,
-      rarity: (card.rarity as string) ?? "",
-      variant_label: (card.variant_label as string | null) ?? null,
-      image_url: (card.image_url as string | null) ?? null,
-      image_url_small: (card.image_url_small as string | null) ?? null,
-      ps: {
-        market_avg: ps.market_avg ?? ps.tcg_market ?? 0,
-        tcg_market: ps.tcg_market ?? 0,
-        chg_1d: ps.chg_1d ?? 0,
-        chg_7d: ps.chg_7d ?? 0,
-        chg_30d: ps.chg_30d ?? 0,
-        volume_7d: ps.volume_7d ?? 0,
-        ath: ps.ath ?? 0,
-        atl: ps.atl ?? 0,
-      },
-    });
+    cardsByCode[code].push(core);
   }
 
   // Surface every code with cards plus every sets-table row even if empty.
@@ -433,56 +551,18 @@ async function loadSetsUncached(options: {
     ...Array.from(setByCode.keys()),
   ]);
 
-  // 3. Top 10 cards per code
-  const CHASE_RANK: Record<string, number> = {
-    MR: 0, GMR: 0, SAR: 1, SP: 2, AA: 3, TR: 4, SEC: 5, SR: 6, L: 7, R: 8,
-  };
-  const rankOf = (r: string) => CHASE_RANK[r] ?? 99;
+  // 3. Top cards per code
   const top10ByCode: Record<string, CardCore[]> = {};
   const allTopIds: string[] = [];
 
   for (const [code, cards] of Object.entries(cardsByCode)) {
-    const byNum = new Map<string, CardCore>();
-    for (const c of cards) {
-      const key = c.card_number ?? `id:${c.id}`;
-      const cur = byNum.get(key);
-      if (!cur) { byNum.set(key, c); continue; }
-      const a = rankOf(cur.rarity);
-      const b = rankOf(c.rarity);
-      if (b < a) byNum.set(key, c);
-      else if (b === a && c.ps.tcg_market > cur.ps.tcg_market) byNum.set(key, c);
-    }
-    const deduped = Array.from(byNum.values())
-      .sort((a, b) => b.ps.tcg_market - a.ps.tcg_market)
-      .slice(0, SET_INDEX_TOP_CARD_LIMIT);
+    const deduped = chaseDedupeTop(cards);
     top10ByCode[code] = deduped;
     allTopIds.push(...deduped.map((c) => c.id));
   }
 
   // 4. Price history for top cards → sparkline data.
-  // True 7-day window so the "7D Trend" column actually shows 7 days, not the
-  // last 13 records (which can drift longer/shorter than a week depending on
-  // sync cadence).
-  const SPARK_DAYS = 7;
-  const historyMap: Record<string, number[]> = {};
-  if (allTopIds.length > 0) {
-    const sinceIso = new Date(Date.now() - SPARK_DAYS * 24 * 60 * 60 * 1000).toISOString();
-    const chunkSize = 200;
-    for (let i = 0; i < allTopIds.length; i += chunkSize) {
-      const chunk = allTopIds.slice(i, i + chunkSize);
-      const { data: history } = await supabase
-        .from("price_history")
-        .select("card_id, tcg_market, recorded_at")
-        .eq("game_id", game.id)
-        .in("card_id", chunk)
-        .gte("recorded_at", sinceIso)
-        .order("recorded_at", { ascending: true });
-      for (const row of history ?? []) {
-        if (!historyMap[row.card_id]) historyMap[row.card_id] = [];
-        historyMap[row.card_id].push(row.tcg_market ?? 0);
-      }
-    }
-  }
+  const historyMap = await fetchSparkHistoryMap(supabase, game.id, allTopIds);
 
   // 5. Compose SetData rows
   const sets: Array<Record<string, unknown>> = [];
@@ -520,46 +600,8 @@ async function loadSetsUncached(options: {
     const up = chg7d >= 0;
 
     const top = top10ByCode[code] ?? [];
-    let spark: number[] = [];
-    if (top.length > 0) {
-      const sparklines = top.map((c) => historyMap[c.id] ?? [c.ps.tcg_market]);
-      const maxLen = Math.max(...sparklines.map((s) => s.length));
-      if (maxLen > 1) {
-        spark = Array(maxLen).fill(0);
-        for (const sl of sparklines) {
-          const padded = Array(maxLen - sl.length).fill(sl[0] ?? 0).concat(sl);
-          for (let j = 0; j < maxLen; j++) spark[j] += padded[j];
-        }
-        const mn = Math.min(...spark);
-        const mx = Math.max(...spark);
-        const rng = mx - mn || 1;
-        spark = spark.map((v) => +((((v - mn) / rng) * 20)).toFixed(1));
-      }
-    }
-    if (spark.length < 2) spark = [10, 10];
-
-    const topCards = top.map((c) => {
-      const cardSpark = historyMap[c.id] ?? [c.ps.tcg_market, c.ps.tcg_market];
-      const cmn = Math.min(...cardSpark);
-      const cmx = Math.max(...cardSpark);
-      const crng = cmx - cmn || 1;
-      const normSpark = cardSpark.map((v) => +((((v - cmn) / crng) * 20)).toFixed(1));
-      return {
-        id: c.id,
-        card_image_id: c.card_image_id ?? c.card_number ?? c.id,
-        img: c.image_url_small ?? c.image_url,
-        e: RARITY_EMOJI[c.rarity] ?? "🎴",
-        n: c.name ?? "Unknown",
-        rb: `rb-${(c.rarity ?? "r").toLowerCase()}`,
-        rl: RARITY_LABELS[c.rarity] ?? c.rarity ?? "RARE",
-        tcg: +c.ps.tcg_market.toFixed(2),
-        avg: +c.ps.market_avg.toFixed(2),
-        d1: c.ps.chg_1d ?? 0,
-        d7: c.ps.chg_7d ?? 0,
-        d30: c.ps.chg_30d ?? 0,
-        sp: normSpark.length >= 2 ? normSpark : [10, 10],
-      };
-    });
+    const spark = composeSetSpark(top, historyMap);
+    const topCards = composeTopCards(top, historyMap);
 
     const totalRows = totalRowsByCode[code] ?? cards.length;
     const slug = meta?.slug ?? code.toLowerCase();
@@ -627,4 +669,147 @@ export async function loadSets(options: {
     ),
     () => loadSetsUncached({ ...options, publicOnly })
   );
+}
+
+// ---------------------------------------------------------------------------
+// loadSetDetail() — one set's detail without the detail-specific full-catalog
+// scan. The switcher chips and the target set's aggregates come from the SAME
+// cached loadSets() entry the /sets index uses; only the target set's top /
+// catalog cards are fetched scoped.
+// ---------------------------------------------------------------------------
+
+export type LoadedSetDetail = {
+  set: Record<string, unknown> | null;
+  allSets: Array<Record<string, unknown>>;
+  game: ReturnType<typeof gameResponsePayload>;
+};
+
+async function enrichSetDetailUncached(
+  setRow: Record<string, unknown>,
+  game: ReturnType<typeof gameResponsePayload>
+): Promise<Record<string, unknown>> {
+  const supabase = createCachedServiceClient();
+
+  if (game.slug !== ONE_PIECE_DB_SLUG) {
+    // Catalog-only games: the first CATALOG_SET_CARD_LIMIT cards in
+    // card_number order, exactly as loadCatalogOnlySets collects them.
+    const { data: setMeta } = await supabase
+      .from("sets")
+      .select("id")
+      .eq("game_id", game.id)
+      .eq("slug", String(setRow.slug))
+      .limit(1)
+      .maybeSingle();
+
+    if (!setMeta) return setRow;
+
+    const { data: cardRows, error: cardsErr } = await supabase
+      .from("cards")
+      .select(`
+        id,
+        set_id,
+        card_image_id,
+        card_number,
+        name,
+        rarity,
+        variant_label,
+        card_type,
+        color,
+        cost,
+        types,
+        image_url,
+        image_url_small,
+        game_payload
+      `)
+      .eq("game_id", game.id)
+      .eq("set_id", setMeta.id)
+      .order("card_number")
+      .limit(CATALOG_SET_CARD_LIMIT);
+
+    if (cardsErr) throw new Error(cardsErr.message);
+
+    return {
+      ...setRow,
+      catalogCards: ((cardRows ?? []) as unknown as CatalogCardRow[]).map(toCatalogSetCard),
+    };
+  }
+
+  // One Piece: scoped card fetch by printed_set_code (N rolls into P upstream,
+  // so the P bin must pull both codes).
+  const code = String(setRow.code);
+  const codes = code === "P" ? ["P", "N"] : [code];
+
+  const scopedCards: Record<string, unknown>[] = [];
+  const pageSize = 1000;
+  let from = 0;
+  while (true) {
+    const { data: batch, error: cardsErr } = await supabase
+      .from("cards")
+      .select(`
+        id,
+        printed_set_code,
+        game_payload,
+        name,
+        card_number,
+        card_image_id,
+        rarity,
+        variant_label,
+        image_url,
+        image_url_small,
+        price_stats!price_stats_card_game_fk (
+          market_avg,
+          tcg_market,
+          chg_1d,
+          chg_7d,
+          chg_30d,
+          volume_7d,
+          ath,
+          atl
+        )
+      `)
+      .eq("game_id", game.id)
+      .in("printed_set_code", codes)
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1);
+
+    if (cardsErr) throw new Error(cardsErr.message);
+    if (!batch || batch.length === 0) break;
+    scopedCards.push(...batch);
+    if (batch.length < pageSize) break;
+    from += pageSize;
+  }
+
+  const cores = scopedCards
+    .map((row) => toCardCore(row))
+    .filter((core): core is CardCore => core !== null);
+  const top = chaseDedupeTop(cores);
+  const historyMap = await fetchSparkHistoryMap(supabase, game.id, top.map((c) => c.id));
+
+  return { ...setRow, topCards: composeTopCards(top, historyMap) };
+}
+
+export async function loadSetDetail(options: {
+  slug: string;
+  game?: string | null;
+  publicOnly?: boolean;
+}): Promise<LoadedSetDetail> {
+  const publicOnly = options.publicOnly ?? !allowsPrivateGamePreview();
+  const { sets, game } = await loadSets({ game: options.game, publicOnly });
+
+  const slug = options.slug.toLowerCase();
+  const setRow =
+    sets.find(
+      (s) => String(s.slug).toLowerCase() === slug || String(s.code).toLowerCase() === slug
+    ) ?? null;
+
+  if (!setRow) {
+    return { set: null, allSets: sets, game };
+  }
+
+  const set = await cachedPublicData(
+    publicDataCacheKey("set-detail-cards", options.game ?? "default", String(setRow.slug), publicOnly),
+    () => enrichSetDetailUncached(setRow, game)
+  );
+
+  return { set, allSets: sets, game };
 }

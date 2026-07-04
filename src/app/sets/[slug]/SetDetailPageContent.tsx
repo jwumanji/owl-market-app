@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { loadSets } from "../load-sets";
+import { loadSetDetail } from "../load-sets";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
 import { PUBLIC_DATA_CACHE_TTL_SECONDS } from "@/lib/public-data-cache";
@@ -25,10 +25,12 @@ export async function SetDetailPageContent({
   const slug = decodeURIComponent(rawSlug).toLowerCase();
 
   let loadedSets: SetData[] = [];
+  let set: SetData | null = null;
   let gameName = "One Piece TCG";
   try {
-    const data = await loadSets({ game: gameRouteSlug, includeCatalogCards: true, includeTopCards: true });
-    loadedSets = data.sets as unknown as SetData[];
+    const data = await loadSetDetail({ slug, game: gameRouteSlug });
+    loadedSets = data.allSets as unknown as SetData[];
+    set = data.set as unknown as SetData | null;
     gameName = data.game.name;
   } catch (e) {
     console.error("Failed to load sets for detail page:", e);
@@ -46,7 +48,6 @@ export async function SetDetailPageContent({
     );
   }
 
-  const set = loadedSets.find((s) => s.slug.toLowerCase() === slug || s.code.toLowerCase() === slug);
   if (!set) {
     notFound();
   }
