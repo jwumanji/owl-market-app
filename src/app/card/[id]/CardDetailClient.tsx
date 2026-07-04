@@ -135,6 +135,7 @@ export default function CardDetailClient({
               alt={card.name}
               width={300}
               height={420}
+              quality={60}
               priority
               className="w-full max-w-[300px] aspect-[5/7] object-cover rounded-c-md border-[1.5px] border-ink shadow-[0_10px_24px_rgba(26,15,8,0.10)]"
             />
