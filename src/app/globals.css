@@ -54,13 +54,54 @@
   /* C1.5 deep cobalt — list-pick selection, PSA tier chip, centering inner-frame (Stage B) */
   --select: #1F47A1;
 
-  /* C1.5 PSA grade-band scale (5-band descending, Stage B) */
+  /* Owl Lens grade-ceiling band scale (best → worst). Drives grade badges, per-grader
+     chips, and the borderline amber. Color only — see grading.ts for the mapping.
+     NOTE: --grade-8 is kept at the Lens value #C76E14 (NOT C1.5's #E89512) so an 8 badge
+     can't be mistaken for brand --gold (#E89512). Preserved through the C1.5 merge. */
   --grade-10:  #2D9961;
   --grade-9:   #5F8E2A;
   --grade-8b:  #B5780E;
-  --grade-8:   #E89512;
+  --grade-8:   #C76E14;
   --grade-7:   #D9641A;
   --grade-low: #D23B3B;
+
+  /* ───────── Legacy compat: dark-era tokens still referenced by src/components/lens/*.
+     Shim retained during the C1.5 merge; drop once Lens is migrated to C1.5. (--coral is
+     intentionally omitted — C1.5 owns it above.) ───────── */
+  --void: #03050D;
+  --deep: #060A16;
+  --surface: #0A1020;
+  --surf2: #0E1628;
+  --surf3: #121D32;
+  --border: rgba(255, 255, 255, 0.055);
+  --border2: rgba(255, 255, 255, 0.10);
+  --owl: #E8A020;
+  --owl2: #F5BE50;
+  --green: #00D68F;
+  --red: #FF4560;
+  --blue: #4F8EF7;
+  --purple: #9B72FF;
+  --text: #E4EAF6;
+  --text2: #7A88A8;
+  --text3: #3D4D6A;
+  --owl-d: rgba(232, 160, 32, 0.12);
+  --green-d: rgba(0, 214, 143, 0.10);
+  --red-d: rgba(255, 69, 96, 0.10);
+}
+
+.tinted-gain {
+  background: rgba(0, 214, 143, 0.10);
+  border-color: rgba(0, 214, 143, 0.40);
+}
+
+.tinted-owl {
+  background: rgba(232, 160, 32, 0.10);
+  border-color: rgba(232, 160, 32, 0.40);
+}
+
+.tinted-loss {
+  background: rgba(255, 69, 96, 0.10);
+  border-color: rgba(255, 69, 96, 0.40);
 }
 
 body {
@@ -69,6 +110,10 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+body:has(.admin-nav) {
+  --top: var(--nav-h);
 }
 
 input[type="date"] {

@@ -3,6 +3,15 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { CENTERING_MEASURE_ACTION, verifyAdminActionToken } from "@/lib/admin-action-token";
 import { isAllowedAdminEmail } from "@/lib/admin-auth";
+import {
+  bgsCeilingBack,
+  bgsCeilingFront,
+  overlayGeometryFromUnknown,
+  psaCeilingBack,
+  psaCeilingFront,
+  tagCeilingBack,
+  tagCeilingFront,
+} from "@/lib/centering-math";
 import { resolveGameScope } from "@/lib/game-scope";
 import { isUploadFile } from "@/lib/inventory-scans";
 import { createServiceClient } from "@/lib/supabase-server";
@@ -13,6 +22,7 @@ export const runtime = "nodejs";
 
 type MeasurementResponse =
   operations["measureCardCentering"]["responses"][200]["content"]["application/json"];
+type CenteringFace = "front" | "back";
 
 function createAuthClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -79,7 +89,52 @@ function passthroughHeaders(response: Response) {
   return headers;
 }
 
-function measurementRow(gameId: string, inventoryItemId: string | null, response: MeasurementResponse) {
+function parseFace(value: FormDataEntryValue | null): CenteringFace | null {
+  if (value === null || value === "") return "front";
+  if (value === "front" || value === "back") return value;
+  return null;
+}
+
+function parseOptionalUuid(value: FormDataEntryValue | null) {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const trimmed = value.trim();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)
+    ? trimmed
+    : undefined;
+}
+
+function parseOptionalText(value: FormDataEntryValue | null) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function parseManualAdjustment(value: FormDataEntryValue | null) {
+  return value === "true" || value === "1";
+}
+
+function parsePersist(value: FormDataEntryValue | null) {
+  if (value === "false" || value === "0" || value === "no") return false;
+  return true;
+}
+
+function measurementRow({
+  gameId,
+  inventoryItemId,
+  response,
+  face,
+  cardSessionId,
+  cardIdentity,
+  manualAdjustment,
+}: {
+  gameId: string;
+  inventoryItemId: string | null;
+  response: MeasurementResponse;
+  face: CenteringFace;
+  cardSessionId: string | null;
+  cardIdentity: string | null;
+  manualAdjustment: boolean;
+}) {
   return {
     game_id: gameId,
     inventory_item_id: inventoryItemId,
@@ -90,7 +145,16 @@ function measurementRow(gameId: string, inventoryItemId: string | null, response
     bottom_pct: response.centering.topBottom.bottomPercent,
     worst_axis: response.centering.worstAxis,
     worst_axis_max_pct: response.centering.worstAxisMaxPercent,
-    psa_ceiling: response.psa.ceiling,
+    psa_ceiling: face === "back"
+      ? psaCeilingBack(response.centering.worstAxisMaxPercent)
+      : psaCeilingFront(response.centering.worstAxisMaxPercent),
+    bgs_ceiling: face === "back"
+      ? bgsCeilingBack(response.centering.worstAxisMaxPercent)
+      : bgsCeilingFront(response.centering.worstAxisMaxPercent),
+    // Owl Lens is One Piece (TCG category); revisit when game-scope brings sports games.
+    tag_ceiling: face === "back"
+      ? tagCeilingBack(response.centering.worstAxisMaxPercent, "tcg")
+      : tagCeilingFront(response.centering.worstAxisMaxPercent, "tcg"),
     pipeline_mode: response.pipeline.mode,
     pipeline_version: response.pipeline.version,
     processing_ms: response.metadata.processingMs,
@@ -98,6 +162,11 @@ function measurementRow(gameId: string, inventoryItemId: string | null, response
     image_width_px: response.image.widthPx,
     image_height_px: response.image.heightPx,
     overlay: response.overlay,
+    manual_adjustment: manualAdjustment,
+    card_identity: cardIdentity,
+    face,
+    card_session_id: cardSessionId,
+    overlay_geometry: overlayGeometryFromUnknown(response.overlay) ?? {},
   };
 }
 
@@ -124,6 +193,20 @@ export async function POST(request: Request) {
     typeof inventoryItemIdEntry === "string" && inventoryItemIdEntry.trim()
       ? inventoryItemIdEntry.trim()
       : null;
+  const face = parseFace(formData.get("face"));
+  if (!face) {
+    return NextResponse.json({ error: "face must be front or back" }, { status: 400 });
+  }
+
+  const cardSessionId = parseOptionalUuid(formData.get("cardSessionId"));
+  if (cardSessionId === undefined) {
+    return NextResponse.json({ error: "cardSessionId must be a UUID" }, { status: 400 });
+  }
+
+  const cardIdentity = parseOptionalText(formData.get("cardIdentity"));
+  const manualAdjustment = parseManualAdjustment(formData.get("manual_adjustment"));
+  const persistResult = parsePersist(formData.get("persist"));
+
   const gameEntry = formData.get("game");
   const requestedGame = typeof gameEntry === "string" && gameEntry.trim() ? gameEntry.trim() : null;
 
@@ -140,7 +223,7 @@ export async function POST(request: Request) {
   const { game } = gameResult;
 
   if (inventoryItemId) {
-    const { data: inventoryItem, error: inventoryError } = await supabase
+    const { data: inventoryItem, error: inventoryError } = await supabase!
       .from("inventory_items")
       .select("id, game_id")
       .eq("id", inventoryItemId)
@@ -191,12 +274,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Owl Lens CV service returned invalid JSON" }, { status: 502 });
   }
 
-  const { error: insertError } = await supabase
-    .from("centering_measurements")
-    .insert(measurementRow(game.id, inventoryItemId, measurement));
+  if (persistResult) {
+    const { error: insertError } = await supabase
+      .from("centering_measurements")
+      .insert(
+        measurementRow({
+          gameId: game.id,
+          inventoryItemId,
+          response: measurement,
+          face,
+          cardSessionId,
+          cardIdentity,
+          manualAdjustment,
+        })
+      );
 
-  if (insertError) {
-    return NextResponse.json({ error: insertError.message }, { status: 500 });
+    if (insertError) {
+      return NextResponse.json({ error: insertError.message }, { status: 500 });
+    }
   }
 
   return new Response(responseBody, {

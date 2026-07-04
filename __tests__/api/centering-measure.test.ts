@@ -34,8 +34,40 @@ const routeJavaScript = ts.transpileModule(routeSource, {
     target: ts.ScriptTarget.ES2022,
   },
 }).outputText;
+const mathPath = path.resolve("src/lib/centering-math.ts");
+const mathJavaScript = ts.transpileModule(fs.readFileSync(mathPath, "utf8"), {
+  compilerOptions: {
+    esModuleInterop: true,
+    module: ts.ModuleKind.CommonJS,
+    target: ts.ScriptTarget.ES2022,
+  },
+}).outputText;
 
-function measurementResponse() {
+function loadMathModule() {
+  const moduleStub = {
+    exports: {} as Record<string, unknown>,
+  };
+  vm.runInContext(
+    mathJavaScript,
+    vm.createContext({
+      exports: moduleStub.exports,
+      module: moduleStub,
+      require: requireFromTest,
+    }),
+    { filename: mathPath }
+  );
+  return moduleStub.exports;
+}
+
+function measurementResponse({
+  leftPercent = 52,
+  rightPercent = 48,
+  worstAxisMaxPercent = 52,
+}: {
+  leftPercent?: number;
+  rightPercent?: number;
+  worstAxisMaxPercent?: number;
+} = {}) {
   return {
     image: {
       contentType: "image/jpeg",
@@ -44,15 +76,15 @@ function measurementResponse() {
     },
     centering: {
       leftRight: {
-        leftPercent: 52,
-        rightPercent: 48,
+        leftPercent,
+        rightPercent,
       },
       topBottom: {
         topPercent: 49,
         bottomPercent: 51,
       },
       worstAxis: "leftRight",
-      worstAxisMaxPercent: 52,
+      worstAxisMaxPercent,
     },
     psa: {
       ceiling: "PSA_10",
@@ -91,17 +123,38 @@ function measurementResponse() {
   };
 }
 
-function measurementRequest(inventoryItemId = "inventory-1", game = "one_piece", headers?: HeadersInit) {
+type MeasurementRequestOptions = {
+  face?: string;
+  cardSessionId?: string;
+  cardIdentity?: string;
+  game?: string;
+  headers?: HeadersInit;
+};
+
+// Supports both calling conventions merged from the two branches:
+//   measurementRequest(id, "one_piece", headers)          — game-scope tests (main)
+//   measurementRequest(id, { face, cardSessionId, ... })  — Owl Lens tests (HEAD)
+function measurementRequest(
+  inventoryItemId = "inventory-1",
+  gameOrOptions: string | MeasurementRequestOptions = {},
+  headers?: HeadersInit
+) {
+  const options: MeasurementRequestOptions =
+    typeof gameOrOptions === "string" ? { game: gameOrOptions, headers } : gameOrOptions;
+
   const formData = new FormData();
   if (inventoryItemId) {
     formData.set("inventoryItemId", inventoryItemId);
   }
-  formData.set("game", game);
+  if (options.face !== undefined) formData.set("face", options.face);
+  if (options.cardSessionId !== undefined) formData.set("cardSessionId", options.cardSessionId);
+  if (options.cardIdentity !== undefined) formData.set("cardIdentity", options.cardIdentity);
+  formData.set("game", options.game ?? "one_piece");
   formData.set("file", new File(["fake image"], "card.jpg", { type: "image/jpeg" }));
 
   return new Request("http://localhost/api/centering/measure", {
     method: "POST",
-    headers,
+    headers: options.headers,
     body: formData,
   });
 }
@@ -232,6 +285,7 @@ function loadRoute({
         return email === "admin@example.com";
       },
     },
+    "@/lib/centering-math": loadMathModule(),
     "@/lib/inventory-scans": {
       isUploadFile(value: FormDataEntryValue | null) {
         return value instanceof File && value.size > 0;
@@ -387,6 +441,8 @@ test("happy path forwards CV response and inserts centering measurement", async 
     worst_axis: "leftRight",
     worst_axis_max_pct: 52,
     psa_ceiling: "PSA_10",
+    bgs_ceiling: "BGS_9_5",
+    tag_ceiling: "TAG_10_GEM_MINT",
     pipeline_mode: "mock",
     pipeline_version: "0.1.0",
     processing_ms: 42,
@@ -394,7 +450,67 @@ test("happy path forwards CV response and inserts centering measurement", async 
     image_width_px: 1024,
     image_height_px: 1428,
     overlay: cvBody.overlay,
+    manual_adjustment: false,
+    card_identity: null,
+    face: "front",
+    card_session_id: null,
+    overlay_geometry: {
+      outer: {
+        tl: { x: 32, y: 28 },
+        tr: { x: 992, y: 28 },
+        br: { x: 992, y: 1400 },
+        bl: { x: 32, y: 1400 },
+      },
+      inner: {
+        tl: { x: 118, y: 134 },
+        tr: { x: 910, y: 134 },
+        br: { x: 910, y: 1298 },
+        bl: { x: 118, y: 1298 },
+      },
+    },
   });
+});
+
+test("optional face, cardSessionId, and cardIdentity metadata are persisted", async () => {
+  const cvBody = measurementResponse();
+  const route = loadRoute({
+    cvResponse: Response.json(cvBody),
+  });
+
+  const response = await route.POST(
+    measurementRequest("inventory-1", {
+      face: "back",
+      cardSessionId: "11111111-1111-4111-8111-111111111111",
+      cardIdentity: "Monkey D. Luffy OP01-001",
+    })
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(route.insertedRows.length, 1);
+  assert.equal(route.insertedRows[0].face, "back");
+  assert.equal(route.insertedRows[0].card_session_id, "11111111-1111-4111-8111-111111111111");
+  assert.equal(route.insertedRows[0].card_identity, "Monkey D. Luffy OP01-001");
+});
+
+test("persisted measure uses face-aware PSA ceiling instead of CV-provided ceiling", async () => {
+  const cvBody = measurementResponse({
+    leftPercent: 70.26,
+    rightPercent: 29.74,
+    worstAxisMaxPercent: 70.26,
+  });
+  cvBody.psa.ceiling = "PSA_8";
+  const route = loadRoute({
+    cvResponse: Response.json(cvBody),
+  });
+
+  const response = await route.POST(measurementRequest("inventory-1", { face: "back" }));
+
+  assert.equal(response.status, 200);
+  assert.equal(route.insertedRows.length, 1);
+  assert.equal(route.insertedRows[0].psa_ceiling, "PSA_10");
+  // BGS/TAG are persisted face-aware (back functions) on the measure path too.
+  assert.equal(route.insertedRows[0].bgs_ceiling, "BGS_9");
+  assert.equal(route.insertedRows[0].tag_ceiling, "TAG_9");
 });
 
 test("standalone request without inventoryItemId persists a null inventory link", async () => {
@@ -443,4 +559,25 @@ test("CV 422 response is forwarded without inserting a row", async () => {
   assert.equal(await response.text(), errorText);
   assert.equal(route.cvCalls.length, 1);
   assert.equal(route.insertedRows.length, 0);
+});
+
+test("measure requires a game scope — a request with no game returns 400 before the CV (regression: Owl Lens wizard)", async () => {
+  // The pre-grade wizard's measureFace must send `game`. Without it the merged route 400s
+  // at resolveGameScope before the CV is ever called — which previously surfaced to the user
+  // as a misleading "...under 20 MB" upload error on the Upload pane.
+  const route = loadRoute();
+  const formData = new FormData();
+  formData.set("inventoryItemId", "inventory-1");
+  formData.set("file", new File(["fake image"], "card.jpg", { type: "image/jpeg" }));
+  const request = new Request("http://localhost/api/centering/measure", {
+    method: "POST",
+    body: formData,
+  });
+
+  const response = await route.POST(request);
+
+  assert.equal(response.status, 400);
+  const body = await response.json();
+  assert.match(body.error, /game is required/i);
+  assert.equal(route.cvCalls.length, 0);
 });
