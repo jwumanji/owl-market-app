@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { loadRarities, RaritiesLoadError } from "@/app/rarities/load-rarities";
 import { gameParamFromRequest } from "@/lib/game-scope";
-import { PUBLIC_DATA_CACHE_HEADERS, CATALOG_DATA_TTL_SECONDS } from "@/lib/public-data-cache";
+import { PUBLIC_DATA_CACHE_HEADERS } from "@/lib/public-data-cache";
 
-export const revalidate = CATALOG_DATA_TTL_SECONDS;
+// Keep in sync with CATALOG_DATA_TTL_SECONDS (Next 15 requires a literal).
+export const revalidate = 3600;
 export const maxDuration = 30;
 
 // GET /api/rarities — rarity index for the requested game (shared with the

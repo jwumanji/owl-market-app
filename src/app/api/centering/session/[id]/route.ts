@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { cookies, type UnsafeUnwrappedCookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { isAllowedAdminEmail } from "@/lib/admin-auth";
 import { gradeRank, type PsaCeiling } from "@/lib/centering-math";
@@ -61,7 +61,7 @@ function createAuthClient() {
     throw new Error("Missing Supabase auth environment variables.");
   }
 
-  const cookieStore = cookies();
+  const cookieStore = (cookies() as unknown as UnsafeUnwrappedCookies);
   return createServerClient(url, anonKey, {
     cookies: {
       get(name: string) {
@@ -222,7 +222,8 @@ async function requireAdmin() {
   }
 }
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const auth = await requireAdmin();
   if (auth.response) return auth.response;
   if (!isUuid(params.id)) return responseError("Session id must be a UUID", 400);
@@ -240,7 +241,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   }
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const auth = await requireAdmin();
   if (auth.response) return auth.response;
   if (!isUuid(params.id)) return responseError("Session id must be a UUID", 400);
@@ -273,7 +275,8 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   });
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const auth = await requireAdmin();
   if (auth.response) return auth.response;
   if (!isUuid(params.id)) return responseError("Session id must be a UUID", 400);

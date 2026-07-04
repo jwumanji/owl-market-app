@@ -2,10 +2,10 @@ import RaritiesClient from "./RaritiesClient";
 import { loadRarities } from "./load-rarities";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gameQueryValue, normalizeGameRouteSlug } from "@/lib/game-routes";
-import { PUBLIC_DATA_CACHE_TTL_SECONDS } from "@/lib/public-data-cache";
 import { RARITIES as FALLBACK_RARITIES, type RarityData } from "./rarities-data";
 
-export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
+// Keep in sync with PUBLIC_DATA_CACHE_TTL_SECONDS (Next 15 requires a literal).
+export const revalidate = 300;
 
 export async function RaritiesPageContent({
   gameRouteSlug = DEFAULT_PUBLIC_GAME_ROUTE_SLUG,

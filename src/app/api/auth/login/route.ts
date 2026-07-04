@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     return jsonError("Authentication is not configured.", 500);
   }
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const response = NextResponse.json(
     { ok: true, redirectTo },
     {

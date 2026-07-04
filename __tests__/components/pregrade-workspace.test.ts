@@ -148,15 +148,15 @@ type PregradeWorkspaceModule = {
 function textContent(node: React.ReactNode): string {
   if (typeof node === "string" || typeof node === "number") return String(node);
   if (Array.isArray(node)) return node.map(textContent).join("");
-  if (React.isValidElement(node)) return textContent(node.props.children);
+  if (React.isValidElement(node)) return textContent((node as React.ReactElement<any>).props.children);
   return "";
 }
 
-function walkElements(node: React.ReactNode, elements: React.ReactElement[] = []) {
+function walkElements(node: React.ReactNode, elements: React.ReactElement<any>[] = []) {
   React.Children.forEach(node, (child) => {
     if (!React.isValidElement(child)) return;
     elements.push(child);
-    walkElements(child.props.children, elements);
+    walkElements((child as React.ReactElement<any>).props.children, elements);
   });
   return elements;
 }

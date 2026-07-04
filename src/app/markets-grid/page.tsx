@@ -6,7 +6,8 @@ import { resolveGameScope } from "@/lib/game-scope";
 import { PRICE_DATA_TTL_SECONDS } from "@/lib/public-data-cache";
 import { flattenPriceStatsCardRow } from "@/lib/supabase-relations";
 
-export const revalidate = PRICE_DATA_TTL_SECONDS;
+// Keep in sync with PRICE_DATA_TTL_SECONDS (Next 15 requires a literal).
+export const revalidate = 900;
 
 export default async function MarketsGridPage() {
   const supabase = createCachedServiceClient(PRICE_DATA_TTL_SECONDS);

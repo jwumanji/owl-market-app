@@ -15,7 +15,8 @@ function inventoryItemId(body: RequestBody) {
   return typeof value === "string" && UUID_PATTERN.test(value.trim()) ? value.trim() : null;
 }
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });

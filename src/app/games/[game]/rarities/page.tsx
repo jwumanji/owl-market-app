@@ -1,17 +1,18 @@
 import { RaritiesPageContent } from "@/app/rarities/RaritiesPageContent";
-import { CATALOG_DATA_TTL_SECONDS } from "@/lib/public-data-cache";
 import { publicGameStaticParams } from "@/lib/static-game-params";
 
-export const revalidate = CATALOG_DATA_TTL_SECONDS;
+// Keep in sync with CATALOG_DATA_TTL_SECONDS (Next 15 requires a literal).
+export const revalidate = 3600;
 
 export function generateStaticParams() {
   return publicGameStaticParams();
 }
 
-export default async function GameRaritiesPage({
-  params,
-}: {
-  params: { game: string };
-}) {
+export default async function GameRaritiesPage(
+  props: {
+    params: Promise<{ game: string }>;
+  }
+) {
+  const params = await props.params;
   return <RaritiesPageContent gameRouteSlug={params.game} />;
 }

@@ -3,9 +3,9 @@ import { CHARACTERS as FALLBACK_CHARS } from "./characters-data";
 import { loadCharactersPageData } from "./characters-index-data";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gameQueryValue } from "@/lib/game-routes";
-import { CATALOG_DATA_TTL_SECONDS } from "@/lib/public-data-cache";
 
-export const revalidate = CATALOG_DATA_TTL_SECONDS;
+// Keep in sync with CATALOG_DATA_TTL_SECONDS (Next 15 requires a literal).
+export const revalidate = 3600;
 
 // Per-character accent palette — dynamic, not semantic. Hues shifted to
 // read well on cream (closer to brand sunset stops + Option-A jewel tones).
@@ -45,11 +45,12 @@ function assignColors(chars: CharacterData[]): CharacterData[] {
   }));
 }
 
-export default async function CharactersPage({
-  params,
-}: {
-  params?: { game?: string };
-}) {
+export default async function CharactersPage(
+  props: {
+    params?: Promise<{ game?: string }>;
+  }
+) {
+  const params = await props.params;
   const gameRouteSlug = params?.game ?? DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
   const isDefaultGame = gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
 

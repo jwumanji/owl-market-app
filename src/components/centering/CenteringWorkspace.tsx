@@ -879,7 +879,7 @@ function ResultPanel({
   cardIdentity: CardIdentity;
   onDownload: () => void;
   onReset: () => void;
-  reportRef: RefObject<HTMLDivElement>;
+  reportRef: RefObject<HTMLDivElement | null>;
 }) {
   const viewModel = buildResultViewModel(result);
   const tone = TONE_STYLES[viewModel.tone];

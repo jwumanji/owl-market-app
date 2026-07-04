@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { loadCharactersPageData } from "@/app/characters/characters-index-data";
 import { gameParamFromRequest } from "@/lib/game-scope";
-import { CATALOG_DATA_TTL_SECONDS, PUBLIC_DATA_CACHE_HEADERS } from "@/lib/public-data-cache";
+import { PUBLIC_DATA_CACHE_HEADERS } from "@/lib/public-data-cache";
 
-export const revalidate = CATALOG_DATA_TTL_SECONDS;
+// Keep in sync with CATALOG_DATA_TTL_SECONDS (Next 15 requires a literal).
+export const revalidate = 3600;
 
 // ---------------------------------------------------------------------------
 // GET /api/characters - returns character index data with top cards + prices

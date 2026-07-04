@@ -11,6 +11,12 @@ const supabaseStorageHostname = (() => {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    // Inline all CSS into the HTML (Next 15+). Kills the two render-blocking
+    // stylesheet requests PSI flagged ~570ms on every page — ~20KB br of CSS
+    // total, and no Early Hints on this deployment to parallelize them.
+    inlineCss: true,
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     // 384 gives the 300px card-detail hero a near-exact rung at 1x DPR

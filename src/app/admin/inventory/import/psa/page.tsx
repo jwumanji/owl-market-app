@@ -13,11 +13,12 @@ function getInitialGame(searchParams?: PsaImportSearchParams) {
   return game?.trim() || undefined;
 }
 
-export default async function PsaImportPage({
-  searchParams,
-}: {
-  searchParams?: PsaImportSearchParams | Promise<PsaImportSearchParams>;
-}) {
+export default async function PsaImportPage(
+  props: {
+    searchParams?: Promise<PsaImportSearchParams | Promise<PsaImportSearchParams>>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const gameSlug = getInitialGame(resolvedSearchParams);
   const gameQuery = gameSlug ? `?game=${encodeURIComponent(gameSlug)}` : "";

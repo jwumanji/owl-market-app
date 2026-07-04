@@ -149,7 +149,7 @@ function CharAvatar({ src, name, size = 28 }: { src: string | null; name: string
 /* ── Card Image with Hover Preview ── */
 function CardImageCell({ card }: { card: CharacterCard }) {
   const [showPreview, setShowPreview] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const handleMouseEnter = () => {
     timeoutRef.current = setTimeout(() => setShowPreview(true), 300);

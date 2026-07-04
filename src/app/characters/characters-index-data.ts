@@ -102,7 +102,7 @@ function mapCharacterSummary(row: PublicCharacterSummaryRow): CharacterIndexEntr
 }
 
 async function loadCharacterSummaries(gameId: string) {
-  const supabase = createCachedServiceClient();
+  const supabase = createCachedServiceClient(CATALOG_DATA_TTL_SECONDS);
   const rows = await loadPublicCharacterSummaryRows(supabase, gameId);
   if (!rows) return null;
 
@@ -179,7 +179,7 @@ function trendSpark(stats: PriceStatsRelation | null) {
 }
 
 async function loadCharacterIndex(gameId: string): Promise<CharacterIndexEntry[]> {
-  const supabase = createCachedServiceClient();
+  const supabase = createCachedServiceClient(CATALOG_DATA_TTL_SECONDS);
 
   const { data: characters, error: charErr } = await supabase
     .from("characters")
@@ -336,7 +336,7 @@ export async function loadCharactersPageData(options: {
   game?: string | null;
 } = {}): Promise<CharactersPageLoadResult> {
   try {
-    const supabase = createCachedServiceClient();
+    const supabase = createCachedServiceClient(CATALOG_DATA_TTL_SECONDS);
     const gameResult = await resolveGameScope(supabase, options.game, {
       defaultToOnePiece: true,
       publicOnly: publicOnlyForCatalogPreview(),

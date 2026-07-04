@@ -179,11 +179,12 @@ async function loadSubmissions(requestedGame?: string | null) {
   };
 }
 
-export default async function PsaSubmissionsPage({
-  searchParams,
-}: {
-  searchParams?: PsaSubmissionsSearchParams | Promise<PsaSubmissionsSearchParams>;
-}) {
+export default async function PsaSubmissionsPage(
+  props: {
+    searchParams?: Promise<PsaSubmissionsSearchParams | Promise<PsaSubmissionsSearchParams>>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const requestedGame = getInitialGame(resolvedSearchParams);
   const [{ submissions, error, gameSlug }, gameOptions] = await Promise.all([

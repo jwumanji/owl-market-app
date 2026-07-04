@@ -128,7 +128,8 @@ async function currentInventoryIds(supabase: ReturnType<typeof createServiceClie
   return ((linksRes.data ?? []) as { inventory_item_id: string }[]).map((row) => row.inventory_item_id);
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
@@ -243,7 +244,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   return NextResponse.json({ id: params.id });
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const supabase = createServiceClient();
   const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request));
 

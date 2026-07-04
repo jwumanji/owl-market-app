@@ -18,11 +18,12 @@ function getInitialGame(searchParams?: NewOrderSearchParams) {
   return game?.trim() || DEFAULT_PUBLIC_GAME_DB_SLUG;
 }
 
-export default async function NewOrderPage({
-  searchParams,
-}: {
-  searchParams?: NewOrderSearchParams | Promise<NewOrderSearchParams>;
-}) {
+export default async function NewOrderPage(
+  props: {
+    searchParams?: Promise<NewOrderSearchParams | Promise<NewOrderSearchParams>>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const gameSlug = getInitialGame(resolvedSearchParams);
   const { data: inventoryItems, error } = await loadOrderInventory(undefined, gameSlug);

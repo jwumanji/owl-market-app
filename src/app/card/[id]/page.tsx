@@ -4,25 +4,27 @@ import {
   DEFAULT_PUBLIC_GAME_DB_SLUG,
   DEFAULT_PUBLIC_GAME_ROUTE_SLUG,
 } from "@/lib/game-scope";
-import { CATALOG_DATA_TTL_SECONDS } from "@/lib/public-data-cache";
 
-export const revalidate = CATALOG_DATA_TTL_SECONDS;
+// Keep in sync with CATALOG_DATA_TTL_SECONDS (Next 15 requires a literal).
+export const revalidate = 3600;
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { id: string };
-}) {
+export async function generateMetadata(
+  props: {
+    params: Promise<{ id: string }>;
+  }
+) {
+  const params = await props.params;
   return {
     title: `${decodeURIComponent(params.id)} - OWL Market`,
   };
 }
 
-export default async function CardDetailPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default async function CardDetailPage(
+  props: {
+    params: Promise<{ id: string }>;
+  }
+) {
+  const params = await props.params;
   const result = await loadCardDetailData({
     id: params.id,
     game: DEFAULT_PUBLIC_GAME_DB_SLUG,

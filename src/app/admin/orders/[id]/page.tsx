@@ -20,13 +20,14 @@ function getInitialGame(searchParams?: EditOrderSearchParams) {
   return game?.trim() || DEFAULT_PUBLIC_GAME_DB_SLUG;
 }
 
-export default async function EditOrderPage({
-  params,
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams?: EditOrderSearchParams | Promise<EditOrderSearchParams>;
-}) {
+export default async function EditOrderPage(
+  props: {
+    params: Promise<{ id: string }>;
+    searchParams?: Promise<EditOrderSearchParams | Promise<EditOrderSearchParams>>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const gameSlug = getInitialGame(resolvedSearchParams);
   const [orderResult, inventoryResult] = await Promise.all([
