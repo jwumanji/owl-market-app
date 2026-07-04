@@ -2,6 +2,11 @@ import { unstable_cache } from "next/cache";
 
 export const PUBLIC_DATA_CACHE_TTL_SECONDS = 300;
 
+// TTLs matched to data cadence (M2): catalog shape changes ~weekly, prices
+// sync 4x/day — neither needs 5-minute regeneration.
+export const CATALOG_DATA_TTL_SECONDS = 3600;
+export const PRICE_DATA_TTL_SECONDS = 900;
+
 export const PUBLIC_DATA_CACHE_HEADERS = {
   "Cache-Control": `public, max-age=60, s-maxage=${PUBLIC_DATA_CACHE_TTL_SECONDS}, stale-while-revalidate=${PUBLIC_DATA_CACHE_TTL_SECONDS * 3}`,
 };

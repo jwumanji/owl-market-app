@@ -10,12 +10,12 @@ import {
 import {
   cachedPublicData,
   PUBLIC_DATA_CACHE_HEADERS,
-  PUBLIC_DATA_CACHE_TTL_SECONDS,
+  CATALOG_DATA_TTL_SECONDS,
   publicDataCacheKey,
 } from "@/lib/public-data-cache";
 import { firstRelation } from "@/lib/supabase-relations";
 
-export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
+export const revalidate = CATALOG_DATA_TTL_SECONDS;
 
 class SetDetailLoadError extends Error {
   status: number;
@@ -32,7 +32,7 @@ async function loadSetDetailData(options: {
   game?: string | null;
   publicOnly: boolean;
 }) {
-  const supabase = createCachedServiceClient(PUBLIC_DATA_CACHE_TTL_SECONDS);
+  const supabase = createCachedServiceClient(CATALOG_DATA_TTL_SECONDS);
   const gameResult = await resolveGameScope(supabase, options.game, {
     defaultToOnePiece: true,
     publicOnly: options.publicOnly,
@@ -120,7 +120,8 @@ export async function GET(
   try {
     const data = await cachedPublicData(
       publicDataCacheKey("api-set-detail-v2", game ?? "default", params.slug, publicOnly),
-      () => loadSetDetailData({ slug: params.slug, game, publicOnly })
+      () => loadSetDetailData({ slug: params.slug, game, publicOnly }),
+      CATALOG_DATA_TTL_SECONDS
     );
 
     return NextResponse.json(data, { headers: PUBLIC_DATA_CACHE_HEADERS });

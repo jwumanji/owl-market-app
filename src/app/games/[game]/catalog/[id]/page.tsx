@@ -15,11 +15,11 @@ import {
   catalogSourcePayload,
 } from "@/lib/catalog-card-fields";
 import { catalogCardDescription } from "@/lib/game-catalog-copy";
-import { PUBLIC_DATA_CACHE_TTL_SECONDS } from "@/lib/public-data-cache";
+import { CATALOG_DATA_TTL_SECONDS } from "@/lib/public-data-cache";
 import FastCardImage from "@/components/ui/FastCardImage";
 import "../catalog.css";
 
-export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
+export const revalidate = CATALOG_DATA_TTL_SECONDS;
 
 type SetInfo = {
   id: string;

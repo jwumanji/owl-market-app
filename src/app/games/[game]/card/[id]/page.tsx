@@ -1,9 +1,9 @@
 import CardDetailClient from "@/app/card/[id]/CardDetailClient";
 import { loadCardDetailData } from "@/app/card/[id]/card-detail-data";
 import { gameQueryValue } from "@/lib/game-routes";
-import { PUBLIC_DATA_CACHE_TTL_SECONDS } from "@/lib/public-data-cache";
+import { CATALOG_DATA_TTL_SECONDS } from "@/lib/public-data-cache";
 
-export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
+export const revalidate = CATALOG_DATA_TTL_SECONDS;
 
 export async function generateMetadata({
   params,

@@ -1,10 +1,8 @@
 import SetsClient from "./SetsClient";
 import { loadSets } from "./load-sets";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
-import { PUBLIC_DATA_CACHE_TTL_SECONDS } from "@/lib/public-data-cache";
 import { SETS as FALLBACK_SETS, type SetData } from "./sets-data";
 
-export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
 
 function fallbackGameName(gameRouteSlug: string | null | undefined) {
   if (!gameRouteSlug || gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG) return "One Piece TCG";

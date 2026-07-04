@@ -7,10 +7,9 @@ import { RARITY_META } from "@/app/rarities/rarities-data";
 import { withOnePiecePayloadFallbacksList } from "@/lib/game-payload";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
-import { cachedPublicData, PUBLIC_DATA_CACHE_TTL_SECONDS, publicDataCacheKey } from "@/lib/public-data-cache";
+import { cachedPublicData, publicDataCacheKey } from "@/lib/public-data-cache";
 import { firstRelation, flattenPriceStatsCardRow } from "@/lib/supabase-relations";
 
-export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
 
 export const metadata = {
   title: "Markets — OWL Market",

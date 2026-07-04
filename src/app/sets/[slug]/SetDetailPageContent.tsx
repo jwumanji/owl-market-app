@@ -3,12 +3,10 @@ import { notFound } from "next/navigation";
 import { loadSetDetail } from "../load-sets";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
-import { PUBLIC_DATA_CACHE_TTL_SECONDS } from "@/lib/public-data-cache";
 import type { SetData } from "../sets-data";
 import SetDetailClient from "./SetDetailClient";
 import "./set-detail.css";
 
-export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
 
 export async function generateMetadata({ params }: { params: { slug: string } }) {
   const slug = decodeURIComponent(params.slug).toLowerCase();

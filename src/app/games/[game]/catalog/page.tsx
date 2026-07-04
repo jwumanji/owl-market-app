@@ -13,10 +13,10 @@ import {
   catalogCardType,
 } from "@/lib/catalog-card-fields";
 import { catalogPageDescription } from "@/lib/game-catalog-copy";
-import { cachedPublicData, PUBLIC_DATA_CACHE_TTL_SECONDS, publicDataCacheKey } from "@/lib/public-data-cache";
+import { cachedPublicData, CATALOG_DATA_TTL_SECONDS, publicDataCacheKey } from "@/lib/public-data-cache";
 import "./catalog.css";
 
-export const revalidate = PUBLIC_DATA_CACHE_TTL_SECONDS;
+export const revalidate = CATALOG_DATA_TTL_SECONDS;
 
 export function generateStaticParams() {
   return publicGameStaticParams();

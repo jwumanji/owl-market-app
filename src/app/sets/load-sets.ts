@@ -12,7 +12,7 @@ import {
   type GameScope,
 } from "@/lib/game-scope";
 import { ONE_PIECE_DB_SLUG } from "@/lib/games/one-piece";
-import { cachedPublicData, publicDataCacheKey } from "@/lib/public-data-cache";
+import { cachedPublicData, CATALOG_DATA_TTL_SECONDS, publicDataCacheKey } from "@/lib/public-data-cache";
 import { firstRelation } from "@/lib/supabase-relations";
 import type { CatalogSetCard } from "./sets-data";
 
@@ -667,7 +667,8 @@ export async function loadSets(options: {
       Boolean(options.includeCatalogCards),
       Boolean(options.includeTopCards)
     ),
-    () => loadSetsUncached({ ...options, publicOnly })
+    () => loadSetsUncached({ ...options, publicOnly }),
+    CATALOG_DATA_TTL_SECONDS
   );
 }
 
@@ -808,7 +809,8 @@ export async function loadSetDetail(options: {
 
   const set = await cachedPublicData(
     publicDataCacheKey("set-detail-cards", options.game ?? "default", String(setRow.slug), publicOnly),
-    () => enrichSetDetailUncached(setRow, game)
+    () => enrichSetDetailUncached(setRow, game),
+    CATALOG_DATA_TTL_SECONDS
   );
 
   return { set, allSets: sets, game };
