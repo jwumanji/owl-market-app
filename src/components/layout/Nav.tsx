@@ -75,6 +75,8 @@ export default function Nav({ variant }: NavProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  // Dev tools (/dev/*) render as bare full-bleed pages — no global chrome.
+  const hideNav = pathname.startsWith("/dev");
   const resolvedVariant: NavVariant =
     variant ?? (pathname.startsWith("/admin") ? "admin" : "public");
   const isAdmin = resolvedVariant === "admin";
@@ -91,7 +93,7 @@ export default function Nav({ variant }: NavProps) {
     : gamePath(activeAdminGameRouteSlug);
 
   useEffect(() => {
-    if (isAdmin) return;
+    if (isAdmin || hideNav) return;
 
     const timeout = window.setTimeout(() => {
       for (const link of links) {
@@ -105,7 +107,9 @@ export default function Nav({ variant }: NavProps) {
     }, 300);
 
     return () => window.clearTimeout(timeout);
-  }, [activeGameRouteSlug, isAdmin, links, router]);
+  }, [activeGameRouteSlug, isAdmin, hideNav, links, router]);
+
+  if (hideNav) return null;
 
   return (
     <nav className="c-topnav" aria-label="Primary">
