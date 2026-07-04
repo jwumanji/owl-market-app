@@ -10,7 +10,13 @@ import {
   CATALOG_DATA_TTL_SECONDS,
   publicDataCacheKey,
 } from "@/lib/public-data-cache";
-import type { CardDetailPayload, PriceStatsData, PricePoint } from "./card-detail-types";
+import type {
+  CardCorePayload,
+  CardDetailPayload,
+  CardHistoryPayload,
+  PriceStatsData,
+  PricePoint,
+} from "./card-detail-types";
 
 export type CardDetailLoadResult =
   | { ok: true; data: CardDetailPayload }
@@ -56,10 +62,10 @@ function firstRelation<T>(relation: JoinedRelation<T>): T | null {
   return Array.isArray(relation) ? relation[0] ?? null : relation;
 }
 
-async function loadCardDetailDataUncached(options: {
+async function loadCardCoreUncached(options: {
   id: string;
   game?: string | null;
-}): Promise<CardDetailPayload> {
+}): Promise<CardCorePayload> {
   const supabase = createCachedServiceClient(CATALOG_DATA_TTL_SECONDS);
   const gameResult = await resolveGameScope(supabase, options.game, {
     defaultToOnePiece: true,
@@ -128,30 +134,6 @@ async function loadCardDetailDataUncached(options: {
   const priceStats = firstRelation(cardRow.price_stats);
   const set = firstRelation(cardRow.sets);
   const payloadCard = withOnePiecePayloadFallbacks(cardRow as unknown as Record<string, unknown>);
-
-  // Longest chart period is 1y (the MAX tab converges with 1y as data ages),
-  // so don't ship lifetime history — the table grows daily (M5).
-  const historySinceIso = new Date(Date.now() - 365 * 86400000).toISOString();
-  const { data: priceHistory } = await supabase
-    .from("price_history")
-    .select("tcg_market, market_avg, recorded_at")
-    .eq("game_id", game.id)
-    .eq("card_id", cardRow.id)
-    .gte("recorded_at", historySinceIso)
-    .order("recorded_at", { ascending: true });
-
-  const realHistory = (priceHistory ?? []) as PricePoint[];
-  let historyOut = realHistory;
-  let synthetic = false;
-
-  if (realHistory.length < 2 && priceStats) {
-    const synth = synthesizeHistory(priceStats);
-    if (synth.length >= 2) {
-      historyOut = synth;
-      synthetic = true;
-    }
-  }
-
   const payloadColor = payloadCard.color;
 
   return {
@@ -176,20 +158,58 @@ async function loadCardDetailDataUncached(options: {
     },
     set,
     priceStats,
-    priceHistory: historyOut,
-    priceHistorySynthetic: synthetic,
   };
 }
 
-export async function loadCardDetailData(options: {
+async function loadCardHistoryUncached(options: {
+  gameId: string;
+  cardId: string;
+  priceStats: PriceStatsData | null;
+}): Promise<CardHistoryPayload> {
+  const supabase = createCachedServiceClient(CATALOG_DATA_TTL_SECONDS);
+
+  // Longest chart period is 1y (the MAX tab converges with 1y as data ages),
+  // so don't ship lifetime history — the table grows daily (M5).
+  const historySinceIso = new Date(Date.now() - 365 * 86400000).toISOString();
+  const { data: priceHistory } = await supabase
+    .from("price_history")
+    .select("tcg_market, market_avg, recorded_at")
+    .eq("game_id", options.gameId)
+    .eq("card_id", options.cardId)
+    .gte("recorded_at", historySinceIso)
+    .order("recorded_at", { ascending: true });
+
+  const realHistory = (priceHistory ?? []) as PricePoint[];
+  let historyOut = realHistory;
+  let synthetic = false;
+
+  if (realHistory.length < 2 && options.priceStats) {
+    const synth = synthesizeHistory(options.priceStats);
+    if (synth.length >= 2) {
+      historyOut = synth;
+      synthetic = true;
+    }
+  }
+
+  return { priceHistory: historyOut, priceHistorySynthetic: synthetic };
+}
+
+export type CardCoreLoadResult =
+  | { ok: true; data: CardCorePayload }
+  | { ok: false; status: number; message: string };
+
+// Above-the-fold loader — one indexed query. The page awaits this, then
+// streams the history behind Suspense so cold TTFB isn't gated on the
+// price_history read.
+export async function loadCardCore(options: {
   id: string;
   game?: string | null;
-}): Promise<CardDetailLoadResult> {
+}): Promise<CardCoreLoadResult> {
   try {
     const publicOnly = publicOnlyForCatalogPreview();
     const data = await cachedPublicData(
-      publicDataCacheKey("card-detail-v2", options.game ?? "default", options.id, publicOnly),
-      () => loadCardDetailDataUncached(options),
+      publicDataCacheKey("card-core-v1", options.game ?? "default", options.id, publicOnly),
+      () => loadCardCoreUncached(options),
       CATALOG_DATA_TTL_SECONDS
     );
     return { ok: true, data };
@@ -204,6 +224,35 @@ export async function loadCardDetailData(options: {
       message: error instanceof Error ? error.message : "Failed to load card",
     };
   }
+}
+
+export function loadCardHistory(options: {
+  gameId: string;
+  cardId: string;
+  priceStats: PriceStatsData | null;
+}): Promise<CardHistoryPayload> {
+  return cachedPublicData(
+    publicDataCacheKey("card-history-v1", options.gameId, options.cardId),
+    () => loadCardHistoryUncached(options),
+    CATALOG_DATA_TTL_SECONDS
+  );
+}
+
+// Composed loader retained for GET /api/card/[id] — response shape unchanged.
+export async function loadCardDetailData(options: {
+  id: string;
+  game?: string | null;
+}): Promise<CardDetailLoadResult> {
+  const core = await loadCardCore(options);
+  if (!core.ok) return core;
+
+  const history = await loadCardHistory({
+    gameId: core.data.game.id,
+    cardId: core.data.card.id,
+    priceStats: core.data.priceStats,
+  });
+
+  return { ok: true, data: { ...core.data, ...history } };
 }
 
 function synthesizeHistory(stats: PriceStatsData): SynthPoint[] {

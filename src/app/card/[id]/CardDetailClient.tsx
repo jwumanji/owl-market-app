@@ -1,12 +1,12 @@
 "use client";
 
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, use, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { formatPrice, formatPct, pctColor, timeAgo } from "@/lib/utils";
 import RarityBadge from "@/components/ui/RarityBadge";
 import { gamePath } from "@/lib/game-routes";
-import type { CardDetailPayload, PricePoint } from "./card-detail-types";
+import type { CardCorePayload, CardHistoryPayload, PricePoint } from "./card-detail-types";
 
 const PERIODS = ["7d", "1m", "3m", "1y", "max"] as const;
 type Period = (typeof PERIODS)[number];
@@ -34,10 +34,14 @@ function formatAthDate(dateStr: string | null): string {
 
 export default function CardDetailClient({
   data,
+  historyPromise,
   error,
   gameRouteSlug,
 }: {
-  data: CardDetailPayload | null;
+  data: CardCorePayload | null;
+  // Un-awaited on the server: the above-fold content streams at first byte
+  // while the price_history query resolves behind Suspense.
+  historyPromise: Promise<CardHistoryPayload> | null;
   error?: string | null;
   gameRouteSlug: string;
 }) {
@@ -54,7 +58,7 @@ export default function CardDetailClient({
     );
   }
 
-  const { card, set, priceStats, priceHistory, priceHistorySynthetic: historySynthetic } = data;
+  const { card, set, priceStats } = data;
   // Always route the hero through the optimizer, mirrored or not: the mirrored
   // srcSet topped out at the 420px preview (soft on retina, cross-origin, no
   // AVIF), while the optimizer serves display-sized AVIF from the same origin.
@@ -65,7 +69,6 @@ export default function CardDetailClient({
       ? ((priceStats.market_avg - priceStats.atl) / priceStats.atl) * 100
       : null;
 
-  const filteredHistory = filterByPeriod(priceHistory, chartPeriod);
   const chg1d = priceStats?.chg_1d;
   const heroPrice = priceStats?.market_avg ?? null;
 
@@ -171,10 +174,10 @@ export default function CardDetailClient({
                 <h2 className="font-grotesk font-bold text-[18px] tracking-[-0.01em] text-ink">
                   Price History
                 </h2>
-                {historySynthetic && filteredHistory.length > 0 && (
-                  <span className="font-mono-2 font-semibold text-[10px] text-ink-3 uppercase tracking-[0.1em]">
-                    Estimated from 30-day stats
-                  </span>
+                {historyPromise && (
+                  <Suspense fallback={null}>
+                    <HistoryNotice promise={historyPromise} period={chartPeriod} />
+                  </Suspense>
                 )}
               </div>
               <div className="flex gap-1.5">
@@ -194,16 +197,12 @@ export default function CardDetailClient({
               </div>
             </div>
 
-            {filteredHistory.length > 0 ? (
-              <div style={{ height: 280 }}>
-                <Suspense fallback={<ChartLoading />}>
-                  <PriceChart data={filteredHistory} period={chartPeriod} />
-                </Suspense>
-              </div>
+            {historyPromise ? (
+              <Suspense fallback={<ChartLoading />}>
+                <HistorySection promise={historyPromise} period={chartPeriod} />
+              </Suspense>
             ) : (
-              <div className="flex items-center justify-center h-[280px] text-ink-3 text-sm font-mono-2">
-                No price history available
-              </div>
+              <HistoryEmpty />
             )}
           </div>
 
@@ -316,6 +315,54 @@ function ChartLoading() {
   return (
     <div className="flex h-[280px] items-center justify-center text-sm font-mono-2 text-ink-3">
       Loading price history...
+    </div>
+  );
+}
+
+function HistoryEmpty() {
+  return (
+    <div className="flex items-center justify-center h-[280px] text-ink-3 text-sm font-mono-2">
+      No price history available
+    </div>
+  );
+}
+
+/* Both consumers below use() the same streamed promise — React resolves it
+   once; the header notice and the chart body unsuspend together. */
+
+function HistoryNotice({
+  promise,
+  period,
+}: {
+  promise: Promise<CardHistoryPayload>;
+  period: Period;
+}) {
+  const { priceHistory, priceHistorySynthetic } = use(promise);
+  if (!priceHistorySynthetic || filterByPeriod(priceHistory, period).length === 0) return null;
+  return (
+    <span className="font-mono-2 font-semibold text-[10px] text-ink-3 uppercase tracking-[0.1em]">
+      Estimated from 30-day stats
+    </span>
+  );
+}
+
+function HistorySection({
+  promise,
+  period,
+}: {
+  promise: Promise<CardHistoryPayload>;
+  period: Period;
+}) {
+  const { priceHistory } = use(promise);
+  const filteredHistory = filterByPeriod(priceHistory, period);
+
+  if (filteredHistory.length === 0) return <HistoryEmpty />;
+
+  return (
+    <div style={{ height: 280 }}>
+      <Suspense fallback={<ChartLoading />}>
+        <PriceChart data={filteredHistory} period={period} />
+      </Suspense>
     </div>
   );
 }

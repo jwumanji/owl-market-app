@@ -46,7 +46,9 @@ export interface PricePoint {
   recorded_at: string;
 }
 
-export interface CardDetailPayload {
+// Above-the-fold payload: everything except price history, so the page can
+// stream the hero/stats at first byte while the history query runs.
+export interface CardCorePayload {
   game: {
     id: string;
     slug: string;
@@ -56,6 +58,11 @@ export interface CardDetailPayload {
   card: CardData;
   set: SetData | null;
   priceStats: PriceStatsData | null;
+}
+
+export interface CardHistoryPayload {
   priceHistory: PricePoint[];
   priceHistorySynthetic: boolean;
 }
+
+export interface CardDetailPayload extends CardCorePayload, CardHistoryPayload {}
