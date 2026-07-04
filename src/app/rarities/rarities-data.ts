@@ -28,7 +28,8 @@ export interface RarityData {
   chg7d: number;
   chg30d: number;
   up: boolean;
-  spark: number[];
+  /** Optional: live loader payloads for One Piece rarities omit it. */
+  spark?: number[];
   topCards: RarityCard[];
   pricingStatus?: "priced" | "catalog_only";
 }
