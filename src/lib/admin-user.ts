@@ -13,7 +13,7 @@ export async function getCurrentAdminUser(): Promise<CurrentAdminUser | null> {
 
   if (!url || !anonKey) return null;
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createServerClient(url, anonKey, {
     cookies: {
       getAll() {

@@ -1,5 +1,3 @@
-"use client";
-
 import Link from "next/link";
 import { CardRow } from "@/lib/types";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";

@@ -75,11 +75,11 @@ type ResultScreenModule = {
   default: (props: Record<string, unknown>) => React.ReactElement;
 };
 
-function walkElements(node: React.ReactNode, elements: React.ReactElement[] = []) {
+function walkElements(node: React.ReactNode, elements: React.ReactElement<any>[] = []) {
   React.Children.forEach(node, (child) => {
     if (!React.isValidElement(child)) return;
     elements.push(child);
-    walkElements(child.props.children, elements);
+    walkElements((child as React.ReactElement<any>).props.children, elements);
   });
   return elements;
 }
@@ -118,15 +118,15 @@ function screenProps(overrides: Record<string, unknown> = {}) {
 
 function render(overrides: Record<string, unknown> = {}) {
   const mod = loadModule<ResultScreenModule>("src/components/lens/ResultScreen.tsx");
-  const element = mod.default(screenProps(overrides)) as React.ReactElement;
+  const element = mod.default(screenProps(overrides)) as React.ReactElement<any>;
   return { element, all: walkElements(element) };
 }
 
-function hasData(all: React.ReactElement[], attr: string) {
+function hasData(all: React.ReactElement<any>[], attr: string) {
   return all.some((el) => el.props?.[attr] === "true");
 }
 
-function overlayPanel(all: React.ReactElement[]) {
+function overlayPanel(all: React.ReactElement<any>[]) {
   // ImageOverlayPanel is the element that receives both an overlay and a mode.
   return all.find((el) => el.props?.overlay && typeof el.props?.mode === "string");
 }

@@ -1,5 +1,3 @@
-"use client";
-
 import Link from "next/link";
 import DashboardWidget from "./DashboardWidget";
 import RarityBadge from "@/components/ui/RarityBadge";

@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { createCachedServiceClient } from "@/lib/supabase-server";
 import { withOnePiecePayloadFallbacksList } from "@/lib/game-payload";
 import { gameParamFromRequest, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
-import { cachedPublicData, PRICE_DATA_TTL_SECONDS, PUBLIC_DATA_CACHE_HEADERS, publicDataCacheKey } from "@/lib/public-data-cache";
+import { cachedPublicData, PUBLIC_DATA_CACHE_HEADERS, publicDataCacheKey } from "@/lib/public-data-cache";
 import { firstRelation, flattenPriceStatsCardRow } from "@/lib/supabase-relations";
 
-export const revalidate = PRICE_DATA_TTL_SECONDS;
+// Keep in sync with PRICE_DATA_TTL_SECONDS (Next 15 requires a literal).
+export const revalidate = 900;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

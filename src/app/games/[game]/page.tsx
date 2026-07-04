@@ -14,7 +14,8 @@ import {
 } from "@/lib/catalog-card-fields";
 import "./game-overview.css";
 
-export const revalidate = PRICE_DATA_TTL_SECONDS;
+// Keep in sync with PRICE_DATA_TTL_SECONDS (Next 15 requires a literal).
+export const revalidate = 900;
 
 export function generateStaticParams() {
   return publicGameStaticParams();
@@ -114,7 +115,8 @@ async function loadGameOverview(gameRouteSlug: string): Promise<OverviewData> {
   const publicOnly = publicOnlyForCatalogPreview();
   return cachedPublicData(
     publicDataCacheKey("game-overview-v1", gameRouteSlug, publicOnly),
-    () => loadGameOverviewUncached(gameRouteSlug, publicOnly)
+    () => loadGameOverviewUncached(gameRouteSlug, publicOnly),
+    PRICE_DATA_TTL_SECONDS
   );
 }
 
@@ -244,17 +246,19 @@ async function loadGameOverviewUncached(gameRouteSlug: string, publicOnly: boole
   }
 }
 
-export async function generateMetadata({ params }: { params: { game: string } }) {
+export async function generateMetadata(props: { params: Promise<{ game: string }> }) {
+  const params = await props.params;
   return {
     title: `${params.game.replace(/-/g, " ")} catalog - OWL Market`,
   };
 }
 
-export default async function GameOverviewPage({
-  params,
-}: {
-  params: { game: string };
-}) {
+export default async function GameOverviewPage(
+  props: {
+    params: Promise<{ game: string }>;
+  }
+) {
+  const params = await props.params;
   const data = await loadGameOverview(params.game);
 
   if (!data.ok) {

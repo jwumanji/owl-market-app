@@ -61,7 +61,7 @@ export async function MarketsPageContent({
 }: {
   gameRouteSlug?: string | null;
 } = {}) {
-  const supabase = createCachedServiceClient();
+  const supabase = createCachedServiceClient(PRICE_DATA_TTL_SECONDS);
   const gameResult = await resolveGameScope(supabase, gameRouteSlug, {
     defaultToOnePiece: true,
     publicOnly: publicOnlyForCatalogPreview(),

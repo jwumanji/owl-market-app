@@ -91,7 +91,7 @@ test("FaceRatioCard exposes selectable button semantics and keyboard activation"
     onSelect: () => {
       selected += 1;
     },
-  }) as React.ReactElement;
+  }) as React.ReactElement<any>;
 
   assert.equal(element.type, "article");
   assert.equal(element.props.role, "button");
@@ -112,7 +112,7 @@ test("FaceRatioCard exposes selectable button semantics and keyboard activation"
 
 test("FaceRatioCard is non-interactive without onSelect", () => {
   const mod = load();
-  const element = mod.default({ face: "back", measurement, isActive: false }) as React.ReactElement;
+  const element = mod.default({ face: "back", measurement, isActive: false }) as React.ReactElement<any>;
 
   assert.equal(element.props.role, undefined);
   assert.equal(element.props.tabIndex, undefined);

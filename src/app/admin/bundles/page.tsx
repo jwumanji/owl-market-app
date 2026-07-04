@@ -24,11 +24,12 @@ async function loadGameOptions() {
   }
 }
 
-export default async function InventoryBundlesPage({
-  searchParams,
-}: {
-  searchParams?: { created?: string | string[]; game?: string | string[] } | Promise<{ created?: string | string[]; game?: string | string[] }>;
-}) {
+export default async function InventoryBundlesPage(
+  props: {
+    searchParams?: Promise<{ created?: string | string[]; game?: string | string[] } | Promise<{ created?: string | string[]; game?: string | string[] }>>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const gameSlug = searchParamValue(resolvedSearchParams?.game) || DEFAULT_PUBLIC_GAME_DB_SLUG;
   const encodedGameSlug = encodeURIComponent(gameSlug);

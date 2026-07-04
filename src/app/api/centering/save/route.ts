@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { cookies, type UnsafeUnwrappedCookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { isAllowedAdminEmail } from "@/lib/admin-auth";
 import {
@@ -45,7 +45,7 @@ function createAuthClient() {
     throw new Error("Missing Supabase auth environment variables.");
   }
 
-  const cookieStore = cookies();
+  const cookieStore = (cookies() as unknown as UnsafeUnwrappedCookies);
   return createServerClient(url, anonKey, {
     cookies: {
       get(name: string) {

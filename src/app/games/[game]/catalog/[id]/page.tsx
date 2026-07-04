@@ -15,11 +15,11 @@ import {
   catalogSourcePayload,
 } from "@/lib/catalog-card-fields";
 import { catalogCardDescription } from "@/lib/game-catalog-copy";
-import { CATALOG_DATA_TTL_SECONDS } from "@/lib/public-data-cache";
 import FastCardImage from "@/components/ui/FastCardImage";
 import "../catalog.css";
 
-export const revalidate = CATALOG_DATA_TTL_SECONDS;
+// Keep in sync with CATALOG_DATA_TTL_SECONDS (Next 15 requires a literal).
+export const revalidate = 3600;
 
 type SetInfo = {
   id: string;
@@ -167,21 +167,23 @@ async function loadCardDetail(gameRouteSlug: string, rawId: string): Promise<Det
   }
 }
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { game: string; id: string };
-}) {
+export async function generateMetadata(
+  props: {
+    params: Promise<{ game: string; id: string }>;
+  }
+) {
+  const params = await props.params;
   return {
     title: `${decodeURIComponent(params.id)} - ${params.game.replace(/-/g, " ")} card - OWL Market`,
   };
 }
 
-export default async function GameCatalogCardPage({
-  params,
-}: {
-  params: { game: string; id: string };
-}) {
+export default async function GameCatalogCardPage(
+  props: {
+    params: Promise<{ game: string; id: string }>;
+  }
+) {
+  const params = await props.params;
   const data = await loadCardDetail(params.game, params.id);
 
   if (!data.ok) {

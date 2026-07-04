@@ -477,7 +477,7 @@ async function loadOnePieceRarityIndex(supabase: SupabaseServiceClient, gameId: 
 }
 
 export async function loadRarities(options: { game?: string | null } = {}): Promise<LoadedRarities> {
-  const supabase = createCachedServiceClient();
+  const supabase = createCachedServiceClient(CATALOG_DATA_TTL_SECONDS);
   const gameResult = await resolveGameScope(supabase, options.game ?? null, {
     defaultToOnePiece: true,
     publicOnly: publicOnlyForCatalogPreview(),

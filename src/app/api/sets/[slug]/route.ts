@@ -15,7 +15,8 @@ import {
 } from "@/lib/public-data-cache";
 import { firstRelation } from "@/lib/supabase-relations";
 
-export const revalidate = CATALOG_DATA_TTL_SECONDS;
+// Keep in sync with CATALOG_DATA_TTL_SECONDS (Next 15 requires a literal).
+export const revalidate = 3600;
 
 class SetDetailLoadError extends Error {
   status: number;
@@ -110,10 +111,8 @@ async function loadSetDetailData(options: {
   return { game: gameResponsePayload(game), set, cards: allCards };
 }
 
-export async function GET(
-  request: Request,
-  { params }: { params: { slug: string } }
-) {
+export async function GET(request: Request, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const game = gameParamFromRequest(request);
   const publicOnly = publicOnlyForCatalogPreview();
 

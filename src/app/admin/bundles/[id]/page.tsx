@@ -18,13 +18,14 @@ function getInitialGame(searchParams?: BundleDetailSearchParams) {
   return game?.trim() || DEFAULT_PUBLIC_GAME_DB_SLUG;
 }
 
-export default async function InventoryBundleDetailPage({
-  params,
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams?: BundleDetailSearchParams | Promise<BundleDetailSearchParams>;
-}) {
+export default async function InventoryBundleDetailPage(
+  props: {
+    params: Promise<{ id: string }>;
+    searchParams?: Promise<BundleDetailSearchParams | Promise<BundleDetailSearchParams>>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const gameSlug = getInitialGame(resolvedSearchParams);
   const encodedGameSlug = encodeURIComponent(gameSlug);

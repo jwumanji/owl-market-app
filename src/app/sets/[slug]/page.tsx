@@ -1,13 +1,15 @@
 import { SetDetailPageContent } from "./SetDetailPageContent";
-import { CATALOG_DATA_TTL_SECONDS } from "@/lib/public-data-cache";
 
-export const revalidate = CATALOG_DATA_TTL_SECONDS;
+// Keep in sync with CATALOG_DATA_TTL_SECONDS (Next 15 requires a literal).
+export const revalidate = 3600;
 
-export async function generateMetadata({ params }: { params: { slug: string } }) {
+export async function generateMetadata(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const slug = decodeURIComponent(params.slug).toLowerCase();
   return { title: `${slug.toUpperCase()} — OWL Market` };
 }
 
-export default async function SetDetailPage({ params }: { params: { slug: string } }) {
+export default async function SetDetailPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   return <SetDetailPageContent slug={params.slug} />;
 }

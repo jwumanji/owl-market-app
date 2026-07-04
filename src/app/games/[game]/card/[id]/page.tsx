@@ -1,25 +1,27 @@
 import CardDetailClient from "@/app/card/[id]/CardDetailClient";
 import { loadCardDetailData } from "@/app/card/[id]/card-detail-data";
 import { gameQueryValue } from "@/lib/game-routes";
-import { CATALOG_DATA_TTL_SECONDS } from "@/lib/public-data-cache";
 
-export const revalidate = CATALOG_DATA_TTL_SECONDS;
+// Keep in sync with CATALOG_DATA_TTL_SECONDS (Next 15 requires a literal).
+export const revalidate = 3600;
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { game: string; id: string };
-}) {
+export async function generateMetadata(
+  props: {
+    params: Promise<{ game: string; id: string }>;
+  }
+) {
+  const params = await props.params;
   return {
     title: `${decodeURIComponent(params.id)} - ${params.game.replace(/-/g, " ")} card - OWL Market`,
   };
 }
 
-export default async function GameCardDetailPage({
-  params,
-}: {
-  params: { game: string; id: string };
-}) {
+export default async function GameCardDetailPage(
+  props: {
+    params: Promise<{ game: string; id: string }>;
+  }
+) {
+  const params = await props.params;
   const result = await loadCardDetailData({
     id: params.id,
     game: gameQueryValue(params.game),

@@ -15,11 +15,12 @@ function searchParamValue(value?: string | string[]) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-export default async function OrdersPage({
-  searchParams,
-}: {
-  searchParams?: OrdersSearchParams | Promise<OrdersSearchParams>;
-}) {
+export default async function OrdersPage(
+  props: {
+    searchParams?: Promise<OrdersSearchParams | Promise<OrdersSearchParams>>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const gameSlug = searchParamValue(resolvedSearchParams?.game)?.trim() || DEFAULT_PUBLIC_GAME_DB_SLUG;
 

@@ -13,11 +13,12 @@ function getInitialGame(searchParams?: NewInventorySearchParams) {
   return game?.trim() || undefined;
 }
 
-export default async function NewInventoryPage({
-  searchParams,
-}: {
-  searchParams?: NewInventorySearchParams | Promise<NewInventorySearchParams>;
-}) {
+export default async function NewInventoryPage(
+  props: {
+    searchParams?: Promise<NewInventorySearchParams | Promise<NewInventorySearchParams>>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const gameSlug = getInitialGame(resolvedSearchParams);
 

@@ -30,11 +30,12 @@ function selectedInventoryIds(searchParams?: NewBundleSearchParams) {
   );
 }
 
-export default async function NewInventoryBundlePage({
-  searchParams,
-}: {
-  searchParams?: NewBundleSearchParams | Promise<NewBundleSearchParams>;
-}) {
+export default async function NewInventoryBundlePage(
+  props: {
+    searchParams?: Promise<NewBundleSearchParams | Promise<NewBundleSearchParams>>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const gameSlug = searchParamValue(resolvedSearchParams?.game) || DEFAULT_PUBLIC_GAME_DB_SLUG;
   const encodedGameSlug = encodeURIComponent(gameSlug);

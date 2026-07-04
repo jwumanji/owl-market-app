@@ -13,10 +13,11 @@ import {
   catalogCardType,
 } from "@/lib/catalog-card-fields";
 import { catalogPageDescription } from "@/lib/game-catalog-copy";
-import { cachedPublicData, CATALOG_DATA_TTL_SECONDS, publicDataCacheKey } from "@/lib/public-data-cache";
+import { cachedPublicData, publicDataCacheKey } from "@/lib/public-data-cache";
 import "./catalog.css";
 
-export const revalidate = CATALOG_DATA_TTL_SECONDS;
+// Keep in sync with CATALOG_DATA_TTL_SECONDS (Next 15 requires a literal).
+export const revalidate = 3600;
 
 export function generateStaticParams() {
   return publicGameStaticParams();
@@ -235,19 +236,21 @@ async function loadCatalog(gameRouteSlug: string, searchParams: CatalogSearchPar
   );
 }
 
-export async function generateMetadata({ params }: { params: { game: string } }) {
+export async function generateMetadata(props: { params: Promise<{ game: string }> }) {
+  const params = await props.params;
   return {
     title: `${params.game.replace(/-/g, " ")} cards - OWL Market`,
   };
 }
 
-export default async function GameCatalogPage({
-  params,
-  searchParams,
-}: {
-  params: { game: string };
-  searchParams: CatalogSearchParams;
-}) {
+export default async function GameCatalogPage(
+  props: {
+    params: Promise<{ game: string }>;
+    searchParams: Promise<CatalogSearchParams>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const data = await loadCatalog(params.game, searchParams);
 
   if (!data.ok) {

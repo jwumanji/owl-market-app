@@ -12,7 +12,8 @@ import { cachedPublicData, PRICE_DATA_TTL_SECONDS, publicDataCacheKey } from "@/
 import { createCachedServiceClient } from "@/lib/supabase-server";
 import { firstRelation, flattenPriceStatsCardRow } from "@/lib/supabase-relations";
 
-export const revalidate = PRICE_DATA_TTL_SECONDS;
+// Keep in sync with PRICE_DATA_TTL_SECONDS (Next 15 requires a literal).
+export const revalidate = 900;
 
 export const metadata = {
   title: "OwlMarket — See what others miss",
@@ -55,7 +56,7 @@ async function fetchRiftboundTileState() {
     } catch {
       return { enabled: privatePreview, status: "Preview" };
     }
-  });
+  }, PRICE_DATA_TTL_SECONDS);
 }
 
 async function fetchTopCards(): Promise<TeaserCard[]> {
@@ -108,7 +109,7 @@ async function fetchTopCards(): Promise<TeaserCard[]> {
     } catch {
       return [];
     }
-  });
+  }, PRICE_DATA_TTL_SECONDS);
 }
 
 export default async function Home() {

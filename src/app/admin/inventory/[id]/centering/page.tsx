@@ -284,13 +284,14 @@ function MeasurementHistory({
   );
 }
 
-export default async function InventoryCenteringPage({
-  params,
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams?: CenteringSearchParams;
-}) {
+export default async function InventoryCenteringPage(
+  props: {
+    params: Promise<{ id: string }>;
+    searchParams?: Promise<CenteringSearchParams>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const currentUser = await getCurrentAdminUser();
   if (!currentUser) {
     redirect(`/login?redirect=${encodeURIComponent(`/admin/inventory/${params.id}/centering`)}`);

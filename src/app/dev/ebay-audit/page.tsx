@@ -77,11 +77,12 @@ function fmtGrade(grader: string | null, grade: number | null): string {
   return parts.length > 0 ? parts.join(" ") : "—";
 }
 
-export default async function EbayAuditPage({
-  searchParams,
-}: {
-  searchParams: { card?: string | string[] };
-}) {
+export default async function EbayAuditPage(
+  props: {
+    searchParams: Promise<{ card?: string | string[] }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const supabase = createServiceClient();
   const rawCard = searchParams.card;
   const selectedId = Array.isArray(rawCard) ? rawCard[0] : rawCard;
@@ -197,11 +198,11 @@ export default async function EbayAuditPage({
                   <div className="mb-6 flex gap-4 rounded border border-border bg-surface p-4">
                     {img ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      (<img
                         src={img}
                         alt={card?.name ?? "card"}
                         className="h-40 w-auto rounded border border-border object-contain"
-                      />
+                      />)
                     ) : (
                       <div className="flex h-40 w-28 items-center justify-center rounded border border-border text-xs text-text-3">
                         no image

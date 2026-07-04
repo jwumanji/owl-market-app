@@ -45,10 +45,8 @@ function parseOptionalNumeric(value: unknown, fieldName: string) {
   return { error: `Invalid ${fieldName}` };
 }
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const body = await request.json().catch(() => null);
 
   if (!body || typeof body !== "object") {
@@ -372,10 +370,8 @@ export async function PATCH(
   return NextResponse.json(data);
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const supabase = createServiceClient();
   const gameResult = await resolveGameScope(supabase, gameParamFromRequest(request));
 

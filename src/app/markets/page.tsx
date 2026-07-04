@@ -1,7 +1,7 @@
 import { MarketsPageContent } from "./MarketsPageContent";
-import { PRICE_DATA_TTL_SECONDS } from "@/lib/public-data-cache";
 
-export const revalidate = PRICE_DATA_TTL_SECONDS;
+// Keep in sync with PRICE_DATA_TTL_SECONDS (Next 15 requires a literal).
+export const revalidate = 900;
 
 export const metadata = {
   title: "Markets — OWL Market",

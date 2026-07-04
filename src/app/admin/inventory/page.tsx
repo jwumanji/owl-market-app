@@ -216,11 +216,12 @@ function toInventoryRow(
   };
 }
 
-export default async function AdminInventoryPage({
-  searchParams,
-}: {
-  searchParams?: InventoryPageSearchParams | Promise<InventoryPageSearchParams>;
-}) {
+export default async function AdminInventoryPage(
+  props: {
+    searchParams?: Promise<InventoryPageSearchParams | Promise<InventoryPageSearchParams>>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const initialStatusFilter = getInitialStatusFilter(resolvedSearchParams);
   const initialPsa10CandidatesOnly = getInitialPsa10CandidatesOnly(resolvedSearchParams);
