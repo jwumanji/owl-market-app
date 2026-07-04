@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import OwlMark from "@/components/brand/OwlMark";
@@ -71,30 +71,38 @@ function gameRouteSlugFromAdminGame(gameSlug: string) {
   return gameSlug.replace(/_/g, "-");
 }
 
+// The public nav must not read useSearchParams(): doing so bails static
+// prerenders out to the Suspense fallback, which shipped HTML with no nav at
+// all — the nav then mounted at hydration, shoving the whole page down (CLS)
+// and re-positioning the LCP element. Only the admin variant needs the
+// ?game= param, so only AdminNav pays the Suspense cost (admin routes are
+// request-rendered anyway).
 export default function Nav({ variant }: NavProps) {
-  const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   // Dev tools (/dev/*) render as bare full-bleed pages — no global chrome.
-  const hideNav = pathname.startsWith("/dev");
+  if (pathname.startsWith("/dev")) return null;
+
   const resolvedVariant: NavVariant =
     variant ?? (pathname.startsWith("/admin") ? "admin" : "public");
-  const isAdmin = resolvedVariant === "admin";
-  const activeAdminGameSlug = adminGameSlugFromSearchParams(searchParams);
-  const activeAdminGameRouteSlug = gameRouteSlugFromAdminGame(activeAdminGameSlug);
+
+  if (resolvedVariant === "admin") {
+    return (
+      <Suspense fallback={null}>
+        <AdminNav pathname={pathname} />
+      </Suspense>
+    );
+  }
+
+  return <PublicNav pathname={pathname} />;
+}
+
+function PublicNav({ pathname }: { pathname: string }) {
+  const router = useRouter();
   const activeGameRouteSlug = gameRouteSlugFromPath(pathname);
   const isDefaultPublicGame = activeGameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
-  const links = useMemo(
-    () => (isAdmin ? adminLinks(activeAdminGameSlug) : publicLinks(activeGameRouteSlug)),
-    [activeAdminGameSlug, activeGameRouteSlug, isAdmin]
-  );
-  const viewSiteHref = activeAdminGameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG
-    ? "/"
-    : gamePath(activeAdminGameRouteSlug);
+  const links = useMemo(() => publicLinks(activeGameRouteSlug), [activeGameRouteSlug]);
 
   useEffect(() => {
-    if (isAdmin || hideNav) return;
-
     const timeout = window.setTimeout(() => {
       for (const link of links) {
         router.prefetch(link.href);
@@ -107,20 +115,16 @@ export default function Nav({ variant }: NavProps) {
     }, 300);
 
     return () => window.clearTimeout(timeout);
-  }, [activeGameRouteSlug, isAdmin, hideNav, links, router]);
-
-  if (hideNav) return null;
+  }, [activeGameRouteSlug, links, router]);
 
   return (
     <nav className="c-topnav" aria-label="Primary">
-      <div className={`c-topnav-inner${isAdmin ? " is-admin" : ""}`}>
+      <div className="c-topnav-inner">
         <div className="c-nav-left">
           <Link href="/" className="c-lockup">
             <OwlMark size={36} />
             <Wordmark />
           </Link>
-
-          {isAdmin ? <span className="c-internal-chip">INTERNAL</span> : null}
         </div>
 
         <ul className="c-nav-links">
@@ -137,30 +141,64 @@ export default function Nav({ variant }: NavProps) {
         </ul>
 
         <div className="c-nav-right">
-          {isAdmin ? (
-            <>
-              <Link href={viewSiteHref} className="c-nav-view">
-                View site ↗
-              </Link>
-              <Link href="/logout" className="c-signin-btn">
-                Sign out
-              </Link>
-            </>
-          ) : (
-            <>
-              <span className="c-live-chip">
-                <span className="c-live-dot" />
-                {isDefaultPublicGame ? "LIVE" : "CATALOG"}
-              </span>
-              <Link href="/login" className="c-signin-btn">
-                Sign in
-              </Link>
-            </>
-          )}
+          <span className="c-live-chip">
+            <span className="c-live-dot" />
+            {isDefaultPublicGame ? "LIVE" : "CATALOG"}
+          </span>
+          <Link href="/login" className="c-signin-btn">
+            Sign in
+          </Link>
         </div>
       </div>
 
-      {!isAdmin && isDefaultPublicGame && <Ticker />}
+      {isDefaultPublicGame && <Ticker />}
+    </nav>
+  );
+}
+
+function AdminNav({ pathname }: { pathname: string }) {
+  const searchParams = useSearchParams();
+  const activeAdminGameSlug = adminGameSlugFromSearchParams(searchParams);
+  const activeAdminGameRouteSlug = gameRouteSlugFromAdminGame(activeAdminGameSlug);
+  const links = useMemo(() => adminLinks(activeAdminGameSlug), [activeAdminGameSlug]);
+  const viewSiteHref = activeAdminGameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG
+    ? "/"
+    : gamePath(activeAdminGameRouteSlug);
+
+  return (
+    <nav className="c-topnav" aria-label="Primary">
+      <div className="c-topnav-inner is-admin">
+        <div className="c-nav-left">
+          <Link href="/" className="c-lockup">
+            <OwlMark size={36} />
+            <Wordmark />
+          </Link>
+
+          <span className="c-internal-chip">INTERNAL</span>
+        </div>
+
+        <ul className="c-nav-links">
+          {links.map((link) => (
+            <li key={link.href}>
+              <Link
+                href={link.href}
+                className={`c-nav-link${isActivePath(pathname, link.href, link.exact) ? " active" : ""}`}
+              >
+                {link.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+
+        <div className="c-nav-right">
+          <Link href={viewSiteHref} className="c-nav-view">
+            View site ↗
+          </Link>
+          <Link href="/logout" className="c-signin-btn">
+            Sign out
+          </Link>
+        </div>
+      </div>
     </nav>
   );
 }

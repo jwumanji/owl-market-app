@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
+import { preconnect, prefetchDNS } from "react-dom";
 import {
   Inter,
   IBM_Plex_Mono,
@@ -69,21 +69,25 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const supabaseOrigin = publicSupabaseOrigin();
+  // Resource hints go through the react-dom API, NOT a hand-rendered <head>:
+  // a manual <head> in the root layout displaces Next's managed head, which
+  // silently dropped every next/font preload link — fonts were discovered
+  // late, and the post-swap repaint of headline text re-fired LCP seconds in.
+  if (supabaseOrigin) {
+    prefetchDNS(supabaseOrigin);
+    preconnect(supabaseOrigin, { crossOrigin: "anonymous" });
+  }
 
   return (
     <html lang="en" className="dark">
-      {supabaseOrigin ? (
-        <head>
-          <link rel="dns-prefetch" href={supabaseOrigin} />
-          <link rel="preconnect" href={supabaseOrigin} crossOrigin="anonymous" />
-        </head>
-      ) : null}
       <body
         className={`${inter.variable} ${ibmPlexMono.variable} ${spaceGrotesk.variable} ${caveat.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
-        <Suspense fallback={null}>
-          <Nav />
-        </Suspense>
+        {/* No Suspense here: the public nav is prerender-safe (no
+            useSearchParams), so static HTML always includes it — the old
+            null fallback shipped nav-less HTML that shifted the whole page
+            at hydration. The admin variant carries its own boundary. */}
+        <Nav />
         <main>{children}</main>
       </body>
     </html>
