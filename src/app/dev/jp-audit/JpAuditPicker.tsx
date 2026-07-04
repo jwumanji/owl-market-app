@@ -9,6 +9,7 @@ export interface PickerCard {
   card_number: string | null;
   rarity: string | null;
   setCode: string | null;
+  region: string;
 }
 
 // Searchable card list for the JP price audit page. SSR links work without JS;
@@ -61,7 +62,12 @@ export default function JpAuditPicker({
                       active ? "bg-surf2 text-owl" : "text-text"
                     }`}
                   >
-                    <span className="block truncate text-sm">{c.name ?? "(unnamed)"}</span>
+                    <span className="flex items-center gap-2 truncate text-sm">
+                      {c.region === "jp" ? (
+                        <span className="shrink-0 rounded border border-owl px-1 text-[10px] font-bold uppercase text-owl">jp</span>
+                      ) : null}
+                      <span className="truncate">{c.name ?? "(unnamed)"}</span>
+                    </span>
                     <span className="mt-0.5 block truncate text-xs text-text-2">
                       {[c.setCode, c.card_number, c.rarity].filter(Boolean).join(" · ") || "—"}
                     </span>

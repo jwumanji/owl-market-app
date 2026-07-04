@@ -153,7 +153,8 @@ async function loadGameOverviewUncached(gameRouteSlug: string, publicOnly: boole
       supabase
         .from("cards")
         .select("id", { count: "exact", head: true })
-        .eq("game_id", game.id),
+        .eq("game_id", game.id)
+        .eq("region", "en"),
       supabase
         .from("game_rarities")
         .select("id, code, name, sort_order")
@@ -191,6 +192,7 @@ async function loadGameOverviewUncached(gameRouteSlug: string, publicOnly: boole
           sets!cards_set_game_fk (slug, code, name)
         `)
         .eq("game_id", game.id)
+        .eq("region", "en")
         .order("card_number")
         .limit(12),
       supabase

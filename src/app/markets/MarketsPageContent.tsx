@@ -88,6 +88,7 @@ export async function MarketsPageContent({
         .from("price_stats")
         .select(MARKET_PRICE_CARD_SELECT)
         .eq("game_id", game.id)
+        .eq("cards.region", "en")
         .not("market_avg", "is", null)
         .order("market_avg", { ascending: false })
         .limit(20)
@@ -107,6 +108,7 @@ export async function MarketsPageContent({
         .from("price_stats")
         .select(DASHBOARD_PRICE_CARD_SELECT)
         .eq("game_id", game.id)
+        .eq("cards.region", "en")
         .gt("market_avg", 5)
         .gt("chg_1d", 0)
         .order("chg_1d", { ascending: false })
@@ -119,6 +121,7 @@ export async function MarketsPageContent({
         .from("price_stats")
         .select(DASHBOARD_PRICE_CARD_SELECT)
         .eq("game_id", game.id)
+        .eq("cards.region", "en")
         .not("chg_1d", "is", null)
         .order("chg_1d", { ascending: false })
         .limit(5)
@@ -130,6 +133,7 @@ export async function MarketsPageContent({
         .from("price_stats")
         .select(DASHBOARD_PRICE_CARD_SELECT)
         .eq("game_id", game.id)
+        .eq("cards.region", "en")
         .not("chg_1d", "is", null)
         .order("chg_1d", { ascending: true })
         .limit(5)
@@ -141,6 +145,7 @@ export async function MarketsPageContent({
         .from("cards")
         .select("rarity, price_stats!price_stats_card_game_fk!inner (market_avg, chg_1d)")
         .eq("game_id", game.id)
+        .eq("region", "en")
         .in("rarity", PREMIUM_RARITIES)
     ),
 
@@ -181,6 +186,7 @@ export async function MarketsPageContent({
         .from("cards")
         .select("id", { count: "exact", head: true })
         .eq("game_id", game.id)
+        .eq("region", "en")
     ),
   ]);
 
@@ -333,6 +339,7 @@ export async function MarketsPageContent({
         .from("cards")
         .select("character_id, rarity, price_stats!price_stats_card_game_fk!inner (market_avg, chg_1d)")
         .eq("game_id", game.id)
+        .eq("region", "en")
         .in("character_id", charIds)
     );
 

@@ -2,20 +2,26 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { resolveOnePieceSyncGame } from "@/lib/games/one-piece/sync-scope";
 import { fetchViaScrapfly } from "@/lib/scrapfly";
-import { yuyuteiSetUrl, parseYuyuteiListing } from "@/lib/yuyutei";
+import {
+  yuyuteiSetUrl,
+  parseYuyuteiListing,
+  parseYuyuteiSetList,
+  isValidCardNumber,
+  jpRarityBase,
+  type YuyuteiRow,
+} from "@/lib/yuyutei";
 import { buildJpCardMatcher, type MatchCardRow } from "@/lib/jp-card-match";
 
 // Vercel Hobby: 10s default, this raises it to 60s
 export const maxDuration = 60;
 
-// Yuyu-tei uses lowercase set codes that match our OP/EB/PRB booster codes.
-const SET_CODE_PATTERN = /^(OP|EB|PRB)\d+$/i;
+// Any set page carries the full vers[] set list, so we bootstrap discovery from
+// one stable page and derive the whole set list from it (no hardcoded array).
+const DISCOVERY_URL = yuyuteiSetUrl("op01");
 
-// One set page = one Scrapfly call (all cards + prices in one static fetch).
 const DEFAULT_SET_LIMIT = 2;
 const MAX_SET_LIMIT = 6;
 const CALL_DELAY_MS = 500;
-
 const CURSOR_KEY = "jp_prices_sync_current";
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -35,9 +41,39 @@ function todayUtc(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-interface SetRow {
-  code: string;
-  name: string | null;
+function prefixFromCardNumber(num: string): string | null {
+  const s = String(num).toUpperCase();
+  const m = s.match(/^([A-Z]+\d+)-/);
+  if (m) return m[1];
+  const p = s.match(/^([A-Z]+)-/);
+  return p ? p[1] : null;
+}
+
+type ServiceClient = ReturnType<typeof createServiceClient>;
+
+interface CursorState {
+  nextOffset?: number;
+  totalSets?: number;
+  completedCycles?: number;
+  lastRunAt?: string;
+  lastProcessed?: number;
+  lastError?: string | null;
+}
+
+interface JpCardInsert {
+  game_id: string;
+  card_image_id: string;
+  card_number: string;
+  name: string;
+  name_base: string | null;
+  variant_label: string | null;
+  rarity: string | null;
+  region: string;
+  set_id: string | null;
+  image_url: string | null;
+  image_url_small: string | null;
+  game_payload: unknown;
+  image_mirror_status: string;
 }
 
 interface JpPriceUpsert {
@@ -60,27 +96,16 @@ interface JpPriceUpsert {
   raw: unknown;
 }
 
-interface CursorState {
-  nextOffset?: number;
-  totalSets?: number;
-  completedCycles?: number;
-  lastRunAt?: string;
-  lastProcessed?: number;
-  lastError?: string | null;
+function isRegionColumnMissing(error: { code?: string; message?: string } | null | undefined): boolean {
+  return Boolean(error?.code === "PGRST204" || error?.message?.toLowerCase().includes("region"));
 }
-
-type ServiceClient = ReturnType<typeof createServiceClient>;
 
 function isMissingTableError(error: { code?: string; message?: string } | null | undefined): boolean {
   return Boolean(error?.code === "42P01" || error?.message?.includes("jp_prices"));
 }
 
 async function readCursor(supabase: ServiceClient): Promise<{ state: CursorState; error?: string }> {
-  const { data, error } = await supabase
-    .from("sync_state")
-    .select("state")
-    .eq("key", CURSOR_KEY)
-    .maybeSingle();
+  const { data, error } = await supabase.from("sync_state").select("state").eq("key", CURSOR_KEY).maybeSingle();
   if (error) {
     const message = error.message ?? "sync_state read failed";
     if (error.code === "42P01" || message.includes("sync_state")) {
@@ -98,7 +123,6 @@ async function writeCursor(supabase: ServiceClient, state: CursorState): Promise
   return error ? error.message ?? "sync_state write failed" : null;
 }
 
-// Page through all catalog cards once so the matcher can be built in memory.
 async function loadAllCards(supabase: ServiceClient, gameId: string): Promise<MatchCardRow[]> {
   const all: MatchCardRow[] = [];
   const PAGE = 1000;
@@ -118,6 +142,36 @@ async function loadAllCards(supabase: ServiceClient, gameId: string): Promise<Ma
   return all;
 }
 
+function buildJpCard(row: YuyuteiRow, gameId: string, cardImageId: string, setId: string | null): JpCardInsert {
+  const nameBase = row.name.replace(/\s*[（(][^）)]*[)）]\s*/g, " ").replace(/\s+/g, " ").trim();
+  return {
+    game_id: gameId,
+    card_image_id: cardImageId,
+    card_number: row.cardNumber,
+    name: row.name,
+    name_base: nameBase || null,
+    variant_label: row.variantLabel || null,
+    rarity: jpRarityBase(row.rarity) || null,
+    region: "jp",
+    set_id: setId,
+    image_url: row.imageUrl,
+    image_url_small: null,
+    game_payload: { card: {} },
+    image_mirror_status: "external",
+  };
+}
+
+interface SetStat {
+  code: string;
+  parsed: number;
+  matchedEn: number;
+  jpCreated: number;
+  jpPendingV45: number;
+  unmatched: number;
+  upserted: number;
+  error?: string;
+}
+
 // ---------------------------------------------------------------------------
 // GET|POST /api/sync/jp-prices
 //   ?limit=N    sets to process this run (default 2, max 6)
@@ -125,21 +179,22 @@ async function loadAllCards(supabase: ServiceClient, gameId: string): Promise<Ma
 //   ?reset=1    (cursor mode) restart at set index 0
 //   ?offset=N   stateless one-shot at an explicit set index (ignored in cursor mode)
 //   ?secret=…   or Authorization: Bearer <CRON_SECRET>
+//
+// Set list is auto-discovered from Yuyu-tei each run — new sets appear on their
+// own. Yuyu-tei rows are matched to EN cards by (card_number, variantKey);
+// valid-but-unmatched rows (incl. super-parallels / signed) become region='jp'
+// cards. DON!! / numberless rows stay unmatched and are never auto-created.
 // ---------------------------------------------------------------------------
 
 async function syncJpPrices(request: Request) {
   const { searchParams } = new URL(request.url);
 
   const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) {
-    return NextResponse.json({ error: "CRON_SECRET is not set" }, { status: 500 });
-  }
+  if (!cronSecret) return NextResponse.json({ error: "CRON_SECRET is not set" }, { status: 500 });
   const isAuthorized =
     request.headers.get("authorization") === `Bearer ${cronSecret}` ||
     searchParams.get("secret") === cronSecret;
-  if (!isAuthorized) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isAuthorized) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   if (!process.env.SCRAPFLY_API_KEY) {
     return NextResponse.json({ error: "SCRAPFLY_API_KEY is not set" }, { status: 500 });
@@ -152,19 +207,17 @@ async function syncJpPrices(request: Request) {
   }
   const { game } = gameResult;
 
-  // Build the Yuyu-tei-compatible set list from our catalog.
-  const { data: setsData, error: setsErr } = await supabase
-    .from("sets")
-    .select("code, name")
-    .eq("game_id", game.id)
-    .order("code");
-  if (setsErr) {
-    return NextResponse.json({ error: setsErr.message }, { status: 500 });
+  // --- Auto-discovery: derive the full set list from Yuyu-tei this run. ---
+  let discoveryHtml: string;
+  try {
+    discoveryHtml = await fetchViaScrapfly(DISCOVERY_URL, { asp: true, country: "jp" });
+  } catch (err) {
+    return NextResponse.json({ error: `discovery fetch: ${err instanceof Error ? err.message : String(err)}` }, { status: 502 });
   }
-  const setList = ((setsData ?? []) as SetRow[]).filter((s) => s.code && SET_CODE_PATTERN.test(s.code));
-  const totalSets = setList.length;
+  const discovered = parseYuyuteiSetList(discoveryHtml);
+  const totalSets = discovered.length;
   if (totalSets === 0) {
-    return NextResponse.json({ provider: "scrapfly-yuyutei", game: game.slug, totalSets: 0, message: "No OP/EB/PRB sets found." });
+    return NextResponse.json({ error: "Set discovery returned no codes (Yuyu-tei markup may have changed)." }, { status: 502 });
   }
 
   const limit = clampInt(searchParams.get("limit"), DEFAULT_SET_LIMIT, 1, MAX_SET_LIMIT);
@@ -182,46 +235,97 @@ async function syncJpPrices(request: Request) {
     startOffset = normalizeIndex(clampInt(searchParams.get("offset"), 0, 0, Number.MAX_SAFE_INTEGER), totalSets);
   }
 
-  const setsToProcess = setList.slice(startOffset, startOffset + limit);
+  const setsToProcess = discovered.slice(startOffset, startOffset + limit);
 
-  // Build the matcher once for the whole run.
+  // Matcher (EN-only) + set-prefix → set_id map, built once.
   const matcher = buildJpCardMatcher(await loadAllCards(supabase, game.id));
-  const snapshotDate = todayUtc();
+  const { data: setsData } = await supabase.from("sets").select("id, code").eq("game_id", game.id);
+  const prefixToSetId: Record<string, string> = {};
+  for (const s of (setsData ?? []) as { id: string; code: string | null }[]) {
+    if (s.code) prefixToSetId[s.code.toUpperCase()] = s.id;
+  }
 
+  const snapshotDate = todayUtc();
+  const htmlCache: Record<string, string> = { [DISCOVERY_URL]: discoveryHtml };
   const errors: string[] = [];
-  const perSet: Array<{
-    code: string;
-    parsed: number;
-    matched: number;
-    unmatched: number;
-    upserted: number;
-    error?: string;
-  }> = [];
+  const perSet: SetStat[] = [];
+  let regionMissing = false;
   let missingTable = false;
 
   for (let i = 0; i < setsToProcess.length; i++) {
-    const set = setsToProcess[i];
+    const code = setsToProcess[i];
+    const stat: SetStat = { code, parsed: 0, matchedEn: 0, jpCreated: 0, jpPendingV45: 0, unmatched: 0, upserted: 0 };
     if (i > 0) await delay(CALL_DELAY_MS);
 
-    const stat = { code: set.code, parsed: 0, matched: 0, unmatched: 0, upserted: 0 } as (typeof perSet)[number];
     try {
-      const html = await fetchViaScrapfly(yuyuteiSetUrl(set.code), { asp: true, country: "jp" });
-      const listings = parseYuyuteiListing(html);
-      stat.parsed = listings.length;
+      const url = yuyuteiSetUrl(code);
+      const html = htmlCache[url] ?? (await fetchViaScrapfly(url, { asp: true, country: "jp" }));
+      const rows = parseYuyuteiListing(html);
+      stat.parsed = rows.length;
 
+      // Plan each row: EN match, JP-create, or unmatched.
+      const plans: Array<{ row: YuyuteiRow; cardId: string | null; cardImageId: string | null; method: string; jpPending?: boolean }> = [];
+      const jpInserts = new Map<string, JpCardInsert>();
+
+      for (const row of rows) {
+        if (!isValidCardNumber(row.cardNumber)) {
+          plans.push({ row, cardId: null, cardImageId: null, method: "unmatched" });
+          continue;
+        }
+        if (!row.jpExclusive) {
+          const m = matcher.match(row.cardNumber, row.variant);
+          if (m) {
+            plans.push({ row, cardId: m.card.id, cardImageId: m.card.card_image_id, method: m.method });
+            continue;
+          }
+        }
+        // JP-exclusive: forced variant, or valid number with no EN match.
+        const cid = row.sourceCardId.split("/")[1] ?? row.sourceCardId;
+        const cardImageId = `${row.cardNumber}_jp_${cid}`;
+        const prefix = prefixFromCardNumber(row.cardNumber);
+        const setId = (prefix && prefixToSetId[prefix]) || null;
+        jpInserts.set(cardImageId, buildJpCard(row, game.id, cardImageId, setId));
+        plans.push({ row, cardId: null, cardImageId, method: "jp-created", jpPending: true });
+      }
+
+      // Create/refresh JP-exclusive cards, then resolve their ids onto the plans.
+      if (jpInserts.size > 0 && !regionMissing) {
+        const { data, error } = await supabase
+          .from("cards")
+          .upsert(Array.from(jpInserts.values()), { onConflict: "game_id,card_image_id" })
+          .select("id, card_image_id");
+        if (error) {
+          if (isRegionColumnMissing(error)) {
+            regionMissing = true;
+            stat.error = "region column missing — apply schema-migration-v45";
+          } else {
+            stat.error = `jp card upsert: ${error.message}`;
+            errors.push(`${code}: ${stat.error}`);
+          }
+        } else {
+          const idByImg = new Map((data ?? []).map((c: { id: string; card_image_id: string }) => [c.card_image_id, c.id]));
+          for (const p of plans) if (p.jpPending) p.cardId = idByImg.get(p.cardImageId!) ?? null;
+        }
+      }
+
+      // Tally + build jp_prices rows (dedupe by source_card_id).
       const byId = new Map<string, JpPriceUpsert>();
-      for (const row of listings) {
-        const m = matcher.match(row.cardNumber, row.variant);
-        if (m) stat.matched++;
-        else stat.unmatched++;
+      for (const p of plans) {
+        if (p.method === "unmatched") stat.unmatched++;
+        else if (p.method === "jp-created") {
+          if (p.cardId) stat.jpCreated++;
+          else stat.jpPendingV45++;
+        } else stat.matchedEn++;
+
+        const row = p.row;
         byId.set(row.sourceCardId, {
           game_id: game.id,
-          card_id: m?.card.id ?? null,
-          card_image_id: m?.card.card_image_id ?? null,
+          card_id: p.cardId,
+          card_image_id: p.cardImageId,
           source: "yuyutei",
           source_card_id: row.sourceCardId,
           source_url: row.sourceUrl,
-          set_code: set.code,
+          set_code: prefixFromCardNumber(row.cardNumber) ?? code.toUpperCase(),
           card_number: row.cardNumber,
           card_name: row.name,
           rarity: row.rarity,
@@ -229,32 +333,32 @@ async function syncJpPrices(request: Request) {
           price_jpy: row.priceJpy,
           in_stock: row.inStock,
           image_url: row.imageUrl,
-          match_method: m?.method ?? "unmatched",
+          match_method: p.method,
           snapshot_date: snapshotDate,
           raw: row,
         });
       }
 
-      const rows = Array.from(byId.values());
-      if (rows.length > 0 && !missingTable) {
+      const priceRows = Array.from(byId.values());
+      if (priceRows.length > 0 && !missingTable) {
         const { error: upErr } = await supabase
           .from("jp_prices")
-          .upsert(rows, { onConflict: "source,source_card_id,snapshot_date" });
+          .upsert(priceRows, { onConflict: "source,source_card_id,snapshot_date" });
         if (upErr) {
           if (isMissingTableError(upErr)) {
             missingTable = true;
-            stat.error = "jp_prices table missing — run schema-migration-v44-jp-prices.sql";
+            stat.error = "jp_prices table missing — run schema-migration-v44";
           } else {
-            stat.error = upErr.message;
-            errors.push(`${set.code}: ${upErr.message}`);
+            stat.error = (stat.error ? stat.error + "; " : "") + upErr.message;
+            errors.push(`${code}: ${upErr.message}`);
           }
         } else {
-          stat.upserted = rows.length;
+          stat.upserted = priceRows.length;
         }
       }
     } catch (err) {
       stat.error = err instanceof Error ? err.message : String(err);
-      errors.push(`${set.code}: ${stat.error}`);
+      errors.push(`${code}: ${stat.error}`);
     }
     perSet.push(stat);
   }
@@ -264,7 +368,6 @@ async function syncJpPrices(request: Request) {
   let wrapped = false;
   let completedCycles = cursorState.completedCycles ?? 0;
   const processed = setsToProcess.length;
-
   if (cursorMode) {
     const advanced = startOffset + processed;
     wrapped = processed === 0 || advanced >= totalSets;
@@ -284,13 +387,15 @@ async function syncJpPrices(request: Request) {
   }
 
   const totals = perSet.reduce(
-    (acc, s) => ({
-      parsed: acc.parsed + s.parsed,
-      matched: acc.matched + s.matched,
-      unmatched: acc.unmatched + s.unmatched,
-      upserted: acc.upserted + s.upserted,
+    (a, s) => ({
+      parsed: a.parsed + s.parsed,
+      matchedEn: a.matchedEn + s.matchedEn,
+      jpCreated: a.jpCreated + s.jpCreated,
+      jpPendingV45: a.jpPendingV45 + s.jpPendingV45,
+      unmatched: a.unmatched + s.unmatched,
+      upserted: a.upserted + s.upserted,
     }),
-    { parsed: 0, matched: 0, unmatched: 0, upserted: 0 }
+    { parsed: 0, matchedEn: 0, jpCreated: 0, jpPendingV45: 0, unmatched: 0, upserted: 0 }
   );
 
   return NextResponse.json({
@@ -298,18 +403,22 @@ async function syncJpPrices(request: Request) {
     game: game.slug,
     mode: cursorMode ? "cursor" : "manual",
     snapshotDate,
+    discoveredSets: totalSets,
     catalogCards: matcher.size,
     startOffset,
     limit,
-    totalSets,
-    processedSets: processed,
-    setsProcessed: setsToProcess.map((s) => s.code),
+    setsProcessed: setsToProcess,
     ...totals,
     nextOffset,
     wrapped,
     completedCycles,
+    regionColumnMissing: regionMissing,
     missingTable,
-    migrationHint: missingTable ? "Apply schema-migration-v44-jp-prices.sql in Supabase, then re-run." : undefined,
+    migrationHint: regionMissing
+      ? "Apply schema-migration-v45-region-aware-cards.sql, then re-run to link JP-exclusive cards."
+      : missingTable
+        ? "Apply schema-migration-v44-jp-prices.sql."
+        : undefined,
     errors: errors.length,
     errorSample: errors.slice(0, 8),
     perSet,

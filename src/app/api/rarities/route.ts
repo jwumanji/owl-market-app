@@ -244,6 +244,7 @@ async function loadCatalogOnlyRarities(supabase: SupabaseServiceClient, gameId: 
           sets!cards_set_game_fk (code, name)
         `)
         .eq("game_id", gameId)
+        .eq("region", "en")
         .in("rarity_id", rarityIds)
         .order("card_number")
         .range(from, to)
@@ -340,6 +341,7 @@ async function loadOnePieceRarityIndex(supabase: SupabaseServiceClient, gameId: 
         .from("cards")
         .select("rarity, set_id")
         .eq("game_id", gameId)
+        .eq("region", "en")
         .order("id")
         .range(from, to)
     ),
@@ -367,6 +369,7 @@ async function loadOnePieceRarityIndex(supabase: SupabaseServiceClient, gameId: 
           )
         `)
         .eq("game_id", gameId)
+        .eq("region", "en")
         .not("price_stats.tcg_market", "is", null)
         .order("id")
         .range(from, to)

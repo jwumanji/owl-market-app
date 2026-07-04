@@ -73,6 +73,10 @@ export function buildJpCardMatcher(cards: MatchCardRow[]): JpCardMatcher {
   const byNumber = new Map<string, MatchCardRow[]>();
 
   for (const c of cards) {
+    // EN-only matcher: JP-exclusive cards carry a "_jp_" card_image_id and must
+    // never be matched as an EN variant. (Marker-based so the sync doesn't need
+    // the region column, keeping it runnable before migration v45 is applied.)
+    if (c.card_image_id?.includes("_jp_")) continue;
     const num = normNumber(c.card_number);
     if (!num) continue;
     const nvKey = `${num}|${cardVariantKey(c)}`;

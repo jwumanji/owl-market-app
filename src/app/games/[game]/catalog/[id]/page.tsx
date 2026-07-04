@@ -129,6 +129,7 @@ async function loadCardDetail(gameRouteSlug: string, rawId: string): Promise<Det
         sets!cards_set_game_fk (id, slug, code, name, year)
       `)
       .eq("game_id", game.id)
+      .eq("region", "en")
       .limit(1);
 
     cardQuery = isUuid(id) ? cardQuery.eq("id", id) : cardQuery.eq("card_image_id", id);

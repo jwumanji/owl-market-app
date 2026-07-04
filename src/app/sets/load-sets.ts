@@ -222,6 +222,7 @@ async function loadCatalogOnlySets(
           game_payload
         `)
         .eq("game_id", game.id)
+        .eq("region", "en")
         .in("set_id", setIds)
         .order("set_id")
         .order("card_number")
@@ -359,6 +360,7 @@ async function loadSetsUncached(options: {
         )
       `)
       .eq("game_id", game.id)
+      .eq("region", "en")
       .order("id", { ascending: true })
       .range(from, from + pageSize - 1);
 

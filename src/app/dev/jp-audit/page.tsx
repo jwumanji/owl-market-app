@@ -21,10 +21,15 @@ interface SetRel {
 
 interface PickerCardRow {
   id: string;
+  card_image_id: string | null;
   name: string | null;
   card_number: string | null;
   rarity: string | null;
   sets: JoinedRelation<{ code: string | null }>;
+}
+
+function regionOf(cardImageId: string | null | undefined): string {
+  return cardImageId?.includes("_jp_") ? "jp" : "en";
 }
 
 interface CardDetail {
@@ -41,6 +46,7 @@ interface CardDetail {
 
 interface JpPriceRow {
   source_card_id: string;
+  card_image_id: string | null;
   snapshot_date: string | null;
   price_jpy: number | null;
   variant: string | null;
@@ -86,7 +92,7 @@ export default async function JpAuditPage({
   if (cardIds.length > 0) {
     const { data: cardRows } = await supabase
       .from("cards")
-      .select("id, name, card_number, rarity, sets!cards_set_game_fk ( code )")
+      .select("id, card_image_id, name, card_number, rarity, sets!cards_set_game_fk ( code )")
       .in("id", cardIds)
       .order("name");
     pickerCards = ((cardRows ?? []) as PickerCardRow[]).map((c) => ({
@@ -95,6 +101,7 @@ export default async function JpAuditPage({
       card_number: c.card_number,
       rarity: c.rarity,
       setCode: firstRelation(c.sets)?.code ?? null,
+      region: regionOf(c.card_image_id),
     }));
   }
 
@@ -116,7 +123,7 @@ export default async function JpAuditPage({
     if (card) {
       const { data: priceRows } = await supabase
         .from("jp_prices")
-        .select("source_card_id, snapshot_date, price_jpy, variant, rarity, card_name, in_stock, match_method, source_url")
+        .select("source_card_id, card_image_id, snapshot_date, price_jpy, variant, rarity, card_name, in_stock, match_method, source_url")
         .eq("card_id", selectedId)
         .order("snapshot_date", { ascending: false })
         .order("price_jpy", { ascending: false, nullsFirst: false })
@@ -189,6 +196,14 @@ export default async function JpAuditPage({
                         <dd className="text-text">{card?.rarity ?? "—"}</dd>
                         <dt className="text-text-3">set</dt>
                         <dd className="text-text">{[set?.code, set?.name].filter(Boolean).join(" · ") || "—"}</dd>
+                        <dt className="text-text-3">region</dt>
+                        <dd className="text-text">
+                          {regionOf(card?.card_image_id) === "jp" ? (
+                            <span className="rounded border border-owl px-1 text-xs font-bold uppercase text-owl">JP · auto-created</span>
+                          ) : (
+                            "EN"
+                          )}
+                        </dd>
                       </dl>
                     </div>
                   </div>
@@ -215,6 +230,7 @@ export default async function JpAuditPage({
                             <th className="px-3 py-2 font-semibold">variant</th>
                             <th className="px-3 py-2 font-semibold">rarity</th>
                             <th className="px-3 py-2 font-semibold">stock</th>
+                            <th className="px-3 py-2 font-semibold">match</th>
                             <th className="px-3 py-2 font-semibold">name / link</th>
                           </tr>
                         </thead>
@@ -226,6 +242,13 @@ export default async function JpAuditPage({
                               <td className="whitespace-nowrap px-3 py-2 text-text">{p.variant || "base"}</td>
                               <td className="whitespace-nowrap px-3 py-2 text-text-2">{p.rarity ?? "—"}</td>
                               <td className="whitespace-nowrap px-3 py-2 text-text-2">{p.in_stock ? "✓" : "✗"}</td>
+                              <td className="whitespace-nowrap px-3 py-2">
+                                {p.match_method === "jp-created" ? (
+                                  <span className="rounded border border-owl px-1 text-xs text-owl">jp-created</span>
+                                ) : (
+                                  <span className="text-text-3">{p.match_method ?? "—"}</span>
+                                )}
+                              </td>
                               <td className="max-w-[320px] truncate px-3 py-2 text-text-2">
                                 {p.source_url ? (
                                   <a href={p.source_url} target="_blank" rel="noopener noreferrer" className="text-owl hover:underline">
