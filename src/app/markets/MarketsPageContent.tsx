@@ -143,6 +143,7 @@ export async function MarketsPageContent({
         .from("cards")
         .select("rarity, price_stats!price_stats_card_game_fk!inner (market_avg, chg_1d)")
         .eq("game_id", game.id)
+        .eq("region", "en")
         .in("rarity", PREMIUM_RARITIES)
     ),
 
@@ -163,6 +164,7 @@ export async function MarketsPageContent({
         .from("cards")
         .select("character_id, rarity, price_stats!price_stats_card_game_fk!inner (market_avg, chg_1d)")
         .eq("game_id", game.id)
+        .eq("region", "en")
         .in("character_id", charList.map((c) => c.id));
       return { charList, charCards: (charCards ?? []) as Record<string, unknown>[] };
     }),
@@ -194,6 +196,7 @@ export async function MarketsPageContent({
         .from("cards")
         .select("id", { count: "exact", head: true })
         .eq("game_id", game.id)
+        .eq("region", "en")
     ),
   ]);
 

@@ -122,6 +122,7 @@ async function loadCardCoreUncached(options: {
       )
     `)
     .eq("game_id", game.id)
+    .eq("region", "en")
     .eq("card_image_id", id)
     .limit(1)
     .single();
