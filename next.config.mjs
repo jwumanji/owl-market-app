@@ -22,7 +22,10 @@ const nextConfig = {
     // 384 gives the 300px card-detail hero a near-exact rung at 1x DPR
     // (otherwise the srcset jumps from 256 straight to the 640 device size).
     imageSizes: [32, 48, 64, 96, 128, 256, 384],
-    minimumCacheTTL: 86400,
+    // 31 days: mirrored card art is effectively immutable (re-mirrors are
+    // rare), and a cold /_next/image encode costs ~2.3s on the LCP path —
+    // once the warm cron has swept a transform it should stay warm.
+    minimumCacheTTL: 2678400,
     remotePatterns: [
       ...(supabaseStorageHostname
         ? [
