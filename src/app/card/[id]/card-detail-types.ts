@@ -1,3 +1,5 @@
+import type { EbayAvgStats } from "@/lib/ebay-stats";
+
 export interface CardData {
   id: string;
   card_image_id: string;
@@ -44,6 +46,29 @@ export interface PricePoint {
   tcg_market: number;
   market_avg: number;
   recorded_at: string;
+}
+
+export interface JpPriceData {
+  price_jpy: number;
+  snapshot_date: string;
+  source_url: string | null;
+}
+
+export interface EbaySaleData {
+  sold_at: string | null;
+  sale_price: number;
+  grader: string | null;
+  grade: number | null;
+  sale_type: string | null;
+  ebay_url: string | null;
+}
+
+// Below-the-fold market extras (JP snapshot + eBay solds) — streamed behind
+// Suspense like the price history, so they never gate first byte.
+export interface CardMarketExtrasPayload {
+  jpPrice: JpPriceData | null;
+  ebayRecent: EbaySaleData[];
+  ebayStats: EbayAvgStats;
 }
 
 // Above-the-fold payload: everything except price history, so the page can

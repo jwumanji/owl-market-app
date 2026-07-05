@@ -1,5 +1,9 @@
 import CardDetailClient from "@/app/card/[id]/CardDetailClient";
-import { loadCardCore, loadCardHistory } from "@/app/card/[id]/card-detail-data";
+import {
+  loadCardCore,
+  loadCardHistory,
+  loadCardMarketExtras,
+} from "@/app/card/[id]/card-detail-data";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gameQueryValue } from "@/lib/game-routes";
 import { createServiceClient } from "@/lib/supabase-server";
@@ -87,10 +91,19 @@ export default async function GameCardDetailPage(
       })
     : null;
 
+  // Same streaming treatment for the JP price + eBay solds blocks.
+  const extrasPromise = result.ok
+    ? loadCardMarketExtras({
+        gameId: result.data.game.id,
+        cardId: result.data.card.id,
+      })
+    : null;
+
   return (
     <CardDetailClient
       data={result.ok ? result.data : null}
       historyPromise={historyPromise}
+      extrasPromise={extrasPromise}
       error={result.ok ? null : result.message}
       gameRouteSlug={params.game}
     />

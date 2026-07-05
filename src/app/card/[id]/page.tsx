@@ -1,5 +1,9 @@
 import CardDetailClient from "./CardDetailClient";
-import { loadCardCore, loadCardHistory } from "./card-detail-data";
+import {
+  loadCardCore,
+  loadCardHistory,
+  loadCardMarketExtras,
+} from "./card-detail-data";
 import {
   DEFAULT_PUBLIC_GAME_DB_SLUG,
   DEFAULT_PUBLIC_GAME_ROUTE_SLUG,
@@ -39,10 +43,19 @@ export default async function CardDetailPage(
       })
     : null;
 
+  // Same streaming treatment for the JP price + eBay solds blocks.
+  const extrasPromise = result.ok
+    ? loadCardMarketExtras({
+        gameId: result.data.game.id,
+        cardId: result.data.card.id,
+      })
+    : null;
+
   return (
     <CardDetailClient
       data={result.ok ? result.data : null}
       historyPromise={historyPromise}
+      extrasPromise={extrasPromise}
       error={result.ok ? null : result.message}
       gameRouteSlug={DEFAULT_PUBLIC_GAME_ROUTE_SLUG}
     />
