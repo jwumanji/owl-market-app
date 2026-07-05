@@ -23,6 +23,11 @@ const PriceChart = lazy(() => import("./PriceChartClient"));
 // TODO(fx): hardcoded JPY→USD rate — swap for a live FX API once one is wired.
 const JPY_PER_USD = 155;
 
+// Past this the EN and JP rows are almost certainly different printings (the
+// JP matcher can pair a promo EN card with the base JP version), so the
+// spread is noise — flag it instead of presenting it as signal.
+const SPREAD_MISMATCH_THRESHOLD_PCT = 300;
+
 function filterByPeriod(history: PricePoint[], period: Period): PricePoint[] {
   if (period === "max") return history;
   const now = Date.now();
@@ -480,6 +485,8 @@ function JpPriceBlock({
   const jpUsd = jp.price_jpy / JPY_PER_USD;
   // Positive spread = EN trades above JP (an EN premium).
   const spread = spreadPct(enMarketPrice, jpUsd);
+  const spreadSuspect =
+    spread != null && Math.abs(spread) > SPREAD_MISMATCH_THRESHOLD_PCT;
   return (
     <div className="mt-3.5 bg-bg-2 border-[1.5px] border-ink rounded-c-md px-5 py-4">
       <div className="font-mono-2 font-semibold text-[11px] tracking-[0.12em] uppercase text-ink-2 mb-2">
@@ -517,7 +524,16 @@ function JpPriceBlock({
               <span className="text-ink-3 text-[11px] mr-1.5 uppercase tracking-[0.06em]">
                 EN vs JP
               </span>
-              <span className={pctColor(spread)}>{formatPct(spread)}</span>
+              {spreadSuspect ? (
+                <span
+                  className="text-gold text-[12px]"
+                  title={`Spread ${formatPct(spread)} exceeds ±${SPREAD_MISMATCH_THRESHOLD_PCT}% — the JP row may be a different printing`}
+                >
+                  possible variant mismatch
+                </span>
+              ) : (
+                <span className={pctColor(spread)}>{formatPct(spread)}</span>
+              )}
             </div>
           </>
         )}

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { resolveOnePieceSyncGame } from "@/lib/games/one-piece/sync-scope";
 import { fetchSoldListings } from "@/lib/scrapingdog-ebay";
+import { parseGrade } from "@/lib/ebay-stats";
 
 // Vercel Hobby: 10s default, this raises it to 60s
 export const maxDuration = 60;
@@ -34,27 +35,8 @@ function normalizeIndex(index: number, total: number): number {
   return ((Math.floor(index) % total) + total) % total;
 }
 
-// Extract grader + numeric grade from a listing title, e.g.
-//   "2023 PSA 10 Monkey D Luffy OP01-024"   → { grader: "PSA", grade: 10 }
-//   "One Piece BGS 9.5 Shanks Manga Rare"    → { grader: "BGS", grade: 9.5 }
-//   "Luffy OP01-024 Alt Art NM"              → { grader: null, grade: null }
-function parseGrade(title: string): {
-  grader: string | null;
-  grade: number | null;
-  sale_type: string;
-} {
-  const match = title.match(
-    /\b(PSA|BGS|CGC|SGC|TAG|ACE)\s*[- ]?\s*(10(?:\.0)?|\d(?:\.5)?)\b/i
-  );
-  if (match) {
-    return {
-      grader: match[1].toUpperCase(),
-      grade: Number(match[2]),
-      sale_type: "graded",
-    };
-  }
-  return { grader: null, grade: null, sale_type: "raw" };
-}
+// parseGrade (grader + numeric grade from a listing title) lives in
+// @/lib/ebay-stats next to the raw/graded split that depends on its output.
 
 // Parse Scrapingdog's sold-date string ("Sold Oct 12, 2024" / "Oct 12, 2024")
 // into an ISO timestamp. Returns null on anything Date can't parse — we never

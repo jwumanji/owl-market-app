@@ -23,6 +23,12 @@ type SaleInput = {
 };
 
 type StatsModule = {
+  KNOWN_GRADERS: readonly string[];
+  parseGrade: (title: string) => {
+    grader: string | null;
+    grade: number | null;
+    sale_type: string;
+  };
   isGradedSale: (sale: Pick<SaleInput, "sale_type" | "grader">) => boolean;
   computeEbayAvgStats: (rows: SaleInput[]) => {
     rawAvg: number | null;
@@ -45,6 +51,51 @@ function loadStats() {
   );
   return moduleStub.exports as StatsModule;
 }
+
+test("parseGrade recognizes every known grader, including CGC, TAG, and ARS", () => {
+  const { KNOWN_GRADERS, parseGrade } = loadStats();
+
+  for (const grader of ["CGC", "TAG", "ARS"]) {
+    assert.ok(KNOWN_GRADERS.includes(grader), `${grader} missing from KNOWN_GRADERS`);
+  }
+
+  const cases: Array<[string, string, number]> = [
+    ["2023 PSA 10 Monkey D Luffy OP01-024", "PSA", 10],
+    ["One Piece BGS 9.5 Shanks Manga Rare", "BGS", 9.5],
+    ["CGC 9.5 Nami OP01-016 Alt Art", "CGC", 9.5],
+    ["TAG 10 Roronoa Zoro OP01-025", "TAG", 10],
+    ["ARS 10 Portgas D Ace OP02-013", "ARS", 10],
+    ["ARS10 Yamato OP06-118 Japanese", "ARS", 10], // no-space form common on JP listings
+    ["SGC 8.5 Kaido OP04-044", "SGC", 8.5],
+    ["ACE 10 Sanji OP03-076", "ACE", 10],
+    ["psa 10 lowercase title", "PSA", 10],
+    ["Luffy PSA-10 hyphenated", "PSA", 10],
+  ];
+
+  for (const [title, grader, grade] of cases) {
+    const parsed = parseGrade(title);
+    assert.equal(parsed.grader, grader, title);
+    assert.equal(parsed.grade, grade, title);
+    assert.equal(parsed.sale_type, "graded", title);
+  }
+});
+
+test("parseGrade falls back to raw on ungraded or malformed titles", () => {
+  const { parseGrade } = loadStats();
+
+  for (const title of [
+    "Luffy OP01-024 Alt Art NM",
+    "PSA 100 nonsense run-on", // trailing \b must reject three-digit grades
+    "Case for PSA submission",
+    "TCG card lot",
+    "",
+  ]) {
+    const parsed = parseGrade(title);
+    assert.equal(parsed.grader, null, title);
+    assert.equal(parsed.grade, null, title);
+    assert.equal(parsed.sale_type, "raw", title);
+  }
+});
 
 test("raw and graded averages never blend — a PSA 10 cannot skew the raw avg", () => {
   const { computeEbayAvgStats } = loadStats();
