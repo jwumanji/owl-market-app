@@ -29,7 +29,24 @@ function filterByPeriod(history: PricePoint[], period: Period): PricePoint[] {
 function formatAthDate(dateStr: string | null): string {
   if (!dateStr) return "—";
   const d = new Date(dateStr);
-  return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+  // timeZone pinned: the page prerenders in UTC, and a viewer in another
+  // timezone hydrating a boundary date would otherwise produce a text
+  // mismatch — React 19 responds by client-rendering the whole root, which
+  // repaints the hero and re-fires LCP seconds late.
+  return d.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+}
+
+/* "3h ago" can never match between prerender time and hydration time, and an
+   unsuppressed text mismatch makes React 19 discard the server DOM (error
+   #418) — confirmed live as the card page's 2.2s LCP render delay.
+   suppressHydrationWarning keeps the server text through hydration; the
+   effect then swaps in the viewer-accurate label. */
+function TimeAgoLabel({ date }: { date: string }) {
+  const [clientLabel, setClientLabel] = useState<string | null>(null);
+  useEffect(() => {
+    setClientLabel(timeAgo(date));
+  }, [date]);
+  return <span suppressHydrationWarning>{clientLabel ?? timeAgo(date)}</span>;
 }
 
 export default function CardDetailClient({
@@ -162,7 +179,7 @@ export default function CardDetailClient({
             </div>
             {priceStats?.updated_at && (
               <div className="mt-2.5 font-mono-2 font-semibold text-[13px] text-ink-2">
-                Last updated {timeAgo(priceStats.updated_at)}
+                Last updated <TimeAgoLabel date={priceStats.updated_at} />
               </div>
             )}
           </div>
@@ -377,7 +394,13 @@ function HistoryNotice({
   promise: Promise<CardHistoryPayload>;
   period: Period;
 }) {
+  // filterByPeriod cuts on Date.now(), which differs between prerender and
+  // hydration — render the notice only after mount so the boundary can never
+  // mismatch. (Cosmetic label; popping in post-hydration is imperceptible.)
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const { priceHistory, priceHistorySynthetic } = use(promise);
+  if (!mounted) return null;
   if (!priceHistorySynthetic || filterByPeriod(priceHistory, period).length === 0) return null;
   return (
     <span className="font-mono-2 font-semibold text-[10px] text-ink-3 uppercase tracking-[0.1em]">
