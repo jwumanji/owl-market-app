@@ -29,6 +29,10 @@
       "schedule": "30 0,6,12,18 * * *"
     },
     {
+      "path": "/api/sync/jp-prices?game=one_piece&cursor=1",
+      "schedule": "30 */6 * * *"
+    },
+    {
       "path": "/api/warm?pages=0&imageCards=550&offset=0&widths=828",
       "schedule": "0 2 * * *"
     },

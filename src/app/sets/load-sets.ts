@@ -222,6 +222,7 @@ async function loadCatalogOnlySets(
           game_payload
         `)
         .eq("game_id", game.id)
+        .eq("region", "en")
         .in("set_id", setIds)
         .order("set_id")
         .order("card_number")
@@ -518,6 +519,7 @@ async function loadSetsUncached(options: {
         )
       `)
       .eq("game_id", game.id)
+      .eq("region", "en")
       .order("id", { ascending: true })
       .range(from, from + pageSize - 1);
 
@@ -723,6 +725,7 @@ async function enrichSetDetailUncached(
         game_payload
       `)
       .eq("game_id", game.id)
+      .eq("region", "en")
       .eq("set_id", setMeta.id)
       .order("card_number")
       .limit(CATALOG_SET_CARD_LIMIT);
@@ -769,6 +772,7 @@ async function enrichSetDetailUncached(
         )
       `)
       .eq("game_id", game.id)
+      .eq("region", "en")
       .in("printed_set_code", codes)
       .order("id", { ascending: true })
       .range(from, from + pageSize - 1);

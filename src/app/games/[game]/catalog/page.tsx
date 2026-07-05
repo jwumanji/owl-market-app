@@ -179,7 +179,8 @@ async function loadCatalogUncached(gameRouteSlug: string, searchParams: CatalogS
         game_payload,
         sets!cards_set_game_fk (slug, code, name)
       `, hasCardFilters ? { count: "planned" } : undefined)
-      .eq("game_id", game.id);
+      .eq("game_id", game.id)
+      .eq("region", "en");
 
     if (selectedSet) cardsQuery = cardsQuery.eq("set_id", selectedSet.id);
     if (selectedRarity?.id) cardsQuery = cardsQuery.eq("rarity_id", selectedRarity.id);

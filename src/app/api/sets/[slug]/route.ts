@@ -87,6 +87,7 @@ async function loadSetDetailData(options: {
         )
       `)
       .eq("game_id", game.id)
+      .eq("region", "en")
       .eq("set_id", set.id)
       .range(from, from + pageSize - 1);
 
