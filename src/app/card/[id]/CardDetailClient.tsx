@@ -3,15 +3,30 @@
 import { lazy, Suspense, use, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { formatPrice, formatPct, pctColor, timeAgo } from "@/lib/utils";
+import { formatPrice, formatPct, pctColor, spreadPct, timeAgo } from "@/lib/utils";
 import RarityBadge from "@/components/ui/RarityBadge";
-import { gamePath } from "@/lib/game-routes";
-import type { CardCorePayload, CardHistoryPayload, PricePoint } from "./card-detail-types";
+import { gamePath, gameQueryValue } from "@/lib/game-routes";
+import type {
+  CardCorePayload,
+  CardHistoryPayload,
+  CardMarketExtrasPayload,
+  EbaySaleData,
+  JpPriceData,
+  PricePoint,
+} from "./card-detail-types";
 
 const PERIODS = ["7d", "1m", "3m", "1y", "max"] as const;
 type Period = (typeof PERIODS)[number];
 
 const PriceChart = lazy(() => import("./PriceChartClient"));
+
+// TODO(fx): hardcoded JPY→USD rate — swap for a live FX API once one is wired.
+const JPY_PER_USD = 155;
+
+// Past this the EN and JP rows are almost certainly different printings (the
+// JP matcher can pair a promo EN card with the base JP version), so the
+// spread is noise — flag it instead of presenting it as signal.
+const SPREAD_MISMATCH_THRESHOLD_PCT = 300;
 
 function filterByPeriod(history: PricePoint[], period: Period): PricePoint[] {
   if (period === "max") return history;
@@ -292,14 +307,17 @@ export default function CardDetailClient({
             </div>
           )}
 
-          {/*
-            Recent-sales table from the mockup is intentionally deferred —
-            no per-sale data source exists today (TCGplayer has no sales-history
-            API). Future source: eBay sold-listings feed. Volume (7d) and PSA 10
-            population tiles are deferred for the same reason. Render the
-            Date / Grade / Source / Price table here using the mockup's
-            `.sales-table` styling once the feed lands.
-          */}
+          {/* JP price + eBay solds — fetched client-side near the viewport
+              (never during static generation: 4.4k prerendered pages × 3
+              queries each timed out the Vercel build). Blocks hide when
+              empty. */}
+          <MountNearViewport placeholder={null}>
+            <MarketExtrasSection
+              cardImageId={card.card_image_id}
+              gameRouteSlug={gameRouteSlug}
+              enMarketPrice={priceStats?.market_avg ?? null}
+            />
+          </MountNearViewport>
         </div>
       </div>
     </section>
@@ -426,6 +444,229 @@ function HistorySection({
       <Suspense fallback={<ChartLoading />}>
         <PriceChart data={filteredHistory} period={period} />
       </Suspense>
+    </div>
+  );
+}
+
+/* ── JP price + eBay solds (streamed like the history promise) ── */
+
+function formatJpy(value: number): string {
+  return `¥${Math.round(value).toLocaleString("en-US")}`;
+}
+
+// snapshot_date is a bare date ("2026-07-04") — pin to UTC so the label
+// doesn't slip a day in negative-offset timezones.
+function formatDateOnly(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function formatSaleDate(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function formatGrade(grade: number): string {
+  return grade % 1 === 0 ? String(grade) : grade.toFixed(1);
+}
+
+function MarketExtrasSection({
+  cardImageId,
+  gameRouteSlug,
+  enMarketPrice,
+}: {
+  cardImageId: string;
+  gameRouteSlug: string;
+  enMarketPrice: number | null;
+}) {
+  const [extras, setExtras] = useState<CardMarketExtrasPayload | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const game = encodeURIComponent(gameQueryValue(gameRouteSlug));
+    fetch(`/api/card/${encodeURIComponent(cardImageId)}/extras?game=${game}`, {
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload: CardMarketExtrasPayload | null) => {
+        if (payload) setExtras(payload);
+      })
+      .catch(() => {
+        // Failed fetch → the blocks just stay hidden.
+      });
+    return () => controller.abort();
+  }, [cardImageId, gameRouteSlug]);
+
+  if (!extras) return null;
+  const { jpPrice, ebayRecent, ebayStats } = extras;
+  if (!jpPrice && ebayRecent.length === 0) return null;
+  return (
+    <>
+      {jpPrice && <JpPriceBlock jp={jpPrice} enMarketPrice={enMarketPrice} />}
+      {ebayRecent.length > 0 && (
+        <EbaySalesBlock recent={ebayRecent} stats={ebayStats} />
+      )}
+    </>
+  );
+}
+
+function JpPriceBlock({
+  jp,
+  enMarketPrice,
+}: {
+  jp: JpPriceData;
+  enMarketPrice: number | null;
+}) {
+  const jpUsd = jp.price_jpy / JPY_PER_USD;
+  // Positive spread = EN trades above JP (an EN premium).
+  const spread = spreadPct(enMarketPrice, jpUsd);
+  const spreadSuspect =
+    spread != null && Math.abs(spread) > SPREAD_MISMATCH_THRESHOLD_PCT;
+  return (
+    <div className="mt-3.5 bg-bg-2 border-[1.5px] border-ink rounded-c-md px-5 py-4">
+      <div className="font-mono-2 font-semibold text-[11px] tracking-[0.12em] uppercase text-ink-2 mb-2">
+        {jp.source_url ? (
+          <a
+            href={jp.source_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-ink transition-colors"
+          >
+            Japan Market — Yuyu-tei ↗
+          </a>
+        ) : (
+          "Japan Market — Yuyu-tei"
+        )}
+      </div>
+      <div className="flex items-center gap-5 font-mono-2 font-semibold text-[14px] text-ink flex-wrap">
+        <div>
+          <span className="text-ink-3 text-[11px] mr-1.5 uppercase tracking-[0.06em]">
+            JP
+          </span>
+          {formatJpy(jp.price_jpy)}
+        </div>
+        <span className="text-ink-3">·</span>
+        <div>
+          <span className="text-ink-3 text-[11px] mr-1.5 uppercase tracking-[0.06em]">
+            USD
+          </span>
+          {formatPrice(jpUsd)}
+        </div>
+        {spread != null && (
+          <>
+            <span className="text-ink-3">·</span>
+            <div>
+              <span className="text-ink-3 text-[11px] mr-1.5 uppercase tracking-[0.06em]">
+                EN vs JP
+              </span>
+              {spreadSuspect ? (
+                <span
+                  className="text-gold text-[12px]"
+                  title={`Spread ${formatPct(spread)} exceeds ±${SPREAD_MISMATCH_THRESHOLD_PCT}% — the JP row may be a different printing`}
+                >
+                  possible variant mismatch
+                </span>
+              ) : (
+                <span className={pctColor(spread)}>{formatPct(spread)}</span>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+      <div className="mt-2 font-mono-2 font-semibold text-[11px] text-ink-3">
+        Snapshot {formatDateOnly(jp.snapshot_date)} · fixed ¥{JPY_PER_USD}/USD
+      </div>
+    </div>
+  );
+}
+
+function EbaySalesBlock({
+  recent,
+  stats,
+}: {
+  recent: EbaySaleData[];
+  stats: CardMarketExtrasPayload["ebayStats"];
+}) {
+  const hasStats = stats.rawCount > 0 || stats.gradedCount > 0;
+  return (
+    <div className="mt-10">
+      <h2 className="font-grotesk font-bold text-[22px] tracking-[-0.01em] text-ink mb-3.5">
+        Recent eBay sales
+      </h2>
+      {hasStats && (
+        <div className="grid grid-cols-2 gap-3.5 mb-3.5">
+          <StatTile
+            label="Raw avg (90d)"
+            value={formatPrice(stats.rawAvg)}
+            foot={`n=${stats.rawCount}`}
+          />
+          <StatTile
+            label="Graded avg (90d)"
+            value={formatPrice(stats.gradedAvg)}
+            foot={`n=${stats.gradedCount}`}
+          />
+        </div>
+      )}
+      <div className="bg-bg-2 border-[1.5px] border-ink rounded-c-md overflow-hidden">
+        <div className="grid grid-cols-[110px_90px_1fr_100px] items-center gap-4 px-[18px] py-3 bg-bg-3 border-b-[1.5px] border-ink font-mono-2 font-semibold text-[11px] tracking-[0.1em] uppercase text-ink-2">
+          <span>Date</span>
+          <span>Grade</span>
+          <span>Source</span>
+          <span className="text-right">Price</span>
+        </div>
+        {recent.map((sale, i) => (
+          <EbaySaleRow key={`${sale.sold_at ?? "unknown"}-${i}`} sale={sale} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EbaySaleRow({ sale }: { sale: EbaySaleData }) {
+  const isGraded = sale.grader != null && sale.grade != null;
+  const isPsa10 = sale.grader === "PSA" && sale.grade === 10;
+  return (
+    <div className="grid grid-cols-[110px_90px_1fr_100px] items-center gap-4 px-[18px] py-3 border-t border-bg-3 hover:bg-bg-3 transition-colors">
+      <span className="font-mono-2 font-semibold text-[13px] text-ink-2">
+        {formatSaleDate(sale.sold_at)}
+      </span>
+      <span>
+        <span
+          className={`inline-block font-mono-2 font-semibold text-[11px] tracking-[0.06em] px-2.5 py-[3px] rounded-c-pill border-[1.5px] w-fit ${
+            isPsa10
+              ? "[background:var(--grad-brand)] text-bg border-transparent"
+              : "border-ink text-ink bg-bg-2"
+          }`}
+        >
+          {isGraded ? `${sale.grader} ${formatGrade(sale.grade!)}` : "Raw"}
+        </span>
+      </span>
+      <span className="font-grotesk font-medium text-[13px] text-ink-2">
+        {sale.ebay_url ? (
+          <a
+            href={sale.ebay_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-ink hover:underline transition-colors"
+          >
+            eBay ↗
+          </a>
+        ) : (
+          "eBay"
+        )}
+      </span>
+      <span className="font-mono-2 font-semibold text-[15px] text-ink text-right">
+        {formatPrice(sale.sale_price)}
+      </span>
     </div>
   );
 }

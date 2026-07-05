@@ -10,10 +10,14 @@ import {
   CATALOG_DATA_TTL_SECONDS,
   publicDataCacheKey,
 } from "@/lib/public-data-cache";
+import { computeEbayAvgStats, type EbaySaleForStats } from "@/lib/ebay-stats";
 import type {
   CardCorePayload,
   CardDetailPayload,
   CardHistoryPayload,
+  CardMarketExtrasPayload,
+  EbaySaleData,
+  JpPriceData,
   PriceStatsData,
   PricePoint,
 } from "./card-detail-types";
@@ -193,6 +197,66 @@ async function loadCardHistoryUncached(options: {
   }
 
   return { priceHistory: historyOut, priceHistorySynthetic: synthetic };
+}
+
+// Raw averages blend Buy-It-Now and auctions; graded copies are a different
+// market entirely, so the split (never a blend) is computed in ebay-stats.
+const EBAY_STATS_WINDOW_DAYS = 90;
+
+async function loadCardMarketExtrasUncached(options: {
+  gameId: string;
+  cardId: string;
+}): Promise<CardMarketExtrasPayload> {
+  const supabase = createCachedServiceClient(CATALOG_DATA_TTL_SECONDS);
+  const statsSinceIso = new Date(
+    Date.now() - EBAY_STATS_WINDOW_DAYS * 86400000
+  ).toISOString();
+
+  // Errors degrade to empty (data ?? []) — the page hides the blocks rather
+  // than failing the Suspense boundary, matching the history loader.
+  const [jpRes, recentRes, windowRes] = await Promise.all([
+    supabase
+      .from("jp_prices")
+      .select("price_jpy, snapshot_date, source_url")
+      .eq("game_id", options.gameId)
+      .eq("card_id", options.cardId)
+      .not("price_jpy", "is", null)
+      .order("snapshot_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1),
+    supabase
+      .from("ebay_sales")
+      .select("sold_at, sale_price, grader, grade, sale_type, ebay_url")
+      .eq("game_id", options.gameId)
+      .eq("card_id", options.cardId)
+      .not("sale_price", "is", null)
+      .order("sold_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("ebay_sales")
+      .select("sale_price, sale_type, grader")
+      .eq("game_id", options.gameId)
+      .eq("card_id", options.cardId)
+      .not("sale_price", "is", null)
+      .gte("sold_at", statsSinceIso),
+  ]);
+
+  return {
+    jpPrice: ((jpRes.data ?? [])[0] ?? null) as JpPriceData | null,
+    ebayRecent: (recentRes.data ?? []) as EbaySaleData[],
+    ebayStats: computeEbayAvgStats((windowRes.data ?? []) as EbaySaleForStats[]),
+  };
+}
+
+export function loadCardMarketExtras(options: {
+  gameId: string;
+  cardId: string;
+}): Promise<CardMarketExtrasPayload> {
+  return cachedPublicData(
+    publicDataCacheKey("card-extras-v1", options.gameId, options.cardId),
+    () => loadCardMarketExtrasUncached(options),
+    CATALOG_DATA_TTL_SECONDS
+  );
 }
 
 export type CardCoreLoadResult =
