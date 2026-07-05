@@ -1,6 +1,6 @@
 "use client";
 
-import { lazy, Suspense, use, useState } from "react";
+import { lazy, Suspense, use, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { formatPrice, formatPct, pctColor, timeAgo } from "@/lib/utils";
@@ -198,9 +198,11 @@ export default function CardDetailClient({
             </div>
 
             {historyPromise ? (
-              <Suspense fallback={<ChartLoading />}>
-                <HistorySection promise={historyPromise} period={chartPeriod} />
-              </Suspense>
+              <MountNearViewport placeholder={<ChartLoading />}>
+                <Suspense fallback={<ChartLoading />}>
+                  <HistorySection promise={historyPromise} period={chartPeriod} />
+                </Suspense>
+              </MountNearViewport>
             ) : (
               <HistoryEmpty />
             )}
@@ -317,6 +319,44 @@ function ChartLoading() {
       Loading price history...
     </div>
   );
+}
+
+/* Defers mounting its children until the block scrolls near the viewport.
+   chart.js parsing/rendering was the biggest TBT contributor after react-dom
+   hydration; on mobile the chart is below the fold, so this moves that work
+   out of the load window entirely. Desktop (chart above the fold) mounts on
+   the first observer callback. */
+function MountNearViewport({
+  children,
+  placeholder,
+}: {
+  children: React.ReactNode;
+  placeholder: React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || mounted) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setMounted(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setMounted(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [mounted]);
+
+  return <div ref={ref}>{mounted ? children : placeholder}</div>;
 }
 
 function HistoryEmpty() {
