@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { formatPrice, formatPct, pctColor, spreadPct, timeAgo } from "@/lib/utils";
 import RarityBadge from "@/components/ui/RarityBadge";
-import { gamePath } from "@/lib/game-routes";
+import { gamePath, gameQueryValue } from "@/lib/game-routes";
 import type {
   CardCorePayload,
   CardHistoryPayload,
@@ -50,7 +50,6 @@ function formatAthDate(dateStr: string | null): string {
 export default function CardDetailClient({
   data,
   historyPromise,
-  extrasPromise,
   error,
   gameRouteSlug,
 }: {
@@ -58,7 +57,6 @@ export default function CardDetailClient({
   // Un-awaited on the server: the above-fold content streams at first byte
   // while the price_history query resolves behind Suspense.
   historyPromise: Promise<CardHistoryPayload> | null;
-  extrasPromise?: Promise<CardMarketExtrasPayload> | null;
   error?: string | null;
   gameRouteSlug: string;
 }) {
@@ -292,15 +290,17 @@ export default function CardDetailClient({
             </div>
           )}
 
-          {/* JP price + eBay solds — streamed; each block hides when empty. */}
-          {extrasPromise && (
-            <Suspense fallback={null}>
-              <MarketExtrasSection
-                promise={extrasPromise}
-                enMarketPrice={priceStats?.market_avg ?? null}
-              />
-            </Suspense>
-          )}
+          {/* JP price + eBay solds — fetched client-side near the viewport
+              (never during static generation: 4.4k prerendered pages × 3
+              queries each timed out the Vercel build). Blocks hide when
+              empty. */}
+          <MountNearViewport placeholder={null}>
+            <MarketExtrasSection
+              cardImageId={card.card_image_id}
+              gameRouteSlug={gameRouteSlug}
+              enMarketPrice={priceStats?.market_avg ?? null}
+            />
+          </MountNearViewport>
         </div>
       </div>
     </section>
@@ -457,13 +457,34 @@ function formatGrade(grade: number): string {
 }
 
 function MarketExtrasSection({
-  promise,
+  cardImageId,
+  gameRouteSlug,
   enMarketPrice,
 }: {
-  promise: Promise<CardMarketExtrasPayload>;
+  cardImageId: string;
+  gameRouteSlug: string;
   enMarketPrice: number | null;
 }) {
-  const { jpPrice, ebayRecent, ebayStats } = use(promise);
+  const [extras, setExtras] = useState<CardMarketExtrasPayload | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const game = encodeURIComponent(gameQueryValue(gameRouteSlug));
+    fetch(`/api/card/${encodeURIComponent(cardImageId)}/extras?game=${game}`, {
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload: CardMarketExtrasPayload | null) => {
+        if (payload) setExtras(payload);
+      })
+      .catch(() => {
+        // Failed fetch → the blocks just stay hidden.
+      });
+    return () => controller.abort();
+  }, [cardImageId, gameRouteSlug]);
+
+  if (!extras) return null;
+  const { jpPrice, ebayRecent, ebayStats } = extras;
   if (!jpPrice && ebayRecent.length === 0) return null;
   return (
     <>
