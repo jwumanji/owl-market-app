@@ -65,11 +65,11 @@
       "schedule": "10 3 * * *"
     },
     {
-      "path": "/api/warm?pages=0&imageCards=250&offset=0&widths=384,640,1080",
+      "path": "/api/warm?pages=0&imageCards=250&offset=0&widths=384,576,640,1080",
       "schedule": "30 3 * * *"
     },
     {
-      "path": "/api/warm?pages=0&imageCards=250&offset=250&widths=384,640,1080",
+      "path": "/api/warm?pages=0&imageCards=250&offset=250&widths=384,576,640,1080",
       "schedule": "40 3 * * *"
     }
   ]
