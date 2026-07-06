@@ -1,0 +1,205 @@
+/* Markets dashboard styles (moved from globals.css — loads with MarketDashboard) */
+
+/* ══════════════════════════════════════════════════════════════
+   C1.5 MARKET DASHBOARD — Stage D
+   Mirrors mockups/02-markets-table.html `.dashboard` / `.widget` /
+   `.drow` rules. Lives alongside the legacy `.dash-*` rules above.
+   ══════════════════════════════════════════════════════════════ */
+.c-dashboard {
+  margin-bottom: 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.c-dash-top {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.c-dash-bottom {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.c-widget {
+  background: var(--bg-2);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.c-widget-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 16px;
+  border-bottom: 1.5px solid var(--ink);
+  background: var(--bg-3);
+}
+.c-widget-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.c-widget-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+.c-widget-all {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--coral);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: opacity 0.14s;
+}
+.c-widget-all:hover {
+  opacity: 0.75;
+}
+.c-widget-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.c-drow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 16px;
+  border-top: 1px solid var(--bg-3);
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.c-drow:first-child {
+  border-top: none;
+}
+.c-drow:hover {
+  background: var(--bg-3);
+}
+.c-drank {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--ink-3);
+  width: 14px;
+  flex-shrink: 0;
+  text-align: center;
+}
+.c-dthumb {
+  width: 42px;
+  height: 59px;
+  border-radius: var(--r-sm);
+  border: 1.2px solid var(--ink);
+  flex-shrink: 0;
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--bg);
+  background: var(--bg-3);
+}
+.c-dinfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.c-dname {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 12.5px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.c-dmeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.c-dvalues {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.c-dprice {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 12.5px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.c-dchg,
+.c-dchg-solo {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.c-dchg-solo {
+  font-size: 12px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.c-dsetcode {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 9px;
+  color: var(--ink-2);
+  background: var(--bg-3);
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.c-dbadges {
+  display: inline-flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.c-dempty {
+  padding: 24px 16px;
+  text-align: center;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+  .c-dash-top { grid-template-columns: 1fr 1fr; }
+  .c-dash-bottom { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .c-dash-top,
+  .c-dash-bottom { grid-template-columns: 1fr; }
+}

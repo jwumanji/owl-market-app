@@ -23,7 +23,7 @@ export const maxDuration = 300;
 // Hero rungs actual devices request at the 300px display size (1x → 384,
 // 2x → 640, moto-g 2.625x → 828, iPhone 3x → 1080), matching quality=60.
 const DEFAULT_WIDTHS = [384, 640, 828, 1080];
-const ALLOWED_WIDTHS = new Set([384, 640, 750, 828, 1080]);
+const ALLOWED_WIDTHS = new Set([384, 576, 640, 750, 828, 1080]);
 const HERO_QUALITY = 60;
 const CONCURRENCY = 8;
 // Stop launching new work near the function deadline so the run returns a

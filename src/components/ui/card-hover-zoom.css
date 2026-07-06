@@ -1,0 +1,39 @@
+/* Card hover-zoom styles (moved from globals.css — loads with the component) */
+
+/* ══════════════════════════════════════════════════════════════
+   C1.5 CARD HOVER-ZOOM — Stage D.1
+   Wraps any card thumbnail; reveals an enlarged preview on hover.
+   Preview uses position:fixed so it escapes table overflow clips.
+   Hidden on touch (no hover) via media query in the component.
+   ══════════════════════════════════════════════════════════════ */
+.c-hzoom-wrap {
+  display: inline-block;
+  position: relative;
+  line-height: 0;
+}
+.c-hzoom-pop {
+  position: fixed;
+  width: 200px;
+  height: 280px;
+  z-index: 1000;
+  pointer-events: none;
+  border-radius: var(--r-sm);
+  border: 1.5px solid var(--ink);
+  background: var(--bg-2);
+  box-shadow: 0 10px 28px rgba(26, 15, 8, 0.22);
+  overflow: hidden;
+  animation: c-hzoom-in 0.12s ease-out;
+}
+.c-hzoom-pop img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+@keyframes c-hzoom-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (hover: none) {
+  .c-hzoom-pop { display: none; }
+}

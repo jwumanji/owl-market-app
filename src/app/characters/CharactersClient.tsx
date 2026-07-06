@@ -7,6 +7,7 @@ import FastCardImage from "@/components/ui/FastCardImage";
 import { TIER_LABELS } from "./characters-data";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
+import "./characters-page.css";
 
 /* ── Types ── */
 export interface CharacterCard {

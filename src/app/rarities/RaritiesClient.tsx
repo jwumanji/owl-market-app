@@ -12,6 +12,7 @@ import {
   type RarityCard,
   type RarityData,
 } from "./rarities-data";
+import "./rarities-page.css";
 
 type RarityViewMode = "list" | "grid";
 

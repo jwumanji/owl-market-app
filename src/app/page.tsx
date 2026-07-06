@@ -11,6 +11,7 @@ import { gamePath } from "@/lib/game-routes";
 import { cachedPublicData, PRICE_DATA_TTL_SECONDS, publicDataCacheKey } from "@/lib/public-data-cache";
 import { createCachedServiceClient } from "@/lib/supabase-server";
 import { firstRelation, flattenPriceStatsCardRow } from "@/lib/supabase-relations";
+import "./home-page.css";
 
 // Keep in sync with PRICE_DATA_TTL_SECONDS (Next 15 requires a literal).
 export const revalidate = 900;

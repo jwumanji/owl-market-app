@@ -44,7 +44,24 @@ function filterByPeriod(history: PricePoint[], period: Period): PricePoint[] {
 function formatAthDate(dateStr: string | null): string {
   if (!dateStr) return "—";
   const d = new Date(dateStr);
-  return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+  // timeZone pinned: the page prerenders in UTC, and a viewer in another
+  // timezone hydrating a boundary date would otherwise produce a text
+  // mismatch — React 19 responds by client-rendering the whole root, which
+  // repaints the hero and re-fires LCP seconds late.
+  return d.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+}
+
+/* "3h ago" can never match between prerender time and hydration time, and an
+   unsuppressed text mismatch makes React 19 discard the server DOM (error
+   #418) — confirmed live as the card page's 2.2s LCP render delay.
+   suppressHydrationWarning keeps the server text through hydration; the
+   effect then swaps in the viewer-accurate label. */
+function TimeAgoLabel({ date }: { date: string }) {
+  const [clientLabel, setClientLabel] = useState<string | null>(null);
+  useEffect(() => {
+    setClientLabel(timeAgo(date));
+  }, [date]);
+  return <span suppressHydrationWarning>{clientLabel ?? timeAgo(date)}</span>;
 }
 
 export default function CardDetailClient({
@@ -155,6 +172,11 @@ export default function CardDetailClient({
               height={420}
               quality={60}
               priority
+              // Next 15's `priority` no longer implies fetchPriority (14 did):
+              // without this, BOTH the img and its preload ship at default
+              // priority — PSI flagged the preload losing the bandwidth race.
+              // This prop flows to the img and into ReactDOM.preload alike.
+              fetchPriority="high"
               className="w-full max-w-[300px] aspect-[5/7] object-cover rounded-c-md border-[1.5px] border-ink shadow-[0_10px_24px_rgba(26,15,8,0.10)]"
             />
           ) : (
@@ -177,7 +199,7 @@ export default function CardDetailClient({
             </div>
             {priceStats?.updated_at && (
               <div className="mt-2.5 font-mono-2 font-semibold text-[13px] text-ink-2">
-                Last updated {timeAgo(priceStats.updated_at)}
+                Last updated <TimeAgoLabel date={priceStats.updated_at} />
               </div>
             )}
           </div>
@@ -388,7 +410,10 @@ function HistoryEmpty() {
 
 /* Mounted by MountNearViewport, so the fetch fires when the chart nears the
    viewport — immediately on desktop, on scroll on mobile. State is lifted to
-   CardDetailClient so the header notice reads the same payload. */
+   CardDetailClient so the header notice reads the same payload. (The old
+   streamed-promise HistoryNotice needed mount-gating against a Date.now()
+   hydration mismatch — moot now: history is always null at prerender, so the
+   notice only ever renders client-side, after the fetch.) */
 
 function HistorySection({
   cardImageId,

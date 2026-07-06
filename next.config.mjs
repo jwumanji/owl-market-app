@@ -16,12 +16,19 @@ const nextConfig = {
     // stylesheet requests PSI flagged ~570ms on every page — ~20KB br of CSS
     // total, and no Early Hints on this deployment to parallelize them.
     inlineCss: true,
+    // The full-catalog prerender (~4,400 card pages x 2-3 Supabase queries
+    // each) can stampede the DB at default build parallelism — one prod
+    // deploy failed on >60s per-page static-gen timeouts. Cap concurrent
+    // page renders per worker to smooth the burst; costs ~1-2 min of build.
+    staticGenerationMaxConcurrency: 4,
+    staticGenerationRetryCount: 3,
   },
   images: {
     formats: ["image/avif", "image/webp"],
-    // 384 gives the 300px card-detail hero a near-exact rung at 1x DPR
-    // (otherwise the srcset jumps from 256 straight to the 640 device size).
-    imageSizes: [32, 48, 64, 96, 128, 256, 384],
+    // 384 gives the 300px card-detail hero a near-exact rung at 1x DPR, and
+    // 576 catches DPR 1.75 (PSI's moto g: 300css -> 525px needed — without it
+    // the srcset jumps to 640 and serves the ~596px source, ~12KiB waste).
+    imageSizes: [32, 48, 64, 96, 128, 256, 384, 576],
     // 31 days: mirrored card art is effectively immutable (re-mirrors are
     // rare), and a cold /_next/image encode costs ~2.3s on the LCP path —
     // once the warm cron has swept a transform it should stay warm.
