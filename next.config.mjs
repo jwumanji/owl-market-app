@@ -16,6 +16,12 @@ const nextConfig = {
     // stylesheet requests PSI flagged ~570ms on every page — ~20KB br of CSS
     // total, and no Early Hints on this deployment to parallelize them.
     inlineCss: true,
+    // The full-catalog prerender (~4,400 card pages x 2-3 Supabase queries
+    // each) can stampede the DB at default build parallelism — one prod
+    // deploy failed on >60s per-page static-gen timeouts. Cap concurrent
+    // page renders per worker to smooth the burst; costs ~1-2 min of build.
+    staticGenerationMaxConcurrency: 4,
+    staticGenerationRetryCount: 3,
   },
   images: {
     formats: ["image/avif", "image/webp"],
