@@ -1,5 +1,5 @@
 import CardDetailClient from "./CardDetailClient";
-import { loadCardCore, loadCardHistory } from "./card-detail-data";
+import { loadCardCore } from "./card-detail-data";
 import {
   DEFAULT_PUBLIC_GAME_DB_SLUG,
   DEFAULT_PUBLIC_GAME_ROUTE_SLUG,
@@ -30,19 +30,11 @@ export default async function CardDetailPage(
     game: DEFAULT_PUBLIC_GAME_DB_SLUG,
   });
 
-  // Deliberately NOT awaited — streams to the chart's Suspense boundary.
-  const historyPromise = result.ok
-    ? loadCardHistory({
-        gameId: result.data.game.id,
-        cardId: result.data.card.id,
-        priceStats: result.data.priceStats,
-      })
-    : null;
-
+  // History + market extras load client-side (/api/card/[id]/history and
+  // /extras) so prerendering this page costs the core query alone.
   return (
     <CardDetailClient
       data={result.ok ? result.data : null}
-      historyPromise={historyPromise}
       error={result.ok ? null : result.message}
       gameRouteSlug={DEFAULT_PUBLIC_GAME_ROUTE_SLUG}
     />

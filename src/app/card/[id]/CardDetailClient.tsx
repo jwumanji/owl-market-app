@@ -1,6 +1,6 @@
 "use client";
 
-import { lazy, Suspense, use, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { formatPrice, formatPct, pctColor, spreadPct, timeAgo } from "@/lib/utils";
@@ -49,18 +49,18 @@ function formatAthDate(dateStr: string | null): string {
 
 export default function CardDetailClient({
   data,
-  historyPromise,
   error,
   gameRouteSlug,
 }: {
   data: CardCorePayload | null;
-  // Un-awaited on the server: the above-fold content streams at first byte
-  // while the price_history query resolves behind Suspense.
-  historyPromise: Promise<CardHistoryPayload> | null;
   error?: string | null;
   gameRouteSlug: string;
 }) {
   const [chartPeriod, setChartPeriod] = useState<Period>("3m");
+  // Fetched client-side near the viewport (never during static generation —
+  // the per-page history reads were the bulk of the build's DB load). State
+  // lives here so the header notice and the chart share one fetch.
+  const [history, setHistory] = useState<CardHistoryPayload | null>(null);
 
   if (error || !data) {
     return (
@@ -189,11 +189,12 @@ export default function CardDetailClient({
                 <h2 className="font-grotesk font-bold text-[18px] tracking-[-0.01em] text-ink">
                   Price History
                 </h2>
-                {historyPromise && (
-                  <Suspense fallback={null}>
-                    <HistoryNotice promise={historyPromise} period={chartPeriod} />
-                  </Suspense>
-                )}
+                {history?.priceHistorySynthetic &&
+                  filterByPeriod(history.priceHistory, chartPeriod).length > 0 && (
+                    <span className="font-mono-2 font-semibold text-[10px] text-ink-3 uppercase tracking-[0.1em]">
+                      Estimated from 30-day stats
+                    </span>
+                  )}
               </div>
               <div className="flex gap-1.5">
                 {PERIODS.map((p) => (
@@ -212,15 +213,15 @@ export default function CardDetailClient({
               </div>
             </div>
 
-            {historyPromise ? (
-              <MountNearViewport placeholder={<ChartLoading />}>
-                <Suspense fallback={<ChartLoading />}>
-                  <HistorySection promise={historyPromise} period={chartPeriod} />
-                </Suspense>
-              </MountNearViewport>
-            ) : (
-              <HistoryEmpty />
-            )}
+            <MountNearViewport placeholder={<ChartLoading />}>
+              <HistorySection
+                cardImageId={card.card_image_id}
+                gameRouteSlug={gameRouteSlug}
+                period={chartPeriod}
+                history={history}
+                onLoaded={setHistory}
+              />
+            </MountNearViewport>
           </div>
 
           {/* Stats grid */}
@@ -385,35 +386,48 @@ function HistoryEmpty() {
   );
 }
 
-/* Both consumers below use() the same streamed promise — React resolves it
-   once; the header notice and the chart body unsuspend together. */
-
-function HistoryNotice({
-  promise,
-  period,
-}: {
-  promise: Promise<CardHistoryPayload>;
-  period: Period;
-}) {
-  const { priceHistory, priceHistorySynthetic } = use(promise);
-  if (!priceHistorySynthetic || filterByPeriod(priceHistory, period).length === 0) return null;
-  return (
-    <span className="font-mono-2 font-semibold text-[10px] text-ink-3 uppercase tracking-[0.1em]">
-      Estimated from 30-day stats
-    </span>
-  );
-}
+/* Mounted by MountNearViewport, so the fetch fires when the chart nears the
+   viewport — immediately on desktop, on scroll on mobile. State is lifted to
+   CardDetailClient so the header notice reads the same payload. */
 
 function HistorySection({
-  promise,
+  cardImageId,
+  gameRouteSlug,
   period,
+  history,
+  onLoaded,
 }: {
-  promise: Promise<CardHistoryPayload>;
+  cardImageId: string;
+  gameRouteSlug: string;
   period: Period;
+  history: CardHistoryPayload | null;
+  onLoaded: (history: CardHistoryPayload) => void;
 }) {
-  const { priceHistory } = use(promise);
-  const filteredHistory = filterByPeriod(priceHistory, period);
+  const loaded = history != null;
 
+  useEffect(() => {
+    if (loaded) return;
+    const controller = new AbortController();
+    const game = encodeURIComponent(gameQueryValue(gameRouteSlug));
+    fetch(`/api/card/${encodeURIComponent(cardImageId)}/history?game=${game}`, {
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload: CardHistoryPayload | null) => {
+        // Failed fetch → empty history → the chart shows its empty state.
+        onLoaded(payload ?? { priceHistory: [], priceHistorySynthetic: false });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          onLoaded({ priceHistory: [], priceHistorySynthetic: false });
+        }
+      });
+    return () => controller.abort();
+  }, [loaded, cardImageId, gameRouteSlug, onLoaded]);
+
+  if (!history) return <ChartLoading />;
+
+  const filteredHistory = filterByPeriod(history.priceHistory, period);
   if (filteredHistory.length === 0) return <HistoryEmpty />;
 
   return (
