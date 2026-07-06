@@ -597,7 +597,9 @@ function JpPriceBlock({
 const TIER_ROWS: Array<[keyof CardMarketExtrasPayload["ebayStats"]["tiers"], string]> = [
   ["BLACK_LABEL", "Black Label"],
   ["PRISTINE_10", "Pristine 10"],
-  ["GRADE_10", "Grade 10"],
+  ["PSA_10", "PSA 10"],
+  ["BGS_10", "BGS 10"],
+  ["OTHER_10", "Other 10"],
   ["GRADE_9", "Grade 9–9.5"],
 ];
 

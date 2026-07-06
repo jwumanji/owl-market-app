@@ -23,12 +23,16 @@ const GRADE_PATTERN = new RegExp(
   "i"
 );
 
-/** Grade tiers, best first. Sub-9 grades belong to no tier — they trade in
- *  their own long tail and would drag every average they touched. */
+/** Grade tiers, best first. Plain 10s split by grader — a PSA 10 and a
+ *  BGS 10 are different markets; CGC/SGC/TAG/ACE/ARS 10s pool as OTHER_10
+ *  (too thin to stand alone). Sub-9 grades belong to no tier — they trade
+ *  in their own long tail and would drag every average they touched. */
 export const GRADE_TIERS = [
   "BLACK_LABEL",
   "PRISTINE_10",
-  "GRADE_10",
+  "PSA_10",
+  "BGS_10",
+  "OTHER_10",
   "GRADE_9",
 ] as const;
 
@@ -45,6 +49,12 @@ function hasBlackLabel(title: string): boolean {
   return /black\s*label/i.test(title);
 }
 
+function tierForTenByGrader(grader: string | null): GradeTier {
+  if (grader === "PSA") return "PSA_10";
+  if (grader === "BGS") return "BGS_10";
+  return "OTHER_10";
+}
+
 function tierForTitle(title: string, grader: string, grade: number): GradeTier | null {
   // Black Label outranks Pristine when both appear — it's the stricter claim.
   // "BL" is kept uppercase-only and BGS-scoped so ordinary words can't match.
@@ -55,13 +65,13 @@ function tierForTitle(title: string, grader: string, grade: number): GradeTier |
   // that branch) — bare "pristine condition" puffery on raw listings must
   // not mint a graded tier.
   if (/pristine/i.test(title)) return "PRISTINE_10";
-  if (grade === 10) return "GRADE_10";
+  if (grade === 10) return tierForTenByGrader(grader);
   if (grade >= 9) return "GRADE_9";
   return null;
 }
 
 // Extract grader + numeric grade + tier from a listing title, e.g.
-//   "2023 PSA 10 Monkey D Luffy OP01-024" → { grader: "PSA", grade: 10, tier: "GRADE_10" }
+//   "2023 PSA 10 Monkey D Luffy OP01-024" → { grader: "PSA", grade: 10, tier: "PSA_10" }
 //   "BGS 10 Black Label Shanks"           → { grader: "BGS", grade: 10, tier: "BLACK_LABEL" }
 //   "Pristine TAG 10 Zoro OP01-025"       → { grader: "TAG", grade: 10, tier: "PRISTINE_10" }
 //   "Luffy OP01-024 Alt Art NM"           → { grader: null, grade: null, tier: null }
@@ -123,7 +133,7 @@ export function saleTier(sale: EbaySaleForStats): GradeTier | null {
   }
   if (!isGradedSale(sale)) return null;
   const grade = sale.grade == null ? null : Number(sale.grade);
-  if (grade === 10) return "GRADE_10";
+  if (grade === 10) return tierForTenByGrader(sale.grader);
   if (grade != null && grade >= 9 && grade < 10) return "GRADE_9";
   return null;
 }
