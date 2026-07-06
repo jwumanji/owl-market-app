@@ -1,5 +1,5 @@
 import CardDetailClient from "@/app/card/[id]/CardDetailClient";
-import { loadCardCore, loadCardHistory } from "@/app/card/[id]/card-detail-data";
+import { loadCardCore } from "@/app/card/[id]/card-detail-data";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gameQueryValue } from "@/lib/game-routes";
 import { createServiceClient } from "@/lib/supabase-server";
@@ -77,20 +77,11 @@ export default async function GameCardDetailPage(
     game: gameQueryValue(params.game),
   });
 
-  // Deliberately NOT awaited: the promise streams to the client and the
-  // chart block unsuspends when the history query lands.
-  const historyPromise = result.ok
-    ? loadCardHistory({
-        gameId: result.data.game.id,
-        cardId: result.data.card.id,
-        priceStats: result.data.priceStats,
-      })
-    : null;
-
+  // History + market extras load client-side (/api/card/[id]/history and
+  // /extras) so prerendering this page costs the core query alone.
   return (
     <CardDetailClient
       data={result.ok ? result.data : null}
-      historyPromise={historyPromise}
       error={result.ok ? null : result.message}
       gameRouteSlug={params.game}
     />
