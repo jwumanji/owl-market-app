@@ -254,10 +254,11 @@ export function loadCardMarketExtras(options: {
   gameId: string;
   cardId: string;
 }): Promise<CardMarketExtrasPayload> {
-  // v2: ebayStats moved from a raw/graded pair to per-tier averages — the
-  // version bump keeps unstable_cache from serving the old shape stale.
+  // v3: plain-10 tier split by grader (PSA_10/BGS_10/OTHER_10) — bump the
+  // version on every payload shape change or unstable_cache serves the old
+  // shape stale.
   return cachedPublicData(
-    publicDataCacheKey("card-extras-v2", options.gameId, options.cardId),
+    publicDataCacheKey("card-extras-v3", options.gameId, options.cardId),
     () => loadCardMarketExtrasUncached(options),
     CATALOG_DATA_TTL_SECONDS
   );
