@@ -5,6 +5,7 @@ import { withOnePiecePayloadFallbacksList } from "@/lib/game-payload";
 import { resolveGameScope } from "@/lib/game-scope";
 import { PRICE_DATA_TTL_SECONDS } from "@/lib/public-data-cache";
 import { flattenPriceStatsCardRow } from "@/lib/supabase-relations";
+import "./markets-grid.css";
 
 // Keep in sync with PRICE_DATA_TTL_SECONDS (Next 15 requires a literal).
 export const revalidate = 900;
