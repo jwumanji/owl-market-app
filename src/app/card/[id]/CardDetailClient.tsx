@@ -589,6 +589,33 @@ function JpPriceBlock({
   );
 }
 
+const TIER_ROWS: Array<[keyof CardMarketExtrasPayload["ebayStats"]["tiers"], string]> = [
+  ["BLACK_LABEL", "Black Label"],
+  ["PRISTINE_10", "Pristine 10"],
+  ["GRADE_10", "Grade 10"],
+  ["GRADE_9", "Grade 9–9.5"],
+];
+
+function AvgRow({
+  label,
+  avg,
+  count,
+}: {
+  label: string;
+  avg: number | null;
+  count: number;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 py-1 font-mono-2 font-semibold text-[14px] text-ink">
+      <span className="text-ink-2 text-[12px] uppercase tracking-[0.06em]">{label}</span>
+      <span className="flex items-baseline gap-3">
+        <span className="text-ink-3 text-[11px]">n={count}</span>
+        {formatPrice(avg)}
+      </span>
+    </div>
+  );
+}
+
 function EbaySalesBlock({
   recent,
   stats,
@@ -596,24 +623,31 @@ function EbaySalesBlock({
   recent: EbaySaleData[];
   stats: CardMarketExtrasPayload["ebayStats"];
 }) {
-  const hasStats = stats.rawCount > 0 || stats.gradedCount > 0;
+  // Optional-chain the tiers: a CDN can serve pre-tier JSON (old payload
+  // shape) for a few minutes after a deploy.
+  const tierRows = TIER_ROWS.filter(([tier]) => (stats.tiers?.[tier]?.count ?? 0) > 0);
+  const hasStats = stats.rawCount > 0 || tierRows.length > 0;
   return (
     <div className="mt-10">
       <h2 className="font-grotesk font-bold text-[22px] tracking-[-0.01em] text-ink mb-3.5">
         Recent eBay sales
       </h2>
       {hasStats && (
-        <div className="grid grid-cols-2 gap-3.5 mb-3.5">
-          <StatTile
-            label="Raw avg (90d)"
-            value={formatPrice(stats.rawAvg)}
-            foot={`n=${stats.rawCount}`}
-          />
-          <StatTile
-            label="Graded avg (90d)"
-            value={formatPrice(stats.gradedAvg)}
-            foot={`n=${stats.gradedCount}`}
-          />
+        <div className="bg-bg-2 border-[1.5px] border-ink rounded-c-md px-5 py-4 mb-3.5">
+          <div className="font-mono-2 font-semibold text-[11px] tracking-[0.12em] uppercase text-ink-2 mb-2">
+            Average sale price (90d)
+          </div>
+          {tierRows.map(([tier, label]) => (
+            <AvgRow
+              key={tier}
+              label={label}
+              avg={stats.tiers[tier].avg}
+              count={stats.tiers[tier].count}
+            />
+          ))}
+          {stats.rawCount > 0 && (
+            <AvgRow label="Raw" avg={stats.rawAvg} count={stats.rawCount} />
+          )}
         </div>
       )}
       <div className="bg-bg-2 border-[1.5px] border-ink rounded-c-md overflow-hidden">
