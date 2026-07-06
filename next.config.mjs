@@ -19,9 +19,10 @@ const nextConfig = {
   },
   images: {
     formats: ["image/avif", "image/webp"],
-    // 384 gives the 300px card-detail hero a near-exact rung at 1x DPR
-    // (otherwise the srcset jumps from 256 straight to the 640 device size).
-    imageSizes: [32, 48, 64, 96, 128, 256, 384],
+    // 384 gives the 300px card-detail hero a near-exact rung at 1x DPR, and
+    // 576 catches DPR 1.75 (PSI's moto g: 300css -> 525px needed — without it
+    // the srcset jumps to 640 and serves the ~596px source, ~12KiB waste).
+    imageSizes: [32, 48, 64, 96, 128, 256, 384, 576],
     // 31 days: mirrored card art is effectively immutable (re-mirrors are
     // rare), and a cold /_next/image encode costs ~2.3s on the LCP path —
     // once the warm cron has swept a transform it should stay warm.
