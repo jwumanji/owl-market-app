@@ -234,7 +234,9 @@ async function loadCardMarketExtrasUncached(options: {
       .limit(5),
     supabase
       .from("ebay_sales")
-      .select("sale_price, sale_type, grader")
+      // grade + title feed the tier split (Black Label / Pristine live only
+      // in the title text).
+      .select("sale_price, sale_type, grader, grade, title")
       .eq("game_id", options.gameId)
       .eq("card_id", options.cardId)
       .not("sale_price", "is", null)
@@ -252,8 +254,10 @@ export function loadCardMarketExtras(options: {
   gameId: string;
   cardId: string;
 }): Promise<CardMarketExtrasPayload> {
+  // v2: ebayStats moved from a raw/graded pair to per-tier averages — the
+  // version bump keeps unstable_cache from serving the old shape stale.
   return cachedPublicData(
-    publicDataCacheKey("card-extras-v1", options.gameId, options.cardId),
+    publicDataCacheKey("card-extras-v2", options.gameId, options.cardId),
     () => loadCardMarketExtrasUncached(options),
     CATALOG_DATA_TTL_SECONDS
   );

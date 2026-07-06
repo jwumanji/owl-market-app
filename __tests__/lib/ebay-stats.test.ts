@@ -20,7 +20,11 @@ type SaleInput = {
   sale_price: number | null;
   sale_type: string | null;
   grader: string | null;
+  grade?: number | null;
+  title?: string | null;
 };
+
+type Tier = "BLACK_LABEL" | "PRISTINE_10" | "GRADE_10" | "GRADE_9";
 
 type StatsModule = {
   KNOWN_GRADERS: readonly string[];
@@ -28,13 +32,14 @@ type StatsModule = {
     grader: string | null;
     grade: number | null;
     sale_type: string;
+    tier: Tier | null;
   };
   isGradedSale: (sale: Pick<SaleInput, "sale_type" | "grader">) => boolean;
+  saleTier: (sale: SaleInput) => Tier | null;
   computeEbayAvgStats: (rows: SaleInput[]) => {
     rawAvg: number | null;
     rawCount: number;
-    gradedAvg: number | null;
-    gradedCount: number;
+    tiers: Record<Tier, { avg: number | null; count: number }>;
   };
 };
 
@@ -97,23 +102,126 @@ test("parseGrade falls back to raw on ungraded or malformed titles", () => {
   }
 });
 
-test("raw and graded averages never blend — a PSA 10 cannot skew the raw avg", () => {
+test("tier detection: Black Label, Pristine, plain 10s, 9s, and lowercase forms", () => {
+  const { parseGrade } = loadStats();
+
+  const cases: Array<[string, Tier | null]> = [
+    ["TAG Pristine 10 Monkey D. Dragon SP OP07-015", "PRISTINE_10"],
+    ["Pristine Tag 10 Monkey D. Dragon SP OP07-015", "PRISTINE_10"],
+    ["BGS 10 Black Label Shanks OP01-120", "BLACK_LABEL"],
+    ["BGS 10 BL Shanks OP01-120", "BLACK_LABEL"],
+    ["BGS 10 GEM MINT Shanks OP01-120", "GRADE_10"],
+    // lowercase forms
+    ["bgs 10 black label luffy op01-003", "BLACK_LABEL"],
+    ["pristine tag 10 zoro op01-025", "PRISTINE_10"],
+    ["psa 10 luffy op01-024", "GRADE_10"],
+    // 9–9.5 band and sub-9 exclusion
+    ["PSA 9 MINT Luffy OP01-024", "GRADE_9"],
+    ["BGS 9.5 Shanks Manga Rare", "GRADE_9"],
+    ["BGS 8.5 Kaido OP04-044", null],
+  ];
+
+  for (const [title, tier] of cases) {
+    assert.equal(parseGrade(title).tier, tier, title);
+  }
+});
+
+test("Black Label outranks Pristine when both appear in a title", () => {
+  const { parseGrade } = loadStats();
+  assert.equal(
+    parseGrade("BGS 10 Pristine Black Label Luffy OP01-024").tier,
+    "BLACK_LABEL"
+  );
+  assert.equal(
+    parseGrade("bgs 10 black label pristine luffy").tier,
+    "BLACK_LABEL"
+  );
+});
+
+test("lowercase 'bl' alone never triggers Black Label, and BL is BGS-scoped", () => {
+  const { parseGrade } = loadStats();
+  // "bl" as an ordinary lowercase fragment must not match.
+  assert.equal(parseGrade("PSA 10 bl luffy").tier, "GRADE_10");
+  // Uppercase BL outside BGS doesn't count either.
+  assert.equal(parseGrade("PSA 10 BL Luffy").tier, "GRADE_10");
+});
+
+test("'Black Label' classifies without a grader token; bare 'pristine' does not", () => {
+  const { parseGrade } = loadStats();
+
+  // Real listing shape: no "BGS", no number — Black Label is BGS-exclusive
+  // and definitionally a 10, so it must not fall into the raw bucket.
+  const bl = parseGrade("Monkey D. Dragon Parallel Leader OP07-001 Low Pop Black Label");
+  assert.equal(bl.grader, "BGS");
+  assert.equal(bl.grade, 10);
+  assert.equal(bl.sale_type, "graded");
+  assert.equal(bl.tier, "BLACK_LABEL");
+
+  // "pristine" as condition puffery on an ungraded listing stays raw.
+  const puffery = parseGrade("Luffy OP01-024 Alt Art pristine condition!");
+  assert.equal(puffery.sale_type, "raw");
+  assert.equal(puffery.tier, null);
+});
+
+test("raw and tier averages never blend — a PSA 10 cannot skew the raw avg", () => {
   const { computeEbayAvgStats } = loadStats();
 
   const stats = computeEbayAvgStats([
-    { sale_price: 10, sale_type: "raw", grader: null },
-    { sale_price: 20, sale_type: "raw", grader: null },
-    { sale_price: 500, sale_type: "graded", grader: "PSA" },
+    { sale_price: 10, sale_type: "raw", grader: null, grade: null, title: "Luffy raw NM" },
+    { sale_price: 20, sale_type: "raw", grader: null, grade: null, title: "Luffy raw LP" },
+    { sale_price: 500, sale_type: "graded", grader: "PSA", grade: 10, title: "PSA 10 Luffy" },
   ]);
 
   assert.equal(stats.rawAvg, 15);
   assert.equal(stats.rawCount, 2);
-  assert.equal(stats.gradedAvg, 500);
-  assert.equal(stats.gradedCount, 1);
+  assert.equal(stats.tiers.GRADE_10.avg, 500);
+  assert.equal(stats.tiers.GRADE_10.count, 1);
+});
+
+test("per-tier averages split Black Label / Pristine / 10 / 9, sub-9 in no bucket", () => {
+  const { computeEbayAvgStats } = loadStats();
+
+  const stats = computeEbayAvgStats([
+    { sale_price: 1000, sale_type: "graded", grader: "BGS", grade: 10, title: "BGS 10 Black Label Luffy" },
+    { sale_price: 400, sale_type: "graded", grader: "TAG", grade: 10, title: "TAG Pristine 10 Luffy" },
+    { sale_price: 200, sale_type: "graded", grader: "PSA", grade: 10, title: "PSA 10 Luffy" },
+    { sale_price: 100, sale_type: "graded", grader: "PSA", grade: 10, title: "PSA 10 Luffy alt" },
+    { sale_price: 80, sale_type: "graded", grader: "BGS", grade: 9.5, title: "BGS 9.5 Luffy" },
+    { sale_price: 50, sale_type: "graded", grader: "PSA", grade: 8, title: "PSA 8 Luffy" },
+    { sale_price: 30, sale_type: "raw", grader: null, grade: null, title: "Luffy NM" },
+  ]);
+
+  assert.equal(stats.tiers.BLACK_LABEL.avg, 1000);
+  assert.equal(stats.tiers.BLACK_LABEL.count, 1);
+  assert.equal(stats.tiers.PRISTINE_10.avg, 400);
+  assert.equal(stats.tiers.PRISTINE_10.count, 1);
+  assert.equal(stats.tiers.GRADE_10.avg, 150);
+  assert.equal(stats.tiers.GRADE_10.count, 2);
+  assert.equal(stats.tiers.GRADE_9.avg, 80);
+  assert.equal(stats.tiers.GRADE_9.count, 1);
+  // The PSA 8 lands nowhere: not raw, not a tier.
+  assert.equal(stats.rawAvg, 30);
+  assert.equal(stats.rawCount, 1);
+});
+
+test("title re-parse outranks stale stored columns in the stats split", () => {
+  const { computeEbayAvgStats } = loadStats();
+
+  // Row stored as raw by an older parser, but the title says Black Label —
+  // it must move to the BLACK_LABEL bucket, not pollute the raw average.
+  const stats = computeEbayAvgStats([
+    { sale_price: 900, sale_type: "raw", grader: null, grade: null, title: "Dragon OP07-001 Low Pop Black Label" },
+    { sale_price: 30, sale_type: "raw", grader: null, grade: null, title: "Dragon OP07-001 NM" },
+  ]);
+
+  assert.equal(stats.tiers.BLACK_LABEL.count, 1);
+  assert.equal(stats.tiers.BLACK_LABEL.avg, 900);
+  assert.equal(stats.rawCount, 1);
+  assert.equal(stats.rawAvg, 30);
 });
 
 test("grader presence marks a sale graded even when sale_type is missing", () => {
-  const { isGradedSale, computeEbayAvgStats } = loadStats();
+  const { isGradedSale, saleTier, computeEbayAvgStats } = loadStats();
 
   // Older rows predate the sale_type column.
   assert.equal(isGradedSale({ sale_type: null, grader: "BGS" }), true);
@@ -121,11 +229,22 @@ test("grader presence marks a sale graded even when sale_type is missing", () =>
   assert.equal(isGradedSale({ sale_type: "raw", grader: null }), false);
   assert.equal(isGradedSale({ sale_type: null, grader: null }), false);
 
+  // Without a parseable title, the stored numeric grade decides the tier
+  // (label tiers are unknowable from numbers alone).
+  assert.equal(
+    saleTier({ sale_price: 1, sale_type: "graded", grader: "PSA", grade: 10, title: null }),
+    "GRADE_10"
+  );
+  assert.equal(
+    saleTier({ sale_price: 1, sale_type: "graded", grader: "BGS", grade: 9.5, title: null }),
+    "GRADE_9"
+  );
+
   const stats = computeEbayAvgStats([
-    { sale_price: 100, sale_type: null, grader: "BGS" },
-    { sale_price: 10, sale_type: null, grader: null },
+    { sale_price: 100, sale_type: null, grader: "BGS", grade: 9, title: null },
+    { sale_price: 10, sale_type: null, grader: null, grade: null, title: null },
   ]);
-  assert.equal(stats.gradedCount, 1);
+  assert.equal(stats.tiers.GRADE_9.count, 1);
   assert.equal(stats.rawCount, 1);
 });
 
@@ -135,14 +254,14 @@ test("null, zero, and non-finite prices are excluded from both populations", () 
   const stats = computeEbayAvgStats([
     { sale_price: null, sale_type: "raw", grader: null },
     { sale_price: 0, sale_type: "raw", grader: null },
-    { sale_price: -5, sale_type: "graded", grader: "PSA" },
+    { sale_price: -5, sale_type: "graded", grader: "PSA", grade: 10, title: "PSA 10 Luffy" },
     { sale_price: Number.NaN, sale_type: "raw", grader: null },
   ]);
 
   assert.equal(stats.rawAvg, null);
   assert.equal(stats.rawCount, 0);
-  assert.equal(stats.gradedAvg, null);
-  assert.equal(stats.gradedCount, 0);
+  assert.equal(stats.tiers.GRADE_10.avg, null);
+  assert.equal(stats.tiers.GRADE_10.count, 0);
 });
 
 test("empty input yields null averages with zero counts", () => {
@@ -152,6 +271,8 @@ test("empty input yields null averages with zero counts", () => {
   const stats = computeEbayAvgStats([]);
   assert.equal(stats.rawAvg, null);
   assert.equal(stats.rawCount, 0);
-  assert.equal(stats.gradedAvg, null);
-  assert.equal(stats.gradedCount, 0);
+  for (const tier of ["BLACK_LABEL", "PRISTINE_10", "GRADE_10", "GRADE_9"] as const) {
+    assert.equal(stats.tiers[tier].avg, null);
+    assert.equal(stats.tiers[tier].count, 0);
+  }
 });
