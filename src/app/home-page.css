@@ -1,0 +1,550 @@
+/* Home page styles (moved from globals.css — loaded only on /) */
+
+/* ══════════════════════════════════════════════════════════════
+   C1.5 HOME — Stage C (page-scoped styles)
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Page shell ── */
+.c-home-main {
+  background: var(--bg);
+  color: var(--ink);
+  padding: 56px 0 96px;
+}
+
+.c-home-container {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-left: 32px;
+  padding-right: 32px;
+}
+
+/* ── Hero ── */
+.c-hero {
+  text-align: center;
+  max-width: 760px;
+  margin: 0 auto 56px;
+}
+
+.c-hero-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+/* Big wordmark variant — overrides .c-lockup-wm size only */
+.c-hero-wm {
+  font-size: 88px;
+}
+
+.c-hero-wm em {
+  font-size: 112px;
+  margin-left: -4px;
+  padding-right: 26px;
+  padding-bottom: 10px;
+}
+
+.c-hero-eyebrow {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--ink-2);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+.c-hero-tagline {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 44px;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  color: var(--ink);
+  margin-top: 8px;
+}
+
+.c-hero-tagline em {
+  font-family: var(--font-caveat), cursive;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 56px;
+  /* Tail-clip fix — same technique as .c-lockup-wm em */
+  padding-right: 12px;
+  padding-bottom: 4px;
+  display: inline-block;
+  background: var(--grad-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.c-hero-sub {
+  margin-top: 18px;
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 17px;
+  color: var(--ink-2);
+  line-height: 1.5;
+  max-width: 560px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ── Section label with coral dots on either side ── */
+.c-section-label {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--ink-2);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.c-section-label::before,
+.c-section-label::after {
+  content: "·";
+  margin: 0 8px;
+  color: var(--coral);
+}
+
+/* ── Games grid ── */
+.c-games-section {
+  margin-bottom: 72px;
+}
+
+.c-games-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+}
+
+.c-game-card {
+  position: relative;
+  background: var(--bg-2);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-md);
+  padding: 22px 16px 20px;
+  text-align: center;
+  text-decoration: none;
+  transition: all 0.18s ease;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-height: 130px;
+  justify-content: center;
+}
+
+.c-game-card.active:hover {
+  transform: translateY(-3px);
+  border-color: var(--coral);
+  box-shadow: 0 10px 24px rgba(26, 15, 8, 0.10);
+}
+
+.c-game-card.disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  border-style: dashed;
+  border-color: var(--ink-3);
+}
+
+/* Featured (One Piece) — gradient ring via mask-composite */
+.c-game-card.featured::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: var(--r-md);
+  padding: 1.5px;
+  background: var(--grad-brand);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.c-game-emoji {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.c-game-card.disabled .c-game-emoji {
+  filter: grayscale(1);
+}
+
+.c-game-name {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.c-game-card.disabled .c-game-name {
+  color: var(--ink-2);
+}
+
+.c-game-status {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+}
+
+.c-game-card.featured .c-game-status {
+  background: var(--grad-brand);
+  color: var(--bg);
+}
+
+.c-game-card.disabled .c-game-status {
+  background: var(--bg-3);
+  color: var(--ink-3);
+}
+
+/* ── Markets teaser ── */
+.c-preview-section {
+  margin-bottom: 72px;
+}
+
+.c-preview-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.c-preview-title {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 36px;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  line-height: 1.05;
+}
+
+.c-preview-title em {
+  font-family: var(--font-caveat), cursive;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 48px;
+  padding-right: 14px;
+  padding-bottom: 4px;
+  display: inline-block;
+  background: var(--grad-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.c-preview-link {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 2px solid;
+  border-image: var(--grad-brand) 1;
+  padding-bottom: 2px;
+}
+
+/* ── Teaser table (read-only, Vol column omitted) ── */
+.c-teaser-table {
+  background: var(--bg-2);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.c-teaser-thead,
+.c-teaser-row {
+  display: grid;
+  grid-template-columns: 56px 1fr 100px 120px 100px;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 22px;
+}
+
+.c-teaser-thead {
+  background: var(--bg-3);
+  border-bottom: 1.5px solid var(--ink);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.c-teaser-thead .right {
+  text-align: right;
+}
+
+.c-teaser-row {
+  border-top: 1px solid var(--bg-3);
+  transition: background 0.15s ease;
+  text-decoration: none;
+  color: inherit;
+}
+
+.c-teaser-row:hover {
+  background: var(--bg-3);
+}
+
+.c-teaser-rank {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.c-teaser-card-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.c-teaser-thumb {
+  width: 52px;
+  height: 73px;
+  border-radius: var(--r-sm);
+  border: 1.5px solid var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--bg);
+  flex-shrink: 0;
+  object-fit: cover;
+  background: var(--ink-2);
+}
+
+.c-teaser-card-meta {
+  min-width: 0;
+}
+
+.c-teaser-card-name {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.c-teaser-card-set {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Rarity chip in the teaser uses the canonical .c-rar component (Stage D). */
+
+.c-teaser-price {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink);
+  text-align: right;
+}
+
+.c-teaser-delta-wrap {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.c-teaser-delta {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--bg);
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+}
+
+.c-teaser-delta.up {
+  background: var(--gain-2);
+}
+
+.c-teaser-delta.down {
+  background: var(--loss-2);
+}
+
+/* Neutral / zero — matches pctColor's text-ink-3 semantics. */
+.c-teaser-delta.flat {
+  background: var(--ink-3);
+  color: var(--bg);
+}
+
+.c-teaser-empty {
+  padding: 32px 22px;
+  text-align: center;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* ── Features trio ── */
+.c-features-section {
+  margin-bottom: 72px;
+}
+
+.c-features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.c-feature {
+  background: var(--bg-2);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-md);
+  padding: 28px 26px 26px;
+}
+
+.c-feature-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-sm);
+  background: var(--grad-brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+}
+
+.c-feature h3 {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  line-height: 1.15;
+  margin-bottom: 8px;
+}
+
+.c-feature p {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
+.c-feature-link {
+  margin-top: 14px;
+  display: inline-block;
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--coral);
+  text-decoration: none;
+}
+
+.c-feature-link:hover {
+  text-decoration: underline;
+}
+
+/* ── CTA strip ── */
+.c-cta-strip {
+  background: var(--grad-brand);
+  border-radius: var(--r-lg);
+  padding: 36px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.c-cta-text {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 26px;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  line-height: 1.15;
+  max-width: 580px;
+}
+
+.c-cta-text em {
+  font-family: var(--font-caveat), cursive;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 34px;
+  padding-right: 8px;
+  padding-bottom: 2px;
+  color: var(--ink);
+}
+
+.c-cta-btn {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--bg);
+  background: var(--ink);
+  border: none;
+  border-radius: var(--r-pill);
+  padding: 14px 28px;
+  cursor: pointer;
+  text-decoration: none;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  transition: transform 0.15s ease;
+}
+
+.c-cta-btn:hover {
+  transform: translateY(-1px);
+}
+
+/* Responsive: collapse games + features grids on narrow widths */
+@media (max-width: 900px) {
+  .c-games-grid { grid-template-columns: repeat(3, 1fr); }
+  .c-features-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .c-games-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Soft-disabled feature card (Lens placeholder before live route) */
+.c-feature-link[aria-disabled="true"] {
+  color: var(--ink-3);
+  cursor: not-allowed;
+}
+.c-feature-link[aria-disabled="true"]:hover {
+  text-decoration: none;
+}
+.c-feature.disabled {
+  opacity: 0.72;
+}

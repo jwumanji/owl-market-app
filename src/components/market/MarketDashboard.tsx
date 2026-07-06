@@ -12,6 +12,7 @@ import type {
   SealedRankItem,
   EbaySaleItem,
 } from "@/lib/types";
+import "./market-dashboard.css";
 
 /* ── Shared row wrapper ── */
 function Row({ href, children }: { href?: string; children: React.ReactNode }) {

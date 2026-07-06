@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import FastCardImage from "@/components/ui/FastCardImage";
+import "./card-hover-zoom.css";
 
 const PREVIEW_W = 200;
 const PREVIEW_H = 280;
