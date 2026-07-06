@@ -146,6 +146,17 @@ test("lowercase 'bl' alone never triggers Black Label, and BL is BGS-scoped", ()
   assert.equal(parseGrade("PSA 10 BL Luffy").tier, "GRADE_10");
 });
 
+test("'Blue' and title-case 'Bl' never trigger BL detection, even on BGS", () => {
+  const { parseGrade } = loadStats();
+  // One Piece cards carry color words — "Blue" on a BGS 10 must stay GRADE_10.
+  assert.equal(parseGrade("BGS 10 Doflamingo Blue OP01-073").tier, "GRADE_10");
+  assert.equal(parseGrade("BGS 10 BLUE Luffy OP02-062").tier, "GRADE_10");
+  // Title-case "Bl" fails the case-sensitive match.
+  assert.equal(parseGrade("BGS 10 Bl Luffy OP01-024").tier, "GRADE_10");
+  // And none of these flip a 9.5 upward.
+  assert.equal(parseGrade("BGS 9.5 Blue Zoro OP01-025").tier, "GRADE_9");
+});
+
 test("'Black Label' classifies without a grader token; bare 'pristine' does not", () => {
   const { parseGrade } = loadStats();
 
