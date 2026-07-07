@@ -121,7 +121,7 @@ function PublicNav({ pathname }: { pathname: string }) {
     <nav className="c-topnav" aria-label="Primary">
       <div className="c-topnav-inner">
         <div className="c-nav-left">
-          <Link href="/" className="c-lockup">
+          <Link href="/" className="c-lockup" aria-label="OWL Market">
             <OwlMark size={36} />
             <Wordmark />
           </Link>
@@ -169,7 +169,7 @@ function AdminNav({ pathname }: { pathname: string }) {
     <nav className="c-topnav" aria-label="Primary">
       <div className="c-topnav-inner is-admin">
         <div className="c-nav-left">
-          <Link href="/" className="c-lockup">
+          <Link href="/" className="c-lockup" aria-label="OWL Market">
             <OwlMark size={36} />
             <Wordmark />
           </Link>
