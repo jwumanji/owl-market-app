@@ -132,7 +132,8 @@ export default async function Home() {
         <section className="c-hero">
           <div className="c-hero-lockup">
             <OwlMark size={80} />
-            <Wordmark className="c-hero-wm" />
+            <Wordmark className="c-hero-wm" width={435} height={85} />
+            <span className="sr-only">OWL Market</span>
           </div>
 
           <div className="c-hero-eyebrow">TCG Market Intelligence · Live</div>
