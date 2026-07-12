@@ -7,7 +7,7 @@ import FastCardImage from "@/components/ui/FastCardImage";
 import { TIER_LABELS } from "./characters-data";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
-import { ONE_PIECE_CHARACTER_IDENTITIES } from "@/lib/one-piece-character-identities";
+import { characterMatchesSearch } from "@/lib/character-search";
 import "./characters-page.css";
 
 /* ── Types ── */
@@ -44,23 +44,6 @@ export interface CharacterData {
   colorD?: string;
   colorBd?: string;
   spark?: number[];
-}
-
-const SEARCH_ALIASES = new Map(
-  ONE_PIECE_CHARACTER_IDENTITIES.map((identity) => [
-    identity.canonicalName.toLowerCase(),
-    identity.aliases.map((alias) => alias.toLowerCase()),
-  ])
-);
-
-function characterMatchesSearch(character: CharacterData, query: string) {
-  const normalizedQuery = query.trim().toLowerCase();
-  if (!normalizedQuery) return true;
-  return (
-    character.name.toLowerCase().includes(normalizedQuery) ||
-    character.faction.toLowerCase().includes(normalizedQuery) ||
-    (SEARCH_ALIASES.get(character.name.toLowerCase()) ?? []).some((alias) => alias.includes(normalizedQuery))
-  );
 }
 
 function gameDisplayName(gameRouteSlug: string) {
@@ -536,31 +519,37 @@ function AllCharactersGrid({ chars, activeSlug, onSelect }: { chars: CharacterDa
 
 /* ── Main Page (client shell — data arrives server-loaded via props) ── */
 
+const ALL_CHARACTER_BATCH_SIZE = 60;
+
 export default function CharactersClient({
   characters,
-  totalCharacterCount = characters.length,
   gameRouteSlug,
 }: {
   characters: CharacterData[];
-  totalCharacterCount?: number;
   gameRouteSlug: string;
 }) {
   const [availableCharacters, setAvailableCharacters] = useState(characters);
+  const [searchResults, setSearchResults] = useState<CharacterData[]>([]);
   const [activeChar, setActiveChar] = useState(characters[0]?.slug ?? "");
   const [search, setSearch] = useState("");
   const [showAll, setShowAll] = useState(false);
+  const [visibleAllCount, setVisibleAllCount] = useState(ALL_CHARACTER_BATCH_SIZE);
   const [detailsBySlug, setDetailsBySlug] = useState<Record<string, CharacterData>>({});
   const detailRequests = useRef(new Set<string>());
   const overviewRequested = useRef(false);
+  const searchRequestId = useRef(0);
 
-  const baseCharacter = availableCharacters.find((x) => x.slug === activeChar) || availableCharacters[0];
+  const activePool = search.trim() && searchResults.length > 0 ? searchResults : availableCharacters;
+  const baseCharacter = activePool.find((x) => x.slug === activeChar) || activePool[0];
   const c = baseCharacter && detailsBySlug[baseCharacter.slug]
     ? { ...baseCharacter, ...detailsBySlug[baseCharacter.slug] }
     : baseCharacter;
   const hasCharacters = Boolean(c);
 
   useEffect(() => {
-    if (!baseCharacter || baseCharacter.topCards.length > 0 || detailsBySlug[baseCharacter.slug]) return;
+    if (!baseCharacter || detailsBySlug[baseCharacter.slug]) return;
+    const expectedTopCards = Math.min(5, baseCharacter.cardCount);
+    if (baseCharacter.topCards.length >= expectedTopCards) return;
     if (detailRequests.current.has(baseCharacter.slug)) return;
     detailRequests.current.add(baseCharacter.slug);
     let cancelled = false;
@@ -607,10 +596,41 @@ export default function CharactersClient({
       });
   }, [gameRouteSlug]);
 
+  useEffect(() => {
+    const query = search.trim();
+    const requestId = ++searchRequestId.current;
+
+    if (!query) {
+      setSearchResults([]);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      fetch(`/api/characters?game=${encodeURIComponent(gameRouteSlug)}&q=${encodeURIComponent(query)}`)
+        .then(async (response) => {
+          if (!response.ok) throw new Error(`Character search request failed (${response.status})`);
+          return response.json() as Promise<CharacterData[]>;
+        })
+        .then((matches) => {
+          if (searchRequestId.current !== requestId) return;
+          const hydratedMatches = matches.map((character) => ({
+            ...character,
+            spark: character.spark ?? [0, Number(character.chg7d ?? 0)],
+          }));
+          setSearchResults(hydratedMatches);
+          if (hydratedMatches[0]) setActiveChar(hydratedMatches[0].slug);
+        })
+        .catch(() => {
+          if (searchRequestId.current === requestId) setSearchResults([]);
+        });
+    }, 125);
+
+    return () => window.clearTimeout(timer);
+  }, [gameRouteSlug, search]);
+
   const handleSearchChange = useCallback((value: string) => {
     setSearch(value);
-    if (value.trim()) ensureFullOverview();
-  }, [ensureFullOverview]);
+  }, []);
 
   const selectChar = useCallback((slug: string) => {
     setActiveChar(slug);
@@ -618,35 +638,11 @@ export default function CharactersClient({
   }, []);
 
   const top10 = availableCharacters.slice(0, 10);
+  const filteredChars = search.trim() ? searchResults : availableCharacters;
 
-  // Filter characters for search and auto-select first match
-  const filteredChars = search.trim()
-    ? availableCharacters.filter((ch) => characterMatchesSearch(ch, search))
-    : availableCharacters;
-
-  // When search text changes, auto-focus on the first matching character
-  useEffect(() => {
-    if (!search.trim()) return;
-    const match = availableCharacters.find((ch) => characterMatchesSearch(ch, search));
-    if (match) setActiveChar(match.slug);
-  }, [search, availableCharacters]);
 
   return (
-    <section className="chars-page">
-      <div className="breadcrumb">
-        <Link href="/" prefetch={false}>OWL Market</Link>
-        <span className="bsep"> &rsaquo; </span>
-        <span style={{ color: "var(--ink)" }}>Characters</span>
-      </div>
-      <div className="ph-eyebrow">{gameDisplayName(gameRouteSlug)}</div>
-      <div className="ph-title">
-        Character <span>Index</span>
-      </div>
-      <div className="ph-sub">
-        {totalCharacterCount} characters tracked &middot; Ranked by total card value &middot;
-        {" Updates with live data"}
-      </div>
-
+    <>
       {!hasCharacters ? (
         <div className="ch-detail" style={{ padding: 28, textAlign: "center" }}>
           <div className="ch-detail-name">No character index yet</div>
@@ -665,7 +661,7 @@ export default function CharactersClient({
           <CharToolbar
             search={search}
             onSearchChange={handleSearchChange}
-            characters={availableCharacters}
+            characters={search.trim() ? searchResults : availableCharacters}
             activeSlug={activeChar}
             onSelect={selectChar}
           />
@@ -686,7 +682,7 @@ export default function CharactersClient({
           {/* See All Characters Button / Grid */}
           {!showAll ? (
             <div className="ch-see-all-wrap">
-              <button className="ch-see-all-btn" onClick={() => { setShowAll(true); ensureFullOverview(); }}>
+              <button className="ch-see-all-btn" onClick={() => { setVisibleAllCount(ALL_CHARACTER_BATCH_SIZE); setShowAll(true); ensureFullOverview(); }}>
                 See All Characters
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="6 9 12 15 18 9" />
@@ -695,7 +691,21 @@ export default function CharactersClient({
             </div>
           ) : (
             <>
-              <AllCharactersGrid chars={filteredChars} activeSlug={activeChar} onSelect={selectChar} />
+              <AllCharactersGrid
+                chars={filteredChars.slice(0, visibleAllCount)}
+                activeSlug={activeChar}
+                onSelect={selectChar}
+              />
+              {visibleAllCount < filteredChars.length && (
+                <div className="ch-see-all-wrap">
+                  <button
+                    className="ch-see-all-btn"
+                    onClick={() => setVisibleAllCount((count) => count + ALL_CHARACTER_BATCH_SIZE)}
+                  >
+                    Load More Characters
+                  </button>
+                </div>
+              )}
               <div className="ch-see-all-wrap">
                 <button className="ch-see-all-btn" onClick={() => setShowAll(false)}>
                   Collapse
@@ -708,6 +718,6 @@ export default function CharactersClient({
           )}
         </>
       )}
-    </section>
+    </>
   );
 }

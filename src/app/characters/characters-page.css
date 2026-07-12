@@ -221,3 +221,18 @@
 .ch-rank-card-sm .ch-rank-price { font-size: 15px; }
 .ch-rank-card-sm .ch-rank-chg { font-size: 11px; margin-bottom: 0; }
 .ch-rank-card-sm .ch-rank-sub { display: none; }
+
+/* Skip layout/paint work for character content outside the viewport. */
+.ch-rank-card,
+.ch-detail-section,
+.ch-grid-card {
+  content-visibility: auto;
+}
+
+.ch-rank-card { contain-intrinsic-size: auto 190px; }
+.ch-detail-section { contain-intrinsic-size: auto 520px; }
+.ch-grid-card { contain-intrinsic-size: auto 220px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ch-rank-card { transition: none; }
+}

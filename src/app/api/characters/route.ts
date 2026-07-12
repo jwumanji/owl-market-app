@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { loadCharactersPageData } from "@/app/characters/characters-index-data";
 import { gameParamFromRequest } from "@/lib/game-scope";
 import { PUBLIC_DATA_CACHE_HEADERS } from "@/lib/public-data-cache";
+import { characterMatchesSearch } from "@/lib/character-search";
 
 // Keep in sync with CATALOG_DATA_TTL_SECONDS (Next 15 requires a literal).
 export const revalidate = 3600;
@@ -20,6 +21,16 @@ export async function GET(request: Request) {
   }
 
   const searchParams = new URL(request.url).searchParams;
+  const query = searchParams.get("q")?.trim();
+  if (query) {
+    return NextResponse.json(
+      result.characters
+        .filter((character) => characterMatchesSearch(character, query))
+        .slice(0, 20),
+      { headers: PUBLIC_DATA_CACHE_HEADERS }
+    );
+  }
+
   const slug = searchParams.get("slug")?.trim();
   if (slug) {
     const character = result.characters.find((entry) => entry.slug === slug);
