@@ -9,9 +9,9 @@ export interface SetData {
   colorD: string;
   colorBd: string;
   price: number;
-  chg7d: number;
-  chg1d: number;
-  chg30d: number;
+  chg7d: number | null;
+  chg1d: number | null;
+  chg30d: number | null;
   chgMax: number;
   cards: number;
   cardsTotal?: number;
@@ -50,9 +50,9 @@ export interface TopCard {
   rl: string;
   tcg: number;
   avg: number;
-  d1: number;
-  d7: number;
-  d30: number;
+  d1: number | null;
+  d7: number | null;
+  d30: number | null;
   sp: number[];
 }
 

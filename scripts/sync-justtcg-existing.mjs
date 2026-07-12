@@ -178,6 +178,7 @@ async function fetchJustTcgCardsForSet(slug) {
     const params = [
       `game=${encodeURIComponent(JUSTTCG_GAME)}`,
       `set=${encodeURIComponent(slug)}`,
+      "include_statistics=7d%2C30d",
       `include_price_history=${BACKFILL_HISTORY ? "true" : "false"}`,
       "include_null_prices=false",
       `limit=${limit}`,

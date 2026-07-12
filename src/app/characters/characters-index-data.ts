@@ -25,9 +25,9 @@ export interface CharacterIndexCard {
   rarity: string;
   tcg: number;
   avg: number;
-  chg1d: number;
-  chg7d: number;
-  chg30d: number;
+  chg1d: number | null;
+  chg7d: number | null;
+  chg30d: number | null;
   spark: number[];
   imageUrlSmall: string | null;
   imageUrlPreview: string | null;
@@ -42,8 +42,8 @@ export interface CharacterIndexEntry {
   tier: number;
   indexValue: number;
   cardCount: number;
-  chg7d: number;
-  chg30d: number;
+  chg7d: number | null;
+  chg30d: number | null;
   up: boolean;
   topCards: CharacterIndexCard[];
 }
@@ -55,6 +55,12 @@ export type CharactersPageLoadResult =
 function numeric(value: number | string | null | undefined) {
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function nullableNumeric(value: number | string | null | undefined) {
+  if (value == null) return null;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function stringValue(value: unknown, fallback = "") {
@@ -73,9 +79,9 @@ function summaryTopCards(value: unknown): CharacterIndexCard[] {
       rarity: stringValue(card.rarity),
       tcg: numeric(card.tcg as number | string | null | undefined),
       avg: numeric(card.avg as number | string | null | undefined),
-      chg1d: numeric(card.chg1d as number | string | null | undefined),
-      chg7d: numeric(card.chg7d as number | string | null | undefined),
-      chg30d: numeric(card.chg30d as number | string | null | undefined),
+      chg1d: nullableNumeric(card.chg1d as number | string | null | undefined),
+      chg7d: nullableNumeric(card.chg7d as number | string | null | undefined),
+      chg30d: nullableNumeric(card.chg30d as number | string | null | undefined),
       spark: Array.isArray(card.spark) ? card.spark.map((point) => numeric(point as number | string | null | undefined)) : [0, 0],
       imageUrlSmall: typeof card.imageUrlSmall === "string" ? card.imageUrlSmall : null,
       imageUrlPreview: typeof card.imageUrlPreview === "string" ? card.imageUrlPreview : null,
@@ -85,7 +91,7 @@ function summaryTopCards(value: unknown): CharacterIndexCard[] {
 
 function mapCharacterSummary(row: PublicCharacterSummaryRow): CharacterIndexEntry {
   const indexValue = numeric(row.index_value);
-  const chg7d = numeric(row.chg_7d);
+  const chg7d = nullableNumeric(row.chg_7d);
 
   return {
     slug: row.slug,
@@ -96,8 +102,8 @@ function mapCharacterSummary(row: PublicCharacterSummaryRow): CharacterIndexEntr
     indexValue,
     cardCount: row.card_count ?? 0,
     chg7d,
-    chg30d: numeric(row.chg_30d),
-    up: chg7d >= 0,
+    chg30d: nullableNumeric(row.chg_30d),
+    up: (chg7d ?? 0) >= 0,
     topCards: summaryTopCards(row.top_cards),
   };
 }
@@ -253,7 +259,13 @@ async function loadCharacterIndex(gameId: string): Promise<CharacterIndexEntry[]
   }
 
   const cardsByCharacter = new Map<string, PricedCharacterCardRow[]>();
-  const totalsByCharacter = new Map<string, { indexValue: number; totalChg7d: number; totalChg30d: number; pricedCount: number }>();
+  const totalsByCharacter = new Map<string, {
+    indexValue: number;
+    totalChg7d: number;
+    totalChg30d: number;
+    chg7dCount: number;
+    chg30dCount: number;
+  }>();
 
   for (const card of pricedCards) {
     const ps = firstRelation(card.price_stats);
@@ -268,12 +280,18 @@ async function loadCharacterIndex(gameId: string): Promise<CharacterIndexEntry[]
         indexValue: 0,
         totalChg7d: 0,
         totalChg30d: 0,
-        pricedCount: 0,
+        chg7dCount: 0,
+        chg30dCount: 0,
       };
       totals.indexValue += effectivePrice;
-      totals.totalChg7d += ps?.chg_7d ?? 0;
-      totals.totalChg30d += ps?.chg_30d ?? 0;
-      totals.pricedCount++;
+      if (ps?.chg_7d != null) {
+        totals.totalChg7d += ps.chg_7d;
+        totals.chg7dCount++;
+      }
+      if (ps?.chg_30d != null) {
+        totals.totalChg30d += ps.chg_30d;
+        totals.chg30dCount++;
+      }
       totalsByCharacter.set(characterId, totals);
     }
   }
@@ -289,10 +307,13 @@ async function loadCharacterIndex(gameId: string): Promise<CharacterIndexEntry[]
 
   const results = ((characters ?? []) as CharacterRow[]).map((char) => {
     const totals = totalsByCharacter.get(char.id);
-    const pricedCount = totals?.pricedCount ?? 0;
     const indexValue = totals?.indexValue ?? 0;
-    const avgChg7d = pricedCount > 0 ? +((totals?.totalChg7d ?? 0) / pricedCount).toFixed(1) : 0;
-    const avgChg30d = pricedCount > 0 ? +((totals?.totalChg30d ?? 0) / pricedCount).toFixed(1) : 0;
+    const avgChg7d = totals?.chg7dCount
+      ? +(totals.totalChg7d / totals.chg7dCount).toFixed(1)
+      : null;
+    const avgChg30d = totals?.chg30dCount
+      ? +(totals.totalChg30d / totals.chg30dCount).toFixed(1)
+      : null;
 
     return {
       slug: char.slug,
@@ -304,7 +325,7 @@ async function loadCharacterIndex(gameId: string): Promise<CharacterIndexEntry[]
       cardCount: cardCounts.get(char.id) ?? 0,
       chg7d: avgChg7d,
       chg30d: avgChg30d,
-      up: avgChg7d >= 0,
+      up: (avgChg7d ?? 0) >= 0,
       topCards: (topCardsByCharacter.get(char.id) ?? []).map((card) => {
         const ps = firstRelation(card.price_stats);
         const setInfo = firstRelation(card.sets);
@@ -314,9 +335,9 @@ async function loadCharacterIndex(gameId: string): Promise<CharacterIndexEntry[]
           rarity: card.rarity ?? "",
           tcg: ps?.tcg_market ?? ps?.market_avg ?? 0,
           avg: ps?.market_avg ?? 0,
-          chg1d: ps?.chg_1d ?? 0,
-          chg7d: ps?.chg_7d ?? 0,
-          chg30d: ps?.chg_30d ?? 0,
+          chg1d: ps?.chg_1d ?? null,
+          chg7d: ps?.chg_7d ?? null,
+          chg30d: ps?.chg_30d ?? null,
           spark: trendSpark(ps),
           imageUrlSmall: card.image_url_small ?? null,
           imageUrlPreview: card.image_url_preview ?? card.image_url ?? null,
@@ -336,7 +357,7 @@ async function loadCharacterIndex(gameId: string): Promise<CharacterIndexEntry[]
  * GET /api/characters so page renders and API calls reuse the same entry.
  */
 export function loadCachedCharacterIndex(gameId: string): Promise<CharacterIndexEntry[]> {
-  return cachedPublicData(publicDataCacheKey("api-characters-v8", gameId), async () => {
+  return cachedPublicData(publicDataCacheKey("api-characters-v9", gameId), async () => {
     const summaryRows = await loadCharacterSummaries(gameId);
     return summaryRows ?? loadCharacterIndex(gameId);
   }, CATALOG_DATA_TTL_SECONDS);

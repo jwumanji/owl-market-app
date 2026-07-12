@@ -31,6 +31,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# supabase local link metadata
+/supabase/.temp/
+
 # claude code
 .claude/
 

@@ -667,7 +667,7 @@ async function syncOneSet(
       const response = await client.v1.cards.get({
         game: GAME,
         set: justTcgSlug,
-        include_statistics: ["30d"],
+        include_statistics: ["7d", "30d"],
         include_null_prices: false,
         limit,
         offset,

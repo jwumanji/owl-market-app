@@ -109,6 +109,12 @@ function numeric(value: number | string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function nullableNumeric(value: number | string | null | undefined) {
+  if (value == null) return null;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function stringValue(value: unknown, fallback = "") {
   return typeof value === "string" && value.length > 0 ? value : fallback;
 }
@@ -125,9 +131,9 @@ function summaryTopCards(value: unknown) {
       rarity: stringValue(card.rarity),
       tcg: numeric(card.tcg as number | string | null | undefined),
       avg: numeric(card.avg as number | string | null | undefined),
-      chg1d: numeric(card.chg1d as number | string | null | undefined),
-      chg7d: numeric(card.chg7d as number | string | null | undefined),
-      chg30d: numeric(card.chg30d as number | string | null | undefined),
+      chg1d: nullableNumeric(card.chg1d as number | string | null | undefined),
+      chg7d: nullableNumeric(card.chg7d as number | string | null | undefined),
+      chg30d: nullableNumeric(card.chg30d as number | string | null | undefined),
       spark: Array.isArray(card.spark) ? card.spark.map((point) => numeric(point as number | string | null | undefined)) : [0, 0],
       cardImageId: stringValue(card.cardImageId),
       imageSmall: typeof card.imageSmall === "string" ? card.imageSmall : null,
@@ -153,9 +159,9 @@ function mapOnePieceRaritySummary(row: PublicRaritySummaryRow) {
     indexValue,
     cardCount: row.card_count ?? 0,
     avgCardPrice: pricedCount > 0 ? numeric(row.avg_card_price) : 0,
-    chg7d: numeric(row.chg_7d),
-    chg30d: numeric(row.chg_30d),
-    up: numeric(row.chg_7d) >= 0,
+    chg7d: nullableNumeric(row.chg_7d),
+    chg30d: nullableNumeric(row.chg_30d),
+    up: (nullableNumeric(row.chg_7d) ?? 0) >= 0,
     topCards: summaryTopCards(row.top_cards),
   };
 }
@@ -178,9 +184,9 @@ function mapCatalogRaritySummary(row: PublicRaritySummaryRow, index: number) {
     indexValue,
     cardCount: row.card_count ?? 0,
     avgCardPrice: pricedCount > 0 ? numeric(row.avg_card_price) : 0,
-    chg7d: numeric(row.chg_7d),
-    chg30d: numeric(row.chg_30d),
-    up: numeric(row.chg_7d) >= 0,
+    chg7d: nullableNumeric(row.chg_7d),
+    chg30d: nullableNumeric(row.chg_30d),
+    up: (nullableNumeric(row.chg_7d) ?? 0) >= 0,
     spark: [10, 10],
     pricingStatus: pricedCount > 0 ? "priced" as const : "catalog_only" as const,
     topCards: summaryTopCards(row.top_cards),
@@ -399,7 +405,14 @@ async function loadOnePieceRarityIndex(supabase: SupabaseServiceClient, gameId: 
     if (code) rarityCounts[code] = (rarityCounts[code] ?? 0) + 1;
   }
 
-  const rarityAgg: Record<string, { indexValue: number; totalChg7d: number; totalChg30d: number; pricedCount: number }> = {};
+  const rarityAgg: Record<string, {
+    indexValue: number;
+    totalChg7d: number;
+    totalChg30d: number;
+    pricedCount: number;
+    chg7dCount: number;
+    chg30dCount: number;
+  }> = {};
   const topCandidates: Record<string, PricedRarityCardRow[]> = {};
 
   for (const card of pricedCards) {
@@ -407,10 +420,23 @@ async function loadOnePieceRarityIndex(supabase: SupabaseServiceClient, gameId: 
     const ps = firstRelation(card.price_stats);
     if (!code || ps?.tcg_market == null) continue;
 
-    const agg = rarityAgg[code] ?? { indexValue: 0, totalChg7d: 0, totalChg30d: 0, pricedCount: 0 };
+    const agg = rarityAgg[code] ?? {
+      indexValue: 0,
+      totalChg7d: 0,
+      totalChg30d: 0,
+      pricedCount: 0,
+      chg7dCount: 0,
+      chg30dCount: 0,
+    };
     agg.indexValue += ps.tcg_market;
-    agg.totalChg7d += ps.chg_7d ?? 0;
-    agg.totalChg30d += ps.chg_30d ?? 0;
+    if (ps.chg_7d != null) {
+      agg.totalChg7d += ps.chg_7d;
+      agg.chg7dCount++;
+    }
+    if (ps.chg_30d != null) {
+      agg.totalChg30d += ps.chg_30d;
+      agg.chg30dCount++;
+    }
     agg.pricedCount++;
     rarityAgg[code] = agg;
 
@@ -438,8 +464,12 @@ async function loadOnePieceRarityIndex(supabase: SupabaseServiceClient, gameId: 
       const agg = rarityAgg[code];
       const indexValue = agg ? +agg.indexValue.toFixed(2) : 0;
       const pricedCount = agg?.pricedCount ?? 0;
-      const avgChg7d = pricedCount > 0 ? +(agg!.totalChg7d / pricedCount).toFixed(1) : 0;
-      const avgChg30d = pricedCount > 0 ? +(agg!.totalChg30d / pricedCount).toFixed(1) : 0;
+      const avgChg7d = agg?.chg7dCount
+        ? +(agg.totalChg7d / agg.chg7dCount).toFixed(1)
+        : null;
+      const avgChg30d = agg?.chg30dCount
+        ? +(agg.totalChg30d / agg.chg30dCount).toFixed(1)
+        : null;
 
       return {
         slug: code.toLowerCase(),
@@ -454,7 +484,7 @@ async function loadOnePieceRarityIndex(supabase: SupabaseServiceClient, gameId: 
         avgCardPrice: pricedCount > 0 ? +(indexValue / pricedCount).toFixed(2) : 0,
         chg7d: avgChg7d,
         chg30d: avgChg30d,
-        up: avgChg7d >= 0,
+        up: (avgChg7d ?? 0) >= 0,
         topCards: (topCardsByRarity[code] ?? []).map((card) => {
           const ps = firstRelation(card.price_stats);
           const setInfo = firstRelation(card.sets);
@@ -464,9 +494,9 @@ async function loadOnePieceRarityIndex(supabase: SupabaseServiceClient, gameId: 
             rarity: card.rarity ?? code,
             tcg: ps?.tcg_market ?? 0,
             avg: ps?.market_avg ?? 0,
-            chg1d: ps?.chg_1d ?? 0,
-            chg7d: ps?.chg_7d ?? 0,
-            chg30d: ps?.chg_30d ?? 0,
+            chg1d: ps?.chg_1d ?? null,
+            chg7d: ps?.chg_7d ?? null,
+            chg30d: ps?.chg_30d ?? null,
             spark: trendSpark(ps),
             cardImageId: card.card_image_id ?? "",
             imageSmall: card.image_url_small ?? card.image_url ?? null,

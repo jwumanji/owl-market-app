@@ -70,7 +70,8 @@ function formatPrice(v: number): string {
   return `$${v.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 }
 
-function formatChg(v: number): string {
+function formatChg(v: number | null): string {
+  if (v == null) return "—";
   return `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
 }
 
@@ -296,9 +297,9 @@ type CardCore = {
   ps: {
     market_avg: number;
     tcg_market: number;
-    chg_1d: number;
-    chg_7d: number;
-    chg_30d: number;
+    chg_1d: number | null;
+    chg_7d: number | null;
+    chg_30d: number | null;
     volume_7d: number;
     ath: number;
     atl: number;
@@ -322,9 +323,9 @@ function toCardCore(cardRow: Record<string, unknown>): CardCore | null {
     ps: {
       market_avg: ps.market_avg ?? ps.tcg_market ?? 0,
       tcg_market: ps.tcg_market ?? 0,
-      chg_1d: ps.chg_1d ?? 0,
-      chg_7d: ps.chg_7d ?? 0,
-      chg_30d: ps.chg_30d ?? 0,
+      chg_1d: ps.chg_1d ?? null,
+      chg_7d: ps.chg_7d ?? null,
+      chg_30d: ps.chg_30d ?? null,
       volume_7d: ps.volume_7d ?? 0,
       ath: ps.ath ?? 0,
       atl: ps.atl ?? 0,
@@ -435,9 +436,9 @@ function composeTopCards(top: CardCore[], historyMap: Record<string, number[]>) 
       rl: RARITY_LABELS[c.rarity] ?? c.rarity ?? "RARE",
       tcg: +c.ps.tcg_market.toFixed(2),
       avg: +c.ps.market_avg.toFixed(2),
-      d1: c.ps.chg_1d ?? 0,
-      d7: c.ps.chg_7d ?? 0,
-      d30: c.ps.chg_30d ?? 0,
+      d1: c.ps.chg_1d,
+      d7: c.ps.chg_7d,
+      d30: c.ps.chg_30d,
       sp: normSpark.length >= 2 ? normSpark : [10, 10],
     };
   });
@@ -580,26 +581,38 @@ async function loadSetsUncached(options: {
     let weightedChg1d = 0;
     let weightedChg7d = 0;
     let weightedChg30d = 0;
+    let chg1dWeight = 0;
+    let chg7dWeight = 0;
+    let chg30dWeight = 0;
     let totalVolume = 0;
     let totalAth = 0;
     let totalAtl = 0;
 
     for (const c of cards) {
       totalValue += c.ps.tcg_market;
-      weightedChg1d += c.ps.tcg_market * (c.ps.chg_1d ?? 0);
-      weightedChg7d += c.ps.tcg_market * (c.ps.chg_7d ?? 0);
-      weightedChg30d += c.ps.tcg_market * (c.ps.chg_30d ?? 0);
+      if (c.ps.chg_1d != null) {
+        weightedChg1d += c.ps.tcg_market * c.ps.chg_1d;
+        chg1dWeight += c.ps.tcg_market;
+      }
+      if (c.ps.chg_7d != null) {
+        weightedChg7d += c.ps.tcg_market * c.ps.chg_7d;
+        chg7dWeight += c.ps.tcg_market;
+      }
+      if (c.ps.chg_30d != null) {
+        weightedChg30d += c.ps.tcg_market * c.ps.chg_30d;
+        chg30dWeight += c.ps.tcg_market;
+      }
       totalVolume += (c.ps.volume_7d ?? 0) * (c.ps.tcg_market ?? 1);
       totalAth += c.ps.ath || c.ps.tcg_market;
       totalAtl += c.ps.atl || c.ps.tcg_market;
     }
 
     const price = +totalValue.toFixed(2);
-    const chg1d = totalValue > 0 ? +(weightedChg1d / totalValue).toFixed(1) : 0;
-    const chg7d = totalValue > 0 ? +(weightedChg7d / totalValue).toFixed(1) : 0;
-    const chg30d = totalValue > 0 ? +(weightedChg30d / totalValue).toFixed(1) : 0;
+    const chg1d = chg1dWeight > 0 ? +(weightedChg1d / chg1dWeight).toFixed(1) : null;
+    const chg7d = chg7dWeight > 0 ? +(weightedChg7d / chg7dWeight).toFixed(1) : null;
+    const chg30d = chg30dWeight > 0 ? +(weightedChg30d / chg30dWeight).toFixed(1) : null;
     const chgMax = totalAtl > 0 ? +(((totalValue - totalAtl) / totalAtl) * 100).toFixed(1) : 0;
-    const up = chg7d >= 0;
+    const up = (chg7d ?? chg30d ?? 0) >= 0;
 
     const top = top10ByCode[code] ?? [];
     const spark = composeSetSpark(top, historyMap);
@@ -638,7 +651,7 @@ async function loadSetsUncached(options: {
           y1: formatChg(chgMax),
           max: formatChg(chgMax),
         },
-        perfUp: [true, chg1d >= 0, chg7d >= 0, chg30d >= 0, chgMax >= 0, chgMax >= 0],
+        perfUp: [true, (chg1d ?? 0) >= 0, (chg7d ?? 0) >= 0, (chg30d ?? 0) >= 0, chgMax >= 0, chgMax >= 0],
         topCards: options.includeTopCards ? topCards : [],
         comingSoon: cards.length === 0,
       });

@@ -114,7 +114,7 @@ function generateChartData(set: SetData, range: RangeKey, seed: number): { x: st
   const numDays = RANGE_DAYS[range];
   const base = set.price;
   const vol = base * 0.03;
-  const trend = set.chg7d / 100;
+  const trend = (set.chg7d ?? set.chg30d ?? 0) / 100;
   const pts: { x: string; y: number }[] = [];
   let p = base * (1 - trend * 0.9);
   const len = Math.max(numDays, 7);
@@ -131,7 +131,8 @@ function generateChartData(set: SetData, range: RangeKey, seed: number): { x: st
   return pts;
 }
 
-function chgCell(v: number) {
+function chgCell(v: number | null) {
+  if (v == null) return <span className="setd-tc-chg flat">—</span>;
   if (v === 0) return <span className="setd-tc-chg flat">0%</span>;
   const up = v > 0;
   return <span className={`setd-tc-chg ${up ? "up" : "dn"}`}>{up ? "+" : ""}{v}%</span>;
@@ -173,15 +174,15 @@ export default function SetDetailClient({
   const catalogCards = set.catalogCards ?? [];
   const cardCount = setCardCount(set);
   const isLive = !catalogOnly && !set.comingSoon && set.cards > 0;
-  const deltaClass = set.chg30d === 0 ? "flat" : set.chg30d > 0 ? "up" : "dn";
+  const deltaClass = set.chg30d == null || set.chg30d === 0 ? "flat" : set.chg30d > 0 ? "up" : "dn";
 
   const imgSlug = set.slug.replace(/-/g, "").toLowerCase();
   const imgFile = SET_IMAGE_MAP[imgSlug];
 
   function chip(s: SetData) {
     const isActive = s.slug === set.slug;
-    const arrow = s.chg30d > 0 ? "▲" : s.chg30d < 0 ? "▼" : "·";
-    const arrowCls = s.chg30d > 0 ? "up" : s.chg30d < 0 ? "dn" : "";
+    const arrow = s.chg30d == null ? "—" : s.chg30d > 0 ? "▲" : s.chg30d < 0 ? "▼" : "·";
+    const arrowCls = s.chg30d == null ? "" : s.chg30d > 0 ? "up" : s.chg30d < 0 ? "dn" : "";
     return (
       <Link key={s.slug} href={gamePath(gameRouteSlug, `/sets/${s.slug}`)} className={`setd-chip${isActive ? " active" : ""}`}>
         <span>{s.code}</span>
@@ -343,7 +344,7 @@ export default function SetDetailClient({
               <div className="setd-cc-price-row">
                 <span className="setd-cc-price">{isLive ? fmtUsd(set.price) : "—"}</span>
                 <span className={`setd-cc-delta ${deltaClass}`}>
-                  {set.chg30d === 0 ? "" : set.chg30d > 0 ? "+" : ""}{set.chg30d}%{" "}
+                  {set.chg30d == null ? "—" : `${set.chg30d > 0 ? "+" : ""}${set.chg30d}%`}{" "}
                   <span style={{ color: "inherit", opacity: 0.75, fontSize: 10, marginLeft: 3 }}>30D</span>
                 </span>
               </div>
@@ -482,7 +483,7 @@ export default function SetDetailClient({
                       <td>{chgCell(c.d7)}</td>
                       <td>{chgCell(c.d30)}</td>
                       <td className="setd-tc-spark">
-                        <MiniSpark data={c.sp} up={c.d7 >= 0} w={90} h={22} />
+                        <MiniSpark data={c.sp} up={(c.d7 ?? c.d30 ?? 0) >= 0} w={90} h={22} />
                       </td>
                     </tr>
                   );

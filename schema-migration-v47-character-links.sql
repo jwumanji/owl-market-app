@@ -146,8 +146,8 @@ begin
         count(*)::integer as priced_count,
         coalesce(sum(effective_price), 0) as index_value,
         coalesce(avg(effective_price), 0) as avg_card_price,
-        coalesce(avg(chg_7d), 0) as chg_7d,
-        coalesce(avg(chg_30d), 0) as chg_30d
+        avg(chg_7d) as chg_7d,
+        avg(chg_30d) as chg_30d
       from priced_cards
       group by rarity_code
     ),
@@ -171,9 +171,9 @@ begin
             'rarity', coalesce(rarity, rarity_code),
             'tcg', coalesce(tcg_market, market_avg, 0),
             'avg', coalesce(market_avg, 0),
-            'chg1d', coalesce(chg_1d, 0),
-            'chg7d', coalesce(chg_7d, 0),
-            'chg30d', coalesce(chg_30d, 0),
+            'chg1d', chg_1d,
+            'chg7d', chg_7d,
+            'chg30d', chg_30d,
             'spark', jsonb_build_array(coalesce(effective_price, 0), coalesce(effective_price, 0)),
             'cardImageId', coalesce(card_image_id, ''),
             'imageSmall', coalesce(image_url_small, image_url),
@@ -210,8 +210,8 @@ begin
       coalesce(aggregates.priced_count, 0),
       round(coalesce(aggregates.index_value, 0), 2),
       round(coalesce(aggregates.avg_card_price, 0), 2),
-      round(coalesce(aggregates.chg_7d, 0), 1),
-      round(coalesce(aggregates.chg_30d, 0), 1),
+      round(aggregates.chg_7d, 1),
+      round(aggregates.chg_30d, 1),
       coalesce(top_cards.top_cards, '[]'::jsonb),
       now()
     from counts
@@ -278,8 +278,8 @@ begin
         character_id,
         count(*)::integer as priced_count,
         coalesce(sum(effective_price), 0) as index_value,
-        coalesce(avg(chg_7d), 0) as chg_7d,
-        coalesce(avg(chg_30d), 0) as chg_30d
+        avg(chg_7d) as chg_7d,
+        avg(chg_30d) as chg_30d
       from priced_cards
       group by character_id
     ),
@@ -302,9 +302,9 @@ begin
             'rarity', coalesce(rarity, ''),
             'tcg', coalesce(tcg_market, market_avg, 0),
             'avg', coalesce(market_avg, 0),
-            'chg1d', coalesce(chg_1d, 0),
-            'chg7d', coalesce(chg_7d, 0),
-            'chg30d', coalesce(chg_30d, 0),
+            'chg1d', chg_1d,
+            'chg7d', chg_7d,
+            'chg30d', chg_30d,
             'spark', jsonb_build_array(coalesce(effective_price, 0), coalesce(effective_price, 0)),
             'imageUrl', image_url,
             'imageUrlSmall', image_url_small,
@@ -346,8 +346,8 @@ begin
       coalesce(card_counts.card_count, 0),
       coalesce(aggregates.priced_count, 0),
       round(coalesce(aggregates.index_value, 0), 2),
-      round(coalesce(aggregates.chg_7d, 0), 1),
-      round(coalesce(aggregates.chg_30d, 0), 1),
+      round(aggregates.chg_7d, 1),
+      round(aggregates.chg_30d, 1),
       coalesce(top_cards.top_cards, '[]'::jsonb),
       now()
     from public.characters

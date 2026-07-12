@@ -82,12 +82,14 @@ function formatCount(value: number) {
 }
 
 function formatChange(value: number | string | null | undefined) {
+  if (value == null) return "—";
   const amount = safeNumber(value);
   if (amount === 0) return "0%";
   return `${amount > 0 ? "+" : ""}${amount}%`;
 }
 
 function changeClass(value: number | string | null | undefined) {
+  if (value == null) return "flat";
   const amount = safeNumber(value);
   if (amount === 0) return "flat";
   return amount > 0 ? "up" : "dn";
