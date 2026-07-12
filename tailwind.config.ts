@@ -10,7 +10,6 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // ── C1.5 ──
         bg: "var(--bg)",
         "bg-2": "var(--bg-2)",
         "bg-3": "var(--bg-3)",
@@ -52,10 +51,9 @@ const config: Config = {
         "text-3": "var(--text3)",
       },
       fontFamily: {
-        // ── Legacy ──
-        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
-        mono: ["var(--font-ibm-plex-mono)", "monospace"],
-        // ── C1.5 ──
+        // Unified C1.5 typography
+        sans: ["var(--font-space-grotesk)", "system-ui", "sans-serif"],
+        mono: ["var(--font-jetbrains-mono)", "monospace"],
         grotesk: ["var(--font-space-grotesk)", "system-ui", "sans-serif"],
         script: ["var(--font-caveat)", "cursive"],
         "mono-2": ["var(--font-jetbrains-mono)", "monospace"],

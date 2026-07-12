@@ -13,10 +13,14 @@
 //   --history-duration=1y  history window for --backfill-history
 
 import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const JUSTTCG_BASE = "https://api.justtcg.com/v1";
 const JUSTTCG_GAME = "one-piece-card-game";
 const ONE_PIECE_DB_SLUG = "one_piece";
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = path.resolve(SCRIPT_DIR, "..");
 const REPORT_PATH = "justtcg-existing-match-report.md";
 const APPLY = process.argv.includes("--apply");
 const WRITE_HISTORY = process.argv.includes("--history");
@@ -194,7 +198,7 @@ async function fetchJustTcgCardsForSet(slug) {
 }
 
 function parseSetSlugMap() {
-  const text = fs.readFileSync("src/lib/justtcg-match.ts", "utf8");
+  const text = fs.readFileSync(path.join(PROJECT_ROOT, "src", "lib", "justtcg-match.ts"), "utf8");
   const map = new Map();
   const re = /"([^"]+)":\s*"([A-Z0-9]+)"/g;
   let match;

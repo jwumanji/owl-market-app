@@ -17,6 +17,7 @@ import { firstRelation } from "@/lib/supabase-relations";
 type QueryResult<T> = PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
 
 const CHARACTER_TOP_CARD_LIMIT = 5;
+const CHARACTER_SUMMARY_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 
 export interface CharacterIndexCard {
   name: string;
@@ -106,6 +107,13 @@ async function loadCharacterSummaries(gameId: string) {
   const rows = await loadPublicCharacterSummaryRows(supabase, gameId);
   if (!rows) return null;
 
+  const latestUpdate = Math.max(
+    ...rows.map((row) => Date.parse(row.updated_at ?? "")).filter(Number.isFinite)
+  );
+  if (!Number.isFinite(latestUpdate) || Date.now() - latestUpdate > CHARACTER_SUMMARY_MAX_AGE_MS) {
+    return null;
+  }
+
   return rows
     .map(mapCharacterSummary)
     .filter((character) => character.indexValue > 0)
@@ -192,15 +200,13 @@ async function loadCharacterIndex(gameId: string): Promise<CharacterIndexEntry[]
     throw new Error(charErr.message);
   }
 
-  const [cardCountRows, pricedCards] = await Promise.all([
-    fetchPaged<{ character_id: string | null }>((from, to) =>
+  const [characterLinks, pricedCards] = await Promise.all([
+    fetchPaged<{ card_id: string; character_id: string }>((from, to) =>
       supabase
-        .from("cards")
-        .select("character_id")
+        .from("card_character_links")
+        .select("card_id, character_id")
         .eq("game_id", gameId)
-        .eq("region", "en")
-        .not("character_id", "is", null)
-        .order("id")
+        .order("card_id")
         .range(from, to)
     ),
     fetchPaged<PricedCharacterCardRow>((from, to) =>
@@ -232,49 +238,51 @@ async function loadCharacterIndex(gameId: string): Promise<CharacterIndexEntry[]
         .eq("game_id", gameId)
         .eq("region", "en")
         .not("character_id", "is", null)
-        .not("price_stats.tcg_market", "is", null)
         .order("id")
         .range(from, to)
     ),
   ]);
 
   const cardCounts = new Map<string, number>();
-  for (const card of cardCountRows) {
-    if (card.character_id) {
-      cardCounts.set(card.character_id, (cardCounts.get(card.character_id) ?? 0) + 1);
-    }
+  const characterIdsByCard = new Map<string, string[]>();
+  for (const link of characterLinks) {
+    cardCounts.set(link.character_id, (cardCounts.get(link.character_id) ?? 0) + 1);
+    const characterIds = characterIdsByCard.get(link.card_id) ?? [];
+    characterIds.push(link.character_id);
+    characterIdsByCard.set(link.card_id, characterIds);
   }
 
   const cardsByCharacter = new Map<string, PricedCharacterCardRow[]>();
   const totalsByCharacter = new Map<string, { indexValue: number; totalChg7d: number; totalChg30d: number; pricedCount: number }>();
 
   for (const card of pricedCards) {
-    if (!card.character_id) continue;
     const ps = firstRelation(card.price_stats);
-    if (ps?.tcg_market == null) continue;
+    const effectivePrice = ps?.tcg_market ?? ps?.market_avg;
+    if (effectivePrice == null) continue;
+    for (const characterId of characterIdsByCard.get(card.id) ?? []) {
+      const cards = cardsByCharacter.get(characterId) ?? [];
+      cards.push(card);
+      cardsByCharacter.set(characterId, cards);
 
-    const cards = cardsByCharacter.get(card.character_id) ?? [];
-    cards.push(card);
-    cardsByCharacter.set(card.character_id, cards);
-
-    const totals = totalsByCharacter.get(card.character_id) ?? {
-      indexValue: 0,
-      totalChg7d: 0,
-      totalChg30d: 0,
-      pricedCount: 0,
-    };
-    totals.indexValue += ps.tcg_market;
-    totals.totalChg7d += ps.chg_7d ?? 0;
-    totals.totalChg30d += ps.chg_30d ?? 0;
-    totals.pricedCount++;
-    totalsByCharacter.set(card.character_id, totals);
+      const totals = totalsByCharacter.get(characterId) ?? {
+        indexValue: 0,
+        totalChg7d: 0,
+        totalChg30d: 0,
+        pricedCount: 0,
+      };
+      totals.indexValue += effectivePrice;
+      totals.totalChg7d += ps?.chg_7d ?? 0;
+      totals.totalChg30d += ps?.chg_30d ?? 0;
+      totals.pricedCount++;
+      totalsByCharacter.set(characterId, totals);
+    }
   }
 
   const topCardsByCharacter = new Map<string, PricedCharacterCardRow[]>();
 
   for (const [characterId, cards] of Array.from(cardsByCharacter.entries())) {
     const topCards = [...cards]
-      .sort((a, b) => (firstRelation(b.price_stats)?.tcg_market ?? 0) - (firstRelation(a.price_stats)?.tcg_market ?? 0))
+      .sort((a, b) => (firstRelation(b.price_stats)?.tcg_market ?? firstRelation(b.price_stats)?.market_avg ?? 0) - (firstRelation(a.price_stats)?.tcg_market ?? firstRelation(a.price_stats)?.market_avg ?? 0))
       .slice(0, CHARACTER_TOP_CARD_LIMIT);
     topCardsByCharacter.set(characterId, topCards);
   }
@@ -304,7 +312,7 @@ async function loadCharacterIndex(gameId: string): Promise<CharacterIndexEntry[]
           name: card.name,
           set: setInfo?.code ?? "",
           rarity: card.rarity ?? "",
-          tcg: ps?.tcg_market ?? 0,
+          tcg: ps?.tcg_market ?? ps?.market_avg ?? 0,
           avg: ps?.market_avg ?? 0,
           chg1d: ps?.chg_1d ?? 0,
           chg7d: ps?.chg_7d ?? 0,
@@ -328,7 +336,7 @@ async function loadCharacterIndex(gameId: string): Promise<CharacterIndexEntry[]
  * GET /api/characters so page renders and API calls reuse the same entry.
  */
 export function loadCachedCharacterIndex(gameId: string): Promise<CharacterIndexEntry[]> {
-  return cachedPublicData(publicDataCacheKey("api-characters-v7", gameId), async () => {
+  return cachedPublicData(publicDataCacheKey("api-characters-v8", gameId), async () => {
     const summaryRows = await loadCharacterSummaries(gameId);
     return summaryRows ?? loadCharacterIndex(gameId);
   }, CATALOG_DATA_TTL_SECONDS);

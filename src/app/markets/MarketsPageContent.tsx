@@ -56,7 +56,7 @@ const MARKET_PRICE_CARD_SELECT = `
 
 const PREMIUM_RARITIES = ["MR", "PROMO", "SP", "SEC", "TR"];
 
-export async function MarketsPageContent({
+async function renderMarketsPageContent({
   gameRouteSlug = DEFAULT_PUBLIC_GAME_ROUTE_SLUG,
 }: {
   gameRouteSlug?: string | null;
@@ -252,7 +252,7 @@ export async function MarketsPageContent({
           </header>
 
           <div className="rounded-c-md border-[1.5px] border-ink bg-bg-2 p-8">
-            <div className="font-mono-2 text-[11px] uppercase tracking-[0.14em] text-ink-3 font-semibold mb-3">
+            <div className="font-mono-2 text-[11px] uppercase tracking-[0.14em] text-ink-2 font-semibold mb-3">
               Catalog-only game
             </div>
             <h2 className="font-grotesk text-[28px] leading-tight font-bold text-ink mb-3">
@@ -433,6 +433,41 @@ export async function MarketsPageContent({
       </section>
     </main>
   );
+}
+
+export async function MarketsPageContent(
+  props: { gameRouteSlug?: string | null } = {},
+) {
+  try {
+    return await renderMarketsPageContent(props);
+  } catch {
+    const gameRouteSlug = props.gameRouteSlug ?? DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
+
+    return (
+      <main className="bg-bg text-ink min-h-screen pt-8 pb-24">
+        <section className="max-w-[1280px] mx-auto px-7">
+          <div className="rounded-c-md border-[1.5px] border-ink bg-bg-2 p-8">
+            <div className="font-mono-2 text-[11px] uppercase tracking-[0.14em] text-ink-2 font-semibold mb-3">
+              Market service unavailable
+            </div>
+            <h1 className="font-grotesk text-[34px] leading-tight font-bold text-ink mb-3">
+              Live pricing is temporarily unavailable.
+            </h1>
+            <p className="font-mono-2 text-[13px] leading-6 font-semibold text-ink-2 max-w-[720px]">
+              The catalog is still available while the pricing service recovers. Please try the
+              market page again shortly.
+            </p>
+            <Link
+              href={gamePath(gameRouteSlug, "/catalog")}
+              className="mt-6 inline-flex rounded-c-sm border-[1.5px] border-ink bg-ink text-bg px-4 py-2 font-mono-2 text-[11px] font-bold uppercase tracking-[0.08em] no-underline"
+            >
+              Open catalog
+            </Link>
+          </div>
+        </section>
+      </main>
+    );
+  }
 }
 
 export default async function MarketsPage() {

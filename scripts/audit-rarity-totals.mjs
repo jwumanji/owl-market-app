@@ -216,7 +216,7 @@ console.log(`Using game scope: ${GAME.slug}`);
 
 const sets = await fetchAll(withGameFilter("sets?select=id,code,slug,name", GAME.id));
 const cards = await fetchAll(
-  withGameFilter("cards?select=id,set_id,card_image_id,card_number,name,variant_label,rarity,price_stats(tcg_market,market_avg)", GAME.id)
+  withGameFilter("cards?select=id,set_id,card_image_id,card_number,name,variant_label,rarity,price_stats!price_stats_card_game_fk(tcg_market,market_avg)", GAME.id)
 );
 
 const setById = new Map(sets.map((s) => [s.id, s]));

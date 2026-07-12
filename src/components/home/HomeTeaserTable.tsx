@@ -103,6 +103,7 @@ export default function HomeTeaserTable({
             <Link
               key={card.id}
               href={gamePath(gameRouteSlug, `/card/${card.card_image_id ?? card.id}`)}
+              prefetch={false}
               className="c-teaser-row"
             >
               <span className="c-teaser-rank">{String(i + 1).padStart(2, "0")}</span>

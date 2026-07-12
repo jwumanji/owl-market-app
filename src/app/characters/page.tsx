@@ -19,9 +19,9 @@ const PALETTE = [
   { color: "#137A8C", colorD: "rgba(19,122,140,0.14)", colorBd: "rgba(19,122,140,0.32)" }, // l-teal
 ];
 
-function generateSparkFromChange(chg7d: number, chg30d: number): number[] {
+function generateSparkFromChange(chg7d: number | null, chg30d: number | null): number[] {
   const base = 10;
-  const trend = chg30d / 100;
+  const trend = (chg30d ?? chg7d ?? 0) / 100;
   const pts: number[] = [];
   let p = base * (1 - trend * 0.5);
   for (let i = 0; i < 13; i++) {
@@ -29,7 +29,7 @@ function generateSparkFromChange(chg7d: number, chg30d: number): number[] {
     pts.push(+Math.max(p, 1).toFixed(1));
   }
   // nudge final point to reflect 7d direction
-  pts[pts.length - 1] = pts[pts.length - 2] + (chg7d > 0 ? 0.5 : -0.5);
+  pts[pts.length - 1] = pts[pts.length - 2] + ((chg7d ?? chg30d ?? 0) > 0 ? 0.5 : -0.5);
   return pts;
 }
 
@@ -59,12 +59,28 @@ export default async function CharactersPage(
   // Same fallback semantics as the old client fetch: the default game keeps
   // the static index when live data is empty/unavailable; other games show
   // the "No character index yet" empty state.
-  const characters = assignColors(loaded ?? (isDefaultGame ? FALLBACK_CHARS : []));
+  const allCharacters = assignColors(loaded ?? (isDefaultGame ? FALLBACK_CHARS : []));
+  const totalCharacterCount = allCharacters.length;
+  const characters = allCharacters.slice(0, 10).map((character, index) =>
+    index < 10
+      ? character
+      : {
+          ...character,
+          // Keep the ranking/search payload compact. Full card detail for
+          // long-tail characters is loaded only when the user selects one.
+          topCards: [],
+          color: undefined,
+          colorD: undefined,
+          colorBd: undefined,
+          spark: [0, Number(character.chg7d ?? 0)],
+        }
+  );
 
   return (
     <CharactersClient
       key={gameRouteSlug}
       characters={characters}
+      totalCharacterCount={totalCharacterCount}
       gameRouteSlug={gameRouteSlug}
     />
   );

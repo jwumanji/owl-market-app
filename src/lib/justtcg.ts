@@ -53,13 +53,25 @@ export interface JustTCGSet {
   set_value_usd: number | null;
 }
 
+interface PageInfo {
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+
 interface PaginatedResponse<T> {
   data: T[];
-  meta: { total: number; limit: number; offset: number; hasMore: boolean };
+  meta?: PageInfo;
+  pagination?: PageInfo;
+}
+
+function hasMore<T>(response: PaginatedResponse<T>) {
+  return Boolean(response.pagination?.hasMore ?? response.meta?.hasMore);
 }
 
 async function fetchJSON<T>(url: string): Promise<T> {
-  const res = await fetch(url, { headers: headers() });
+  const res = await fetch(url, { headers: headers(), cache: "no-store" });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`JustTCG ${res.status}: ${body}`);
@@ -67,12 +79,21 @@ async function fetchJSON<T>(url: string): Promise<T> {
   return res.json();
 }
 
-/** Fetch all One Piece TCG sets */
+/** Fetch all One Piece TCG sets, handling future pagination growth. */
 export async function fetchSets(): Promise<JustTCGSet[]> {
-  const res = await fetchJSON<PaginatedResponse<JustTCGSet>>(
-    `${BASE}/sets?game=${GAME}&limit=100`
-  );
-  return res.data;
+  const all: JustTCGSet[] = [];
+  let offset = 0;
+
+  while (true) {
+    const res = await fetchJSON<PaginatedResponse<JustTCGSet>>(
+      `${BASE}/sets?game=${GAME}&limit=100&offset=${offset}`
+    );
+    all.push(...res.data);
+    if (!hasMore(res)) break;
+    offset += 100;
+  }
+
+  return all;
 }
 
 /** Fetch all cards in a set, handling pagination (100 per page) */
@@ -85,7 +106,7 @@ export async function fetchCardsBySet(setSlug: string): Promise<JustTCGCard[]> {
       `${BASE}/cards?game=${GAME}&set=${encodeURIComponent(setSlug)}&include_price_history=false&limit=100&offset=${offset}`
     );
     all.push(...res.data);
-    if (!res.meta.hasMore) break;
+    if (!hasMore(res)) break;
     offset += 100;
   }
 

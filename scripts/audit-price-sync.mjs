@@ -31,7 +31,7 @@ const sets = await fetchAll(withGameFilter("sets?select=id,code,slug", GAME.id))
 const setIdToCode = new Map(sets.map(s => [s.id, (s.code ?? "").toUpperCase()]));
 const promoSetId = sets.find(s => s.slug === "promo")?.id ?? null;
 
-const cards = await fetchAll(withGameFilter("cards?select=id,set_id,name,card_number,variant_label,rarity,price_stats(tcg_market,market_avg,tcg_low,updated_at)", GAME.id));
+const cards = await fetchAll(withGameFilter("cards?select=id,set_id,name,card_number,variant_label,rarity,price_stats!price_stats_card_game_fk(tcg_market,market_avg,tcg_low,updated_at)", GAME.id));
 console.log(`cards=${cards.length}`);
 
 const FOCUS = ["SR","L","R","SEC","TR","UC","C"];

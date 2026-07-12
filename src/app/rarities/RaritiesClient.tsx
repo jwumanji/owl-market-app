@@ -385,7 +385,7 @@ function FeaturedCard({
 
   if (href) {
     return (
-      <Link href={href} className="rar-feature-card">
+      <Link href={href} className="rar-feature-card" prefetch={false}>
         {content}
       </Link>
     );
@@ -445,7 +445,7 @@ function FullRankingTable({
                     )}
                     <div style={{ minWidth: 0 }}>
                       {href ? (
-                        <Link href={href} className="rar-card-name-link">
+                        <Link href={href} className="rar-card-name-link" prefetch={false}>
                           {card.name}
                         </Link>
                       ) : (
@@ -584,7 +584,7 @@ export default function RaritiesClient({
   return (
     <section className="rar-page">
       <div className="breadcrumb">
-        <Link href="/">OWL Market</Link>
+        <Link href="/" prefetch={false}>OWL Market</Link>
         <span className="bsep"> &rsaquo; </span>
         <span style={{ color: "var(--ink)" }}>Rarities</span>
       </div>

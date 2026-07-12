@@ -17,7 +17,7 @@ import "./market-dashboard.css";
 /* ── Shared row wrapper ── */
 function Row({ href, children }: { href?: string; children: React.ReactNode }) {
   const cls = "c-drow";
-  if (href) return <Link href={href} className={cls}>{children}</Link>;
+  if (href) return <Link href={href} className={cls} prefetch={false}>{children}</Link>;
   return <div className={cls}>{children}</div>;
 }
 

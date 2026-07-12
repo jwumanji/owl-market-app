@@ -52,7 +52,7 @@ export async function GET(request: Request) {
         .select(`
           card_id, tcg_market, market_avg,
           chg_1d, chg_7d, chg_30d,
-          card:card_id (name, rarity)
+          card:cards!price_stats_card_game_fk (name, rarity)
         `)
         .eq("game_id", game.id)
         .in("card_id", cardIds)

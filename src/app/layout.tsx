@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { preconnect, prefetchDNS } from "react-dom";
 import {
-  Inter,
-  IBM_Plex_Mono,
   Space_Grotesk,
   Caveat,
   JetBrains_Mono,
@@ -10,33 +8,20 @@ import {
 import Nav from "@/components/layout/Nav";
 import "./globals.css";
 
-// ── Legacy fonts (kept during migration) ──
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
-const ibmPlexMono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-ibm-plex-mono",
-  display: "swap",
-});
 
 // ── C1.5 fonts (introduced in Stage A) ──
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-space-grotesk",
-  display: "swap",
+  display: "optional",
 });
 
 const caveat = Caveat({
   subsets: ["latin"],
   weight: ["700"],
   variable: "--font-caveat",
-  display: "swap",
+  display: "optional",
 });
 
 const jetbrainsMono = JetBrains_Mono({
@@ -81,7 +66,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${inter.variable} ${ibmPlexMono.variable} ${spaceGrotesk.variable} ${caveat.variable} ${jetbrainsMono.variable} font-sans antialiased`}
+        className={`${spaceGrotesk.variable} ${caveat.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
         {/* No Suspense here: the public nav is prerender-safe (no
             useSearchParams), so static HTML always includes it — the old

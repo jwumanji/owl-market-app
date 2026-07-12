@@ -16,7 +16,7 @@ export default function DashboardWidget({ icon, title, viewAllHref, children }: 
           <span className="c-widget-icon">{icon}</span> {title}
         </span>
         {viewAllHref && (
-          <Link href={viewAllHref} className="c-widget-all">
+          <Link href={viewAllHref} className="c-widget-all" prefetch={false}>
             View all &rarr;
           </Link>
         )}

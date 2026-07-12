@@ -4,12 +4,16 @@
 // - Does not mutate the database.
 
 import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { loadGameScope, scriptGameSlug, withGameFilter } from "./lib/supabase-game-scope.mjs";
 
 const OPT_BASE = "https://optcgapi.com/api";
 const OPT_IMAGE_BASE = "https://optcgapi.com/media/static/Card_Images";
 const JUSTTCG_BASE = "https://api.justtcg.com/v1";
 const JUSTTCG_GAME = "one-piece-card-game";
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = path.resolve(SCRIPT_DIR, "..");
 const REPORT_PATH = "catalog-audit-report.md";
 
 const BANDAI_BASE_OVERRIDES = new Map([
@@ -232,7 +236,7 @@ function expectedRarity(card) {
 }
 
 function parseSetSlugMap() {
-  const file = "src/lib/justtcg-match.ts";
+  const file = path.join(PROJECT_ROOT, "src", "lib", "justtcg-match.ts");
   if (!fs.existsSync(file)) return new Map();
   const text = fs.readFileSync(file, "utf8");
   const map = new Map();
@@ -778,7 +782,7 @@ function expectedRow(card) {
     attribute: nullIfNullStr(card.attribute),
     types,
     effect: normText(card.card_text),
-    image_url: nullIfNullStr(card.card_image),
+    image_source_url: nullIfNullStr(card.card_image),
   };
 }
 
@@ -790,7 +794,7 @@ function sourceClaimSignature(entry) {
     name: expected.name,
     rarity: expected.rarityDerived,
     variant_label: expected.variantLabel,
-    image_url: expected.image_url,
+    image_source_url: expected.image_source_url,
   });
 }
 
@@ -830,7 +834,7 @@ async function main() {
   console.log(`Loading Supabase sets/cards for game scope: ${game.slug}...`);
   const [dbSets, dbCards, promoSegmentError] = await Promise.all([
     sbFetchAll(withGameFilter("sets?select=id,slug,code,name,card_count,series,year", game.id)),
-    sbFetchAll(withGameFilter("cards?select=id,card_image_id,card_number,name,name_base,variant_label,set_id,rarity,card_type,color,power,counter,life,cost,attribute,types,effect,trigger,image_url,image_url_small,tcg_product_id,price_stats(tcg_market,market_avg,updated_at)", game.id)),
+    sbFetchAll(withGameFilter("cards?select=id,card_image_id,card_number,name,name_base,variant_label,set_id,rarity,card_type,color,power,counter,life,cost,attribute,types,effect,trigger,image_url,image_source_url,image_url_small,tcg_product_id,price_stats!price_stats_card_game_fk(tcg_market,market_avg,updated_at)", game.id)),
     tryPromoSegmentProbe(game.id),
   ]);
 
@@ -1084,7 +1088,7 @@ async function main() {
     compareField(mismatches, "attribute", db.attribute, expected.attribute, normText);
     compareField(mismatches, "types", arrayText(db.types), expected.types, normText);
     compareField(mismatches, "effect", db.effect, expected.effect, normText);
-    compareField(mismatches, "image_url", db.image_url, expected.image_url, normText);
+    compareField(mismatches, "image_source_url", db.image_source_url, expected.image_source_url, normText);
 
     if (mismatches.length > 0) {
       perSetRow.mismatched++;
