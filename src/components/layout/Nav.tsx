@@ -1,12 +1,12 @@
 "use client";
 
-import { Suspense, useEffect, useMemo } from "react";
+import { Suspense, useMemo } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import OwlMark from "@/components/brand/OwlMark";
 import Wordmark from "@/components/brand/Wordmark";
 import { DEFAULT_PUBLIC_GAME_DB_SLUG, DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
-import { gamePath, gameQueryValue } from "@/lib/game-routes";
+import { gamePath } from "@/lib/game-routes";
 import Ticker from "./Ticker";
 
 type NavVariant = "public" | "admin";
@@ -97,31 +97,15 @@ export default function Nav({ variant }: NavProps) {
 }
 
 function PublicNav({ pathname }: { pathname: string }) {
-  const router = useRouter();
   const activeGameRouteSlug = gameRouteSlugFromPath(pathname);
   const isDefaultPublicGame = activeGameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
-  const links = useMemo(() => publicLinks(activeGameRouteSlug), [activeGameRouteSlug]);
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      for (const link of links) {
-        router.prefetch(link.href);
-      }
-
-      const game = encodeURIComponent(gameQueryValue(activeGameRouteSlug));
-      void fetch(`/api/rarities?game=${game}`, { cache: "force-cache" }).catch(() => {});
-      void fetch(`/api/characters?game=${game}`, { cache: "force-cache" }).catch(() => {});
-      void fetch(`/api/markets?game=${game}&limit=20`, { cache: "force-cache" }).catch(() => {});
-    }, 300);
-
-    return () => window.clearTimeout(timeout);
-  }, [activeGameRouteSlug, links, router]);
+  const links = publicLinks(activeGameRouteSlug);
 
   return (
     <nav className="c-topnav" aria-label="Primary">
       <div className="c-topnav-inner">
         <div className="c-nav-left">
-          <Link href="/" className="c-lockup">
+          <Link href="/" className="c-lockup" aria-label="OWL Market" prefetch={false}>
             <OwlMark size={36} />
             <Wordmark />
           </Link>
@@ -132,6 +116,7 @@ function PublicNav({ pathname }: { pathname: string }) {
             <li key={link.href}>
               <Link
                 href={link.href}
+                prefetch={false}
                 className={`c-nav-link${isActivePath(pathname, link.href, link.exact) ? " active" : ""}`}
               >
                 {link.label}
@@ -145,7 +130,7 @@ function PublicNav({ pathname }: { pathname: string }) {
             <span className="c-live-dot" />
             {isDefaultPublicGame ? "LIVE" : "CATALOG"}
           </span>
-          <Link href="/login" className="c-signin-btn">
+          <Link href="/login" className="c-signin-btn" prefetch={false}>
             Sign in
           </Link>
         </div>
@@ -169,7 +154,7 @@ function AdminNav({ pathname }: { pathname: string }) {
     <nav className="c-topnav" aria-label="Primary">
       <div className="c-topnav-inner is-admin">
         <div className="c-nav-left">
-          <Link href="/" className="c-lockup">
+          <Link href="/" className="c-lockup" aria-label="OWL Market" prefetch={false}>
             <OwlMark size={36} />
             <Wordmark />
           </Link>
@@ -182,6 +167,7 @@ function AdminNav({ pathname }: { pathname: string }) {
             <li key={link.href}>
               <Link
                 href={link.href}
+                prefetch={false}
                 className={`c-nav-link${isActivePath(pathname, link.href, link.exact) ? " active" : ""}`}
               >
                 {link.label}

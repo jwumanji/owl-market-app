@@ -2,8 +2,8 @@
 //
 // This script treats optcgapi as the source of truth for catalog fields:
 // set membership, card number, name, rarity classification, type/stat fields,
-// and optcg image URL. It preserves enrichment fields such as tcg_product_id,
-// image_url_small, prices, and history.
+// and optcg source image URL. It preserves mirrored display images and
+// enrichment fields such as tcg_product_id, image_url_small, prices, and history.
 //
 // Default mode is a dry run. Use --apply to write deterministic upserts.
 
@@ -368,7 +368,7 @@ function expectedRow(rawCard, source, setByCode, gameId) {
     types: types ? [types] : null,
     effect: normText(rawCard.card_text),
     trigger,
-    image_url: imageUrl,
+    image_source_url: imageUrl,
   };
 }
 
@@ -397,7 +397,7 @@ function diffRow(existing, expected) {
     "types",
     "effect",
     "trigger",
-    "image_url",
+    "image_source_url",
   ];
   const changed = [];
   for (const field of fields) {
@@ -426,7 +426,7 @@ function rowKey(row) {
     arrayText(row.types),
     row.effect,
     row.trigger,
-    row.image_url,
+    row.image_source_url,
   ].map((value) => JSON.stringify(value ?? null)).join("|");
 }
 
@@ -452,7 +452,7 @@ async function main() {
   console.log("Loading Supabase One Piece sets/cards...");
   const [dbSets, dbCards] = await Promise.all([
     sbFetchAll(`sets?select=id,game_id,slug,code,name,card_count,series&${gameFilter}`),
-    sbFetchAll(`cards?select=id,game_id,card_image_id,card_number,name,name_base,variant_label,set_id,rarity,card_type,color,power,counter,life,cost,attribute,types,effect,trigger,image_url,tcg_product_id,image_url_small&${gameFilter}`),
+    sbFetchAll(`cards?select=id,game_id,card_image_id,card_number,name,name_base,variant_label,set_id,rarity,card_type,color,power,counter,life,cost,attribute,types,effect,trigger,image_url,image_source_url,tcg_product_id,image_url_small&${gameFilter}`),
   ]);
 
   const setByCode = new Map();
@@ -586,7 +586,10 @@ async function main() {
       continue;
     }
 
-    safeRows.push(row);
+    safeRows.push({
+      ...row,
+      image_url: existing?.image_url ?? row.image_source_url,
+    });
     if (!existing) inserts.push({ source, row, changed });
     else updates.push({ source, row, existing, changed });
     for (const field of changed) {

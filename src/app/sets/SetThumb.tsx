@@ -24,11 +24,13 @@ export default function SetThumb({
   code,
   color,
   variant = "table",
+  priority = false,
 }: {
   slug: string;
   code: string;
   color: string;
   variant?: Variant;
+  priority?: boolean;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
   const [pos, setPos] = useState<{ x: number; y: number; flipLeft: boolean } | null>(null);
@@ -60,7 +62,16 @@ export default function SetThumb({
         onBlur={hidePreview}
       >
         {imgUrl ? (
-          <Image src={imgUrl} alt={`${code} box art`} width={sz.w} height={sz.h} sizes={`${sz.w}px`} loading="lazy" />
+          <Image
+            src={imgUrl}
+            alt={`${code} box art`}
+            width={sz.w}
+            height={sz.h}
+            sizes={`${sz.w}px`}
+            priority={priority}
+            fetchPriority={priority ? "high" : "low"}
+            loading={priority ? "eager" : "lazy"}
+          />
         ) : (
           <span className={sz.placeholderCls} aria-hidden>
             {code.replace(/[0-9]/g, "")[0] ?? "·"}

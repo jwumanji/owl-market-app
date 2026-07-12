@@ -128,7 +128,7 @@ function HeadlineCard({
   }
   const style = { ["--hl-color" as string]: set.color, ["--hl-color-d" as string]: colorD } as React.CSSProperties;
   return (
-    <Link href={gamePath(gameRouteSlug, `/sets/${set.slug}`)} className="sets-v2-hl" style={style}>
+    <Link href={gamePath(gameRouteSlug, `/sets/${set.slug}`)} className="sets-v2-hl" style={style} prefetch={false}>
       <div className="sets-v2-hl-glow" />
       <div className="sets-v2-hl-head">
         <span className="sets-v2-hl-label">{label}</span>
@@ -139,7 +139,7 @@ function HeadlineCard({
         {set.year && <span className="sets-v2-hl-year">{set.year}</span>}
       </div>
       <div className="sets-v2-hl-title-row">
-        <SetThumb slug={set.slug} code={set.code} color={set.color} variant="headline" />
+        <SetThumb slug={set.slug} code={set.code} color={set.color} variant="headline" priority />
         <div className="sets-v2-hl-name">{set.name}</div>
       </div>
       <div className="sets-v2-hl-stat-row">
@@ -260,7 +260,7 @@ export default function SetsClient({
   return (
     <section className="sets-v2-page">
       <div className="sets-v2-breadcrumb">
-        <Link href="/">OWL Market</Link>
+        <Link href="/" prefetch={false}>OWL Market</Link>
         <span className="bsep">›</span>
         <span className="here">Sets</span>
       </div>

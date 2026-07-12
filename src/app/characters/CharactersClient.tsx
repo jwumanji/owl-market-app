@@ -7,6 +7,7 @@ import FastCardImage from "@/components/ui/FastCardImage";
 import { TIER_LABELS } from "./characters-data";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
+import { ONE_PIECE_CHARACTER_IDENTITIES } from "@/lib/one-piece-character-identities";
 import "./characters-page.css";
 
 /* ── Types ── */
@@ -43,6 +44,23 @@ export interface CharacterData {
   colorD?: string;
   colorBd?: string;
   spark?: number[];
+}
+
+const SEARCH_ALIASES = new Map(
+  ONE_PIECE_CHARACTER_IDENTITIES.map((identity) => [
+    identity.canonicalName.toLowerCase(),
+    identity.aliases.map((alias) => alias.toLowerCase()),
+  ])
+);
+
+function characterMatchesSearch(character: CharacterData, query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return true;
+  return (
+    character.name.toLowerCase().includes(normalizedQuery) ||
+    character.faction.toLowerCase().includes(normalizedQuery) ||
+    (SEARCH_ALIASES.get(character.name.toLowerCase()) ?? []).some((alias) => alias.includes(normalizedQuery))
+  );
 }
 
 function gameDisplayName(gameRouteSlug: string) {
@@ -242,11 +260,7 @@ function CharToolbar({
 
   // Filter dropdown by search text
   const filtered = search.trim()
-    ? sorted.filter(
-        (ch) =>
-          ch.name.toLowerCase().includes(search.toLowerCase()) ||
-          ch.faction.toLowerCase().includes(search.toLowerCase())
-      )
+    ? sorted.filter((ch) => characterMatchesSearch(ch, search))
     : sorted;
 
   // Close dropdown on outside click
@@ -528,23 +542,20 @@ export default function CharactersClient({
 
   // Filter characters for search and auto-select first match
   const filteredChars = search.trim()
-    ? characters.filter((ch) => ch.name.toLowerCase().includes(search.toLowerCase()) || ch.faction.toLowerCase().includes(search.toLowerCase()))
+    ? characters.filter((ch) => characterMatchesSearch(ch, search))
     : characters;
 
   // When search text changes, auto-focus on the first matching character
   useEffect(() => {
     if (!search.trim()) return;
-    const q = search.toLowerCase();
-    const match = characters.find(
-      (ch) => ch.name.toLowerCase().includes(q) || ch.faction.toLowerCase().includes(q)
-    );
+    const match = characters.find((ch) => characterMatchesSearch(ch, search));
     if (match) setActiveChar(match.slug);
   }, [search, characters]);
 
   return (
     <section className="chars-page">
       <div className="breadcrumb">
-        <Link href="/">OWL Market</Link>
+        <Link href="/" prefetch={false}>OWL Market</Link>
         <span className="bsep"> &rsaquo; </span>
         <span style={{ color: "var(--ink)" }}>Characters</span>
       </div>

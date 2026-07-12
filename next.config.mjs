@@ -11,6 +11,10 @@ const supabaseStorageHostname = (() => {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // This repository is commonly opened from a parent directory that also has
+  // a lockfile. Keep output tracing scoped to this app instead of letting Next
+  // infer C:\Users\Justin wu as the workspace root.
+  outputFileTracingRoot: process.cwd(),
   experimental: {
     // Inline all CSS into the HTML (Next 15+). Kills the two render-blocking
     // stylesheet requests PSI flagged ~570ms on every page — ~20KB br of CSS

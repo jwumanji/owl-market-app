@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { JustTCG } from "justtcg-js";
+import { fetchSets as fetchJustTcgSets } from "@/lib/justtcg";
 import { refreshPublicGameSummaries } from "@/lib/public-page-summaries";
 import {
   ONE_PIECE_JUSTTCG_GAME_SLUG,
   buildJustTcgCodeToSlugs,
-  buildPrimaryJustTcgSlugByCode,
+
   catalogImageUrlForOnePieceCard,
   onePieceGame,
   extractVariantLabel,
@@ -18,8 +19,8 @@ export const maxDuration = 60;
 
 // Reverse map: internal code → all JustTCG set slugs
 const CODE_TO_SLUGS = buildJustTcgCodeToSlugs(onePieceGame.justTcgSetSlugMap);
-// Compat: single-slug lookup (first match)
-const CODE_TO_SLUG = buildPrimaryJustTcgSlugByCode(CODE_TO_SLUGS);
+
+
 
 const GAME = ONE_PIECE_JUSTTCG_GAME_SLUG;
 const CARD_UPSERT_CONFLICT = "game_id,card_image_id";
@@ -85,6 +86,21 @@ async function syncPrices(request: Request) {
   }
   const { game } = gameResult;
 
+  if (!process.env.JUSTTCG_API_KEY) {
+    return NextResponse.json({ error: "JUSTTCG_API_KEY is not set" }, { status: 500 });
+  }
+
+  let availableJustTcgSlugs: Set<string>;
+  try {
+    const providerSets = await fetchJustTcgSets();
+    availableJustTcgSlugs = new Set(providerSets.map((set) => set.id).filter(Boolean));
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to load JustTCG sets." },
+      { status: 502 }
+    );
+  }
+
   // Fetch all sets from DB
   const { data: dbSets, error: setsErr } = await supabase
     .from("sets")
@@ -97,7 +113,9 @@ async function syncPrices(request: Request) {
   }
 
   const allDbSets = (dbSets ?? []) as DbSet[];
-  const syncableSets = allDbSets.filter((s) => s.code && CODE_TO_SLUG[s.code]);
+  const syncableSets = allDbSets.filter(
+    (s) => s.code && CODE_TO_SLUGS[s.code]?.some((slug) => availableJustTcgSlugs.has(slug))
+  );
   if (syncableSets.length === 0) {
     return NextResponse.json({ error: "No JustTCG-mapped sets found." }, { status: 500 });
   }
@@ -108,7 +126,7 @@ async function syncPrices(request: Request) {
   if (!setsParam) {
     const indexParam = searchParams.get("_index");
     if (indexParam !== null) {
-      return await syncByIndex(request, syncableSets, parseInt(indexParam ?? "0", 10), allowCatalogMutations);
+      return await syncByIndex(request, syncableSets, parseInt(indexParam ?? "0", 10), availableJustTcgSlugs, allowCatalogMutations);
     }
 
     const cursorMode =
@@ -123,6 +141,7 @@ async function syncPrices(request: Request) {
         syncableSets,
         clampInt(searchParams.get("maxSets"), DEFAULT_MAX_SETS, 1, 8),
         searchParams.get("reset") === "1",
+        availableJustTcgSlugs,
         allowCatalogMutations
       );
     }
@@ -154,7 +173,7 @@ async function syncPrices(request: Request) {
   const cardMaps = buildCardMaps(allCards);
 
   for (const dbSet of setsToSync) {
-    const result = await syncOneSet(client, supabase, game.id, dbSet, prefixToSetId, cardMaps, { allowCatalogMutations });
+    const result = await syncOneSet(client, supabase, game.id, dbSet, prefixToSetId, cardMaps, { allowCatalogMutations, availableSlugs: availableJustTcgSlugs });
     results.push(result);
   }
 
@@ -181,6 +200,7 @@ async function syncByCursor(
   syncableSets: DbSet[],
   maxSets: number,
   reset: boolean,
+  availableSlugs: ReadonlySet<string>,
   allowCatalogMutations = false
 ) {
   const cursor = await acquireCursor(supabase, PRICE_SYNC_STATE_KEY, syncableSets.length, reset);
@@ -208,7 +228,7 @@ async function syncByCursor(
     const cardMaps = buildCardMaps(allCards);
 
     for (const dbSet of setsToSync) {
-      const result = await syncOneSet(client, supabase, gameId, dbSet, prefixToSetId, cardMaps, { allowCatalogMutations });
+      const result = await syncOneSet(client, supabase, gameId, dbSet, prefixToSetId, cardMaps, { allowCatalogMutations, availableSlugs });
       results.push(result);
       processedForCursor++;
     }
@@ -261,6 +281,7 @@ async function syncByIndex(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   syncableSets: DbSet[],
   index: number,
+  availableSlugs: ReadonlySet<string>,
   allowCatalogMutations = false
 ) {
   if (index >= syncableSets.length) {
@@ -292,7 +313,7 @@ async function syncByIndex(
   const allCards = await loadAllCards(supabase, game.id);
   const cardMaps = buildCardMaps(allCards);
 
-  const result = await syncOneSet(client, supabase, game.id, dbSet, prefixToSetId, cardMaps, { allowCatalogMutations });
+  const result = await syncOneSet(client, supabase, game.id, dbSet, prefixToSetId, cardMaps, { allowCatalogMutations, availableSlugs });
 
   // Trigger next set in the chain (fire-and-forget)
   const nextIndex = index + 1;
@@ -571,22 +592,32 @@ function prefixFromCardNumber(cardNumber: string | null | undefined): string | n
 function allowsCardNumberInSet(setCode: string, cardNumber: string | null | undefined): boolean {
   const prefix = prefixFromCardNumber(cardNumber);
   if (!prefix) return false;
-  if (setCode === "P" || setCode.startsWith("EB") || setCode.startsWith("PRB")) {
-    return true;
-  }
+  // Cross-set products must carry a recognized variant tag before matching.
+  // This prevents promo/reprint feeds from overwriting an ordinary base card.
   return prefix === setCode;
 }
 
 function shouldSyncJustTcgCard(
   setCode: string,
   cardNumber: string | null | undefined,
-  name: string | null | undefined
+  name: string | null | undefined,
+  productId: string | null | undefined,
+  byNumber: Map<string, DbCard[]>
 ): boolean {
   if (allowsCardNumberInSet(setCode, cardNumber)) return true;
 
   // Treasure/SP/etc. cards are often distributed in a later set while keeping
   // the original card number, e.g. OP13 contains OP11-058 (TR).
-  return Boolean(prefixFromCardNumber(cardNumber) && extractVariantLabel(name ?? ""));
+  if (prefixFromCardNumber(cardNumber) && extractVariantLabel(name ?? "")) return true;
+
+  // For an unrecognized cross-set label, trust an existing provider link only
+  // when it points to a non-base physical row. Base rows remain protected.
+  if (!cardNumber || !productId) return false;
+  return (byNumber.get(cardNumber) ?? []).some(
+    (card) =>
+      card.card_image_id !== card.card_number &&
+      String(card.tcg_product_id ?? "") === String(productId)
+  );
 }
 
 function catalogImageUrlForNewCard(
@@ -606,10 +637,13 @@ async function syncOneSet(
   dbSet: any,
   prefixToSetId: Record<string, string> = {},
   cardMaps: CardMaps,
-  options: { allowCatalogMutations?: boolean } = {}
+  options: { allowCatalogMutations?: boolean; availableSlugs?: ReadonlySet<string> } = {}
 ): Promise<{ code: string; updated: number; errors: string[] }> {
   const setCode = dbSet.code;
-  const justTcgSlugs = CODE_TO_SLUGS[setCode];
+  const configuredSlugs = CODE_TO_SLUGS[setCode] ?? [];
+  const justTcgSlugs = options.availableSlugs
+    ? configuredSlugs.filter((slug) => options.availableSlugs?.has(slug))
+    : configuredSlugs;
 
   if (!justTcgSlugs || justTcgSlugs.length === 0) {
     return { code: setCode, updated: 0, errors: ["No JustTCG slug mapping"] };
@@ -650,7 +684,7 @@ async function syncOneSet(
 
       for (const jtCard of cards) {
         try {
-          if (!shouldSyncJustTcgCard(setCode, jtCard.number, jtCard.name)) continue;
+          if (!shouldSyncJustTcgCard(setCode, jtCard.number, jtCard.name, jtCard.id, byNumber)) continue;
           matchAndCollect(jtCard, byNumber, byNameLower, priceUpserts, historyInserts, rarityUpdates, matchedCardIds, gameId, dbSet.id, unmatchedCards);
         } catch (err) {
           setErrors.push(

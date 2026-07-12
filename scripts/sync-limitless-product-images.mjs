@@ -248,7 +248,7 @@ async function main() {
   const game = await loadGameScope({ supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_KEY, gameSlug: GAME_SLUG });
   console.log(`Loading Supabase cards for game scope: ${game.slug}...`);
   const select = encodeURIComponent(
-    "id,name,card_number,rarity,image_url,image_url_small,variant_label,promo_segment,sets(code,name)"
+    "id,name,card_number,rarity,image_url,image_url_small,variant_label,promo_segment,sets!cards_set_game_fk(code,name)"
   );
   const cards = await sbFetchAll(withGameFilter(`cards?select=${select}&order=card_number.asc`, game.id));
 

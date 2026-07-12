@@ -204,7 +204,7 @@ async function main() {
   console.log(`Loading Supabase cards and price_history for game scope: ${game.slug}...`);
   const [sets, cards, historyRows] = await Promise.all([
     sbFetchAll(withGameFilter("sets?select=id,code,slug,name", game.id)),
-    sbFetchAll(withGameFilter("cards?select=id,set_id,card_number,name,variant_label,price_stats(tcg_market,market_avg,updated_at)", game.id)),
+    sbFetchAll(withGameFilter("cards?select=id,set_id,card_number,name,variant_label,price_stats!price_stats_card_game_fk(tcg_market,market_avg,updated_at)", game.id)),
     sbFetchAll(withGameFilter("price_history?select=id,card_id,tcg_market,market_avg,recorded_at&order=recorded_at.asc,id.asc", game.id)),
   ]);
 

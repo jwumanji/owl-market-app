@@ -64,13 +64,26 @@ const sets = await fetchAll(withGameFilter("sets?select=id,code,slug", GAME.id))
 const setIdToCode = new Map(sets.map((s) => [s.id, (s.code ?? "").toUpperCase()]));
 const promoSetId = sets.find((s) => s.slug === "p" || s.slug === "promo")?.id ?? null;
 
-const cards = await fetchAll(withGameFilter("cards?select=id,set_id,name,card_number,card_image_id,variant_label,rarity,price_stats(tcg_market,market_avg,updated_at)", GAME.id));
+const cards = await fetchAll(withGameFilter("cards?select=id,set_id,name,card_number,card_image_id,variant_label,rarity,price_stats!price_stats_card_game_fk(tcg_market,market_avg,updated_at)", GAME.id));
 console.log(`Loaded ${cards.length} cards.\n`);
 
 const tcgPrice = (c) => {
   const ps = Array.isArray(c.price_stats) ? c.price_stats[0] : c.price_stats;
   return ps?.tcg_market ?? null;
 };
+
+function hasVariantSignal(card) {
+  if (card.variant_label) return true;
+  if (/_(?:p\d+|r\d+|alt|tr|sp|manga)/i.test(card.card_image_id ?? "")) return true;
+  const tags = Array.from(String(card.name ?? "").matchAll(/\(([^)]+)\)/g), (match) => match[1].trim());
+  return tags.some((tag) => !/^\d+$/.test(tag));
+}
+
+function isKnownDistributionRow(setCode, numberPrefix, card) {
+  if ((setCode === "OP14" || setCode === "OP15") && numberPrefix === "EB04") return true;
+  if (/reprint/i.test(card.card_image_id ?? "")) return true;
+  return hasVariantSignal(card);
+}
 
 // Group cards by card_number for sibling comparisons.
 const byNumber = new Map();
@@ -89,7 +102,7 @@ for (const [num, group] of byNumber) {
   if (group.length !== 1) continue;
   const c = group[0];
   if (c.set_id === promoSetId) continue;
-  if (c.variant_label) continue;
+  if (hasVariantSignal(c)) continue;
   const price = tcgPrice(c);
   if (price && price > 20) {
     orphanBaseHighPrice.push({ c, price });
@@ -119,8 +132,8 @@ for (const c of cards) {
   if (!setCode) continue;
   const numberPrefix = (c.card_number.match(/^([A-Z]+\d+)/) ?? [])[1] ?? null;
   if (!numberPrefix || numberPrefix === setCode) continue;
-  // Variant suffix means the row is a legit cross-set variant (e.g. _p2)
-  if (/_(p\d+|r\d+|alt|tr|sp)/i.test(c.card_image_id)) continue;
+  // Distribution-set variants, reprints, and OP14/OP15 EB04 bundle rows are legitimate.
+  if (isKnownDistributionRow(setCode, numberPrefix, c)) continue;
   // Promo prefix is fine
   if (c.card_image_id.startsWith("P-")) continue;
   const price = tcgPrice(c);
@@ -145,11 +158,12 @@ console.log(`Total flagged: ${misroutedBare.length}\n`);
 const inverted = [];
 for (const [num, group] of byNumber) {
   if (group.length < 2) continue;
-  const base = group.find((c) => !c.variant_label && c.set_id !== promoSetId);
+  const baseCandidates = group.filter((c) => !hasVariantSignal(c) && c.set_id !== promoSetId);
+  const base = baseCandidates.find((c) => c.card_image_id === num) ?? baseCandidates[0];
   if (!base) continue;
   const basePrice = tcgPrice(base);
   if (!basePrice || basePrice < 5) continue;
-  const variants = group.filter((c) => c !== base && c.variant_label);
+  const variants = group.filter((c) => c !== base && hasVariantSignal(c));
   if (variants.length === 0) continue;
   const variantMax = Math.max(
     ...variants.map((c) => tcgPrice(c) ?? 0),

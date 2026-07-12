@@ -32,17 +32,8 @@
   margin-bottom: 32px;
 }
 
-/* Big wordmark variant — overrides .c-lockup-wm size only */
-.c-hero-wm {
-  font-size: 88px;
-}
-
-.c-hero-wm em {
-  font-size: 112px;
-  margin-left: -4px;
-  padding-right: 26px;
-  padding-bottom: 10px;
-}
+/* Big wordmark variant: the SVG wordmark takes explicit width/height props
+   at the hero call site (435x85) — no font-size scaling needed. */
 
 .c-hero-eyebrow {
   font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
@@ -410,7 +401,7 @@
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 /* ── Features trio ── */
@@ -466,7 +457,7 @@
   font-family: var(--font-space-grotesk), system-ui, sans-serif;
   font-weight: 600;
   font-size: 13px;
-  color: var(--coral);
+  color: var(--coral-text);
   text-decoration: none;
 }
 
@@ -539,12 +530,12 @@
 
 /* Soft-disabled feature card (Lens placeholder before live route) */
 .c-feature-link[aria-disabled="true"] {
-  color: var(--ink-3);
+  color: var(--ink-2);
   cursor: not-allowed;
 }
 .c-feature-link[aria-disabled="true"]:hover {
   text-decoration: none;
 }
 .c-feature.disabled {
-  opacity: 0.72;
+  background: #FFFCF7;
 }

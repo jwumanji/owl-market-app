@@ -60,7 +60,7 @@
   font-weight: 800;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--coral);
+  color: var(--coral-text);
 }
 
 .catalog-hero h1,

@@ -21,6 +21,7 @@
   /* Sunset gradient stops */
   --pink:  #FF6BB8;
   --coral: #FF4936;
+  --coral-text: #C93426;
   --gold:  #E89512;
 
   /* Semantic UI accents */
@@ -29,8 +30,8 @@
   --breadcrumb-active: var(--ink);
 
   /* Semantic (new aliases — values aligned with brand bible) */
-  --gain-2: #2D9961;
-  --loss-2: #E04E4E;
+  --gain-2: #1F6F47;
+  --loss-2: #B83232;
 
   /* Primary gradient — A3 Sunset Multi-stop */
   --grad-brand: linear-gradient(
@@ -333,23 +334,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   align-items: baseline;
 }
 
-.c-lockup-wm em {
-  font-family: var(--font-caveat), cursive;
-  font-style: normal;
-  font-weight: 700;
-  font-size: 28px;
-  margin-left: -2px;
-  /* Tail-clip fix: padding-right + padding-bottom prevents the last Caveat letter
-     from being clipped under background-clip:text. NEVER remove. */
-  padding-right: 8px;
-  padding-bottom: 2px;
-  display: inline-block;
-  background: var(--grad-brand);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-}
+/* The wordmark is an inline SVG now (docs/specs/owl-logo-svg.md) — the old
+   `em` text rules (Caveat + background-clip gradient + tail-clip padding)
+   live on as baked glyph paths inside the component. */
 
 .c-nav-links {
   display: inline-flex;

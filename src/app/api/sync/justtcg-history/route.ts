@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
+import { fetchSets as fetchJustTcgSets } from "@/lib/justtcg";
 import {
   ONE_PIECE_JUSTTCG_GAME_SLUG,
   buildJustTcgCodeToSlugs,
@@ -126,6 +127,18 @@ async function syncHistory(request: Request) {
     return NextResponse.json({ error: gameResult.error.message }, { status: gameResult.error.status });
   }
   const { game } = gameResult;
+
+  let availableJustTcgSlugs: Set<string>;
+  try {
+    const providerSets = await fetchJustTcgSets();
+    availableJustTcgSlugs = new Set(providerSets.map((set) => set.id).filter(Boolean));
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to load JustTCG sets." },
+      { status: 502 }
+    );
+  }
+
   const { data: dbSets, error: setsError } = await supabase
     .from("sets")
     .select("id, game_id, code, name")
@@ -137,7 +150,7 @@ async function syncHistory(request: Request) {
   }
 
   const syncableSets = ((dbSets ?? []) as DbSet[])
-    .filter((set) => set.code && CODE_TO_SLUGS[set.code])
+    .filter((set) => set.code && CODE_TO_SLUGS[set.code]?.some((slug) => availableJustTcgSlugs.has(slug)))
     .sort((a, b) => setSortKey(a.code ?? "").localeCompare(setSortKey(b.code ?? "")));
 
   if (syncableSets.length === 0) {
@@ -177,7 +190,7 @@ async function syncHistory(request: Request) {
   try {
     for (const dbSet of setsToProcess) {
       try {
-        const result = await syncOneSetHistory(supabase, game.id, dbSet, historyDuration);
+        const result = await syncOneSetHistory(supabase, game.id, dbSet, historyDuration, availableJustTcgSlugs);
         results.push(result);
         processedForCursor++;
       } catch (error) {
@@ -231,10 +244,11 @@ async function syncOneSetHistory(
   supabase: any,
   gameId: string,
   dbSet: DbSet,
-  historyDuration: Duration
+  historyDuration: Duration,
+  availableSlugs: ReadonlySet<string>
 ): Promise<SetResult> {
   const setCode = dbSet.code ?? "";
-  const slugs = CODE_TO_SLUGS[setCode] ?? [];
+  const slugs = (CODE_TO_SLUGS[setCode] ?? []).filter((slug) => availableSlugs.has(slug));
   const result: SetResult = {
     code: setCode,
     slugs: slugs.length,
@@ -418,9 +432,7 @@ function findExistingMatch(
   const jtNumber = nullIfEmpty(jtCard.number);
   if (!jtNumber) return { card: null, reason: "no_number" };
   const jtVariantKey = variantKey(expectedVariantLabel(jtCard.name));
-  if (!allowsCardNumberInSet(setCode, jtNumber) && !jtVariantKey) {
-    return { card: null, reason: "prefix_mismatch" };
-  }
+  const crossSetWithoutVariant = !allowsCardNumberInSet(setCode, jtNumber) && !jtVariantKey;
 
   const direct = jtCard.id
     ? (indexes.byTcgProductId.get(String(jtCard.id)) ?? []).filter(
@@ -429,7 +441,12 @@ function findExistingMatch(
           directProductMatchAllowed(card, jtVariantKey)
       )
     : [];
-  if (direct.length === 1) return { card: direct[0], reason: "tcg_product_id", score: -100 };
+  if (direct.length === 1 && (!crossSetWithoutVariant || direct[0].card_image_id !== jtNumber)) {
+    return { card: direct[0], reason: "tcg_product_id", score: -100 };
+  }
+  if (crossSetWithoutVariant) {
+    return { card: null, reason: "prefix_mismatch" };
+  }
 
   const candidates = indexes.bySetNumber.get(jtNumber) ?? [];
   if (candidates.length === 0) return { card: null, reason: "no_existing_card" };
@@ -791,7 +808,8 @@ function prefixFromCardNumber(cardNumber: string | null | undefined): string | n
 function allowsCardNumberInSet(setCode: string, cardNumber: string | null | undefined): boolean {
   const prefix = prefixFromCardNumber(cardNumber);
   if (!prefix) return false;
-  if (setCode === "P" || setCode.startsWith("EB") || setCode.startsWith("PRB")) return true;
+  // Cross-set products must carry a recognized variant tag before matching.
+  // This prevents promo/reprint feeds from overwriting an ordinary base card.
   return prefix === setCode;
 }
 
