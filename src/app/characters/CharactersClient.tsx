@@ -17,9 +17,9 @@ export interface CharacterCard {
   rarity: string;
   tcg: number;
   avg: number;
-  chg1d: number;
-  chg7d: number;
-  chg30d: number;
+  chg1d: number | null;
+  chg7d: number | null;
+  chg30d: number | null;
   spark: number[];
   imageUrl?: string | null;
   imageUrlSmall?: string | null;
@@ -35,8 +35,8 @@ export interface CharacterData {
   tier: number;
   indexValue: number;
   cardCount: number;
-  chg7d: number;
-  chg30d: number;
+  chg7d: number | null;
+  chg30d: number | null;
   up: boolean;
   topCards: CharacterCard[];
   // assigned server-side (accent palette + generated spark):
@@ -70,6 +70,21 @@ function gameDisplayName(gameRouteSlug: string) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function formatChange(value: number | null, showPlus = true) {
+  if (value == null) return "—";
+  return `${showPlus && value > 0 ? "+" : ""}${value}%`;
+}
+
+function changeColor(value: number | null) {
+  if (value == null || value === 0) return "var(--ink-3)";
+  return value > 0 ? "var(--gain-2)" : "var(--loss-2)";
+}
+
+function changeClass(value: number | null) {
+  if (value == null || value === 0) return "flat";
+  return value > 0 ? "up" : "dn";
 }
 
 function rarityClass(rarity: string): string {
@@ -228,9 +243,9 @@ function RankCard({ c, rank, active, onClick }: { c: CharacterData; rank: number
       <div className="ch-rank-price">${c.indexValue.toLocaleString()}</div>
       <div
         className="ch-rank-chg"
-        style={{ color: c.chg7d === 0 ? "var(--ink-3)" : c.up ? "var(--gain-2)" : "var(--loss-2)" }}
+        style={{ color: changeColor(c.chg7d) }}
       >
-        {c.chg7d === 0 ? "" : c.up ? "↑" : "↓"} {Math.abs(c.chg7d)}% <span className="ch-rank-period">7D</span>
+        {c.chg7d == null ? "—" : <>{c.chg7d === 0 ? "" : c.chg7d > 0 ? "↑" : "↓"} {Math.abs(c.chg7d)}%</>} <span className="ch-rank-period">7D</span>
       </div>
       <div className="ch-rank-spark">
         <SparkSvg data={c.spark || [0, 0]} up={c.up} w={200} h={28} pad={3} />
@@ -334,7 +349,9 @@ function CharacterDetail({ c }: { c: CharacterData }) {
   const tier = TIER_LABELS[c.tier] || TIER_LABELS[3];
   const color = c.color || "#E89512";
   const avatar = getCharAvatar(c);
-  const fullImg = c.topCards?.[0]?.imageUrlPreview ?? c.topCards?.[0]?.imageUrl ?? c.topCards?.[0]?.imageUrlSmall ?? null;
+  // The detail portrait renders at 80px wide, so prefer the thumbnail and
+  // avoid downloading a much larger preview image during initial paint.
+  const fullImg = c.topCards?.[0]?.imageUrlSmall ?? c.topCards?.[0]?.imageUrlPreview ?? c.topCards?.[0]?.imageUrl ?? null;
   return (
     <div className="ch-detail">
       <div className="ch-detail-header" style={{ background: `linear-gradient(135deg,${c.colorD || "rgba(232,149,18,0.16)"},transparent)` }}>
@@ -362,8 +379,8 @@ function CharacterDetail({ c }: { c: CharacterData }) {
       <div className="ch-detail-stats">
         {[
           ["Character Index", `$${c.indexValue.toLocaleString()}`, color],
-          ["7D Change", `${c.chg7d === 0 ? "" : c.up ? "+" : ""}${c.chg7d}%`, c.chg7d === 0 ? "var(--ink-3)" : c.up ? "var(--gain-2)" : "var(--loss-2)"],
-          ["30D Change", `${c.chg30d === 0 ? "" : c.chg30d > 0 ? "+" : ""}${c.chg30d}%`, c.chg30d === 0 ? "var(--ink-3)" : c.chg30d > 0 ? "var(--gain-2)" : "var(--loss-2)"],
+          ["7D Change", formatChange(c.chg7d), changeColor(c.chg7d)],
+          ["30D Change", formatChange(c.chg30d), changeColor(c.chg30d)],
           ["Cards Tracked", String(c.cardCount), undefined],
         ].map(([k, v, clr]) => (
           <div className="ch-stat-row" key={k}>
@@ -447,10 +464,10 @@ function CharacterCards({ c, gameRouteSlug }: { c: CharacterData; gameRouteSlug:
                 <td><span className={`rb ${rarityClass(card.rarity)}`}>{card.rarity}</span></td>
                 <td className="price-r">${card.avg.toFixed(2)}</td>
                 <td className="price-r">${card.tcg}</td>
-                <td className={`chg-r ${card.chg1d >= 0 ? "up" : "dn"}`}>{card.chg1d >= 0 ? "+" : ""}{card.chg1d}%</td>
-                <td className={`chg-r ${card.chg7d >= 0 ? "up" : "dn"}`}>{card.chg7d >= 0 ? "+" : ""}{card.chg7d}%</td>
-                <td className={`chg-r ${card.chg30d >= 0 ? "up" : "dn"}`}>{card.chg30d >= 0 ? "+" : ""}{card.chg30d}%</td>
-                <td><RowSpark data={card.spark} up={card.chg7d >= 0} /></td>
+                <td className={`chg-r ${changeClass(card.chg1d)}`}>{formatChange(card.chg1d)}</td>
+                <td className={`chg-r ${changeClass(card.chg7d)}`}>{formatChange(card.chg7d)}</td>
+                <td className={`chg-r ${changeClass(card.chg30d)}`}>{formatChange(card.chg30d)}</td>
+                <td><RowSpark data={card.spark} up={(card.chg7d ?? card.chg30d ?? 0) >= 0} /></td>
               </tr>
             ))}
           </tbody>
@@ -488,9 +505,9 @@ function AllCharactersGrid({ chars, activeSlug, onSelect }: { chars: CharacterDa
                 </div>
                 <span
                   className="ch-grid-chg"
-                  style={{ color: c.chg30d === 0 ? "var(--ink-3)" : c.chg30d > 0 ? "var(--gain-2)" : "var(--loss-2)" }}
+                  style={{ color: changeColor(c.chg30d) }}
                 >
-                  {c.chg30d === 0 ? "" : c.chg30d > 0 ? "+" : ""}{c.chg30d}%
+                  {formatChange(c.chg30d)}
                 </span>
               </div>
               <div className="ch-grid-name-row">
@@ -506,8 +523,8 @@ function AllCharactersGrid({ chars, activeSlug, onSelect }: { chars: CharacterDa
                 <SparkSvg data={c.spark || [0, 0]} up={c.up} w={200} h={48} pad={4} />
               </div>
               <div className="ch-grid-footer">
-                <div className="ch-grid-stat">7D <span style={{ color: c.chg7d === 0 ? "var(--ink-3)" : c.up ? "var(--gain-2)" : "var(--loss-2)" }}>{c.chg7d === 0 ? "" : c.up ? "+" : ""}{c.chg7d}%</span></div>
-                <div className="ch-grid-stat">30D <span style={{ color: c.chg30d === 0 ? "var(--ink-3)" : c.chg30d > 0 ? "var(--gain-2)" : "var(--loss-2)" }}>{c.chg30d === 0 ? "" : c.chg30d > 0 ? "+" : ""}{c.chg30d}%</span></div>
+                <div className="ch-grid-stat">7D <span style={{ color: changeColor(c.chg7d) }}>{formatChange(c.chg7d)}</span></div>
+                <div className="ch-grid-stat">30D <span style={{ color: changeColor(c.chg30d) }}>{formatChange(c.chg30d)}</span></div>
               </div>
             </div>
           );
@@ -521,36 +538,98 @@ function AllCharactersGrid({ chars, activeSlug, onSelect }: { chars: CharacterDa
 
 export default function CharactersClient({
   characters,
+  totalCharacterCount = characters.length,
   gameRouteSlug,
 }: {
   characters: CharacterData[];
+  totalCharacterCount?: number;
   gameRouteSlug: string;
 }) {
+  const [availableCharacters, setAvailableCharacters] = useState(characters);
   const [activeChar, setActiveChar] = useState(characters[0]?.slug ?? "");
   const [search, setSearch] = useState("");
   const [showAll, setShowAll] = useState(false);
+  const [detailsBySlug, setDetailsBySlug] = useState<Record<string, CharacterData>>({});
+  const detailRequests = useRef(new Set<string>());
+  const overviewRequested = useRef(false);
 
-  const c = characters.find((x) => x.slug === activeChar) || characters[0];
+  const baseCharacter = availableCharacters.find((x) => x.slug === activeChar) || availableCharacters[0];
+  const c = baseCharacter && detailsBySlug[baseCharacter.slug]
+    ? { ...baseCharacter, ...detailsBySlug[baseCharacter.slug] }
+    : baseCharacter;
   const hasCharacters = Boolean(c);
+
+  useEffect(() => {
+    if (!baseCharacter || baseCharacter.topCards.length > 0 || detailsBySlug[baseCharacter.slug]) return;
+    if (detailRequests.current.has(baseCharacter.slug)) return;
+    detailRequests.current.add(baseCharacter.slug);
+    let cancelled = false;
+
+    fetch(`/api/characters?game=${encodeURIComponent(gameRouteSlug)}&slug=${encodeURIComponent(baseCharacter.slug)}`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Character detail request failed (${response.status})`);
+        return response.json() as Promise<CharacterData>;
+      })
+      .then((detail) => {
+        if (!cancelled) setDetailsBySlug((current) => ({ ...current, [detail.slug]: detail }));
+      })
+      .catch(() => {
+        // The overview remains usable if an on-demand detail request fails.
+      })
+      .finally(() => detailRequests.current.delete(baseCharacter.slug));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [baseCharacter, detailsBySlug, gameRouteSlug]);
+
+  const ensureFullOverview = useCallback(() => {
+    if (overviewRequested.current) return;
+    overviewRequested.current = true;
+    fetch(`/api/characters?game=${encodeURIComponent(gameRouteSlug)}&view=overview`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Character overview request failed (${response.status})`);
+        return response.json() as Promise<CharacterData[]>;
+      })
+      .then((overview) => {
+        setAvailableCharacters((current) => {
+          const currentBySlug = new Map(current.map((character) => [character.slug, character]));
+          return overview.map((character) => {
+            const existing = currentBySlug.get(character.slug);
+            return existing
+              ? { ...character, ...existing }
+              : { ...character, spark: [0, Number(character.chg7d ?? 0)] };
+          });
+        });
+      })
+      .catch(() => {
+        overviewRequested.current = false;
+      });
+  }, [gameRouteSlug]);
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearch(value);
+    if (value.trim()) ensureFullOverview();
+  }, [ensureFullOverview]);
 
   const selectChar = useCallback((slug: string) => {
     setActiveChar(slug);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  const top10 = characters.slice(0, 10);
+  const top10 = availableCharacters.slice(0, 10);
 
   // Filter characters for search and auto-select first match
   const filteredChars = search.trim()
-    ? characters.filter((ch) => characterMatchesSearch(ch, search))
-    : characters;
+    ? availableCharacters.filter((ch) => characterMatchesSearch(ch, search))
+    : availableCharacters;
 
   // When search text changes, auto-focus on the first matching character
   useEffect(() => {
     if (!search.trim()) return;
-    const match = characters.find((ch) => characterMatchesSearch(ch, search));
+    const match = availableCharacters.find((ch) => characterMatchesSearch(ch, search));
     if (match) setActiveChar(match.slug);
-  }, [search, characters]);
+  }, [search, availableCharacters]);
 
   return (
     <section className="chars-page">
@@ -564,7 +643,7 @@ export default function CharactersClient({
         Character <span>Index</span>
       </div>
       <div className="ph-sub">
-        {characters.length} characters tracked &middot; Ranked by total card value &middot;
+        {totalCharacterCount} characters tracked &middot; Ranked by total card value &middot;
         {" Updates with live data"}
       </div>
 
@@ -585,8 +664,8 @@ export default function CharactersClient({
           {/* Search + All Characters Dropdown */}
           <CharToolbar
             search={search}
-            onSearchChange={setSearch}
-            characters={characters}
+            onSearchChange={handleSearchChange}
+            characters={availableCharacters}
             activeSlug={activeChar}
             onSelect={selectChar}
           />
@@ -607,7 +686,7 @@ export default function CharactersClient({
           {/* See All Characters Button / Grid */}
           {!showAll ? (
             <div className="ch-see-all-wrap">
-              <button className="ch-see-all-btn" onClick={() => setShowAll(true)}>
+              <button className="ch-see-all-btn" onClick={() => { setShowAll(true); ensureFullOverview(); }}>
                 See All Characters
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="6 9 12 15 18 9" />

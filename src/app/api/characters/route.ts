@@ -19,5 +19,20 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: result.message }, { status: result.status });
   }
 
+  const searchParams = new URL(request.url).searchParams;
+  const slug = searchParams.get("slug")?.trim();
+  if (slug) {
+    const character = result.characters.find((entry) => entry.slug === slug);
+    if (!character) return NextResponse.json({ error: "Character not found." }, { status: 404 });
+    return NextResponse.json(character, { headers: PUBLIC_DATA_CACHE_HEADERS });
+  }
+
+  if (searchParams.get("view") === "overview") {
+    return NextResponse.json(
+      result.characters.map((character) => ({ ...character, topCards: [] })),
+      { headers: PUBLIC_DATA_CACHE_HEADERS }
+    );
+  }
+
   return NextResponse.json(result.characters, { headers: PUBLIC_DATA_CACHE_HEADERS });
 }
