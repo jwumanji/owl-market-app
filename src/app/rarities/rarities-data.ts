@@ -5,9 +5,9 @@ export interface RarityCard {
   rarity: string;
   tcg: number;
   avg: number;
-  chg1d: number;
-  chg7d: number;
-  chg30d: number;
+  chg1d: number | null;
+  chg7d: number | null;
+  chg30d: number | null;
   spark: number[];
   cardImageId?: string;
   imageSmall?: string | null;
@@ -25,8 +25,8 @@ export interface RarityData {
   indexValue: number;
   cardCount: number;
   avgCardPrice: number;
-  chg7d: number;
-  chg30d: number;
+  chg7d: number | null;
+  chg30d: number | null;
   up: boolean;
   /** Optional: live loader payloads for One Piece rarities omit it. */
   spark?: number[];

@@ -43,7 +43,8 @@ function fmtUsd(v: number) {
   return `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function fmtPct(v: number) {
+function fmtPct(v: number | null) {
+  if (v == null) return <span className="sv2-pct flat">—</span>;
   if (v === 0) return <span className="sv2-pct flat">0%</span>;
   const up = v > 0;
   return <span className={`sv2-pct ${up ? "up" : "dn"}`}>{`${up ? "+" : ""}${v}%`}</span>;
@@ -112,10 +113,10 @@ function HeadlineCard({
       </span>
     );
   } else if (metric === "30d" || metric === "val") {
-    const cls = set.chg30d === 0 ? "neutral" : set.chg30d >= 0 ? "up" : "dn";
+    const cls = set.chg30d == null || set.chg30d === 0 ? "neutral" : set.chg30d > 0 ? "up" : "dn";
     footer = (
       <span className={`sets-v2-hl-pct ${cls}`}>
-        {set.chg30d === 0 ? "" : set.chg30d > 0 ? "+" : ""}{set.chg30d}%{" "}
+        {set.chg30d == null ? "—" : `${set.chg30d > 0 ? "+" : ""}${set.chg30d}%`}{" "}
         <span style={{ fontSize: 10, color: "var(--ink-3)", marginLeft: 4 }}>30D</span>
       </span>
     );
@@ -149,7 +150,7 @@ function HeadlineCard({
         {footer}
       </div>
       <div className="sets-v2-hl-spark">
-        <SparkSVG data={set.spark} up={set.chg30d >= 0} w={260} h={32} />
+        <SparkSVG data={set.spark} up={(set.chg30d ?? set.chg7d ?? 0) >= 0} w={260} h={32} />
       </div>
     </Link>
   );
@@ -228,7 +229,7 @@ export default function SetsClient({
     const pool = live.length > 0 ? live : sets;
     const bigMover = [...pool].sort((a, b) => {
       if (live.length === 0) return setCardCount(b) - setCardCount(a);
-      return Math.abs(b.chg30d) - Math.abs(a.chg30d);
+      return Math.abs(b.chg30d ?? 0) - Math.abs(a.chg30d ?? 0);
     })[0]!;
     const mostValuable = [...pool].sort((a, b) => {
       if (live.length === 0) return setCardCount(b) - setCardCount(a);
@@ -425,7 +426,7 @@ export default function SetsClient({
                     <td>{empty ? <span className="sv2-pct flat">—</span> : fmtPct(s.chg30d)}</td>
                     <td className="sv2-cards">{cardCount.toLocaleString()}</td>
                     <td className="sv2-spark">
-                      {empty ? <span style={{ color: "var(--ink-3)" }}>—</span> : <SparkSVG data={s.spark} up={s.chg30d >= 0} w={100} h={22} />}
+                      {empty ? <span style={{ color: "var(--ink-3)" }}>—</span> : <SparkSVG data={s.spark} up={(s.chg30d ?? s.chg7d ?? 0) >= 0} w={100} h={22} />}
                     </td>
                   </tr>
                 );
