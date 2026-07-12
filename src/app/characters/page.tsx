@@ -1,8 +1,19 @@
+import Link from "next/link";
 import CharactersClient, { type CharacterData } from "./CharactersClient";
 import { CHARACTERS as FALLBACK_CHARS } from "./characters-data";
 import { loadCharactersPageData } from "./characters-index-data";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gameQueryValue } from "@/lib/game-routes";
+
+function gameDisplayName(gameRouteSlug: string) {
+  if (gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG) return "One Piece TCG";
+  return gameRouteSlug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 
 // Keep in sync with CATALOG_DATA_TTL_SECONDS (Next 15 requires a literal).
 export const revalidate = 3600;
@@ -62,26 +73,37 @@ export default async function CharactersPage(
   const allCharacters = assignColors(loaded ?? (isDefaultGame ? FALLBACK_CHARS : []));
   const totalCharacterCount = allCharacters.length;
   const characters = allCharacters.slice(0, 10).map((character, index) =>
-    index < 10
+    index === 0
       ? character
       : {
           ...character,
-          // Keep the ranking/search payload compact. Full card detail for
-          // long-tail characters is loaded only when the user selects one.
-          topCards: [],
-          color: undefined,
-          colorD: undefined,
-          colorBd: undefined,
-          spark: [0, Number(character.chg7d ?? 0)],
+          // Rank cards only need one thumbnail. The complete five-card detail
+          // is fetched when a user selects another ranked character.
+          topCards: character.topCards.slice(0, 1),
         }
   );
 
   return (
-    <CharactersClient
-      key={gameRouteSlug}
-      characters={characters}
-      totalCharacterCount={totalCharacterCount}
-      gameRouteSlug={gameRouteSlug}
-    />
+    <section className="chars-page">
+      <div className="breadcrumb">
+        <Link href="/" prefetch={false}>OWL Market</Link>
+        <span className="bsep"> &rsaquo; </span>
+        <span style={{ color: "var(--ink)" }}>Characters</span>
+      </div>
+      <div className="ph-eyebrow">{gameDisplayName(gameRouteSlug)}</div>
+      <div className="ph-title">
+        Character <span>Index</span>
+      </div>
+      <div className="ph-sub">
+        {totalCharacterCount} characters tracked &middot; Ranked by total card value &middot;
+        {" Updates with live data"}
+      </div>
+
+      <CharactersClient
+        key={gameRouteSlug}
+        characters={characters}
+        gameRouteSlug={gameRouteSlug}
+      />
+    </section>
   );
 }
