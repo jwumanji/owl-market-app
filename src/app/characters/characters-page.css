@@ -14,6 +14,11 @@
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 .chars-page > .ph-title span {
+  background: none;
+  color: var(--coral-text);
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  -webkit-text-fill-color: currentColor;
   font-style: italic;
   font-weight: 800;
   font-size: 50px;
