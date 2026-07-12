@@ -6,6 +6,19 @@
 
 .chars-page { max-width: 1280px; margin: 0 auto; padding: 24px 20px 80px; }
 
+/* The hero title is the page LCP. Keep its first paint independent of the
+   downloaded brand fonts; the gradient and italic treatment retain the
+   playful display style without a late webfont repaint. */
+.chars-page > .ph-title,
+.chars-page > .ph-title span {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.chars-page > .ph-title span {
+  font-style: italic;
+  font-weight: 800;
+  font-size: 50px;
+}
+
 /* ── Rank Cards Row (top 5/10) ── */
 .ch-rank-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 18px; }
 @media (max-width: 900px) { .ch-rank-row { grid-template-columns: repeat(3, 1fr); } }
