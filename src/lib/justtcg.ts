@@ -29,6 +29,12 @@ export interface JustTCGVariant {
   trendSlope30d: number | null;
   minPriceAllTime: number | null;
   maxPriceAllTime: number | null;
+  lastUpdated?: number | null;
+  avgPrice90d?: number | null;
+  minPrice90d?: number | null;
+  maxPrice90d?: number | null;
+  tcgplayerSkuId?: string | null;
+  uuid?: string | null;
 }
 
 export interface JustTCGCard {
@@ -41,6 +47,11 @@ export interface JustTCGCard {
   rarity: string;
   tcgplayerId: string | null;
   variants: JustTCGVariant[];
+}
+
+export interface JustTCGSealedProduct extends JustTCGCard {
+  uuid?: string | null;
+  details?: string | null;
 }
 
 export interface JustTCGSet {
@@ -104,6 +115,27 @@ export async function fetchCardsBySet(setSlug: string): Promise<JustTCGCard[]> {
   while (true) {
     const res = await fetchJSON<PaginatedResponse<JustTCGCard>>(
       `${BASE}/cards?game=${GAME}&set=${encodeURIComponent(setSlug)}&include_price_history=false&limit=100&offset=${offset}`
+    );
+    all.push(...res.data);
+    if (!hasMore(res)) break;
+    offset += 100;
+  }
+
+  return all;
+}
+
+/**
+ * Fetch every sealed One Piece SKU. JustTCG exposes TCGplayer sealed products
+ * through the cards endpoint when condition=Sealed, including boxes, cases,
+ * packs, displays, collections, and starter decks.
+ */
+export async function fetchSealedProducts(): Promise<JustTCGSealedProduct[]> {
+  const all: JustTCGSealedProduct[] = [];
+  let offset = 0;
+
+  while (true) {
+    const res = await fetchJSON<PaginatedResponse<JustTCGSealedProduct>>(
+      `${BASE}/cards?game=${GAME}&condition=Sealed&include_null_prices=true&include_price_history=false&limit=100&offset=${offset}`
     );
     all.push(...res.data);
     if (!hasMore(res)) break;

@@ -173,13 +173,15 @@ async function renderMarketsPageContent({
     }),
 
     // Sealed boxes
-    cachedMarketData(publicDataCacheKey("markets-page-v3", game.id, "sealed"), async () =>
+    cachedMarketData(publicDataCacheKey("markets-page-v4", game.id, "sealed"), async () =>
       await supabase
         .from("sealed_products")
-        .select("name, product_type, market_avg, chg_1d, sets!sealed_products_set_game_fk (code)")
+        .select("name, product_type, tcg_price, chg_1d, sets!sealed_products_set_game_fk (code)")
         .eq("game_id", game.id)
-        .not("market_avg", "is", null)
-        .order("market_avg", { ascending: false })
+        .eq("is_active", true)
+        .in("product_type", ["booster_box", "booster_box_case"])
+        .not("tcg_price", "is", null)
+        .order("tcg_price", { ascending: false })
         .limit(5)
     ),
 
@@ -387,7 +389,7 @@ async function renderMarketsPageContent({
       name: row.name as string,
       set_code: s?.code ?? null,
       product_type: (row.product_type as string | null) ?? null,
-      market_avg: (row.market_avg as number | null) ?? null,
+      market_avg: (row.tcg_price as number | null) ?? null,
       chg_1d: (row.chg_1d as number | null) ?? null,
     };
   });

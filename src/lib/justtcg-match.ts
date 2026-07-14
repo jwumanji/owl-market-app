@@ -126,6 +126,7 @@ export const SET_SLUG_MAP: Record<string, string> = {
   "starter-deck-29-egghead-one-piece-card-game":         "ST29",
   "luffy-and-ace-one-piece-card-game":                   "ST30",
   "starter-deck-ex-luffy-and-ace-one-piece-card-game":   "ST30",
+  "starter-deck-ex-luffy-ace-one-piece-card-game":       "ST30",
 
   // ── Promo / Collection sets (all → 'P') ─────────────────────────────────
   "one-piece-promotion-cards-one-piece-card-game":                        "P",

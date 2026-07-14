@@ -14,7 +14,7 @@ import {
 import { ONE_PIECE_DB_SLUG } from "@/lib/games/one-piece";
 import { cachedPublicData, CATALOG_DATA_TTL_SECONDS, publicDataCacheKey } from "@/lib/public-data-cache";
 import { firstRelation } from "@/lib/supabase-relations";
-import type { CatalogSetCard } from "./sets-data";
+import type { CatalogSetCard, SealedProductPrice } from "./sets-data";
 
 // ---------------------------------------------------------------------------
 // loadSets() — groups cards by cards.printed_set_code so EB04, OP14, OP15 etc
@@ -306,6 +306,73 @@ type CardCore = {
   };
 };
 
+type SealedProductRow = {
+  id: string;
+  set_id: string | null;
+  name: string;
+  product_type: string | null;
+  tcg_price: number | string | null;
+  market_avg: number | string | null;
+  chg_1d: number | string | null;
+  chg_7d: number | string | null;
+  chg_30d: number | string | null;
+  product_url: string | null;
+  price_updated_at: string | null;
+};
+
+function nullableNumber(value: number | string | null): number | null {
+  if (value == null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+async function loadSealedProductsBySet(
+  supabase: ReturnType<typeof createCachedServiceClient>,
+  gameId: string
+): Promise<Map<string, SealedProductPrice[]>> {
+  const { data, error } = await supabase
+    .from("sealed_products")
+    .select(`
+      id,
+      set_id,
+      name,
+      product_type,
+      tcg_price,
+      market_avg,
+      chg_1d,
+      chg_7d,
+      chg_30d,
+      product_url,
+      price_updated_at
+    `)
+    .eq("game_id", gameId)
+    .eq("is_active", true)
+    .in("product_type", ["booster_box", "booster_box_case"])
+    .order("product_type")
+    .order("name");
+
+  if (error) throw new Error(error.message);
+
+  const productsBySetId = new Map<string, SealedProductPrice[]>();
+  for (const row of (data ?? []) as SealedProductRow[]) {
+    if (!row.set_id) continue;
+    const products = productsBySetId.get(row.set_id) ?? [];
+    products.push({
+      id: row.id,
+      name: row.name,
+      productType: row.product_type ?? "other",
+      tcgPrice: nullableNumber(row.tcg_price),
+      marketAvg: nullableNumber(row.market_avg),
+      chg1d: nullableNumber(row.chg_1d),
+      chg7d: nullableNumber(row.chg_7d),
+      chg30d: nullableNumber(row.chg_30d),
+      productUrl: row.product_url,
+      priceUpdatedAt: row.price_updated_at,
+    });
+    productsBySetId.set(row.set_id, products);
+  }
+  return productsBySetId;
+}
 function toCardCore(cardRow: Record<string, unknown>): CardCore | null {
   const card = withOnePiecePayloadFallbacks(cardRow);
   const ps = firstRelation(card.price_stats as Record<string, number> | Record<string, number>[] | null);
@@ -488,6 +555,7 @@ async function loadSetsUncached(options: {
   for (const s of (allSets ?? []) as unknown as SetMeta[]) {
     if (s.code) setByCode.set(s.code, s);
   }
+  const sealedProductsBySetId = await loadSealedProductsBySet(supabase, game.id);
 
   // 2. All cards. Group by printed_set_code in JS.
   const allCards: Record<string, unknown>[] = [];
@@ -653,6 +721,7 @@ async function loadSetsUncached(options: {
         },
         perfUp: [true, (chg1d ?? 0) >= 0, (chg7d ?? 0) >= 0, (chg30d ?? 0) >= 0, chgMax >= 0, chgMax >= 0],
         topCards: options.includeTopCards ? topCards : [],
+        sealedProducts: meta ? sealedProductsBySetId.get(meta.id) ?? [] : [],
         comingSoon: cards.length === 0,
       });
     }
@@ -803,7 +872,10 @@ async function enrichSetDetailUncached(
   const top = chaseDedupeTop(cores);
   const historyMap = await fetchSparkHistoryMap(supabase, game.id, top.map((c) => c.id));
 
-  return { ...setRow, topCards: composeTopCards(top, historyMap) };
+  return {
+    ...setRow,
+    topCards: composeTopCards(top, historyMap),
+  };
 }
 
 export async function loadSetDetail(options: {

@@ -24,8 +24,22 @@ export interface SetData {
   perfUp: boolean[];
   topCards: TopCard[];
   catalogCards?: CatalogSetCard[];
+  sealedProducts?: SealedProductPrice[];
   comingSoon?: boolean;
   pricingStatus?: "priced" | "catalog_only";
+}
+
+export interface SealedProductPrice {
+  id: string;
+  name: string;
+  productType: string;
+  tcgPrice: number | null;
+  marketAvg: number | null;
+  chg1d: number | null;
+  chg7d: number | null;
+  chg30d: number | null;
+  productUrl: string | null;
+  priceUpdatedAt: string | null;
 }
 
 export interface CatalogSetCard {

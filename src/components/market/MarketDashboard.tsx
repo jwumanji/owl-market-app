@@ -90,6 +90,12 @@ function CharacterRow({ item, rank, gameRouteSlug }: { item: CharacterRankItem; 
 }
 
 /* ── Sealed row ── */
+function sealedTypeLabel(type: string | null) {
+  if (type === "booster_box_case") return "Booster Box Case";
+  if (type === "booster_box") return "1× Booster Box";
+  return type?.replaceAll("_", " ") ?? "Sealed";
+}
+
 function SealedRow({ item, rank }: { item: SealedRankItem; rank: number }) {
   return (
     <Row>
@@ -98,7 +104,7 @@ function SealedRow({ item, rank }: { item: SealedRankItem; rank: number }) {
         <span className="c-dname">{item.name}</span>
         <span className="c-dmeta">
           {item.set_code && <span>{item.set_code}</span>}
-          {item.product_type && <span> &middot; {item.product_type}</span>}
+          {item.product_type && <span> &middot; {sealedTypeLabel(item.product_type)}</span>}
         </span>
       </span>
       <span className="c-dvalues">
@@ -173,7 +179,7 @@ export default function MarketDashboard({
             : <Empty />}
         </DashboardWidget>
 
-        <DashboardWidget icon="📦" title="Sealed Boxes" viewAllHref={gamePath(gameRouteSlug, "/rarities")}>
+        <DashboardWidget icon="📦" title="Sealed Boxes" viewAllHref={gamePath(gameRouteSlug, "/sets")}>
           {data.sealedBoxes.length > 0
             ? data.sealedBoxes.map((s, i) => <SealedRow key={i} item={s} rank={i + 1} />)
             : <Empty />}

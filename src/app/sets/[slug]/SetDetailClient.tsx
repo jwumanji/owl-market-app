@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { lazy, Suspense, useMemo, useState } from "react";
 import { gamePath } from "@/lib/game-routes";
 import FastCardImage from "@/components/ui/FastCardImage";
-import type { CatalogSetCard, SetData, TopCard } from "../sets-data";
+import type { CatalogSetCard, SealedProductPrice, SetData, TopCard } from "../sets-data";
 
 // chart.js only loads when the chart actually renders (L1) — keeps ~65kB
 // out of the route's First Load JS.
@@ -385,6 +385,8 @@ export default function SetDetailClient({
         </div>
       </div>
 
+      <SealedProductsSection products={set.sealedProducts ?? []} />
+
       <div className="setd-tc-section">
         <div className="setd-tc-head">
           <div>
@@ -492,6 +494,64 @@ export default function SetDetailClient({
             </table>
           )}
         </div>
+      </div>
+    </section>
+  );
+}
+
+function sealedTypeLabel(type: string) {
+  return type === "booster_box_case" ? "Booster Box Case" : "1× Booster Box";
+}
+
+function SealedProductsSection({ products }: { products: SealedProductPrice[] }) {
+  if (products.length === 0) return null;
+
+  return (
+    <section className="setd-sealed-section" aria-labelledby="setd-sealed-title">
+      <div className="setd-sealed-head">
+        <div>
+          <div className="setd-sealed-eyebrow">Sealed Market</div>
+          <h2 className="setd-sealed-title" id="setd-sealed-title">
+            Booster Box &amp; Case Prices
+          </h2>
+          <p className="setd-sealed-sub">
+            Individually tracked TCGplayer products · boxes and cases are never combined
+          </p>
+        </div>
+        <span className="setd-sealed-source">TCGplayer · via JustTCG</span>
+      </div>
+      <div className="setd-sealed-grid">
+        {products.map((product) => {
+          const price = product.tcgPrice ?? product.marketAvg;
+          const change = product.chg7d ?? product.chg1d ?? product.chg30d;
+          const changePeriod = product.chg7d != null ? "7D" : product.chg1d != null ? "24H" : "30D";
+          const changeClass = change == null || change === 0 ? "flat" : change > 0 ? "up" : "dn";
+          return (
+            <article className="setd-sealed-card" key={product.id}>
+              <div className="setd-sealed-card-top">
+                <span className={`setd-sealed-type ${product.productType === "booster_box_case" ? "case" : "box"}`}>
+                  {sealedTypeLabel(product.productType)}
+                </span>
+                <span className={`setd-sealed-change ${changeClass}`}>
+                  {change == null ? "—" : `${change > 0 ? "+" : ""}${change.toFixed(1)}% ${changePeriod}`}
+                </span>
+              </div>
+              <div className="setd-sealed-name">{product.name}</div>
+              <div className="setd-sealed-price">{price == null ? "—" : fmtUsd(price)}</div>
+              <div className="setd-sealed-market-label">Current sealed market price</div>
+              {product.productUrl && (
+                <a
+                  className="setd-sealed-link"
+                  href={product.productUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  View TCGplayer product ↗
+                </a>
+              )}
+            </article>
+          );
+        })}
       </div>
     </section>
   );

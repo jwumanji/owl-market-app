@@ -62,6 +62,28 @@ function setCardCount(set: SetData) {
   return set.cardsTotal ?? set.cards;
 }
 
+function sealedPriceSummary(set: SetData, productType: "booster_box" | "booster_box_case") {
+  const products = (set.sealedProducts ?? []).filter((product) => product.productType === productType);
+  const priced = products
+    .map((product) => product.tcgPrice ?? product.marketAvg)
+    .filter((price): price is number => price != null && price > 0)
+    .sort((a, b) => a - b);
+  if (priced.length === 0) return { label: "—", count: products.length, title: "No current price" };
+
+  const title = products
+    .map((product) => {
+      const price = product.tcgPrice ?? product.marketAvg;
+      return `${product.name}: ${price == null ? "—" : fmtUsd(price)}`;
+    })
+    .join("\n");
+  if (priced.length === 1) return { label: fmtUsd(priced[0]), count: products.length, title };
+  return {
+    label: `${fmtUsd(priced[0])}–${fmtUsd(priced[priced.length - 1])}`,
+    count: products.length,
+    title,
+  };
+}
+
 function SparkSVG({ data, up, w, h }: { data: number[]; up: boolean; w: number; h: number }) {
   if (!data || data.length < 2) {
     return <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} />;
@@ -348,6 +370,8 @@ export default function SetsClient({
             <col className="c-code" />
             <col className="c-name" />
             <col className="c-val" />
+            <col className="c-box" />
+            <col className="c-case" />
             <col className="c-d1" />
             <col className="c-d7" />
             <col className="c-d30" />
@@ -369,6 +393,8 @@ export default function SetsClient({
               <th className={`r${sort === "price" ? " sorted" : ""}`} onClick={() => toggleSort("price")}>
                 Index Value {sortIndicator("price")}
               </th>
+              <th className="r no-sort">1× Box</th>
+              <th className="r no-sort">Box Case</th>
               <th className={`r${sort === "chg1d" ? " sorted" : ""}`} onClick={() => toggleSort("chg1d")}>
                 24H {sortIndicator("chg1d")}
               </th>
@@ -387,7 +413,7 @@ export default function SetsClient({
           <tbody>
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={10} style={{ textAlign: "center", color: "var(--ink-3)", padding: 40 }}>
+                <td colSpan={12} style={{ textAlign: "center", color: "var(--ink-3)", padding: 40 }}>
                   {loadError ?? "No sets match these filters."}
                 </td>
               </tr>
@@ -396,6 +422,8 @@ export default function SetsClient({
                 const catalogOnly = isCatalogOnly(s);
                 const empty = !hasLivePricing(s);
                 const cardCount = setCardCount(s);
+                const boosterBox = sealedPriceSummary(s, "booster_box");
+                const boosterCase = sealedPriceSummary(s, "booster_box_case");
                 return (
                   <tr key={s.code} onClick={() => router.push(gamePath(gameRouteSlug, `/sets/${s.slug}`))}>
                     <td className="sv2-rank">{i + 1}</td>
@@ -421,6 +449,14 @@ export default function SetsClient({
                       </div>
                     </td>
                     <td className={`sv2-val${empty ? " muted" : ""}`}>{empty ? "—" : fmtUsd(s.price)}</td>
+                    <td className="sv2-sealed-price" title={boosterBox.title}>
+                      <span>{boosterBox.label}</span>
+                      {boosterBox.count > 1 && <small>{boosterBox.count} variants</small>}
+                    </td>
+                    <td className="sv2-sealed-price" title={boosterCase.title}>
+                      <span>{boosterCase.label}</span>
+                      {boosterCase.count > 1 && <small>{boosterCase.count} variants</small>}
+                    </td>
                     <td>{empty ? <span className="sv2-pct flat">—</span> : fmtPct(s.chg1d)}</td>
                     <td>{empty ? <span className="sv2-pct flat">—</span> : fmtPct(s.chg7d)}</td>
                     <td>{empty ? <span className="sv2-pct flat">—</span> : fmtPct(s.chg30d)}</td>
