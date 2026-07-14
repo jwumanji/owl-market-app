@@ -9,6 +9,7 @@ import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG, publicOnlyForCatalogPreview, resolveGam
 import { gamePath } from "@/lib/game-routes";
 import { cachedPublicData, PRICE_DATA_TTL_SECONDS, publicDataCacheKey } from "@/lib/public-data-cache";
 import { firstRelation, flattenPriceStatsCardRow } from "@/lib/supabase-relations";
+import { MIN_MOVEMENT_CARD_PRICE_USD, isMeaningfulMovementPrice } from "@/lib/market-quality";
 
 const cachedMarketData = <T,>(key: string, load: () => Promise<T>) =>
   cachedPublicData(key, load, PRICE_DATA_TTL_SECONDS);
@@ -104,34 +105,36 @@ async function renderMarketsPageContent({
     ),
 
     // Trending: high-value cards with positive gains
-    cachedMarketData(publicDataCacheKey("markets-page-v3", game.id, "trending"), async () =>
+    cachedMarketData(publicDataCacheKey("markets-page-v4", game.id, "trending"), async () =>
       await supabase
         .from("price_stats")
         .select(DASHBOARD_PRICE_CARD_SELECT)
         .eq("game_id", game.id)
-        .gt("market_avg", 5)
+        .gte("market_avg", MIN_MOVEMENT_CARD_PRICE_USD)
         .gt("chg_1d", 0)
         .order("chg_1d", { ascending: false })
         .limit(5)
     ),
 
     // Top Gainers
-    cachedMarketData(publicDataCacheKey("markets-page-v3", game.id, "gainers"), async () =>
+    cachedMarketData(publicDataCacheKey("markets-page-v4", game.id, "gainers"), async () =>
       await supabase
         .from("price_stats")
         .select(DASHBOARD_PRICE_CARD_SELECT)
         .eq("game_id", game.id)
+        .gte("market_avg", MIN_MOVEMENT_CARD_PRICE_USD)
         .not("chg_1d", "is", null)
         .order("chg_1d", { ascending: false })
         .limit(5)
     ),
 
     // Top Losers
-    cachedMarketData(publicDataCacheKey("markets-page-v3", game.id, "losers"), async () =>
+    cachedMarketData(publicDataCacheKey("markets-page-v4", game.id, "losers"), async () =>
       await supabase
         .from("price_stats")
         .select(DASHBOARD_PRICE_CARD_SELECT)
         .eq("game_id", game.id)
+        .gte("market_avg", MIN_MOVEMENT_CARD_PRICE_USD)
         .not("chg_1d", "is", null)
         .order("chg_1d", { ascending: true })
         .limit(5)
@@ -286,7 +289,8 @@ async function renderMarketsPageContent({
       const pb = firstRelation(b.price_stats as { chg_1d: number | null } | Array<{ chg_1d: number | null }> | null);
       return (pb?.chg_1d ?? 0) - (pa?.chg_1d ?? 0);
     })
-    .map(toDashboardCard);
+    .map(toDashboardCard)
+    .filter((card) => isMeaningfulMovementPrice(card.market_avg));
 
   const topGainers = ((gainersRes.data ?? []) as Record<string, unknown>[])
     .map(flattenPriceStatsCardRow)
@@ -296,7 +300,8 @@ async function renderMarketsPageContent({
       const pb = firstRelation(b.price_stats as { chg_1d: number | null } | Array<{ chg_1d: number | null }> | null);
       return (pb?.chg_1d ?? 0) - (pa?.chg_1d ?? 0);
     })
-    .map(toDashboardCard);
+    .map(toDashboardCard)
+    .filter((card) => isMeaningfulMovementPrice(card.market_avg));
 
   const topLosers = ((losersRes.data ?? []) as Record<string, unknown>[])
     .map(flattenPriceStatsCardRow)
@@ -306,7 +311,8 @@ async function renderMarketsPageContent({
       const pb = firstRelation(b.price_stats as { chg_1d: number | null } | Array<{ chg_1d: number | null }> | null);
       return (pa?.chg_1d ?? 0) - (pb?.chg_1d ?? 0);
     })
-    .map(toDashboardCard);
+    .map(toDashboardCard)
+    .filter((card) => isMeaningfulMovementPrice(card.market_avg));
 
   // ── Dashboard: Rarity Ranking ──
   const rarityGroups: Record<string, { prices: number[]; changes: number[] }> = {};

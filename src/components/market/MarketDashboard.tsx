@@ -3,6 +3,7 @@ import DashboardWidget from "./DashboardWidget";
 import RarityBadge from "@/components/ui/RarityBadge";
 import { gamePath } from "@/lib/game-routes";
 import { formatPrice, formatPct, pctColor } from "@/lib/utils";
+import { formatEbaySalePrice } from "@/lib/market-quality";
 import MarketCardImage from "./MarketCardImage";
 import type {
   DashboardData,
@@ -115,7 +116,7 @@ function EbayRow({ item }: { item: EbaySaleItem }) {
       <span className="c-dinfo">
         <span className="c-dname">{item.title ?? "Unknown card"}</span>
       </span>
-      <span className="c-dprice">{formatPrice(item.sale_price)}</span>
+      <span className="c-dprice">{formatEbaySalePrice(item.sale_price)}</span>
     </Row>
   );
 }
