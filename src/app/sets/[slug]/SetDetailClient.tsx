@@ -36,6 +36,28 @@ function setCardCount(set: SetData) {
   return set.cardsTotal ?? set.cards;
 }
 
+function sealedPriceSummary(products: SealedProductPrice[], productType: "booster_box" | "booster_box_case") {
+  const matching = products.filter((product) => product.productType === productType);
+  const priced = matching
+    .map((product) => product.tcgPrice ?? product.marketAvg)
+    .filter((price): price is number => price != null && price > 0)
+    .sort((a, b) => a - b);
+  const title = matching
+    .map((product) => {
+      const price = product.tcgPrice ?? product.marketAvg;
+      return `${product.name}: ${price == null ? "—" : fmtUsd(price)}`;
+    })
+    .join("\n");
+
+  if (priced.length === 0) return { label: "—", count: matching.length, title: title || "No current price" };
+  if (priced.length === 1) return { label: fmtUsd(priced[0]), count: matching.length, title };
+  return {
+    label: `${fmtUsd(priced[0])}–${fmtUsd(priced[priced.length - 1])}`,
+    count: matching.length,
+    title,
+  };
+}
+
 function hexToRgba(hex: string, alpha: number): string {
   const h = hex.replace("#", "");
   const r = parseInt(h.substring(0, 2), 16);
@@ -175,6 +197,8 @@ export default function SetDetailClient({
   const cardCount = setCardCount(set);
   const isLive = !catalogOnly && !set.comingSoon && set.cards > 0;
   const deltaClass = set.chg30d == null || set.chg30d === 0 ? "flat" : set.chg30d > 0 ? "up" : "dn";
+  const boosterBox = sealedPriceSummary(set.sealedProducts ?? [], "booster_box");
+  const boosterCase = sealedPriceSummary(set.sealedProducts ?? [], "booster_box_case");
 
   const imgSlug = set.slug.replace(/-/g, "").toLowerCase();
   const imgFile = SET_IMAGE_MAP[imgSlug];
@@ -307,6 +331,18 @@ export default function SetDetailClient({
               <span className="setd-id-key">Index Value</span>
               <span className="setd-id-val" style={{ color: "var(--set-color)" }}>
                 {isLive ? fmtUsd(set.price) : "—"}
+              </span>
+            </div>
+            <div className="setd-id-row sealed" title={boosterBox.title}>
+              <span className="setd-id-key">1× Box{boosterBox.count > 1 ? ` ×${boosterBox.count}` : ""}</span>
+              <span className={`setd-id-val sealed${boosterBox.count > 1 ? " range" : ""}`}>
+                {boosterBox.label}
+              </span>
+            </div>
+            <div className="setd-id-row sealed" title={boosterCase.title}>
+              <span className="setd-id-key">Box Case{boosterCase.count > 1 ? ` ×${boosterCase.count}` : ""}</span>
+              <span className={`setd-id-val sealed${boosterCase.count > 1 ? " range" : ""}`}>
+                {boosterCase.label}
               </span>
             </div>
             <div className="setd-id-row">

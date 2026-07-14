@@ -57,9 +57,12 @@
 
 .setd-id-rows { display: flex; flex-direction: column; padding: 4px 0; }
 .setd-id-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; border-bottom: 1px solid var(--bg-3); }
+.setd-id-row.sealed { background: linear-gradient(90deg, var(--set-color-d), transparent 82%); }
 .setd-id-row:last-child { border-bottom: none; }
 .setd-id-key { font-family: var(--font-jetbrains-mono), ui-monospace, monospace; font-size: 11px; color: var(--ink-3); letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; }
 .setd-id-val { font-family: var(--font-jetbrains-mono), ui-monospace, monospace; font-size: 14px; color: var(--ink); font-weight: 600; text-align: right; letter-spacing: -0.01em; }
+.setd-id-val.sealed { color: var(--set-color); font-weight: 700; }
+.setd-id-val.sealed.range { font-size: 11px; letter-spacing: -0.04em; }
 .setd-id-val.muted { color: var(--ink-3); }
 
 .setd-chart-card { background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-md); overflow: hidden; display: flex; flex-direction: column; }
