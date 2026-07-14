@@ -77,9 +77,8 @@ table.sets-v2-table col.c-rank  { width: 48px; }
 table.sets-v2-table col.c-thumb { width: 68px; }
 table.sets-v2-table col.c-code  { width: 130px; }
 table.sets-v2-table col.c-name  { width: auto; }
+table.sets-v2-table col.c-sealed { width: 202px; }
 table.sets-v2-table col.c-val   { width: 128px; }
-table.sets-v2-table col.c-box   { width: 150px; }
-table.sets-v2-table col.c-case  { width: 150px; }
 table.sets-v2-table col.c-d1    { width: 80px; }
 table.sets-v2-table col.c-d7    { width: 80px; }
 table.sets-v2-table col.c-d30   { width: 80px; }
@@ -106,9 +105,11 @@ table.sets-v2-table col.c-spark { width: 124px; }
 .sv2-name { font-family: var(--font-space-grotesk), system-ui, sans-serif; font-size: 14px; color: var(--ink); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; }
 .sv2-val { font-family: var(--font-jetbrains-mono), ui-monospace, monospace; font-size: 14px; font-weight: 600; color: var(--ink); text-align: right; letter-spacing: -0.01em; }
 .sv2-val.muted { color: var(--ink-3); }
-.sv2-sealed-price { font-family: var(--font-jetbrains-mono), ui-monospace, monospace; text-align: right; color: var(--ink); }
-.sv2-sealed-price > span { display: block; font-size: 11px; line-height: 1.25; font-weight: 700; white-space: nowrap; letter-spacing: -0.03em; }
-.sv2-sealed-price > small { display: block; margin-top: 3px; font-size: 8px; line-height: 1; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
+.sv2-sealed-pair { font-family: var(--font-jetbrains-mono), ui-monospace, monospace; color: var(--ink); }
+.sv2-sealed-pair-line { display: grid; grid-template-columns: 54px minmax(0, 1fr); align-items: baseline; gap: 7px; line-height: 1.35; }
+.sv2-sealed-pair-line + .sv2-sealed-pair-line { margin-top: 3px; }
+.sv2-sealed-pair-label { color: var(--ink-3); font-size: 9px; font-weight: 700; letter-spacing: 0.04em; text-align: left; text-transform: uppercase; white-space: nowrap; }
+.sv2-sealed-pair-value { font-size: 11px; font-weight: 700; letter-spacing: -0.035em; text-align: right; white-space: nowrap; }
 .sv2-pct { font-family: var(--font-jetbrains-mono), ui-monospace, monospace; font-size: 13px; font-weight: 600; text-align: right; letter-spacing: -0.01em; display: block; }
 .sv2-pct.up { color: var(--gain-2); }
 .sv2-pct.dn { color: var(--loss-2); }

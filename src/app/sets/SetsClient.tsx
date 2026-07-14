@@ -369,9 +369,8 @@ export default function SetsClient({
             <col className="c-thumb" />
             <col className="c-code" />
             <col className="c-name" />
+            <col className="c-sealed" />
             <col className="c-val" />
-            <col className="c-box" />
-            <col className="c-case" />
             <col className="c-d1" />
             <col className="c-d7" />
             <col className="c-d30" />
@@ -390,11 +389,10 @@ export default function SetsClient({
               <th className={sort === "name" ? "sorted" : ""} onClick={() => toggleSort("name")}>
                 Name {sortIndicator("name")}
               </th>
+              <th className="r no-sort">Box / Case</th>
               <th className={`r${sort === "price" ? " sorted" : ""}`} onClick={() => toggleSort("price")}>
                 Index Value {sortIndicator("price")}
               </th>
-              <th className="r no-sort">1× Box</th>
-              <th className="r no-sort">Box Case</th>
               <th className={`r${sort === "chg1d" ? " sorted" : ""}`} onClick={() => toggleSort("chg1d")}>
                 24H {sortIndicator("chg1d")}
               </th>
@@ -413,7 +411,7 @@ export default function SetsClient({
           <tbody>
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={12} style={{ textAlign: "center", color: "var(--ink-3)", padding: 40 }}>
+                <td colSpan={11} style={{ textAlign: "center", color: "var(--ink-3)", padding: 40 }}>
                   {loadError ?? "No sets match these filters."}
                 </td>
               </tr>
@@ -448,15 +446,24 @@ export default function SetsClient({
                         <span className="sv2-row-arrow">→</span>
                       </div>
                     </td>
+                    <td
+                      className="sv2-sealed-pair"
+                      title={`1× Booster Box\n${boosterBox.title}\n\nBooster Box Case\n${boosterCase.title}`}
+                    >
+                      <div className="sv2-sealed-pair-line">
+                        <span className="sv2-sealed-pair-label">
+                          Box{boosterBox.count > 1 ? ` ×${boosterBox.count}` : ""}
+                        </span>
+                        <span className="sv2-sealed-pair-value">{boosterBox.label}</span>
+                      </div>
+                      <div className="sv2-sealed-pair-line">
+                        <span className="sv2-sealed-pair-label">
+                          Case{boosterCase.count > 1 ? ` ×${boosterCase.count}` : ""}
+                        </span>
+                        <span className="sv2-sealed-pair-value">{boosterCase.label}</span>
+                      </div>
+                    </td>
                     <td className={`sv2-val${empty ? " muted" : ""}`}>{empty ? "—" : fmtUsd(s.price)}</td>
-                    <td className="sv2-sealed-price" title={boosterBox.title}>
-                      <span>{boosterBox.label}</span>
-                      {boosterBox.count > 1 && <small>{boosterBox.count} variants</small>}
-                    </td>
-                    <td className="sv2-sealed-price" title={boosterCase.title}>
-                      <span>{boosterCase.label}</span>
-                      {boosterCase.count > 1 && <small>{boosterCase.count} variants</small>}
-                    </td>
                     <td>{empty ? <span className="sv2-pct flat">—</span> : fmtPct(s.chg1d)}</td>
                     <td>{empty ? <span className="sv2-pct flat">—</span> : fmtPct(s.chg7d)}</td>
                     <td>{empty ? <span className="sv2-pct flat">—</span> : fmtPct(s.chg30d)}</td>
