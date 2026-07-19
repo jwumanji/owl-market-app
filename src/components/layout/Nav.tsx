@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import OwlMark from "@/components/brand/OwlMark";
@@ -21,16 +21,23 @@ type NavLink = {
   exact?: boolean;
 };
 
-function publicLinks(gameRouteSlug: string): NavLink[] {
-  const isDefaultPublicGame = gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
+type PublicNavLink = {
+  label: string;
+  href?: string;
+  exact?: boolean;
+  status?: "coming-soon";
+  divider?: boolean;
+};
 
+function publicLinks(gameRouteSlug: string): PublicNavLink[] {
   return [
-    { label: "Home", href: isDefaultPublicGame ? "/" : gamePath(gameRouteSlug), exact: true },
     { label: "Markets", href: gamePath(gameRouteSlug, "/markets") },
-    { label: "Catalog", href: gamePath(gameRouteSlug, "/catalog") },
-    { label: "Rarities", href: gamePath(gameRouteSlug, "/rarities") },
-    { label: "Sets", href: gamePath(gameRouteSlug, "/sets") },
     { label: "Characters", href: gamePath(gameRouteSlug, "/characters") },
+    { label: "Sets", href: gamePath(gameRouteSlug, "/sets") },
+    { label: "Rarities", href: gamePath(gameRouteSlug, "/rarities") },
+    { label: "Japan Market", status: "coming-soon" },
+    { label: "eBay Sales", status: "coming-soon" },
+    { label: "All Cards", href: gamePath(gameRouteSlug, "/catalog"), divider: true },
   ];
 }
 
@@ -71,6 +78,96 @@ function gameRouteSlugFromAdminGame(gameSlug: string) {
   return gameSlug.replace(/_/g, "-");
 }
 
+function ChevronDownIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={`c-game-switcher-chevron${open ? " is-open" : ""}`}
+      viewBox="0 0 16 16"
+      width="16"
+      height="16"
+      fill="none"
+    >
+      <path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 18 18" width="17" height="17" fill="none">
+      <circle cx="8" cy="8" r="5" stroke="currentColor" strokeWidth="1.6" />
+      <path d="m12 12 3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PublicGameSwitcher({ gameRouteSlug }: { gameRouteSlug: string }) {
+  const [open, setOpen] = useState(false);
+  const switcherRef = useRef<HTMLDivElement>(null);
+  const isDefaultGame = gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
+  const currentLabel = isDefaultGame ? "One Piece" : gameRouteSlug.replace(/-/g, " ");
+
+  useEffect(() => {
+    if (!open) return;
+
+    function closeOnOutsideClick(event: MouseEvent) {
+      if (!switcherRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
+  return (
+    <div className="c-game-switcher" ref={switcherRef}>
+      <button
+        type="button"
+        className="c-game-switcher-btn"
+        aria-expanded={open}
+        aria-controls="public-game-menu"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span className="c-game-switcher-dot" aria-hidden="true" />
+        <span className="c-game-switcher-name">{currentLabel}</span>
+        <ChevronDownIcon open={open} />
+      </button>
+
+      <div id="public-game-menu" className="c-game-switcher-menu" hidden={!open}>
+        <div className="c-game-switcher-heading">Switch game</div>
+        <Link
+          href={gamePath(DEFAULT_PUBLIC_GAME_ROUTE_SLUG, "/markets")}
+          className="c-game-option is-active"
+          aria-current={isDefaultGame ? "true" : undefined}
+          prefetch={false}
+          onClick={() => setOpen(false)}
+        >
+          <span>
+            <strong>One Piece</strong>
+            <small>Main market</small>
+          </span>
+          <span className="c-game-option-check" aria-hidden="true">✓</span>
+        </Link>
+        <div className="c-game-option is-disabled" aria-disabled="true">
+          <span>
+            <strong>Riftbound</strong>
+            <small>Coming next</small>
+          </span>
+          <span className="c-nav-soon">Soon</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // The public nav must not read useSearchParams(): doing so bails static
 // prerenders out to the Suspense fallback, which shipped HTML with no nav at
 // all — the nav then mounted at hydration, shoving the whole page down (CLS)
@@ -103,29 +200,25 @@ function PublicNav({ pathname }: { pathname: string }) {
 
   return (
     <nav className="c-topnav" aria-label="Primary">
-      <div className="c-topnav-inner">
+      <div className="c-topnav-inner c-public-masthead">
         <div className="c-nav-left">
           <Link href="/" className="c-lockup" aria-label="OWL Market" prefetch={false}>
             <OwlMark size={36} />
             <Wordmark />
           </Link>
+
+          <PublicGameSwitcher gameRouteSlug={activeGameRouteSlug} />
         </div>
 
-        <ul className="c-nav-links">
-          {links.map((link) => (
-            <li key={link.href}>
-              <Link
-                href={link.href}
-                prefetch={false}
-                className={`c-nav-link${isActivePath(pathname, link.href, link.exact) ? " active" : ""}`}
-              >
-                {link.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-
         <div className="c-nav-right">
+          <Link
+            href={gamePath(activeGameRouteSlug, "/catalog")}
+            className="c-nav-search"
+            prefetch={false}
+          >
+            <SearchIcon />
+            <span>Search</span>
+          </Link>
           <span className="c-live-chip">
             <span className="c-live-dot" />
             {isDefaultPublicGame ? "LIVE" : "CATALOG"}
@@ -134,6 +227,29 @@ function PublicNav({ pathname }: { pathname: string }) {
             Sign in
           </Link>
         </div>
+      </div>
+
+      <div className="c-public-nav-strip">
+        <ul className="c-nav-links c-public-nav-links">
+          {links.map((link) => (
+            <li key={link.label} className={link.divider ? "c-nav-item-divider" : undefined}>
+              {link.href ? (
+                <Link
+                  href={link.href}
+                  prefetch={false}
+                  className={`c-nav-link${isActivePath(pathname, link.href, link.exact) ? " active" : ""}`}
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <span className="c-nav-link is-disabled" aria-disabled="true">
+                  {link.label}
+                  {link.status === "coming-soon" && <span className="c-nav-soon">Soon</span>}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
       </div>
 
       {isDefaultPublicGame && <Ticker />}
