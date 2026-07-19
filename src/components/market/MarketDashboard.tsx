@@ -208,7 +208,7 @@ function TrendingSection({ data, gameRouteSlug }: { data: DashboardData; gameRou
   return (
     <section className="qd-section" aria-labelledby="quickdash-trending">
       <SectionHeader
-        eyebrow="Movers right now"
+        eyebrow="$100+ movers right now"
         title=""
         emphasis="Trending"
         selector={<WindowSelector data={data.topGainers} value={window} onChange={setWindow} label="Trending" />}
@@ -217,15 +217,19 @@ function TrendingSection({ data, gameRouteSlug }: { data: DashboardData; gameRou
       <div className="qd-trend-grid">
         <div className="qd-trend-panel">
           <h3><span className="qd-dot gain" />Top gainers</h3>
-          {gainers.map((card, index) => (
-            <TrendRow key={card.id} card={card} rank={index + 1} window={window} gameRouteSlug={gameRouteSlug} />
-          ))}
+          {gainers.length > 0
+            ? gainers.map((card, index) => (
+                <TrendRow key={card.id} card={card} rank={index + 1} window={window} gameRouteSlug={gameRouteSlug} />
+              ))
+            : <div className="qd-trend-empty">No qualifying gainers</div>}
         </div>
         <div className="qd-trend-panel">
           <h3><span className="qd-dot loss" />Top losers</h3>
-          {losers.map((card, index) => (
-            <TrendRow key={card.id} card={card} rank={index + 1} window={window} gameRouteSlug={gameRouteSlug} />
-          ))}
+          {losers.length > 0
+            ? losers.map((card, index) => (
+                <TrendRow key={card.id} card={card} rank={index + 1} window={window} gameRouteSlug={gameRouteSlug} />
+              ))
+            : <div className="qd-trend-empty">No qualifying losers</div>}
         </div>
       </div>
     </section>
@@ -258,7 +262,7 @@ function TopCardsSection({ data, gameRouteSlug }: { data: DashboardData; gameRou
   return (
     <section className="qd-section" aria-labelledby="quickdash-cards">
       <SectionHeader
-        eyebrow="Ranked by % growth"
+        eyebrow="Ranked by market value"
         title="Top"
         emphasis="cards"
         selector={<WindowSelector data={data.topCards} value={window} onChange={setWindow} label="Top cards" />}
@@ -280,7 +284,7 @@ function TopCardsSection({ data, gameRouteSlug }: { data: DashboardData; gameRou
             <div className="qd-card-id">{card.card_number ?? card.set_code ?? "—"}</div>
             <div className="qd-stats">
               <div className="qd-stat">
-                <span>Top price</span>
+                <span>Market value</span>
                 <strong>{formatPrice(card.market_avg)}</strong>
               </div>
               <div className="qd-stat">

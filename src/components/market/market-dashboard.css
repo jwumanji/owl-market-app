@@ -308,6 +308,17 @@
   text-transform: uppercase;
 }
 
+.qd-trend-empty {
+  padding: 28px 12px;
+  color: var(--ink-3);
+  font-family: var(--font-jetbrains-mono-stack);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
 .qd-dot {
   width: 9px;
   height: 9px;

@@ -11,7 +11,7 @@ export function generateStaticParams() {
 
 export const metadata = {
   title: "Top Cards — OWL Market",
-  description: "The full OWL Market card growth ranking.",
+  description: "The full OWL Market card value ranking.",
 };
 
 export default async function TopCardsPage({
@@ -31,7 +31,7 @@ export default async function TopCardsPage({
           Top <em className="inline-block bg-grad-brand bg-clip-text pb-1 pr-3 font-script text-[48px] not-italic text-transparent">cards</em>
         </h1>
         <p className="mt-3 max-w-[680px] font-mono-2 text-[13px] font-semibold leading-6 text-ink-2">
-          The expanded top-50 view is being prepared. The Quick Dash already shows the leading ten cards for every available timeframe.
+          The expanded top-50 view is being prepared. The Quick Dash already shows the ten highest-value cards across the catalog.
         </p>
         <Link
           href={gamePath(game, "/markets")}

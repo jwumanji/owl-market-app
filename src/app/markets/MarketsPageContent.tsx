@@ -111,8 +111,9 @@ async function renderMarketsPageContent({
   const { game } = gameResult;
 
   const [
-    topCards1dRes,
-    topCards7dRes,
+    topValueCardsRes,
+    gainers1dRes,
+    gainers7dRes,
     losers1dRes,
     losers7dRes,
     rarityCardsRes,
@@ -120,47 +121,65 @@ async function renderMarketsPageContent({
     sealedRes,
     catalogCountRes,
   ] = await Promise.all([
-    cachedMarketData(publicDataCacheKey("markets-quickdash-v1", game.id, "top-cards-1d"), async () =>
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "top-value-cards"), async () =>
       await supabase
         .from("price_stats")
         .select(DASHBOARD_PRICE_CARD_SELECT)
         .eq("game_id", game.id)
+        .eq("cards.region", "en")
         .not("market_avg", "is", null)
+        .order("market_avg", { ascending: false })
+        .limit(10)
+    ),
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "gainers-1d-100-plus"), async () =>
+      await supabase
+        .from("price_stats")
+        .select(DASHBOARD_PRICE_CARD_SELECT)
+        .eq("game_id", game.id)
+        .eq("cards.region", "en")
+        .gte("market_avg", 100)
         .not("chg_1d", "is", null)
+        .gt("chg_1d", 0)
         .order("chg_1d", { ascending: false })
-        .limit(10)
+        .limit(5)
     ),
-    cachedMarketData(publicDataCacheKey("markets-quickdash-v1", game.id, "top-cards-7d"), async () =>
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "gainers-7d-100-plus"), async () =>
       await supabase
         .from("price_stats")
         .select(DASHBOARD_PRICE_CARD_SELECT)
         .eq("game_id", game.id)
-        .not("market_avg", "is", null)
+        .eq("cards.region", "en")
+        .gte("market_avg", 100)
         .not("chg_7d", "is", null)
+        .gt("chg_7d", 0)
         .order("chg_7d", { ascending: false })
-        .limit(10)
+        .limit(5)
     ),
-    cachedMarketData(publicDataCacheKey("markets-quickdash-v1", game.id, "losers-1d"), async () =>
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "losers-1d-100-plus"), async () =>
       await supabase
         .from("price_stats")
         .select(DASHBOARD_PRICE_CARD_SELECT)
         .eq("game_id", game.id)
-        .not("market_avg", "is", null)
+        .eq("cards.region", "en")
+        .gte("market_avg", 100)
         .not("chg_1d", "is", null)
+        .lt("chg_1d", 0)
         .order("chg_1d", { ascending: true })
         .limit(5)
     ),
-    cachedMarketData(publicDataCacheKey("markets-quickdash-v1", game.id, "losers-7d"), async () =>
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "losers-7d-100-plus"), async () =>
       await supabase
         .from("price_stats")
         .select(DASHBOARD_PRICE_CARD_SELECT)
         .eq("game_id", game.id)
-        .not("market_avg", "is", null)
+        .eq("cards.region", "en")
+        .gte("market_avg", 100)
         .not("chg_7d", "is", null)
+        .lt("chg_7d", 0)
         .order("chg_7d", { ascending: true })
         .limit(5)
     ),
-    cachedMarketData(publicDataCacheKey("markets-quickdash-v1", game.id, "rarity-cards"), async () => {
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "rarity-cards"), async () => {
       const rows: Record<string, unknown>[] = [];
       const pageSize = 1000;
       for (let from = 0; ; from += pageSize) {
@@ -179,7 +198,7 @@ async function renderMarketsPageContent({
       }
       return rows;
     }),
-    cachedMarketData(publicDataCacheKey("markets-quickdash-v1", game.id, "characters"), async () => {
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "characters"), async () => {
       const { data: characterRows } = await supabase
         .from("characters")
         .select("id, slug, name")
@@ -214,7 +233,7 @@ async function renderMarketsPageContent({
 
       return { characters, cards };
     }),
-    cachedMarketData(publicDataCacheKey("markets-quickdash-v1", game.id, "sealed"), async () =>
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "sealed"), async () =>
       await supabase
         .from("sealed_products")
         .select(`
@@ -225,7 +244,7 @@ async function renderMarketsPageContent({
         .not("market_avg", "is", null)
         .limit(100)
     ),
-    cachedMarketData(publicDataCacheKey("markets-quickdash-v1", game.id, "catalog-count"), async () =>
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "catalog-count"), async () =>
       await supabase
         .from("cards")
         .select("id", { count: "exact", head: true })
@@ -234,16 +253,18 @@ async function renderMarketsPageContent({
     ),
   ]);
 
-  const topCards1d = mapDashboardCards(topCards1dRes.data)
+  const topValueCards = mapDashboardCards(topValueCardsRes.data)
+    .sort((a, b) => (b.market_avg ?? Number.NEGATIVE_INFINITY) - (a.market_avg ?? Number.NEGATIVE_INFINITY));
+  const topGainers1d = mapDashboardCards(gainers1dRes.data)
     .sort((a, b) => cardChange(b, "1D") - cardChange(a, "1D"));
-  const topCards7d = mapDashboardCards(topCards7dRes.data)
+  const topGainers7d = mapDashboardCards(gainers7dRes.data)
     .sort((a, b) => cardChange(b, "7D") - cardChange(a, "7D"));
   const topLosers1d = mapDashboardCards(losers1dRes.data)
     .sort((a, b) => cardChange(a, "1D") - cardChange(b, "1D"));
   const topLosers7d = mapDashboardCards(losers7dRes.data)
     .sort((a, b) => cardChange(a, "7D") - cardChange(b, "7D"));
 
-  if (topCards1d.length === 0 && topCards7d.length === 0 && (catalogCountRes.count ?? 0) > 0) {
+  if (topValueCards.length === 0 && (catalogCountRes.count ?? 0) > 0) {
     return (
       <div className="qd-page-shell">
         <section className="qd-page-container">
@@ -422,7 +443,7 @@ async function renderMarketsPageContent({
 
   if (candidateSetIds.length > 0) {
     const setValueRows = await cachedMarketData(
-      publicDataCacheKey("markets-quickdash-v1", game.id, "set-values", candidateSetIds.sort().join(",")),
+      publicDataCacheKey("markets-quickdash-v2", game.id, "set-values", candidateSetIds.sort().join(",")),
       async () => {
         const rows: Array<{
           set_id: string | null;
@@ -464,12 +485,12 @@ async function renderMarketsPageContent({
 
   const dashboardData: DashboardData = {
     topCards: {
-      "1D": topCards1d.slice(0, 10),
-      "7D": topCards7d.slice(0, 10),
+      "1D": topValueCards.slice(0, 10),
+      "7D": topValueCards.slice(0, 10),
     },
     topGainers: {
-      "1D": topCards1d.slice(0, 5),
-      "7D": topCards7d.slice(0, 5),
+      "1D": topGainers1d.slice(0, 5),
+      "7D": topGainers7d.slice(0, 5),
     },
     topLosers: {
       "1D": topLosers1d.slice(0, 5),
