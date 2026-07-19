@@ -10,7 +10,7 @@ export function generateStaticParams() {
 
 export const metadata = {
   title: "Markets - OWL Market",
-  description: "Top cards ranked by market value.",
+  description: "TCG movers, top cards, box sets, characters, and rarity performance.",
 };
 
 export default async function GameMarketsPage(
