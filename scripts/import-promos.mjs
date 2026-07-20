@@ -2,11 +2,10 @@
 // Run: SUPABASE_SERVICE_ROLE_KEY=... node scripts/import-promos.mjs
 //
 // Behavior:
-// - Routes each promo to its ORIGIN set (by card-number prefix), matching
-//   the JustTCG sync convention. So a promo print of "ST01-007 Nami" lives
-//   under ST01, not P.
+// - Routes every promotional printing to distribution set P while preserving
+//   the original printed number (for example, ST01-007) as origin lineage.
 // - Categorizes the parenthetical in card_name into a `promo_segment` column.
-// - Backfills NULL fields only — never overwrites existing values.
+// - Backfills NULL fields and corrects stale set_id values to P.
 // - Inserts new rows for promo printings JustTCG hasn't seen, using a
 //   synthetic card_image_id like "ST01-007-premium-card-collection".
 // - Skips records with garbled fields (upstream API bugs).
@@ -239,7 +238,8 @@ async function sbPatch(table, filter, body) {
   return true;
 }
 
-// Build {prefix → set_id (uuid)} map once.
+// Build {code → set_id (uuid)} map once. Prefix entries validate the source
+// card's origin; the P entry owns every promotional distribution printing.
 async function buildPrefixMap(gameId) {
   const sets = await sbGet(
     `sets?select=id,code&game_id=eq.${encodeURIComponent(gameId)}`
@@ -288,8 +288,10 @@ function buildInsertRow(c, setUuid, segment, syntheticId, gameId) {
 
 // Build a PATCH body that ONLY backfills null fields on the existing row.
 // Returns null if there's nothing to update.
-function buildBackfillPatch(c, existing, segment) {
+function buildBackfillPatch(c, existing, segment, promoSetUuid) {
   const patch = {};
+
+  if (existing.set_id !== promoSetUuid) patch.set_id = promoSetUuid;
 
   const trySet = (col, value) => {
     if (value === null || value === undefined) return;
@@ -337,12 +339,16 @@ async function main() {
 
   console.log("Building prefix → set_id map...");
   const prefixMap = await buildPrefixMap(game.id);
+  const promoSetUuid = prefixMap.P;
+  if (!promoSetUuid) {
+    throw new Error("One Piece promotion set (code P) is missing");
+  }
 
   // Pre-load all existing card_image_ids and the columns we may backfill,
   // so we can decide insert vs patch without per-row queries.
   console.log("Loading existing cards (this may take a moment)...");
   const existingCards = await sbGet(
-    `cards?select=id,game_id,card_image_id,card_number,rarity,card_type,power,counter,life,cost,attribute,effect,color,types,image_url,promo_segment&game_id=eq.${encodeURIComponent(game.id)}&limit=20000`,
+    `cards?select=id,game_id,set_id,card_image_id,card_number,rarity,card_type,power,counter,life,cost,attribute,effect,color,types,image_url,promo_segment&game_id=eq.${encodeURIComponent(game.id)}&limit=20000`,
   );
   const byCardImageId = new Map();
   for (const row of existingCards) {
@@ -371,8 +377,8 @@ async function main() {
     }
 
     const prefix = prefixFromCardNumber(c.card_set_id);
-    const setUuid = prefix ? prefixMap[prefix] : null;
-    if (!setUuid) {
+    const originSetUuid = prefix ? prefixMap[prefix] : null;
+    if (!originSetUuid) {
       unroutable++;
       continue;
     }
@@ -387,7 +393,7 @@ async function main() {
     const existing = byCardImageId.get(syntheticId) ?? byCardImageId.get(c.card_set_id);
 
     if (existing) {
-      const patch = buildBackfillPatch(c, existing, segment);
+      const patch = buildBackfillPatch(c, existing, segment, promoSetUuid);
       if (patch) {
         const ok = await sbPatch("cards", `id=eq.${existing.id}&game_id=eq.${encodeURIComponent(game.id)}`, patch);
         if (ok) patches++;
@@ -397,7 +403,7 @@ async function main() {
     } else {
       // Queue for batch insert. Dedupe within the run so the same synthetic ID
       // (e.g. duplicate "Brook Premium Card Collection" rows) doesn't ON CONFLICT-twice.
-      insertBatch.set(syntheticId, buildInsertRow(c, setUuid, segment, syntheticId, game.id));
+      insertBatch.set(syntheticId, buildInsertRow(c, promoSetUuid, segment, syntheticId, game.id));
     }
   }
 

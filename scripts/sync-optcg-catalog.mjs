@@ -182,15 +182,6 @@ function endpointCodeFromSet(set) {
   return compact;
 }
 
-function prefixFromCardNumber(cardNumber) {
-  const text = nullIfNullStr(cardNumber);
-  if (!text) return null;
-  const withDigits = text.match(/^([A-Z]+\d+)-/i);
-  if (withDigits) return withDigits[1].toUpperCase();
-  const promo = text.match(/^([A-Z]+)-/i);
-  return promo ? promo[1].toUpperCase() : null;
-}
-
 function variantTags(name) {
   const text = normText(name) ?? "";
   const tags = [];
@@ -336,10 +327,9 @@ function expectedRow(rawCard, source, setByCode, gameId) {
   const sourceImageId =
     nullIfNullStr(rawCard.card_image_id) ??
     (source.kind === "promo" ? promoSyntheticId(rawCard) : null);
-  const setCode =
-    source.kind === "promo"
-      ? prefixFromCardNumber(cardNumber) ?? "P"
-      : source.endpointCode;
+  // The printed number retains the card's origin (for example OP07-038),
+  // while set_id records the product that distributed this physical copy.
+  const setCode = source.kind === "promo" ? "P" : source.endpointCode;
   const set = setByCode.get(setCode);
   if (!sourceImageId || !set) return null;
 
