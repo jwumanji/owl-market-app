@@ -532,7 +532,7 @@ function CharactersSection({ data, gameRouteSlug }: { data: DashboardData; gameR
   return (
     <section className="qd-section" aria-labelledby="quickdash-characters">
       <SectionHeader
-        eyebrow="Ranked by total card value"
+        eyebrow="Ranked only by total set value"
         title="Top"
         emphasis="characters"
         selector={<WindowSelector data={data.topCharacters} value={window} onChange={setWindow} label="Top characters" />}
