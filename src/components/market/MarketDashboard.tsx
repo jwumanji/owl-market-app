@@ -389,13 +389,13 @@ function CharacterImage({ item }: { item: CharacterRankItem }) {
 }
 
 function CharactersSection({ data, gameRouteSlug }: { data: DashboardData; gameRouteSlug?: string | null }) {
-  const [window, setWindow] = useState<MarketWindow>("1D");
+  const [window, setWindow] = useState<MarketWindow>("7D");
   const characters = data.topCharacters[window] ?? [];
 
   return (
     <section className="qd-section" aria-labelledby="quickdash-characters">
       <SectionHeader
-        eyebrow="Ranked by % growth"
+        eyebrow="Ranked by total card value"
         title="Top"
         emphasis="characters"
         selector={<WindowSelector data={data.topCharacters} value={window} onChange={setWindow} label="Top characters" />}
