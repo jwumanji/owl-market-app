@@ -85,6 +85,7 @@ export interface SealedRankItem {
   set_code: string | null;
   product_type: string | null;
   market_avg: number | null;
+  case_market_avg: number | null;
   total_set_value: number;
   image_url: string | null;
   image_url_fallback: string | null;

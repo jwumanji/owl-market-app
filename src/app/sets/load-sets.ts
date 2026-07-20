@@ -12,6 +12,7 @@ import {
   type GameScope,
 } from "@/lib/game-scope";
 import { ONE_PIECE_DB_SLUG } from "@/lib/games/one-piece";
+import { representativeSealedImageBySet } from "@/lib/market-sealed";
 import { cachedPublicData, CATALOG_DATA_TTL_SECONDS, publicDataCacheKey } from "@/lib/public-data-cache";
 import { firstRelation } from "@/lib/supabase-relations";
 import type { CatalogSetCard } from "./sets-data";
@@ -489,6 +490,23 @@ async function loadSetsUncached(options: {
     if (s.code) setByCode.set(s.code, s);
   }
 
+  const { data: sealedProducts, error: sealedProductsError } = await supabase
+    .from("sealed_products")
+    .select("set_id, product_type, market_avg, image_url, tcg_product_id")
+    .eq("game_id", game.id)
+    .not("set_id", "is", null)
+    .limit(1000);
+
+  if (sealedProductsError) throw new Error(sealedProductsError.message);
+
+  const sealedImageBySetId = representativeSealedImageBySet((sealedProducts ?? []) as Array<{
+    set_id: string | null;
+    product_type: string | null;
+    market_avg: number | null;
+    image_url: string | null;
+    tcg_product_id: string | null;
+  }>);
+
   // 2. All cards. Group by printed_set_code in JS.
   const allCards: Record<string, unknown>[] = [];
   const pageSize = 1000;
@@ -626,6 +644,7 @@ async function loadSetsUncached(options: {
         slug,
         code,
         name: meta?.name ?? code,
+        imageUrl: meta?.id ? sealedImageBySetId.get(meta.id) ?? null : null,
         year: meta?.year ?? null,
         type,
         color,
@@ -676,7 +695,7 @@ export async function loadSets(options: {
   const publicOnly = options.publicOnly ?? !allowsPrivateGamePreview();
   return cachedPublicData(
     publicDataCacheKey(
-      "sets-loader",
+      "sets-loader-v2",
       options.game ?? "default",
       publicOnly,
       Boolean(options.includeCatalogCards),

@@ -23,18 +23,20 @@ export default function SetThumb({
   slug,
   code,
   color,
+  imageUrl,
   variant = "table",
   priority = false,
 }: {
   slug: string;
   code: string;
   color: string;
+  imageUrl?: string | null;
   variant?: Variant;
   priority?: boolean;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
   const [pos, setPos] = useState<{ x: number; y: number; flipLeft: boolean } | null>(null);
-  const imgUrl = getSetImageUrl(slug);
+  const imgUrl = imageUrl ?? getSetImageUrl(slug);
   const sz = SIZE[variant];
 
   const showPreview = useCallback(() => {

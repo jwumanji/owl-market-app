@@ -6,7 +6,7 @@ import { getSetImageUrl } from "@/app/sets/set-images";
 import MarketDashboard from "@/components/market/MarketDashboard";
 import { gamePath } from "@/lib/game-routes";
 import { characterIndexMarketRanking } from "@/lib/market-characters";
-import { rankBoosterBoxesByPrice, tcgPlayerProductImageUrl } from "@/lib/market-sealed";
+import { attachCasePrices, rankBoosterBoxesByPrice, tcgPlayerProductImageUrl } from "@/lib/market-sealed";
 import {
   DEFAULT_PUBLIC_GAME_ROUTE_SLUG,
   publicOnlyForCatalogPreview,
@@ -202,7 +202,7 @@ async function renderMarketsPageContent({
       return rows;
     }),
     loadCachedCharacterIndex(game.id),
-    cachedMarketData(publicDataCacheKey("markets-quickdash-v3", game.id, "sealed"), async () =>
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v4", game.id, "sealed"), async () =>
       await supabase
         .from("sealed_products")
         .select(`
@@ -210,8 +210,7 @@ async function renderMarketsPageContent({
           sets!sealed_products_set_game_fk (id, slug, code, name)
         `)
         .eq("game_id", game.id)
-        .not("market_avg", "is", null)
-        .limit(100)
+        .limit(1000)
     ),
     cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "catalog-count"), async () =>
       await supabase
@@ -326,6 +325,7 @@ async function renderMarketsPageContent({
         set_code: set?.code ?? null,
         product_type: (row.product_type as string | null) ?? null,
         market_avg: (row.market_avg as number | null) ?? null,
+        case_market_avg: null,
         total_set_value: 0,
         image_url: (row.image_url as string | null) ?? productImageUrl ?? setImageUrl,
         image_url_fallback: setImageUrl,
@@ -336,23 +336,24 @@ async function renderMarketsPageContent({
       };
     });
 
-  const candidateSets = rankBoosterBoxesByPrice(rawSealed, 5);
-  const candidateSetIds = candidateSets.flatMap((item) => item.set_id ? [item.set_id] : []);
+  const pairedBoosterBoxes = attachCasePrices(rawSealed);
+  const candidateSets = rankBoosterBoxesByPrice(pairedBoosterBoxes, pairedBoosterBoxes.length);
+  const candidateSetIds = Array.from(new Set(candidateSets.flatMap((item) => item.set_id ? [item.set_id] : [])));
   const setValueById = new Map<string, number>();
 
   if (candidateSetIds.length > 0) {
     const setValueRows = await cachedMarketData(
-      publicDataCacheKey("markets-quickdash-v2", game.id, "set-values", candidateSetIds.sort().join(",")),
+      publicDataCacheKey("markets-quickdash-v3", game.id, "set-values", candidateSetIds.sort().join(",")),
       async () => {
         const rows: Array<{
           set_id: string | null;
-          price_stats: { market_avg: number | null } | Array<{ market_avg: number | null }> | null;
+          price_stats: { tcg_market: number | null; market_avg: number | null } | Array<{ tcg_market: number | null; market_avg: number | null }> | null;
         }> = [];
         const pageSize = 1000;
         for (let from = 0; ; from += pageSize) {
           const { data, error } = await supabase
             .from("cards")
-            .select("id, set_id, price_stats!price_stats_card_game_fk (market_avg)")
+            .select("id, set_id, price_stats!price_stats_card_game_fk (tcg_market, market_avg)")
             .eq("game_id", game.id)
             .eq("region", "en")
             .in("set_id", candidateSetIds)
@@ -369,10 +370,11 @@ async function renderMarketsPageContent({
 
     for (const row of setValueRows as unknown as Array<{
       set_id: string | null;
-      price_stats: { market_avg: number | null } | Array<{ market_avg: number | null }> | null;
+      price_stats: { tcg_market: number | null; market_avg: number | null } | Array<{ tcg_market: number | null; market_avg: number | null }> | null;
     }>) {
       if (!row.set_id) continue;
-      const marketValue = firstRelation(row.price_stats)?.market_avg ?? 0;
+      const priceStats = firstRelation(row.price_stats);
+      const marketValue = priceStats?.tcg_market ?? priceStats?.market_avg ?? 0;
       setValueById.set(row.set_id, (setValueById.get(row.set_id) ?? 0) + marketValue);
     }
   }

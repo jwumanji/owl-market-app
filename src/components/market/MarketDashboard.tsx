@@ -4,6 +4,11 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { gamePath } from "@/lib/game-routes";
+import {
+  rankBoosterBoxesByPrice,
+  rankBoosterBoxesByTotalSetValue,
+  sealedValueMultiple,
+} from "@/lib/market-sealed";
 import type {
   CharacterRankItem,
   DashboardCard,
@@ -17,6 +22,7 @@ import MarketCardImage from "./MarketCardImage";
 import "./market-dashboard.css";
 
 const WINDOWS: MarketWindow[] = ["1D", "7D", "90D"];
+type SetRankingMode = "booster_box" | "tsv";
 
 const NEWS = [
   {
@@ -82,6 +88,35 @@ function WindowSelector<T>({
   );
 }
 
+function SetRankingToggle({
+  value,
+  onChange,
+}: {
+  value: SetRankingMode;
+  onChange: (mode: SetRankingMode) => void;
+}) {
+  return (
+    <div className="qd-ranking-toggle" role="group" aria-label="Rank box sets by">
+      <button
+        type="button"
+        className={value === "booster_box" ? "is-active" : undefined}
+        aria-pressed={value === "booster_box"}
+        onClick={() => onChange("booster_box")}
+      >
+        Booster box
+      </button>
+      <button
+        type="button"
+        className={value === "tsv" ? "is-active" : undefined}
+        aria-pressed={value === "tsv"}
+        onClick={() => onChange("tsv")}
+      >
+        TSV
+      </button>
+    </div>
+  );
+}
+
 function DeltaChip({ value }: { value: number | null | undefined }) {
   const direction = value == null || value === 0 ? "flat" : value > 0 ? "gain" : "loss";
   return (
@@ -96,21 +131,26 @@ function SectionHeader({
   eyebrow,
   title,
   emphasis,
+  titleAddon,
   selector,
 }: {
   eyebrow: string;
   title: string;
   emphasis: string;
+  titleAddon?: React.ReactNode;
   selector?: React.ReactNode;
 }) {
   return (
     <div className="qd-section-head">
       <div>
         <div className="qd-section-kicker">{eyebrow}</div>
-        <h2 className="qd-section-title">
-          {title && <>{title} </>}
-          <em>{emphasis}</em>
-        </h2>
+        <div className="qd-section-title-line">
+          <h2 className="qd-section-title">
+            {title && <>{title} </>}
+            <em>{emphasis}</em>
+          </h2>
+          {titleAddon}
+        </div>
       </div>
       {selector}
     </div>
@@ -322,46 +362,66 @@ function SetImage({ item }: { item: SealedRankItem }) {
 
 function SetsSection({ data, gameRouteSlug }: { data: DashboardData; gameRouteSlug?: string | null }) {
   const [window, setWindow] = useState<MarketWindow>("1D");
-  const sets = data.sealedBoxes[window] ?? [];
+  const [rankingMode, setRankingMode] = useState<SetRankingMode>("booster_box");
+  const allSets = data.sealedBoxes[window] ?? [];
+  const sets = rankingMode === "tsv"
+    ? rankBoosterBoxesByTotalSetValue(allSets, 5)
+    : rankBoosterBoxesByPrice(allSets, 5);
 
   return (
     <section className="qd-section" aria-labelledby="quickdash-sets">
       <SectionHeader
-        eyebrow="Ranked by booster box cost"
+        eyebrow={rankingMode === "tsv" ? "Ranked by total set value" : "Ranked by booster box cost"}
         title="Box"
         emphasis="sets"
+        titleAddon={<SetRankingToggle value={rankingMode} onChange={setRankingMode} />}
         selector={<WindowSelector data={data.sealedBoxes} value={window} onChange={setWindow} label="Box sets" />}
       />
       <h2 id="quickdash-sets" className="sr-only">Box sets</h2>
       <div className="qd-card-grid">
-        {sets.map((item, index) => (
-          <Link
-            key={`${item.set_code ?? item.name}-${index}`}
-            href={item.set_slug ? gamePath(gameRouteSlug, `/sets/${item.set_slug}`) : gamePath(gameRouteSlug, "/sets")}
-            className="qd-market-card"
-            prefetch={false}
-          >
-            <div className="qd-card-head">
-              <span className="qd-rank">#{index + 1}</span>
-              <span className="qd-card-name">{item.name}</span>
-            </div>
-            <SetImage item={item} />
-            <div className="qd-stats qd-stats-wide">
-              <div className="qd-stat">
-                <span>Booster box</span>
-                <strong>{formatPrice(item.market_avg)}</strong>
+        {sets.map((item, index) => {
+          const valueMultiple = sealedValueMultiple(item.total_set_value, item.market_avg);
+          const valueFormula = valueMultiple == null
+            ? "TSV or booster box price is unavailable"
+            : `${formatPrice(item.total_set_value)} ÷ ${formatPrice(item.market_avg)} = ${valueMultiple.toFixed(1)}×`;
+
+          return (
+            <Link
+              key={`${item.set_code ?? item.name}-${index}`}
+              href={item.set_slug ? gamePath(gameRouteSlug, `/sets/${item.set_slug}`) : gamePath(gameRouteSlug, "/sets")}
+              className="qd-market-card"
+              prefetch={false}
+            >
+              <div className="qd-card-head">
+                <span className="qd-rank">#{index + 1}</span>
+                <span className="qd-card-name">{item.name}</span>
               </div>
-              <div className="qd-stat">
-                <span>Total set value</span>
-                <b>{formatPrice(item.total_set_value)}</b>
+              <SetImage item={item} />
+              <div className="qd-stats qd-stats-wide">
+                <div className="qd-stat">
+                  <span>Booster box</span>
+                  <strong>{formatPrice(item.market_avg)}</strong>
+                </div>
+                <div className="qd-stat">
+                  <span>Case price</span>
+                  <b>{formatPrice(item.case_market_avg)}</b>
+                </div>
+                <div className="qd-stat">
+                  <span>Total set value</span>
+                  <b>{formatPrice(item.total_set_value)}</b>
+                </div>
+                <div className="qd-value-formula" title={valueFormula} aria-label={valueFormula}>
+                  <span>TSV ÷ box</span>
+                  <b>{valueMultiple == null ? "—" : `= ${valueMultiple.toFixed(1)}×`}</b>
+                </div>
+                <div className="qd-stat">
+                  <span>{window}</span>
+                  <DeltaChip value={item.changes[window]} />
+                </div>
               </div>
-              <div className="qd-stat">
-                <span>{window}</span>
-                <DeltaChip value={item.changes[window]} />
-              </div>
-            </div>
-          </Link>
-        ))}
+            </Link>
+          );
+        })}
       </div>
       <SeeAll href={gamePath(gameRouteSlug, "/sets")}>See all sets</SeeAll>
     </section>

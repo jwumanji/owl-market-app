@@ -140,7 +140,7 @@ function HeadlineCard({
         {set.year && <span className="sets-v2-hl-year">{set.year}</span>}
       </div>
       <div className="sets-v2-hl-title-row">
-        <SetThumb slug={set.slug} code={set.code} color={set.color} variant="headline" priority />
+        <SetThumb slug={set.slug} code={set.code} color={set.color} imageUrl={set.imageUrl} variant="headline" priority />
         <div className="sets-v2-hl-name">{set.name}</div>
       </div>
       <div className="sets-v2-hl-stat-row">
@@ -400,7 +400,7 @@ export default function SetsClient({
                   <tr key={s.code} onClick={() => router.push(gamePath(gameRouteSlug, `/sets/${s.slug}`))}>
                     <td className="sv2-rank">{i + 1}</td>
                     <td className="sv2-thumb-cell">
-                      <SetThumb slug={s.slug} code={s.code} color={s.color} variant="table" />
+                      <SetThumb slug={s.slug} code={s.code} color={s.color} imageUrl={s.imageUrl} variant="table" />
                     </td>
                     <td>
                       <div className="sv2-code-cell">
