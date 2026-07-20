@@ -9,7 +9,7 @@ Keep Riftbound pricing deferred. The catalog is ready for provider ID testing, b
 
 Recommended first pilot: Scrydex, if paid API terms and a sample fixture validate exact card IDs or deterministic search joins. TCGplayer is the strongest fallback for USD market pricing because every synced Riftbound card currently has a TCGplayer product ID, but it still needs official API access and product-to-SKU/condition resolution. Cardmarket should stay secondary until card-level IDs and API approval are available.
 
-## Current Owl Market Join State
+## Current Moon Market Join State
 
 Run:
 
@@ -44,7 +44,7 @@ Sources:
 - https://scrydex.com/pricing
 - https://scrydex.com/docs/getting-started/rate-limits
 
-Open risk: Owl Market does not currently store Scrydex card IDs. Before implementation, run a credentialed fixture over representative Riftbound cards and confirm whether Scrydex IDs match Riftcodex/Riftbound IDs or require a search join by set code, collector number, name, and variant.
+Open risk: Moon Market does not currently store Scrydex card IDs. Before implementation, run a credentialed fixture over representative Riftbound cards and confirm whether Scrydex IDs match Riftcodex/Riftbound IDs or require a search join by set code, collector number, name, and variant.
 
 ### TCGplayer
 
@@ -55,11 +55,11 @@ Sources:
 - https://docs.tcgplayer.com/reference/pricing_getproductconditionprices-1
 - https://help.tcgplayer.com/hc/en-us/articles/201577976-How-can-I-get-access-to-your-card-pricing-data
 
-Open risk: product ID coverage is complete, but current Owl Market storage only has card-level aggregate `price_stats`. A real TCGplayer integration must define how conditions and foil/printing SKUs collapse into the display aggregate.
+Open risk: product ID coverage is complete, but current Moon Market storage only has card-level aggregate `price_stats`. A real TCGplayer integration must define how conditions and foil/printing SKUs collapse into the display aggregate.
 
 ### Cardmarket
 
-Cardmarket has live Riftbound marketplace pages and price-guide concepts, but our catalog only has partial Cardmarket set IDs and no Cardmarket card IDs. Official API access is OAuth based, restricted/approval gated, and the docs warn against repeatedly pulling public marketplace resources through a dedicated app. Cardmarket is useful as an EUR secondary source, but it is not ready for exact joins in Owl Market yet.
+Cardmarket has live Riftbound marketplace pages and price-guide concepts, but our catalog only has partial Cardmarket set IDs and no Cardmarket card IDs. Official API access is OAuth based, restricted/approval gated, and the docs warn against repeatedly pulling public marketplace resources through a dedicated app. Cardmarket is useful as an EUR secondary source, but it is not ready for exact joins in Moon Market yet.
 
 Sources:
 

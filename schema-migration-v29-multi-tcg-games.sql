@@ -96,7 +96,7 @@ ALTER TABLE public.psa_submissions
 ALTER TABLE public.psa_submission_items
   ADD COLUMN IF NOT EXISTS game_id uuid REFERENCES public.games(id) ON DELETE RESTRICT;
 
--- Backfill all existing OWL Market rows to One Piece. Current production data
+-- Backfill all existing Moon Market rows to One Piece. Current production data
 -- is One Piece-only; future migrations will enforce explicit game scope.
 WITH one_piece AS (
   SELECT id FROM public.games WHERE slug = 'one_piece'
