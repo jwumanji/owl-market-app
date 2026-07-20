@@ -576,7 +576,7 @@ function RaritySection({ data, gameRouteSlug }: { data: DashboardData; gameRoute
   return (
     <section className="qd-section qd-section-last" aria-labelledby="quickdash-rarities">
       <SectionHeader
-        eyebrow="Market cap by rarity"
+        eyebrow="Ranked only by top card value"
         title="Rarity"
         emphasis="index"
         selector={(
@@ -600,7 +600,7 @@ function RaritySection({ data, gameRouteSlug }: { data: DashboardData; gameRoute
           >
             <div className="qd-rarity-card-head">
               <span className="qd-rarity-rank">#{index + 1}</span>
-              <span className="qd-rarity-name">{item.name}</span>
+              <span className="qd-rarity-name" title={item.name}>{item.name}</span>
               <span className={`qd-rarity-badge rarity-${item.code.toLowerCase()}`}>{item.code}</span>
             </div>
             <div className="qd-market-image qd-rarity-image">
@@ -624,8 +624,8 @@ function RaritySection({ data, gameRouteSlug }: { data: DashboardData; gameRoute
             </div>
             <div className="qd-rarity-stats">
               <div className="qd-rarity-index">
-                <span>Index value</span>
-                <strong>{formatPrice(item.index_value)}</strong>
+                <span>Top card value</span>
+                <strong>{formatPrice(item.top_card_market)}</strong>
               </div>
               <span className="qd-rarity-meta">
                 <span>{item.card_count} cards</span>
