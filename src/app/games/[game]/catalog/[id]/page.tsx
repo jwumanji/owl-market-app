@@ -175,7 +175,7 @@ export async function generateMetadata(
 ) {
   const params = await props.params;
   return {
-    title: `${decodeURIComponent(params.id)} - ${params.game.replace(/-/g, " ")} card - OWL Market`,
+    title: `${decodeURIComponent(params.id)} - ${params.game.replace(/-/g, " ")} card - Moon Market`,
   };
 }
 

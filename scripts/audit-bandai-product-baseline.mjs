@@ -64,7 +64,7 @@ function sleep(ms) {
 async function fetchText(url, attempt = 0) {
   const res = await fetch(url, {
     headers: {
-      "user-agent": "owl-market-audit/1.0",
+      "user-agent": "moon-market-audit/1.0",
       accept: "text/html,application/xhtml+xml",
     },
   });

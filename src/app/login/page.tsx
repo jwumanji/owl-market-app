@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import LoginForm from "./LoginForm";
 
 export const metadata = {
-  title: "Login - OWL Market",
+  title: "Login - Moon Market",
 };
 
 export default function LoginPage() {

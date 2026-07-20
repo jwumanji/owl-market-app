@@ -1,5 +1,5 @@
 -- ============================================================
--- OWL Market — Migration v3: Promo set support
+-- Moon Market — Migration v3: Promo set support
 -- Run in Supabase Studio → SQL Editor → New Query → Run
 -- ============================================================
 

@@ -6,7 +6,7 @@ import { DEFAULT_PUBLIC_GAME_DB_SLUG } from "@/lib/game-scope";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Create Bundle - OWL Market",
+  title: "Create Bundle - Moon Market",
 };
 
 type NewBundleSearchParams = {

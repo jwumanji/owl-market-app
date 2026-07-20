@@ -43,7 +43,7 @@ Sources:
 
 ## PokemonTCG.io Fit
 
-PokemonTCG.io gives us most of what Owl Market needs for a first Pokemon catalog:
+PokemonTCG.io gives us most of what Moon Market needs for a first Pokemon catalog:
 
 - `GET /v2/sets` for set rows.
 - `GET /v2/cards` with `page`, `pageSize`, `q`, and `orderBy` for paged catalog sync.

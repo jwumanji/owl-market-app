@@ -32,9 +32,17 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OWL Market — See What Others Miss",
+  title: "Moon Market — See What Others Miss",
   description:
     "TCG market intelligence platform for pricing, trends, catalog data, and portfolio tracking.",
+  applicationName: "Moon Market",
+  icons: {
+    icon: [
+      { url: "/brand/favicon.svg", type: "image/svg+xml" },
+      { url: "/brand/favicon-32.png", type: "image/png", sizes: "32x32" },
+    ],
+    apple: [{ url: "/brand/moon-mark-512.png", sizes: "512x512", type: "image/png" }],
+  },
 };
 
 function publicSupabaseOrigin() {

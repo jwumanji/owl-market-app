@@ -6,7 +6,7 @@ export const revalidate = 3600;
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }) {
   const params = await props.params;
   const slug = decodeURIComponent(params.slug).toLowerCase();
-  return { title: `${slug.toUpperCase()} — OWL Market` };
+  return { title: `${slug.toUpperCase()} — Moon Market` };
 }
 
 export default async function SetDetailPage(props: { params: Promise<{ slug: string }> }) {

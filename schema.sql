@@ -1,5 +1,5 @@
 -- ============================================================
--- OWL Market — Supabase Schema
+-- Moon Market — Supabase Schema
 -- Run this in Supabase Studio → SQL Editor → New Query → Run
 -- ============================================================
 

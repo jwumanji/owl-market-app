@@ -310,9 +310,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .c-lockup {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   text-decoration: none;
   flex-shrink: 0;
+}
+
+.c-lockup-brand {
+  display: block;
+  width: 155px;
+  height: 36px;
+}
+
+.c-lockup-mark-mobile {
+  display: none;
 }
 
 .c-nav-left {
@@ -470,9 +479,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   align-items: baseline;
 }
 
-/* The wordmark is an inline SVG now (docs/specs/owl-logo-svg.md) — the old
-   `em` text rules (Caveat + background-clip gradient + tail-clip padding)
-   live on as baked glyph paths inside the component. */
+/* The supplied Moon Market wordmark is outlined, so it paints consistently
+   without waiting for a logo-specific webfont. */
 
 .c-nav-links {
   display: inline-flex;
@@ -647,8 +655,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     gap: 10px;
   }
 
-  .c-public-masthead .c-lockup-wm {
+  .c-public-masthead .c-lockup-brand {
     display: none;
+  }
+
+  .c-public-masthead .c-lockup-mark-mobile {
+    display: block;
   }
 
   .c-public-masthead .c-nav-left {

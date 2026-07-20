@@ -1,6 +1,5 @@
 import Link from "next/link";
-import OwlMark from "@/components/brand/OwlMark";
-import Wordmark from "@/components/brand/Wordmark";
+import MoonMarketLogo from "@/components/brand/MoonMarketLogo";
 import HomeTeaserTable, { type TeaserCard } from "@/components/home/HomeTeaserTable";
 import {
   allowsPrivateGamePreview,
@@ -17,7 +16,7 @@ import "./home-page.css";
 export const revalidate = 900;
 
 export const metadata = {
-  title: "OwlMarket — See what others miss",
+  title: "Moon Market — See what others miss",
   description:
     "TCG Market Intelligence. Real-time price tracking, market trends, and portfolio tools — built for serious TCG players and collectors. Currently powering One Piece TCG.",
 };
@@ -131,9 +130,8 @@ export default async function Home() {
         {/* HERO */}
         <section className="c-hero">
           <div className="c-hero-lockup">
-            <OwlMark size={80} />
-            <Wordmark className="c-hero-wm" width={435} height={85} />
-            <span className="sr-only">OWL Market</span>
+            <MoonMarketLogo className="c-hero-wm" width={516} height={120} priority />
+            <span className="sr-only">Moon Market</span>
           </div>
 
           <div className="c-hero-eyebrow">TCG Market Intelligence · Live</div>

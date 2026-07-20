@@ -10,7 +10,7 @@ import "./set-detail.css";
 
 export async function generateMetadata({ params }: { params: { slug: string } }) {
   const slug = decodeURIComponent(params.slug).toLowerCase();
-  return { title: `${slug.toUpperCase()} — OWL Market` };
+  return { title: `${slug.toUpperCase()} — Moon Market` };
 }
 
 export async function SetDetailPageContent({
@@ -35,7 +35,7 @@ export async function SetDetailPageContent({
     return (
       <section className="setd-page">
         <div className="setd-breadcrumb">
-          <Link href="/">OWL Market</Link>
+          <Link href="/">Moon Market</Link>
           <span className="bsep">›</span>
           <Link href={gamePath(gameRouteSlug, "/sets")}>Sets</Link>
         </div>
