@@ -8,7 +8,7 @@ import { loadOrderForEdit, loadOrderInventory } from "../order-data";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Order - OWL Market",
+  title: "Order - Moon Market",
 };
 
 type EditOrderSearchParams = {

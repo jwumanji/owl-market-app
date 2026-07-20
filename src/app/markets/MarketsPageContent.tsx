@@ -1,31 +1,74 @@
 import Link from "next/link";
-import { createCachedServiceClient } from "@/lib/supabase-server";
-import { CardRow, SetInfo, DashboardData, DashboardCard, RarityRankItem, CharacterRankItem, SealedRankItem, EbaySaleItem } from "@/lib/types";
-import MarketTable from "@/components/market/MarketTable";
-import MarketDashboard from "@/components/market/MarketDashboard";
+
+import { loadCachedCharacterIndex } from "@/app/characters/characters-index-data";
 import { RARITY_META } from "@/app/rarities/rarities-data";
-import { withOnePiecePayloadFallbacksList } from "@/lib/game-payload";
-import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG, publicOnlyForCatalogPreview, resolveGameScope } from "@/lib/game-scope";
+import { getSetImageUrl } from "@/app/sets/set-images";
+import MarketDashboard from "@/components/market/MarketDashboard";
 import { gamePath } from "@/lib/game-routes";
+import { characterIndexMarketRanking } from "@/lib/market-characters";
+import { rankBoosterBoxesByPrice, tcgPlayerProductImageUrl } from "@/lib/market-sealed";
+import {
+  DEFAULT_PUBLIC_GAME_ROUTE_SLUG,
+  publicOnlyForCatalogPreview,
+  resolveGameScope,
+} from "@/lib/game-scope";
 import { cachedPublicData, PRICE_DATA_TTL_SECONDS, publicDataCacheKey } from "@/lib/public-data-cache";
+import { createCachedServiceClient } from "@/lib/supabase-server";
 import { firstRelation, flattenPriceStatsCardRow } from "@/lib/supabase-relations";
+import type {
+  CharacterRankItem,
+  DashboardCard,
+  DashboardData,
+  MarketWindow,
+  RarityRankItem,
+  SealedRankItem,
+} from "@/lib/types";
 
 const cachedMarketData = <T,>(key: string, load: () => Promise<T>) =>
   cachedPublicData(key, load, PRICE_DATA_TTL_SECONDS);
 
-
 export const metadata = {
-  title: "Markets — OWL Market",
-  description: "Top cards ranked by market value.",
+  title: "Markets — Moon Market",
+  description: "One Piece TCG movers, top cards, box sets, characters, and rarity performance.",
 };
 
-/* ── Shape a card query result into DashboardCard ── */
+type PriceChangeStats = {
+  market_avg: number | null;
+  chg_1d: number | null;
+  chg_7d: number | null;
+  chg_30d: number | null;
+};
+
+type SetRelation = {
+  id?: string | null;
+  slug?: string | null;
+  code?: string | null;
+  name?: string | null;
+};
+
+const DASHBOARD_PRICE_CARD_SELECT = `
+  market_avg, chg_1d, chg_7d, chg_30d,
+  cards!price_stats_card_game_fk!inner (
+    id, card_image_id, card_number, name, rarity,
+    image_url, image_url_small, image_url_preview,
+    sets!cards_set_game_fk (code)
+  )
+`;
+
+const RARITY_CODES = ["MR", "SEC", "SP", "AA", "SR"];
+
+function cardChange(card: DashboardCard, window: MarketWindow) {
+  return card.changes[window] ?? Number.NEGATIVE_INFINITY;
+}
+
 function toDashboardCard(row: Record<string, unknown>): DashboardCard {
-  const ps = firstRelation(row.price_stats as { market_avg: number | null; chg_1d: number | null } | Array<{ market_avg: number | null; chg_1d: number | null }> | null);
-  const set = firstRelation(row.sets as { code: string } | Array<{ code: string }> | null);
+  const ps = firstRelation(row.price_stats as PriceChangeStats | PriceChangeStats[] | null);
+  const set = firstRelation(row.sets as SetRelation | SetRelation[] | null);
+
   return {
     id: row.id as string,
     card_image_id: row.card_image_id as string,
+    card_number: (row.card_number as string | null) ?? null,
     name: row.name as string,
     rarity: (row.rarity as string | null) ?? null,
     image_url: (row.image_url as string | null) ?? null,
@@ -33,28 +76,28 @@ function toDashboardCard(row: Record<string, unknown>): DashboardCard {
     image_url_preview: (row.image_url_preview as string | null) ?? null,
     set_code: set?.code ?? null,
     market_avg: ps?.market_avg ?? null,
-    chg_1d: ps?.chg_1d ?? null,
+    changes: {
+      "1D": ps?.chg_1d ?? null,
+      "7D": ps?.chg_7d ?? null,
+    },
   };
 }
 
-const DASHBOARD_PRICE_CARD_SELECT = `
-  market_avg, chg_1d,
-  cards!price_stats_card_game_fk!inner (
-    id, card_image_id, name, rarity, image_url, image_url_small, image_url_preview,
-    sets!cards_set_game_fk (code)
-  )
-`;
+function mapDashboardCards(data: unknown) {
+  return ((data ?? []) as Record<string, unknown>[])
+    .map(flattenPriceStatsCardRow)
+    .filter((row): row is Record<string, unknown> => row != null)
+    .map(toDashboardCard);
+}
 
-const MARKET_PRICE_CARD_SELECT = `
-  market_avg, tcg_market, ebay_avg, chg_1d, chg_7d, chg_30d,
-  cards!price_stats_card_game_fk!inner (
-    id, card_image_id, card_number, name, name_base, variant_label, rarity,
-    card_type, color, game_payload, image_url, image_url_small, image_url_preview,
-    sets!cards_set_game_fk (id, slug, code, name, series, color, year)
-  )
-`;
-
-const PREMIUM_RARITIES = ["MR", "PROMO", "SP", "SEC", "TR"];
+function sortByWindow<T extends { changes: Partial<Record<MarketWindow, number | null>> }>(
+  rows: T[],
+  window: MarketWindow,
+) {
+  return [...rows].sort(
+    (a, b) => (b.changes[window] ?? Number.NEGATIVE_INFINITY) - (a.changes[window] ?? Number.NEGATIVE_INFINITY),
+  );
+}
 
 async function renderMarketsPageContent({
   gameRouteSlug = DEFAULT_PUBLIC_GAME_ROUTE_SLUG,
@@ -67,131 +110,110 @@ async function renderMarketsPageContent({
     publicOnly: publicOnlyForCatalogPreview(),
   });
 
-  if (gameResult.error) {
-    throw new Error(gameResult.error.message);
-  }
+  if (gameResult.error) throw new Error(gameResult.error.message);
   const { game } = gameResult;
 
   const [
-    cardsRes,
-    setsRes,
-    trendingRes,
-    gainersRes,
-    losersRes,
+    topValueCardsRes,
+    gainers1dRes,
+    gainers7dRes,
+    losers1dRes,
+    losers7dRes,
     rarityCardsRes,
-    charBundle,
+    characterIndex,
     sealedRes,
-    ebayRes,
     catalogCountRes,
   ] = await Promise.all([
-    // Existing: top 20 by market value
-    cachedMarketData(publicDataCacheKey("markets-page-v3", game.id, "cards"), async () =>
-      await supabase
-        .from("price_stats")
-        .select(MARKET_PRICE_CARD_SELECT)
-        .eq("game_id", game.id)
-        .not("market_avg", "is", null)
-        .order("market_avg", { ascending: false })
-        .limit(20)
-    ),
-
-    cachedMarketData(publicDataCacheKey("markets-page-v3", game.id, "sets"), async () =>
-      await supabase
-        .from("sets")
-        .select("id, slug, code, name, series, color, year")
-        .eq("game_id", game.id)
-        .order("name")
-    ),
-
-    // Trending: high-value cards with positive gains
-    cachedMarketData(publicDataCacheKey("markets-page-v3", game.id, "trending"), async () =>
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "top-value-cards"), async () =>
       await supabase
         .from("price_stats")
         .select(DASHBOARD_PRICE_CARD_SELECT)
         .eq("game_id", game.id)
-        .gt("market_avg", 5)
+        .eq("cards.region", "en")
+        .not("market_avg", "is", null)
+        .order("market_avg", { ascending: false })
+        .limit(10)
+    ),
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "gainers-1d-100-plus"), async () =>
+      await supabase
+        .from("price_stats")
+        .select(DASHBOARD_PRICE_CARD_SELECT)
+        .eq("game_id", game.id)
+        .eq("cards.region", "en")
+        .gte("market_avg", 100)
+        .not("chg_1d", "is", null)
         .gt("chg_1d", 0)
         .order("chg_1d", { ascending: false })
         .limit(5)
     ),
-
-    // Top Gainers
-    cachedMarketData(publicDataCacheKey("markets-page-v3", game.id, "gainers"), async () =>
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "gainers-7d-100-plus"), async () =>
       await supabase
         .from("price_stats")
         .select(DASHBOARD_PRICE_CARD_SELECT)
         .eq("game_id", game.id)
-        .not("chg_1d", "is", null)
-        .order("chg_1d", { ascending: false })
+        .eq("cards.region", "en")
+        .gte("market_avg", 100)
+        .not("chg_7d", "is", null)
+        .gt("chg_7d", 0)
+        .order("chg_7d", { ascending: false })
         .limit(5)
     ),
-
-    // Top Losers
-    cachedMarketData(publicDataCacheKey("markets-page-v3", game.id, "losers"), async () =>
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "losers-1d-100-plus"), async () =>
       await supabase
         .from("price_stats")
         .select(DASHBOARD_PRICE_CARD_SELECT)
         .eq("game_id", game.id)
+        .eq("cards.region", "en")
+        .gte("market_avg", 100)
         .not("chg_1d", "is", null)
+        .lt("chg_1d", 0)
         .order("chg_1d", { ascending: true })
         .limit(5)
     ),
-
-    // Rarity aggregation: fetch all cards for premium rarities
-    cachedMarketData(publicDataCacheKey("markets-page-v3", game.id, "rarity-cards"), async () =>
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "losers-7d-100-plus"), async () =>
       await supabase
-        .from("cards")
-        .select("rarity, price_stats!price_stats_card_game_fk!inner (market_avg, chg_1d)")
+        .from("price_stats")
+        .select(DASHBOARD_PRICE_CARD_SELECT)
         .eq("game_id", game.id)
-        .eq("region", "en")
-        .in("rarity", PREMIUM_RARITIES)
+        .eq("cards.region", "en")
+        .gte("market_avg", 100)
+        .not("chg_7d", "is", null)
+        .lt("chg_7d", 0)
+        .order("chg_7d", { ascending: true })
+        .limit(5)
     ),
-
-    // Characters (top 20 by tier) + their cards. The second query depends on
-    // the first, so both run inside one batch entry instead of serializing
-    // after the Promise.all (M4).
-    cachedMarketData(publicDataCacheKey("markets-page-v3", game.id, "characters-with-cards"), async () => {
-      const { data: charRows } = await supabase
-        .from("characters")
-        .select("id, slug, name")
-        .eq("game_id", game.id)
-        .order("tier")
-        .limit(20);
-      const charList = (charRows ?? []) as { id: string; slug: string; name: string }[];
-      if (charList.length === 0) return { charList, charCards: [] as Record<string, unknown>[] };
-
-      const { data: charCards } = await supabase
-        .from("cards")
-        .select("character_id, rarity, price_stats!price_stats_card_game_fk!inner (market_avg, chg_1d)")
-        .eq("game_id", game.id)
-        .eq("region", "en")
-        .in("character_id", charList.map((c) => c.id));
-      return { charList, charCards: (charCards ?? []) as Record<string, unknown>[] };
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "rarity-cards"), async () => {
+      const rows: Record<string, unknown>[] = [];
+      const pageSize = 1000;
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
+          .from("cards")
+          .select("id, rarity, price_stats!price_stats_card_game_fk!inner (market_avg, chg_1d, chg_7d, chg_30d)")
+          .eq("game_id", game.id)
+          .eq("region", "en")
+          .in("rarity", RARITY_CODES)
+          .order("id")
+          .range(from, from + pageSize - 1);
+        if (error) throw new Error(error.message);
+        if (!data || data.length === 0) break;
+        rows.push(...data as unknown as Record<string, unknown>[]);
+        if (data.length < pageSize) break;
+      }
+      return rows;
     }),
-
-    // Sealed boxes
-    cachedMarketData(publicDataCacheKey("markets-page-v3", game.id, "sealed"), async () =>
+    loadCachedCharacterIndex(game.id),
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v3", game.id, "sealed"), async () =>
       await supabase
         .from("sealed_products")
-        .select("name, product_type, market_avg, chg_1d, sets!sealed_products_set_game_fk (code)")
+        .select(`
+          name, product_type, market_avg, chg_1d, chg_7d, chg_30d, image_url, tcg_product_id,
+          sets!sealed_products_set_game_fk (id, slug, code, name)
+        `)
         .eq("game_id", game.id)
         .not("market_avg", "is", null)
-        .order("market_avg", { ascending: false })
-        .limit(5)
+        .limit(100)
     ),
-
-    // Recent eBay sales
-    cachedMarketData(publicDataCacheKey("markets-page-v3", game.id, "ebay"), async () =>
-      await supabase
-        .from("ebay_sales")
-        .select("sale_price, sold_at, title")
-        .eq("game_id", game.id)
-        .not("sale_price", "is", null)
-        .order("sold_at", { ascending: false })
-        .limit(5)
-    ),
-
-    cachedMarketData(publicDataCacheKey("markets-page-v3", game.id, "catalog-count"), async () =>
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "catalog-count"), async () =>
       await supabase
         .from("cards")
         .select("id", { count: "exact", head: true })
@@ -200,238 +222,198 @@ async function renderMarketsPageContent({
     ),
   ]);
 
-  // ── Existing table data ──
-  const cards = (withOnePiecePayloadFallbacksList(
-    ((cardsRes.data as unknown as Record<string, unknown>[] | null) ?? [])
-      .map(flattenPriceStatsCardRow)
-      .filter((row): row is Record<string, unknown> => row != null)
-  ) as unknown as CardRow[]).sort(
-    (a, b) => (b.price_stats?.market_avg ?? 0) - (a.price_stats?.market_avg ?? 0)
-  );
+  const topValueCards = mapDashboardCards(topValueCardsRes.data)
+    .sort((a, b) => (b.market_avg ?? Number.NEGATIVE_INFINITY) - (a.market_avg ?? Number.NEGATIVE_INFINITY));
+  const topGainers1d = mapDashboardCards(gainers1dRes.data)
+    .sort((a, b) => cardChange(b, "1D") - cardChange(a, "1D"));
+  const topGainers7d = mapDashboardCards(gainers7dRes.data)
+    .sort((a, b) => cardChange(b, "7D") - cardChange(a, "7D"));
+  const topLosers1d = mapDashboardCards(losers1dRes.data)
+    .sort((a, b) => cardChange(a, "1D") - cardChange(b, "1D"));
+  const topLosers7d = mapDashboardCards(losers7dRes.data)
+    .sort((a, b) => cardChange(a, "7D") - cardChange(b, "7D"));
 
-  const PREFIX_ORDER: Record<string, number> = { OP: 0, EB: 1, PRB: 2 };
-  const sets = ((setsRes.data as SetInfo[] | null) ?? []).sort((a, b) => {
-    const parseCode = (code: string | null) => {
-      const m = code?.match(/^([A-Z]+)(\d+)/);
-      if (!m) return { prefix: "ZZZ", num: 999 };
-      return { prefix: m[1], num: parseInt(m[2], 10) };
-    };
-    const pa = parseCode(a.code);
-    const pb = parseCode(b.code);
-    const oa = PREFIX_ORDER[pa.prefix] ?? 99;
-    const ob = PREFIX_ORDER[pb.prefix] ?? 99;
-    if (oa !== ob) return oa - ob;
-    return pa.num - pb.num;
-  });
-  const catalogCardCount = catalogCountRes.count ?? 0;
-
-  if (cards.length === 0 && catalogCardCount > 0) {
+  if (topValueCards.length === 0 && (catalogCountRes.count ?? 0) > 0) {
     return (
-      <main className="bg-bg text-ink min-h-screen pt-8 pb-24">
-        <section className="max-w-[1280px] mx-auto px-7">
-          <header className="mb-6">
-            <div className="font-mono-2 font-semibold text-[12px] text-ink-2 tracking-[0.14em] uppercase mb-3">
-              TCG · Catalog preview · Pricing pending
-            </div>
-            <h1 className="font-grotesk font-bold text-[44px] leading-none tracking-[-0.025em] text-ink">
-              Markets &mdash;{" "}
-              <em
-                className="font-script not-italic bg-grad-brand bg-clip-text text-transparent inline-block"
-                style={{ fontSize: "56px", paddingRight: "12px", paddingBottom: "4px" }}
-              >
-                pending
-              </em>
-            </h1>
-            <p className="mt-3 font-mono-2 font-semibold text-[13px] text-ink-2">
-              {game.name}
-              <span className="text-coral mx-1.5">·</span>
-              {catalogCardCount.toLocaleString()} catalog cards loaded
-              <span className="text-coral mx-1.5">·</span>
-              Pricing provider not enabled
-            </p>
-          </header>
-
+      <div className="qd-page-shell">
+        <section className="qd-page-container">
           <div className="rounded-c-md border-[1.5px] border-ink bg-bg-2 p-8">
-            <div className="font-mono-2 text-[11px] uppercase tracking-[0.14em] text-ink-2 font-semibold mb-3">
-              Catalog-only game
+            <div className="mb-3 font-mono-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-2">
+              Catalog preview · Pricing pending
             </div>
-            <h2 className="font-grotesk text-[28px] leading-tight font-bold text-ink mb-3">
+            <h1 className="mb-3 font-grotesk text-[34px] font-bold leading-tight text-ink">
               Market pricing is not live for {game.name} yet.
-            </h2>
-            <p className="font-mono-2 text-[13px] leading-6 font-semibold text-ink-2 max-w-[720px]">
-              The catalog schema is loaded and scoped to this game, but market tables stay empty until
-              a pricing provider is mapped for this game. Use the catalog and set index for smoke
-              testing card data now.
+            </h1>
+            <p className="max-w-[720px] font-mono-2 text-[13px] font-semibold leading-6 text-ink-2">
+              {(catalogCountRes.count ?? 0).toLocaleString()} catalog cards are loaded. Pricing will appear here when a market provider is enabled.
             </p>
-            <div className="flex flex-wrap gap-3 mt-6">
-              <Link href={gamePath(game.routeSlug, "/catalog")} className="rounded-c-sm border-[1.5px] border-ink bg-ink text-bg px-4 py-2 font-mono-2 text-[11px] font-bold uppercase tracking-[0.08em] no-underline">
-                Open catalog
-              </Link>
-              <Link href={gamePath(game.routeSlug, "/sets")} className="rounded-c-sm border-[1.5px] border-ink bg-bg text-ink px-4 py-2 font-mono-2 text-[11px] font-bold uppercase tracking-[0.08em] no-underline">
-                View sets
-              </Link>
-            </div>
+            <Link
+              href={gamePath(game.routeSlug, "/catalog")}
+              className="mt-6 inline-flex rounded-c-sm border-[1.5px] border-ink bg-ink px-4 py-2 font-mono-2 text-[11px] font-bold uppercase tracking-[0.08em] text-bg no-underline"
+            >
+              Open catalog
+            </Link>
           </div>
         </section>
-      </main>
+      </div>
     );
   }
 
-  // ── Dashboard: Trending / Gainers / Losers ──
-  const trending = ((trendingRes.data ?? []) as Record<string, unknown>[])
-    .map(flattenPriceStatsCardRow)
-    .filter((row): row is Record<string, unknown> => row != null)
-    .sort((a, b) => {
-      const pa = firstRelation(a.price_stats as { chg_1d: number | null } | Array<{ chg_1d: number | null }> | null);
-      const pb = firstRelation(b.price_stats as { chg_1d: number | null } | Array<{ chg_1d: number | null }> | null);
-      return (pb?.chg_1d ?? 0) - (pa?.chg_1d ?? 0);
-    })
-    .map(toDashboardCard);
+  type RarityAggregate = {
+    indexValue: number;
+    count: number;
+    weighted: { "1D": number; "7D": number };
+    weight: { "1D": number; "7D": number };
+  };
 
-  const topGainers = ((gainersRes.data ?? []) as Record<string, unknown>[])
-    .map(flattenPriceStatsCardRow)
-    .filter((row): row is Record<string, unknown> => row != null)
-    .sort((a, b) => {
-      const pa = firstRelation(a.price_stats as { chg_1d: number | null } | Array<{ chg_1d: number | null }> | null);
-      const pb = firstRelation(b.price_stats as { chg_1d: number | null } | Array<{ chg_1d: number | null }> | null);
-      return (pb?.chg_1d ?? 0) - (pa?.chg_1d ?? 0);
-    })
-    .map(toDashboardCard);
-
-  const topLosers = ((losersRes.data ?? []) as Record<string, unknown>[])
-    .map(flattenPriceStatsCardRow)
-    .filter((row): row is Record<string, unknown> => row != null)
-    .sort((a, b) => {
-      const pa = firstRelation(a.price_stats as { chg_1d: number | null } | Array<{ chg_1d: number | null }> | null);
-      const pb = firstRelation(b.price_stats as { chg_1d: number | null } | Array<{ chg_1d: number | null }> | null);
-      return (pa?.chg_1d ?? 0) - (pb?.chg_1d ?? 0);
-    })
-    .map(toDashboardCard);
-
-  // ── Dashboard: Rarity Ranking ──
-  const rarityGroups: Record<string, { prices: number[]; changes: number[] }> = {};
-  for (const row of (rarityCardsRes.data ?? []) as unknown as { rarity: string; price_stats: { market_avg: number | null; chg_1d: number | null } | Array<{ market_avg: number | null; chg_1d: number | null }> | null }[]) {
-    const r = row.rarity;
+  const rarityAggregates = new Map<string, RarityAggregate>();
+  for (const row of rarityCardsRes as unknown as Array<{
+    rarity: string;
+    price_stats: PriceChangeStats | PriceChangeStats[] | null;
+  }>) {
     const ps = firstRelation(row.price_stats);
-    if (!rarityGroups[r]) rarityGroups[r] = { prices: [], changes: [] };
-    if (ps?.market_avg != null) {
-      rarityGroups[r].prices.push(ps.market_avg);
-      rarityGroups[r].changes.push(ps.chg_1d ?? 0);
-    }
-  }
+    if (ps?.market_avg == null) continue;
 
-  const rarityRanking: RarityRankItem[] = PREMIUM_RARITIES
-    .map((code) => {
-      const g = rarityGroups[code];
-      const meta = RARITY_META[code];
-      if (!g || g.prices.length === 0) {
-        return { code, name: meta?.name ?? code, avg_price: 0, card_count: 0, chg_1d: 0 };
-      }
-      const avg_price = g.prices.reduce((s, v) => s + v, 0) / g.prices.length;
-      const chg_1d = g.changes.reduce((s, v) => s + v, 0) / g.changes.length;
-      return {
-        code,
-        name: meta?.name ?? code,
-        avg_price: +avg_price.toFixed(2),
-        card_count: g.prices.length,
-        chg_1d: +chg_1d.toFixed(1),
-      };
-    })
-    .sort((a, b) => b.avg_price - a.avg_price);
-
-  // ── Dashboard: Top Characters ──
-  let topCharacters: CharacterRankItem[] = [];
-  const { charList, charCards } = charBundle;
-  if (charList.length > 0) {
-    const charMap: Record<string, { total: number; chgSum: number; count: number; rarities: Set<string> }> = {};
-    for (const row of (charCards ?? []) as unknown as { character_id: string; rarity: string | null; price_stats: { market_avg: number | null; chg_1d: number | null } | Array<{ market_avg: number | null; chg_1d: number | null }> | null }[]) {
-      if (!charMap[row.character_id]) {
-        charMap[row.character_id] = { total: 0, chgSum: 0, count: 0, rarities: new Set() };
-      }
-      const m = charMap[row.character_id];
-      const ps = firstRelation(row.price_stats);
-      m.total += ps?.market_avg ?? 0;
-      m.chgSum += ps?.chg_1d ?? 0;
-      m.count++;
-      if (row.rarity) m.rarities.add(row.rarity);
-    }
-
-    topCharacters = charList
-      .map((c) => {
-        const m = charMap[c.id];
-        return {
-          name: c.name,
-          slug: c.slug,
-          rarities: m ? Array.from(m.rarities) : [],
-          chg_1d: m && m.count > 0 ? +(m.chgSum / m.count).toFixed(1) : 0,
-          _index: m?.total ?? 0,
-        };
-      })
-      .filter((c) => c._index > 0)
-      .sort((a, b) => b._index - a._index)
-      .slice(0, 5)
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      .map(({ _index, ...rest }) => rest);
-  }
-
-  // ── Dashboard: Sealed Boxes ──
-  const sealedBoxes: SealedRankItem[] = ((sealedRes.data ?? []) as Record<string, unknown>[]).map((row) => {
-    const s = row.sets as { code: string } | null;
-    return {
-      name: row.name as string,
-      set_code: s?.code ?? null,
-      product_type: (row.product_type as string | null) ?? null,
-      market_avg: (row.market_avg as number | null) ?? null,
-      chg_1d: (row.chg_1d as number | null) ?? null,
+    const aggregate = rarityAggregates.get(row.rarity) ?? {
+      indexValue: 0,
+      count: 0,
+      weighted: { "1D": 0, "7D": 0 },
+      weight: { "1D": 0, "7D": 0 },
     };
-  });
+    aggregate.indexValue += ps.market_avg;
+    aggregate.count += 1;
 
-  // ── Dashboard: Top eBay Sales ──
-  const topEbaySales: EbaySaleItem[] = ((ebayRes.data ?? []) as Record<string, unknown>[]).map((row) => ({
-    title: (row.title as string | null) ?? null,
-    sale_price: (row.sale_price as number | null) ?? null,
-    sold_at: (row.sold_at as string | null) ?? null,
+    if (ps.chg_1d != null) {
+      aggregate.weighted["1D"] += ps.market_avg * ps.chg_1d;
+      aggregate.weight["1D"] += ps.market_avg;
+    }
+    if (ps.chg_7d != null) {
+      aggregate.weighted["7D"] += ps.market_avg * ps.chg_7d;
+      aggregate.weight["7D"] += ps.market_avg;
+    }
+    rarityAggregates.set(row.rarity, aggregate);
+  }
+
+  const allRarities: RarityRankItem[] = RARITY_CODES.map((code) => {
+    const aggregate = rarityAggregates.get(code);
+    return {
+      code,
+      name: RARITY_META[code]?.name ?? code,
+      index_value: +(aggregate?.indexValue ?? 0).toFixed(2),
+      card_count: aggregate?.count ?? 0,
+      changes: {
+        "1D": aggregate?.weight["1D"]
+          ? +(aggregate.weighted["1D"] / aggregate.weight["1D"]).toFixed(1)
+          : null,
+        "7D": aggregate?.weight["7D"]
+          ? +(aggregate.weighted["7D"] / aggregate.weight["7D"]).toFixed(1)
+          : null,
+      },
+    };
+  }).filter((rarity) => rarity.card_count > 0);
+
+  const allCharacters: CharacterRankItem[] = characterIndexMarketRanking(characterIndex, 5);
+
+  const rawSealed: SealedRankItem[] = ((sealedRes.data ?? []) as unknown as Array<Record<string, unknown>>)
+    .map((row) => {
+      const set = firstRelation(row.sets as SetRelation | SetRelation[] | null);
+      const setImageUrl = set?.slug ? getSetImageUrl(set.slug) : null;
+      const productImageUrl = tcgPlayerProductImageUrl(row.tcg_product_id as string | null);
+      return {
+        set_id: set?.id ?? null,
+        set_slug: set?.slug ?? null,
+        name: (row.name as string | null) ?? set?.name ?? "Booster box",
+        set_code: set?.code ?? null,
+        product_type: (row.product_type as string | null) ?? null,
+        market_avg: (row.market_avg as number | null) ?? null,
+        total_set_value: 0,
+        image_url: (row.image_url as string | null) ?? productImageUrl ?? setImageUrl,
+        image_url_fallback: setImageUrl,
+        changes: {
+          "1D": (row.chg_1d as number | null) ?? null,
+          "7D": (row.chg_7d as number | null) ?? null,
+        },
+      };
+    });
+
+  const candidateSets = rankBoosterBoxesByPrice(rawSealed, 5);
+  const candidateSetIds = candidateSets.flatMap((item) => item.set_id ? [item.set_id] : []);
+  const setValueById = new Map<string, number>();
+
+  if (candidateSetIds.length > 0) {
+    const setValueRows = await cachedMarketData(
+      publicDataCacheKey("markets-quickdash-v2", game.id, "set-values", candidateSetIds.sort().join(",")),
+      async () => {
+        const rows: Array<{
+          set_id: string | null;
+          price_stats: { market_avg: number | null } | Array<{ market_avg: number | null }> | null;
+        }> = [];
+        const pageSize = 1000;
+        for (let from = 0; ; from += pageSize) {
+          const { data, error } = await supabase
+            .from("cards")
+            .select("id, set_id, price_stats!price_stats_card_game_fk (market_avg)")
+            .eq("game_id", game.id)
+            .eq("region", "en")
+            .in("set_id", candidateSetIds)
+            .order("id")
+            .range(from, from + pageSize - 1);
+          if (error) throw new Error(error.message);
+          if (!data || data.length === 0) break;
+          rows.push(...data as unknown as typeof rows);
+          if (data.length < pageSize) break;
+        }
+        return rows;
+      },
+    );
+
+    for (const row of setValueRows as unknown as Array<{
+      set_id: string | null;
+      price_stats: { market_avg: number | null } | Array<{ market_avg: number | null }> | null;
+    }>) {
+      if (!row.set_id) continue;
+      const marketValue = firstRelation(row.price_stats)?.market_avg ?? 0;
+      setValueById.set(row.set_id, (setValueById.get(row.set_id) ?? 0) + marketValue);
+    }
+  }
+
+  const sealedWithValues = candidateSets.map((item) => ({
+    ...item,
+    total_set_value: item.set_id ? +(setValueById.get(item.set_id) ?? 0).toFixed(2) : 0,
   }));
 
-  // ── Compose dashboard data ──
   const dashboardData: DashboardData = {
-    trending,
-    topGainers,
-    topLosers,
-    rarityRanking,
-    topCharacters,
-    sealedBoxes,
-    topEbaySales,
+    topCards: {
+      "1D": topValueCards.slice(0, 10),
+      "7D": topValueCards.slice(0, 10),
+    },
+    topGainers: {
+      "1D": topGainers1d.slice(0, 5),
+      "7D": topGainers7d.slice(0, 5),
+    },
+    topLosers: {
+      "1D": topLosers1d.slice(0, 5),
+      "7D": topLosers7d.slice(0, 5),
+    },
+    rarityRanking: {
+      "1D": sortByWindow(allRarities, "1D").slice(0, 5),
+      "7D": sortByWindow(allRarities, "7D").slice(0, 5),
+    },
+    topCharacters: {
+      "7D": allCharacters,
+    },
+    sealedBoxes: {
+      "1D": sealedWithValues,
+      "7D": sealedWithValues,
+    },
   };
 
   return (
-    <main className="bg-bg text-ink min-h-screen pt-8 pb-24">
-      <section className="max-w-[1280px] mx-auto px-7">
-        <header className="mb-6">
-          <div className="font-mono-2 font-semibold text-[12px] text-ink-2 tracking-[0.14em] uppercase mb-3">
-            TCG · Live prices · Verified data
-          </div>
-          <h1 className="font-grotesk font-bold text-[44px] leading-none tracking-[-0.025em] text-ink">
-            Markets &mdash;{" "}
-            <em
-              className="font-script not-italic bg-grad-brand bg-clip-text text-transparent inline-block"
-              style={{ fontSize: "56px", paddingRight: "12px", paddingBottom: "4px" }}
-            >
-              live
-            </em>
-          </h1>
-          <p className="mt-3 font-mono-2 font-semibold text-[13px] text-ink-2">
-            Top 20 by market value
-            <span className="text-coral mx-1.5">·</span>
-            Updated every 60s
-            <span className="text-coral mx-1.5">·</span>
-            {game.name}
-          </p>
-        </header>
+    <div className="qd-page-shell">
+      <div className="qd-page-container">
         <MarketDashboard data={dashboardData} gameRouteSlug={game.routeSlug} />
-        <MarketTable cards={cards} sets={sets} gameRouteSlug={game.routeSlug} />
-      </section>
-    </main>
+      </div>
+    </div>
   );
 }
 
@@ -444,28 +426,27 @@ export async function MarketsPageContent(
     const gameRouteSlug = props.gameRouteSlug ?? DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
 
     return (
-      <main className="bg-bg text-ink min-h-screen pt-8 pb-24">
-        <section className="max-w-[1280px] mx-auto px-7">
+      <div className="qd-page-shell">
+        <section className="qd-page-container">
           <div className="rounded-c-md border-[1.5px] border-ink bg-bg-2 p-8">
-            <div className="font-mono-2 text-[11px] uppercase tracking-[0.14em] text-ink-2 font-semibold mb-3">
+            <div className="mb-3 font-mono-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-2">
               Market service unavailable
             </div>
-            <h1 className="font-grotesk text-[34px] leading-tight font-bold text-ink mb-3">
+            <h1 className="mb-3 font-grotesk text-[34px] font-bold leading-tight text-ink">
               Live pricing is temporarily unavailable.
             </h1>
-            <p className="font-mono-2 text-[13px] leading-6 font-semibold text-ink-2 max-w-[720px]">
-              The catalog is still available while the pricing service recovers. Please try the
-              market page again shortly.
+            <p className="max-w-[720px] font-mono-2 text-[13px] font-semibold leading-6 text-ink-2">
+              The catalog is still available while the pricing service recovers. Please try the market page again shortly.
             </p>
             <Link
               href={gamePath(gameRouteSlug, "/catalog")}
-              className="mt-6 inline-flex rounded-c-sm border-[1.5px] border-ink bg-ink text-bg px-4 py-2 font-mono-2 text-[11px] font-bold uppercase tracking-[0.08em] no-underline"
+              className="mt-6 inline-flex rounded-c-sm border-[1.5px] border-ink bg-ink px-4 py-2 font-mono-2 text-[11px] font-bold uppercase tracking-[0.08em] text-bg no-underline"
             >
               Open catalog
             </Link>
           </div>
         </section>
-      </main>
+      </div>
     );
   }
 }

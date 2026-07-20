@@ -1,4 +1,4 @@
--- OWL Market — Migration v44: Japanese market pricing (Yuyu-tei) snapshots
+-- Moon Market — Migration v44: Japanese market pricing (Yuyu-tei) snapshots
 --
 -- One row per source card per snapshot_date (time-series friendly). game_id is
 -- NOT NULL per the v40 game-boundary convention. card_id / card_image_id are

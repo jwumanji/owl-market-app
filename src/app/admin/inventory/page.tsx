@@ -17,7 +17,7 @@ import { CATALOG_MATCH_STATUSES, type CatalogMatchStatus, type GradedRating } fr
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Inventory - OWL Market",
+  title: "Inventory - Moon Market",
 };
 
 type InventoryQueryRow = {

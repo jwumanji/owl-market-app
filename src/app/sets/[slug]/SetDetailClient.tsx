@@ -199,7 +199,7 @@ export default function SetDetailClient({
   return (
     <section className="setd-page" style={colorCss}>
       <div className="setd-breadcrumb">
-        <Link href="/">OWL Market</Link>
+        <Link href="/">Moon Market</Link>
         <span className="bsep">›</span>
         <Link href={gamePath(gameRouteSlug, "/sets")}>Sets</Link>
         <span className="bsep">›</span>

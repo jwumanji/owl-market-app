@@ -1,4 +1,4 @@
--- OWL Market — Migration v45: region-aware cards (EN catalog vs JP-exclusive)
+-- Moon Market — Migration v45: region-aware cards (EN catalog vs JP-exclusive)
 --
 -- Adds cards.region so Japanese-exclusive rows (auto-created by the Yuyu-tei
 -- sync) can coexist with the English catalog without leaking into EN pages.

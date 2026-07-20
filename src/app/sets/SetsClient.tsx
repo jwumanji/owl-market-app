@@ -261,7 +261,7 @@ export default function SetsClient({
   return (
     <section className="sets-v2-page">
       <div className="sets-v2-breadcrumb">
-        <Link href="/" prefetch={false}>OWL Market</Link>
+        <Link href="/" prefetch={false}>Moon Market</Link>
         <span className="bsep">›</span>
         <span className="here">Sets</span>
       </div>

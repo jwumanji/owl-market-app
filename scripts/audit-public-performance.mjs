@@ -1,4 +1,4 @@
-// Lightweight public route and API timing audit for OWL Market.
+// Lightweight public route and API timing audit for Moon Market.
 //
 // Examples:
 //   node scripts/audit-public-performance.mjs --base-url=http://localhost:3003
@@ -101,7 +101,7 @@ async function fetchTimed(path, accept) {
   const response = await fetch(url, {
     headers: {
       accept,
-      "user-agent": "OwlMarketPublicPerformanceAudit/1.0",
+      "user-agent": "MoonMarketPublicPerformanceAudit/1.0",
     },
   });
   const text = await response.text();
@@ -218,7 +218,7 @@ async function main() {
   }
 
   const lines = [
-    "# OWL Market Public Performance Audit",
+    "# Moon Market Public Performance Audit",
     "",
     `Base URL: ${BASE_URL}`,
     `Game route: ${GAME_ROUTE}`,

@@ -4,7 +4,7 @@ import { DEFAULT_PUBLIC_GAME_DB_SLUG } from "@/lib/game-scope";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Orders - OWL Market",
+  title: "Orders - Moon Market",
 };
 
 type OrdersSearchParams = {

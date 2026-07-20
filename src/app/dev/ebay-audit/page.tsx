@@ -6,7 +6,7 @@ import EbayAuditPicker, { type PickerCard } from "./EbayAuditPicker";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "eBay Sync Audit · OWL Dev",
+  title: "eBay Sync Audit · Moon Market Dev",
   robots: { index: false, follow: false },
 };
 
@@ -160,7 +160,7 @@ export default async function EbayAuditPage(
       <div className="mx-auto max-w-[1240px] px-4 py-8">
         <header className="mb-6 border-b border-border pb-4">
           <p className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-owl">
-            OWL · Dev
+            Moon Market · Dev
           </p>
           <h1 className="text-2xl font-bold text-text">eBay Sync Audit</h1>
           <p className="mt-1 text-sm text-text-2">

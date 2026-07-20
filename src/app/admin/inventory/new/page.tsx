@@ -1,7 +1,7 @@
 import NewInventoryForm from "./NewInventoryForm";
 
 export const metadata = {
-  title: "Add Inventory - OWL Market",
+  title: "Add Inventory - Moon Market",
 };
 
 type NewInventorySearchParams = {

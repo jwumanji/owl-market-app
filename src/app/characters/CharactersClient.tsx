@@ -327,58 +327,15 @@ function CharToolbar({
   );
 }
 
-/* ── Character Detail Panel ── */
-function CharacterDetail({ c }: { c: CharacterData }) {
-  const tier = TIER_LABELS[c.tier] || TIER_LABELS[3];
-  const color = c.color || "#E89512";
-  const avatar = getCharAvatar(c);
-  // The detail portrait renders at 80px wide, so prefer the thumbnail and
-  // avoid downloading a much larger preview image during initial paint.
-  const fullImg = c.topCards?.[0]?.imageUrlSmall ?? c.topCards?.[0]?.imageUrlPreview ?? c.topCards?.[0]?.imageUrl ?? null;
-  return (
-    <div className="ch-detail">
-      <div className="ch-detail-header" style={{ background: `linear-gradient(135deg,${c.colorD || "rgba(232,149,18,0.16)"},transparent)` }}>
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,transparent,${color},transparent)` }} />
-        <div className="ch-detail-header-inner">
-          {fullImg ? (
-            <FastCardImage src={fullImg} alt={c.name} className="ch-detail-avatar" width={80} height={112} sizes="80px" loading="lazy" />
-          ) : avatar ? (
-            <FastCardImage src={avatar} alt={c.name} className="ch-detail-avatar" width={80} height={112} sizes="80px" loading="lazy" />
-          ) : (
-            <div className="ch-detail-avatar-placeholder">
-              {c.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
-            </div>
-          )}
-          <div className="ch-detail-header-info">
-            <div className="ch-detail-badges">
-              <span className="ch-tier-badge" style={{ background: tier.bg, color: tier.color }}>Tier {tier.label}</span>
-              <span className="ch-faction-badge">{c.faction}</span>
-            </div>
-            <div className="ch-detail-name">{c.name}</div>
-            <div className="ch-detail-sub">{c.subtitle}</div>
-          </div>
-        </div>
-      </div>
-      <div className="ch-detail-stats">
-        {[
-          ["Character Index", `$${c.indexValue.toLocaleString()}`, color],
-          ["7D Change", formatChange(c.chg7d), changeColor(c.chg7d)],
-          ["30D Change", formatChange(c.chg30d), changeColor(c.chg30d)],
-          ["Cards Tracked", String(c.cardCount), undefined],
-        ].map(([k, v, clr]) => (
-          <div className="ch-stat-row" key={k}>
-            <span className="ch-stat-key">{k}</span>
-            <span className="ch-stat-val" style={clr ? { color: clr } : undefined}>{v}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 /* ── Character Cards Table ── */
 function CharacterCards({ c, gameRouteSlug }: { c: CharacterData; gameRouteSlug: string }) {
   const router = useRouter();
+  const tier = TIER_LABELS[c.tier] || TIER_LABELS[3];
+  const avatar = getCharAvatar(c);
+  const indexValue = c.indexValue.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
   const openCard = useCallback(
     (card: CharacterCard) => {
@@ -391,10 +348,29 @@ function CharacterCards({ c, gameRouteSlug }: { c: CharacterData; gameRouteSlug:
 
   return (
     <div className="ch-cards-section">
-      <div className="section-header">
-        <div>
-          <div className="section-title">Top Cards &mdash; <span style={{ color: c.color }}>{c.name}</span></div>
-          <div className="section-sub">Top {c.topCards.length} highest value cards across all sets</div>
+      <div className="ch-cards-header">
+        <div className="ch-cards-identity">
+          <CharAvatar src={avatar} name={c.name} size={30} />
+          <span className="ch-cards-character-name" style={{ color: c.color }}>{c.name}</span>
+          <div className="ch-cards-badges">
+            <span className="ch-tier-badge" style={{ background: tier.bg, color: tier.color }}>Tier {tier.label}</span>
+            <span className="ch-faction-badge">{c.faction}</span>
+          </div>
+        </div>
+        <div className="ch-cards-stats">
+          <div className="ch-cards-stat">
+            <span className="ch-cards-stat-label">Index</span>
+            <span className="ch-cards-stat-value">${indexValue}</span>
+          </div>
+          <div className="ch-cards-stat">
+            <span className="ch-cards-stat-label">7D</span>
+            <span className="ch-cards-stat-value" style={{ color: changeColor(c.chg7d) }}>{formatChange(c.chg7d)}</span>
+          </div>
+          <div className="ch-cards-stat">
+            <span className="ch-cards-stat-label">30D</span>
+            <span className="ch-cards-stat-value" style={{ color: changeColor(c.chg30d) }}>{formatChange(c.chg30d)}</span>
+          </div>
+          <div className="ch-cards-tracked">{c.cardCount.toLocaleString()} cards tracked</div>
         </div>
         <Link href={gamePath(gameRouteSlug, "/markets")} className="section-action">View all in markets &rarr;</Link>
       </div>
@@ -548,7 +524,7 @@ export default function CharactersClient({
 
   useEffect(() => {
     if (!baseCharacter || detailsBySlug[baseCharacter.slug]) return;
-    const expectedTopCards = Math.min(5, baseCharacter.cardCount);
+    const expectedTopCards = Math.min(10, baseCharacter.cardCount);
     if (baseCharacter.topCards.length >= expectedTopCards) return;
     if (detailRequests.current.has(baseCharacter.slug)) return;
     detailRequests.current.add(baseCharacter.slug);
@@ -673,9 +649,8 @@ export default function CharactersClient({
             ))}
           </div>
 
-          {/* Detail + Cards */}
+          {/* Selected character + cards */}
           <div className="ch-detail-section">
-            <CharacterDetail c={c} />
             <CharacterCards c={c} gameRouteSlug={gameRouteSlug} />
           </div>
 

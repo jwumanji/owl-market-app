@@ -1,5 +1,5 @@
 /**
- * JustTCG → OWL Market set mapping and card variant detection.
+ * JustTCG → Moon Market set mapping and card variant detection.
  *
  * TODO: Slug patterns are derived from TCGPlayer naming conventions.
  * Verify against the actual JustTCG API response

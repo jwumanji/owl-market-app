@@ -10,7 +10,7 @@ export async function generateMetadata(
 ) {
   const params = await props.params;
   const slug = decodeURIComponent(params.slug).toLowerCase();
-  return { title: `${slug.toUpperCase()} - OWL Market` };
+  return { title: `${slug.toUpperCase()} - Moon Market` };
 }
 
 export default async function GameSetDetailPage(

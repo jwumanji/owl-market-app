@@ -42,9 +42,14 @@ export type SortKey = "value" | "chg_1d" | "chg_7d" | "chg_30d";
 
 /* ── Dashboard widget types ── */
 
+export type MarketWindow = "1D" | "7D" | "90D";
+
+export type MarketWindowPayload<T> = Partial<Record<MarketWindow, T>>;
+
 export interface DashboardCard {
   id: string;
   card_image_id: string;
+  card_number: string | null;
   name: string;
   rarity: string | null;
   image_url: string | null;
@@ -52,30 +57,38 @@ export interface DashboardCard {
   image_url_preview?: string | null;
   set_code: string | null;
   market_avg: number | null;
-  chg_1d: number | null;
+  changes: MarketWindowPayload<number | null>;
 }
 
 export interface RarityRankItem {
   code: string;
   name: string;
-  avg_price: number;
+  index_value: number;
   card_count: number;
-  chg_1d: number;
+  changes: MarketWindowPayload<number | null>;
 }
 
 export interface CharacterRankItem {
   name: string;
   slug: string;
-  rarities: string[];
-  chg_1d: number;
+  index_value: number;
+  image_url: string | null;
+  image_url_small: string | null;
+  image_url_preview: string | null;
+  changes: MarketWindowPayload<number | null>;
 }
 
 export interface SealedRankItem {
+  set_id: string | null;
+  set_slug: string | null;
   name: string;
   set_code: string | null;
   product_type: string | null;
   market_avg: number | null;
-  chg_1d: number | null;
+  total_set_value: number;
+  image_url: string | null;
+  image_url_fallback: string | null;
+  changes: MarketWindowPayload<number | null>;
 }
 
 export interface EbaySaleItem {
@@ -85,11 +98,10 @@ export interface EbaySaleItem {
 }
 
 export interface DashboardData {
-  trending: DashboardCard[];
-  topGainers: DashboardCard[];
-  topLosers: DashboardCard[];
-  rarityRanking: RarityRankItem[];
-  topCharacters: CharacterRankItem[];
-  sealedBoxes: SealedRankItem[];
-  topEbaySales: EbaySaleItem[];
+  topCards: MarketWindowPayload<DashboardCard[]>;
+  topGainers: MarketWindowPayload<DashboardCard[]>;
+  topLosers: MarketWindowPayload<DashboardCard[]>;
+  rarityRanking: MarketWindowPayload<RarityRankItem[]>;
+  topCharacters: MarketWindowPayload<CharacterRankItem[]>;
+  sealedBoxes: MarketWindowPayload<SealedRankItem[]>;
 }

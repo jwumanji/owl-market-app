@@ -32,6 +32,11 @@
   margin-bottom: 32px;
 }
 
+.c-hero-wm {
+  width: min(516px, calc(100vw - 32px));
+  height: auto;
+}
+
 /* Big wordmark variant: the SVG wordmark takes explicit width/height props
    at the hero call site (435x85) — no font-size scaling needed. */
 

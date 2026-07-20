@@ -8,7 +8,7 @@ import { createServiceClient } from "@/lib/supabase-server";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "PSA Submissions - OWL Market",
+  title: "PSA Submissions - Moon Market",
 };
 
 type PsaSubmissionRow = {
