@@ -311,8 +311,9 @@ function SetImage({ item }: { item: SealedRankItem }) {
         fetchPriority="low"
         height={200}
         imageUrl={item.image_url}
-        imageUrlSmall={item.image_url}
+        imageUrlSmall={item.image_url_fallback}
         loading="lazy"
+        sourceSize="display"
         width={320}
       />
     </div>
@@ -326,7 +327,7 @@ function SetsSection({ data, gameRouteSlug }: { data: DashboardData; gameRouteSl
   return (
     <section className="qd-section" aria-labelledby="quickdash-sets">
       <SectionHeader
-        eyebrow="Ranked by % growth"
+        eyebrow="Ranked by booster box cost"
         title="Box"
         emphasis="sets"
         selector={<WindowSelector data={data.sealedBoxes} value={window} onChange={setWindow} label="Box sets" />}

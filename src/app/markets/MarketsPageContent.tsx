@@ -4,6 +4,7 @@ import { RARITY_META } from "@/app/rarities/rarities-data";
 import { getSetImageUrl } from "@/app/sets/set-images";
 import MarketDashboard from "@/components/market/MarketDashboard";
 import { gamePath } from "@/lib/game-routes";
+import { rankBoosterBoxesByPrice, tcgPlayerProductImageUrl } from "@/lib/market-sealed";
 import {
   DEFAULT_PUBLIC_GAME_ROUTE_SLUG,
   publicOnlyForCatalogPreview,
@@ -233,11 +234,11 @@ async function renderMarketsPageContent({
 
       return { characters, cards };
     }),
-    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "sealed"), async () =>
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v3", game.id, "sealed"), async () =>
       await supabase
         .from("sealed_products")
         .select(`
-          name, product_type, market_avg, chg_1d, chg_7d, chg_30d, image_url,
+          name, product_type, market_avg, chg_1d, chg_7d, chg_30d, image_url, tcg_product_id,
           sets!sealed_products_set_game_fk (id, slug, code, name)
         `)
         .eq("game_id", game.id)
@@ -412,6 +413,8 @@ async function renderMarketsPageContent({
   const rawSealed: SealedRankItem[] = ((sealedRes.data ?? []) as unknown as Array<Record<string, unknown>>)
     .map((row) => {
       const set = firstRelation(row.sets as SetRelation | SetRelation[] | null);
+      const setImageUrl = set?.slug ? getSetImageUrl(set.slug) : null;
+      const productImageUrl = tcgPlayerProductImageUrl(row.tcg_product_id as string | null);
       return {
         set_id: set?.id ?? null,
         set_slug: set?.slug ?? null,
@@ -420,7 +423,8 @@ async function renderMarketsPageContent({
         product_type: (row.product_type as string | null) ?? null,
         market_avg: (row.market_avg as number | null) ?? null,
         total_set_value: 0,
-        image_url: (row.image_url as string | null) ?? (set?.slug ? getSetImageUrl(set.slug) : null),
+        image_url: (row.image_url as string | null) ?? productImageUrl ?? setImageUrl,
+        image_url_fallback: setImageUrl,
         changes: {
           "1D": (row.chg_1d as number | null) ?? null,
           "7D": (row.chg_7d as number | null) ?? null,
@@ -428,16 +432,7 @@ async function renderMarketsPageContent({
       };
     });
 
-  const boosterOnly = rawSealed.filter((item) =>
-    `${item.product_type ?? ""} ${item.name}`.toLowerCase().includes("booster"),
-  );
-  const sealedPool = boosterOnly.length >= 5 ? boosterOnly : rawSealed;
-  const candidateSets = Array.from(new Map(
-    [
-      ...sortByWindow(sealedPool, "1D").slice(0, 5),
-      ...sortByWindow(sealedPool, "7D").slice(0, 5),
-    ].map((item) => [item.set_id ?? `${item.set_code}:${item.name}`, item]),
-  ).values());
+  const candidateSets = rankBoosterBoxesByPrice(rawSealed, 5);
   const candidateSetIds = candidateSets.flatMap((item) => item.set_id ? [item.set_id] : []);
   const setValueById = new Map<string, number>();
 
@@ -505,8 +500,8 @@ async function renderMarketsPageContent({
       "7D": sortByWindow(allCharacters, "7D").slice(0, 5),
     },
     sealedBoxes: {
-      "1D": sortByWindow(sealedWithValues, "1D").slice(0, 5),
-      "7D": sortByWindow(sealedWithValues, "7D").slice(0, 5),
+      "1D": sealedWithValues,
+      "7D": sealedWithValues,
     },
   };
 
