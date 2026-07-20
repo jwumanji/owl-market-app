@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { cardImageSources, type CardImageSourceSize } from "@/lib/card-image-variants";
 import CardHoverZoom from "../ui/CardHoverZoom";
 import FastCardImage from "../ui/FastCardImage";
 
@@ -15,6 +16,7 @@ type MarketCardImageProps = {
   imageUrlPreview?: string | null;
   imageUrlSmall?: string | null;
   loading?: "eager" | "lazy";
+  sourceSize?: CardImageSourceSize;
   width?: number;
 };
 
@@ -32,11 +34,12 @@ export default function MarketCardImage({
   imageUrlPreview,
   imageUrlSmall,
   loading = "lazy",
+  sourceSize = "thumbnail",
   width,
 }: MarketCardImageProps) {
   const sources = useMemo(
-    () => [imageUrlSmall, imageUrl].filter((src): src is string => Boolean(src)),
-    [imageUrlSmall, imageUrl],
+    () => cardImageSources({ imageUrl, imageUrlPreview, imageUrlSmall }, sourceSize),
+    [imageUrl, imageUrlPreview, imageUrlSmall, sourceSize],
   );
   const [sourceIndex, setSourceIndex] = useState(0);
   const [loadedSource, setLoadedSource] = useState<string | null>(null);

@@ -249,6 +249,7 @@ function CardImage({ card, eager = false }: { card: DashboardCard; eager?: boole
         imageUrlPreview={card.image_url_preview}
         imageUrlSmall={card.image_url_small}
         loading={eager ? "eager" : "lazy"}
+        sourceSize="display"
         width={300}
       />
     </div>
@@ -379,6 +380,7 @@ function CharacterImage({ item }: { item: CharacterRankItem }) {
         imageUrlPreview={item.image_url_preview}
         imageUrlSmall={item.image_url_small}
         loading="lazy"
+        sourceSize="display"
         width={320}
       />
     </div>
