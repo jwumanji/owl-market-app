@@ -1,11 +1,13 @@
 import Link from "next/link";
 
 import { loadCachedCharacterIndex } from "@/app/characters/characters-index-data";
-import { RARITY_META } from "@/app/rarities/rarities-data";
+import { loadRarities } from "@/app/rarities/load-rarities";
+import { RARITY_INDEX_SLUGS } from "@/app/rarities/rarities-data";
 import { getSetImageUrl } from "@/app/sets/set-images";
 import MarketDashboard from "@/components/market/MarketDashboard";
 import { gamePath } from "@/lib/game-routes";
 import { characterIndexMarketRanking } from "@/lib/market-characters";
+import { marketRarityRanking } from "@/lib/market-rarities";
 import { attachCasePrices, rankBoosterBoxesByPrice, tcgPlayerProductImageUrl } from "@/lib/market-sealed";
 import {
   DEFAULT_PUBLIC_GAME_ROUTE_SLUG,
@@ -21,7 +23,6 @@ import type {
   DashboardData,
   EbaySaleItem,
   MarketWindow,
-  RarityRankItem,
   SealedRankItem,
 } from "@/lib/types";
 
@@ -74,8 +75,6 @@ const DASHBOARD_PRICE_CARD_SELECT = `
     sets!cards_set_game_fk (code)
   )
 `;
-
-const RARITY_CODES = ["MR", "SEC", "SP", "AA", "SR"];
 
 function cardChange(card: DashboardCard, window: MarketWindow) {
   return card.changes[window] ?? Number.NEGATIVE_INFINITY;
@@ -142,15 +141,6 @@ function mapTopEbaySales(data: unknown): EbaySaleItem[] {
   return sales;
 }
 
-function sortByWindow<T extends { changes: Partial<Record<MarketWindow, number | null>> }>(
-  rows: T[],
-  window: MarketWindow,
-) {
-  return [...rows].sort(
-    (a, b) => (b.changes[window] ?? Number.NEGATIVE_INFINITY) - (a.changes[window] ?? Number.NEGATIVE_INFINITY),
-  );
-}
-
 async function renderMarketsPageContent({
   gameRouteSlug = DEFAULT_PUBLIC_GAME_ROUTE_SLUG,
 }: {
@@ -172,7 +162,7 @@ async function renderMarketsPageContent({
     gainers7dRes,
     losers1dRes,
     losers7dRes,
-    rarityCardsRes,
+    rarityIndex,
     characterIndex,
     sealedRes,
     topEbaySalesRes,
@@ -236,25 +226,7 @@ async function renderMarketsPageContent({
         .order("chg_7d", { ascending: true })
         .limit(5)
     ),
-    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "rarity-cards"), async () => {
-      const rows: Record<string, unknown>[] = [];
-      const pageSize = 1000;
-      for (let from = 0; ; from += pageSize) {
-        const { data, error } = await supabase
-          .from("cards")
-          .select("id, rarity, price_stats!price_stats_card_game_fk!inner (market_avg, chg_1d, chg_7d, chg_30d)")
-          .eq("game_id", game.id)
-          .eq("region", "en")
-          .in("rarity", RARITY_CODES)
-          .order("id")
-          .range(from, from + pageSize - 1);
-        if (error) throw new Error(error.message);
-        if (!data || data.length === 0) break;
-        rows.push(...data as unknown as Record<string, unknown>[]);
-        if (data.length < pageSize) break;
-      }
-      return rows;
-    }),
+    loadRarities({ game: game.routeSlug }),
     loadCachedCharacterIndex(game.id),
     cachedMarketData(publicDataCacheKey("markets-quickdash-v4", game.id, "sealed"), async () =>
       await supabase
@@ -331,58 +303,7 @@ async function renderMarketsPageContent({
     );
   }
 
-  type RarityAggregate = {
-    indexValue: number;
-    count: number;
-    weighted: { "1D": number; "7D": number };
-    weight: { "1D": number; "7D": number };
-  };
-
-  const rarityAggregates = new Map<string, RarityAggregate>();
-  for (const row of rarityCardsRes as unknown as Array<{
-    rarity: string;
-    price_stats: PriceChangeStats | PriceChangeStats[] | null;
-  }>) {
-    const ps = firstRelation(row.price_stats);
-    if (ps?.market_avg == null) continue;
-
-    const aggregate = rarityAggregates.get(row.rarity) ?? {
-      indexValue: 0,
-      count: 0,
-      weighted: { "1D": 0, "7D": 0 },
-      weight: { "1D": 0, "7D": 0 },
-    };
-    aggregate.indexValue += ps.market_avg;
-    aggregate.count += 1;
-
-    if (ps.chg_1d != null) {
-      aggregate.weighted["1D"] += ps.market_avg * ps.chg_1d;
-      aggregate.weight["1D"] += ps.market_avg;
-    }
-    if (ps.chg_7d != null) {
-      aggregate.weighted["7D"] += ps.market_avg * ps.chg_7d;
-      aggregate.weight["7D"] += ps.market_avg;
-    }
-    rarityAggregates.set(row.rarity, aggregate);
-  }
-
-  const allRarities: RarityRankItem[] = RARITY_CODES.map((code) => {
-    const aggregate = rarityAggregates.get(code);
-    return {
-      code,
-      name: RARITY_META[code]?.name ?? code,
-      index_value: +(aggregate?.indexValue ?? 0).toFixed(2),
-      card_count: aggregate?.count ?? 0,
-      changes: {
-        "1D": aggregate?.weight["1D"]
-          ? +(aggregate.weighted["1D"] / aggregate.weight["1D"]).toFixed(1)
-          : null,
-        "7D": aggregate?.weight["7D"]
-          ? +(aggregate.weighted["7D"] / aggregate.weight["7D"]).toFixed(1)
-          : null,
-      },
-    };
-  }).filter((rarity) => rarity.card_count > 0);
+  const allRarities = marketRarityRanking(rarityIndex.rarities, 5, RARITY_INDEX_SLUGS);
 
   const allCharacters: CharacterRankItem[] = characterIndexMarketRanking(characterIndex, 5);
 
@@ -472,8 +393,8 @@ async function renderMarketsPageContent({
     },
     topEbaySales,
     rarityRanking: {
-      "1D": sortByWindow(allRarities, "1D").slice(0, 5),
-      "7D": sortByWindow(allRarities, "7D").slice(0, 5),
+      "7D": allRarities,
+      "30D": allRarities,
     },
     topCharacters: {
       "7D": allCharacters,

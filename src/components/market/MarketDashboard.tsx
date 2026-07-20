@@ -61,15 +61,17 @@ function WindowSelector<T>({
   value,
   onChange,
   label,
+  windows = WINDOWS,
 }: {
   data: MarketWindowPayload<T>;
   value: MarketWindow;
   onChange: (window: MarketWindow) => void;
   label: string;
+  windows?: MarketWindow[];
 }) {
   return (
     <div className="qd-timeframes" role="group" aria-label={`${label} timeframe`}>
-      {WINDOWS.map((window) => {
+      {windows.map((window) => {
         const available = data[window] != null;
         return (
           <button
@@ -568,7 +570,7 @@ function CharactersSection({ data, gameRouteSlug }: { data: DashboardData; gameR
 }
 
 function RaritySection({ data, gameRouteSlug }: { data: DashboardData; gameRouteSlug?: string | null }) {
-  const [window, setWindow] = useState<MarketWindow>("1D");
+  const [window, setWindow] = useState<MarketWindow>("7D");
   const rarities = data.rarityRanking[window] ?? [];
 
   return (
@@ -577,23 +579,59 @@ function RaritySection({ data, gameRouteSlug }: { data: DashboardData; gameRoute
         eyebrow="Market cap by rarity"
         title="Rarity"
         emphasis="index"
-        selector={<WindowSelector data={data.rarityRanking} value={window} onChange={setWindow} label="Rarity index" />}
+        selector={(
+          <WindowSelector
+            data={data.rarityRanking}
+            value={window}
+            onChange={setWindow}
+            label="Rarity index"
+            windows={["7D", "30D"]}
+          />
+        )}
       />
       <h2 id="quickdash-rarities" className="sr-only">Rarity index</h2>
       <div className="qd-rarity-grid">
-        {rarities.map((item) => (
+        {rarities.map((item, index) => (
           <Link
             key={item.code}
             href={gamePath(gameRouteSlug, "/rarities")}
             className="qd-rarity-card"
             prefetch={false}
           >
-            <span className={`qd-rarity-badge rarity-${item.code.toLowerCase()}`}>{item.code}</span>
-            <strong>{formatPrice(item.index_value)}</strong>
-            <span className="qd-rarity-meta">
-              <span>{item.card_count} cards</span>
-              <DeltaChip value={item.changes[window]} />
-            </span>
+            <div className="qd-rarity-card-head">
+              <span className="qd-rarity-rank">#{index + 1}</span>
+              <span className="qd-rarity-name">{item.name}</span>
+              <span className={`qd-rarity-badge rarity-${item.code.toLowerCase()}`}>{item.code}</span>
+            </div>
+            <div className="qd-market-image qd-rarity-image">
+              <MarketCardImage
+                alt={item.top_card_name ?? `${item.name} top card`}
+                className="qd-image"
+                fallbackTimeoutMs={0}
+                fetchPriority={index < 2 ? "high" : "low"}
+                height={180}
+                imageUrl={item.image_url}
+                imageUrlPreview={item.image_url_preview}
+                imageUrlSmall={item.image_url_small}
+                loading={index < 2 ? "eager" : "lazy"}
+                sourceSize="display"
+                width={128}
+              />
+            </div>
+            <div className="qd-rarity-top-card">
+              <span>Top card</span>
+              <strong title={item.top_card_name ?? undefined}>{item.top_card_name ?? "Preview unavailable"}</strong>
+            </div>
+            <div className="qd-rarity-stats">
+              <div className="qd-rarity-index">
+                <span>Index value</span>
+                <strong>{formatPrice(item.index_value)}</strong>
+              </div>
+              <span className="qd-rarity-meta">
+                <span>{item.card_count} cards</span>
+                <DeltaChip value={item.changes[window]} />
+              </span>
+            </div>
           </Link>
         ))}
       </div>

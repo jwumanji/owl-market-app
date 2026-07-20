@@ -42,7 +42,7 @@ export type SortKey = "value" | "chg_1d" | "chg_7d" | "chg_30d";
 
 /* ── Dashboard widget types ── */
 
-export type MarketWindow = "1D" | "7D" | "90D";
+export type MarketWindow = "1D" | "7D" | "30D" | "90D";
 
 export type MarketWindowPayload<T> = Partial<Record<MarketWindow, T>>;
 
@@ -61,10 +61,17 @@ export interface DashboardCard {
 }
 
 export interface RarityRankItem {
+  slug: string;
   code: string;
   name: string;
   index_value: number;
   card_count: number;
+  top_card_name: string | null;
+  top_card_image_id: string | null;
+  top_card_market: number | null;
+  image_url: string | null;
+  image_url_small: string | null;
+  image_url_preview: string | null;
   changes: MarketWindowPayload<number | null>;
 }
 
