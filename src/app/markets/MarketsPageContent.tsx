@@ -1,9 +1,12 @@
 import Link from "next/link";
 
+import { loadCachedCharacterIndex } from "@/app/characters/characters-index-data";
 import { RARITY_META } from "@/app/rarities/rarities-data";
 import { getSetImageUrl } from "@/app/sets/set-images";
 import MarketDashboard from "@/components/market/MarketDashboard";
 import { gamePath } from "@/lib/game-routes";
+import { characterIndexMarketRanking } from "@/lib/market-characters";
+import { rankBoosterBoxesByPrice, tcgPlayerProductImageUrl } from "@/lib/market-sealed";
 import {
   DEFAULT_PUBLIC_GAME_ROUTE_SLUG,
   publicOnlyForCatalogPreview,
@@ -117,7 +120,7 @@ async function renderMarketsPageContent({
     losers1dRes,
     losers7dRes,
     rarityCardsRes,
-    characterBundle,
+    characterIndex,
     sealedRes,
     catalogCountRes,
   ] = await Promise.all([
@@ -198,46 +201,12 @@ async function renderMarketsPageContent({
       }
       return rows;
     }),
-    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "characters"), async () => {
-      const { data: characterRows } = await supabase
-        .from("characters")
-        .select("id, slug, name")
-        .eq("game_id", game.id)
-        .order("tier")
-        .limit(100);
-
-      const characters = (characterRows ?? []) as { id: string; slug: string; name: string }[];
-      if (characters.length === 0) {
-        return { characters, cards: [] as Record<string, unknown>[] };
-      }
-
-      const cards: Record<string, unknown>[] = [];
-      const pageSize = 1000;
-      for (let from = 0; ; from += pageSize) {
-        const { data, error } = await supabase
-          .from("cards")
-          .select(`
-            id, character_id, name, card_image_id, image_url, image_url_small, image_url_preview,
-            price_stats!price_stats_card_game_fk!inner (market_avg, chg_1d, chg_7d, chg_30d)
-          `)
-          .eq("game_id", game.id)
-          .eq("region", "en")
-          .in("character_id", characters.map((character) => character.id))
-          .order("id")
-          .range(from, from + pageSize - 1);
-        if (error) throw new Error(error.message);
-        if (!data || data.length === 0) break;
-        cards.push(...data as unknown as Record<string, unknown>[]);
-        if (data.length < pageSize) break;
-      }
-
-      return { characters, cards };
-    }),
-    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "sealed"), async () =>
+    loadCachedCharacterIndex(game.id),
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v3", game.id, "sealed"), async () =>
       await supabase
         .from("sealed_products")
         .select(`
-          name, product_type, market_avg, chg_1d, chg_7d, chg_30d, image_url,
+          name, product_type, market_avg, chg_1d, chg_7d, chg_30d, image_url, tcg_product_id,
           sets!sealed_products_set_game_fk (id, slug, code, name)
         `)
         .eq("game_id", game.id)
@@ -343,75 +312,13 @@ async function renderMarketsPageContent({
     };
   }).filter((rarity) => rarity.card_count > 0);
 
-  type CharacterAggregate = {
-    indexValue: number;
-    weighted: { "1D": number; "7D": number };
-    weight: { "1D": number; "7D": number };
-    topPrice: number;
-    imageUrl: string | null;
-    imageUrlSmall: string | null;
-    imageUrlPreview: string | null;
-  };
-
-  const characterAggregates = new Map<string, CharacterAggregate>();
-  for (const row of characterBundle.cards as Array<Record<string, unknown>>) {
-    const characterId = row.character_id as string | null;
-    const ps = firstRelation(row.price_stats as PriceChangeStats | PriceChangeStats[] | null);
-    if (!characterId || ps?.market_avg == null) continue;
-
-    const aggregate = characterAggregates.get(characterId) ?? {
-      indexValue: 0,
-      weighted: { "1D": 0, "7D": 0 },
-      weight: { "1D": 0, "7D": 0 },
-      topPrice: Number.NEGATIVE_INFINITY,
-      imageUrl: null,
-      imageUrlSmall: null,
-      imageUrlPreview: null,
-    };
-    aggregate.indexValue += ps.market_avg;
-
-    if (ps.chg_1d != null) {
-      aggregate.weighted["1D"] += ps.market_avg * ps.chg_1d;
-      aggregate.weight["1D"] += ps.market_avg;
-    }
-    if (ps.chg_7d != null) {
-      aggregate.weighted["7D"] += ps.market_avg * ps.chg_7d;
-      aggregate.weight["7D"] += ps.market_avg;
-    }
-    if (ps.market_avg > aggregate.topPrice) {
-      aggregate.topPrice = ps.market_avg;
-      aggregate.imageUrl = (row.image_url as string | null) ?? null;
-      aggregate.imageUrlSmall = (row.image_url_small as string | null) ?? null;
-      aggregate.imageUrlPreview = (row.image_url_preview as string | null) ?? null;
-    }
-    characterAggregates.set(characterId, aggregate);
-  }
-
-  const allCharacters: CharacterRankItem[] = characterBundle.characters
-    .flatMap((character): CharacterRankItem[] => {
-      const aggregate = characterAggregates.get(character.id);
-      if (!aggregate) return [];
-      return [{
-        name: character.name,
-        slug: character.slug,
-        index_value: +aggregate.indexValue.toFixed(2),
-        image_url: aggregate.imageUrl,
-        image_url_small: aggregate.imageUrlSmall,
-        image_url_preview: aggregate.imageUrlPreview,
-        changes: {
-          "1D": aggregate.weight["1D"]
-            ? +(aggregate.weighted["1D"] / aggregate.weight["1D"]).toFixed(1)
-            : null,
-          "7D": aggregate.weight["7D"]
-            ? +(aggregate.weighted["7D"] / aggregate.weight["7D"]).toFixed(1)
-            : null,
-        },
-      }];
-    });
+  const allCharacters: CharacterRankItem[] = characterIndexMarketRanking(characterIndex, 5);
 
   const rawSealed: SealedRankItem[] = ((sealedRes.data ?? []) as unknown as Array<Record<string, unknown>>)
     .map((row) => {
       const set = firstRelation(row.sets as SetRelation | SetRelation[] | null);
+      const setImageUrl = set?.slug ? getSetImageUrl(set.slug) : null;
+      const productImageUrl = tcgPlayerProductImageUrl(row.tcg_product_id as string | null);
       return {
         set_id: set?.id ?? null,
         set_slug: set?.slug ?? null,
@@ -420,7 +327,8 @@ async function renderMarketsPageContent({
         product_type: (row.product_type as string | null) ?? null,
         market_avg: (row.market_avg as number | null) ?? null,
         total_set_value: 0,
-        image_url: (row.image_url as string | null) ?? (set?.slug ? getSetImageUrl(set.slug) : null),
+        image_url: (row.image_url as string | null) ?? productImageUrl ?? setImageUrl,
+        image_url_fallback: setImageUrl,
         changes: {
           "1D": (row.chg_1d as number | null) ?? null,
           "7D": (row.chg_7d as number | null) ?? null,
@@ -428,16 +336,7 @@ async function renderMarketsPageContent({
       };
     });
 
-  const boosterOnly = rawSealed.filter((item) =>
-    `${item.product_type ?? ""} ${item.name}`.toLowerCase().includes("booster"),
-  );
-  const sealedPool = boosterOnly.length >= 5 ? boosterOnly : rawSealed;
-  const candidateSets = Array.from(new Map(
-    [
-      ...sortByWindow(sealedPool, "1D").slice(0, 5),
-      ...sortByWindow(sealedPool, "7D").slice(0, 5),
-    ].map((item) => [item.set_id ?? `${item.set_code}:${item.name}`, item]),
-  ).values());
+  const candidateSets = rankBoosterBoxesByPrice(rawSealed, 5);
   const candidateSetIds = candidateSets.flatMap((item) => item.set_id ? [item.set_id] : []);
   const setValueById = new Map<string, number>();
 
@@ -501,12 +400,11 @@ async function renderMarketsPageContent({
       "7D": sortByWindow(allRarities, "7D").slice(0, 5),
     },
     topCharacters: {
-      "1D": sortByWindow(allCharacters, "1D").slice(0, 5),
-      "7D": sortByWindow(allCharacters, "7D").slice(0, 5),
+      "7D": allCharacters,
     },
     sealedBoxes: {
-      "1D": sortByWindow(sealedWithValues, "1D").slice(0, 5),
-      "7D": sortByWindow(sealedWithValues, "7D").slice(0, 5),
+      "1D": sealedWithValues,
+      "7D": sealedWithValues,
     },
   };
 

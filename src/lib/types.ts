@@ -87,6 +87,7 @@ export interface SealedRankItem {
   market_avg: number | null;
   total_set_value: number;
   image_url: string | null;
+  image_url_fallback: string | null;
   changes: MarketWindowPayload<number | null>;
 }
 

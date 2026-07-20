@@ -249,6 +249,7 @@ function CardImage({ card, eager = false }: { card: DashboardCard; eager?: boole
         imageUrlPreview={card.image_url_preview}
         imageUrlSmall={card.image_url_small}
         loading={eager ? "eager" : "lazy"}
+        sourceSize="display"
         width={300}
       />
     </div>
@@ -310,8 +311,9 @@ function SetImage({ item }: { item: SealedRankItem }) {
         fetchPriority="low"
         height={200}
         imageUrl={item.image_url}
-        imageUrlSmall={item.image_url}
+        imageUrlSmall={item.image_url_fallback}
         loading="lazy"
+        sourceSize="display"
         width={320}
       />
     </div>
@@ -325,7 +327,7 @@ function SetsSection({ data, gameRouteSlug }: { data: DashboardData; gameRouteSl
   return (
     <section className="qd-section" aria-labelledby="quickdash-sets">
       <SectionHeader
-        eyebrow="Ranked by % growth"
+        eyebrow="Ranked by booster box cost"
         title="Box"
         emphasis="sets"
         selector={<WindowSelector data={data.sealedBoxes} value={window} onChange={setWindow} label="Box sets" />}
@@ -379,6 +381,7 @@ function CharacterImage({ item }: { item: CharacterRankItem }) {
         imageUrlPreview={item.image_url_preview}
         imageUrlSmall={item.image_url_small}
         loading="lazy"
+        sourceSize="display"
         width={320}
       />
     </div>
@@ -386,13 +389,13 @@ function CharacterImage({ item }: { item: CharacterRankItem }) {
 }
 
 function CharactersSection({ data, gameRouteSlug }: { data: DashboardData; gameRouteSlug?: string | null }) {
-  const [window, setWindow] = useState<MarketWindow>("1D");
+  const [window, setWindow] = useState<MarketWindow>("7D");
   const characters = data.topCharacters[window] ?? [];
 
   return (
     <section className="qd-section" aria-labelledby="quickdash-characters">
       <SectionHeader
-        eyebrow="Ranked by % growth"
+        eyebrow="Ranked by total card value"
         title="Top"
         emphasis="characters"
         selector={<WindowSelector data={data.topCharacters} value={window} onChange={setWindow} label="Top characters" />}
