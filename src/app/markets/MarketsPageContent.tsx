@@ -19,6 +19,7 @@ import type {
   CharacterRankItem,
   DashboardCard,
   DashboardData,
+  EbaySaleItem,
   MarketWindow,
   RarityRankItem,
   SealedRankItem,
@@ -44,6 +45,25 @@ type SetRelation = {
   slug?: string | null;
   code?: string | null;
   name?: string | null;
+};
+
+type EbaySaleCardRelation = {
+  id?: string | null;
+  card_image_id?: string | null;
+  card_number?: string | null;
+  name?: string | null;
+  sets?: SetRelation | SetRelation[] | null;
+};
+
+type EbaySaleRow = {
+  ebay_item_id?: string | null;
+  card_id?: string | null;
+  sale_price?: number | null;
+  currency?: string | null;
+  sold_at?: string | null;
+  title?: string | null;
+  ebay_url?: string | null;
+  cards?: EbaySaleCardRelation | EbaySaleCardRelation[] | null;
 };
 
 const DASHBOARD_PRICE_CARD_SELECT = `
@@ -90,6 +110,38 @@ function mapDashboardCards(data: unknown) {
     .map(toDashboardCard);
 }
 
+function mapTopEbaySales(data: unknown): EbaySaleItem[] {
+  const sales: EbaySaleItem[] = [];
+  const seenCardIds = new Set<string>();
+
+  for (const row of (data ?? []) as EbaySaleRow[]) {
+    const card = firstRelation(row.cards);
+    const cardId = row.card_id ?? card?.id ?? null;
+    if (!cardId || seenCardIds.has(cardId) || !row.ebay_item_id || row.sale_price == null || !card?.card_image_id || !card.name) {
+      continue;
+    }
+
+    const set = firstRelation(card.sets);
+    seenCardIds.add(cardId);
+    sales.push({
+      ebay_item_id: row.ebay_item_id,
+      card_id: cardId,
+      card_image_id: card.card_image_id,
+      card_name: card.name,
+      card_number: card.card_number ?? null,
+      set_code: set?.code ?? null,
+      title: row.title ?? null,
+      sale_price: row.sale_price,
+      currency: row.currency ?? "USD",
+      sold_at: row.sold_at ?? null,
+      ebay_url: row.ebay_url ?? null,
+    });
+    if (sales.length === 5) break;
+  }
+
+  return sales;
+}
+
 function sortByWindow<T extends { changes: Partial<Record<MarketWindow, number | null>> }>(
   rows: T[],
   window: MarketWindow,
@@ -112,6 +164,7 @@ async function renderMarketsPageContent({
 
   if (gameResult.error) throw new Error(gameResult.error.message);
   const { game } = gameResult;
+  const ebaySalesSince = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
 
   const [
     topValueCardsRes,
@@ -122,6 +175,7 @@ async function renderMarketsPageContent({
     rarityCardsRes,
     characterIndex,
     sealedRes,
+    topEbaySalesRes,
     catalogCountRes,
   ] = await Promise.all([
     cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "top-value-cards"), async () =>
@@ -212,6 +266,24 @@ async function renderMarketsPageContent({
         .eq("game_id", game.id)
         .limit(1000)
     ),
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v4", game.id, "top-ebay-sales-90d-en"), async () =>
+      await supabase
+        .from("ebay_sales")
+        .select(`
+          ebay_item_id, card_id, sale_price, currency, sold_at, title, ebay_url,
+          cards!ebay_sales_card_id_fkey!inner (
+            id, card_image_id, card_number, name,
+            sets!cards_set_game_fk (code)
+          )
+        `)
+        .eq("game_id", game.id)
+        .eq("cards.region", "en")
+        .not("sale_price", "is", null)
+        .not("sold_at", "is", null)
+        .gte("sold_at", ebaySalesSince)
+        .order("sale_price", { ascending: false, nullsFirst: false })
+        .limit(250)
+    ),
     cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "catalog-count"), async () =>
       await supabase
         .from("cards")
@@ -231,6 +303,7 @@ async function renderMarketsPageContent({
     .sort((a, b) => cardChange(a, "1D") - cardChange(b, "1D"));
   const topLosers7d = mapDashboardCards(losers7dRes.data)
     .sort((a, b) => cardChange(a, "7D") - cardChange(b, "7D"));
+  const topEbaySales = mapTopEbaySales(topEbaySalesRes.data);
 
   if (topValueCards.length === 0 && (catalogCountRes.count ?? 0) > 0) {
     return (
@@ -397,6 +470,7 @@ async function renderMarketsPageContent({
       "1D": topLosers1d.slice(0, 5),
       "7D": topLosers7d.slice(0, 5),
     },
+    topEbaySales,
     rarityRanking: {
       "1D": sortByWindow(allRarities, "1D").slice(0, 5),
       "7D": sortByWindow(allRarities, "7D").slice(0, 5),

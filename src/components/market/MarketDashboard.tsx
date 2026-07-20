@@ -13,6 +13,7 @@ import type {
   CharacterRankItem,
   DashboardCard,
   DashboardData,
+  EbaySaleItem,
   MarketWindow,
   MarketWindowPayload,
   SealedRankItem,
@@ -240,6 +241,63 @@ function TrendRow({
   );
 }
 
+function formatSaleDate(value: string | null) {
+  if (!value) return "Recent";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(value));
+}
+
+function EbaySaleRow({
+  sale,
+  rank,
+  gameRouteSlug,
+}: {
+  sale: EbaySaleItem;
+  rank: number;
+  gameRouteSlug?: string | null;
+}) {
+  const content = (
+    <>
+      <span className="qd-trend-rank">{rank}</span>
+      <span className="qd-trend-name" title={sale.title ?? sale.card_name}>
+        {sale.card_name}
+        <span>{sale.card_number ?? sale.set_code}</span>
+      </span>
+      <span className="qd-ebay-sale-meta">
+        <strong>{formatPrice(sale.sale_price)}</strong>
+        <small>{formatSaleDate(sale.sold_at)}{sale.ebay_url ? " ↗" : ""}</small>
+      </span>
+    </>
+  );
+
+  if (sale.ebay_url) {
+    return (
+      <a
+        href={sale.ebay_url}
+        className="qd-trend-row qd-ebay-row"
+        target="_blank"
+        rel="noreferrer"
+        aria-label={`${sale.card_name}, sold for ${formatPrice(sale.sale_price)} on eBay`}
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <Link
+      href={gamePath(gameRouteSlug, `/card/${sale.card_image_id}`)}
+      className="qd-trend-row qd-ebay-row"
+      prefetch={false}
+    >
+      {content}
+    </Link>
+  );
+}
+
 function TrendingSection({ data, gameRouteSlug }: { data: DashboardData; gameRouteSlug?: string | null }) {
   const [window, setWindow] = useState<MarketWindow>("1D");
   const gainers = data.topGainers[window] ?? [];
@@ -270,6 +328,23 @@ function TrendingSection({ data, gameRouteSlug }: { data: DashboardData; gameRou
                 <TrendRow key={card.id} card={card} rank={index + 1} window={window} gameRouteSlug={gameRouteSlug} />
               ))
             : <div className="qd-trend-empty">No qualifying losers</div>}
+        </div>
+        <div className="qd-trend-panel">
+          <h3>
+            <span className="qd-dot ebay" />
+            Top eBay sales
+            <span className="qd-panel-window">90D</span>
+          </h3>
+          {data.topEbaySales.length > 0
+            ? data.topEbaySales.map((sale, index) => (
+                <EbaySaleRow
+                  key={sale.ebay_item_id}
+                  sale={sale}
+                  rank={index + 1}
+                  gameRouteSlug={gameRouteSlug}
+                />
+              ))
+            : <div className="qd-trend-empty">No recent eBay sales</div>}
         </div>
       </div>
     </section>

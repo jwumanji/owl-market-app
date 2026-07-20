@@ -93,15 +93,24 @@ export interface SealedRankItem {
 }
 
 export interface EbaySaleItem {
+  ebay_item_id: string;
+  card_id: string;
+  card_image_id: string;
+  card_name: string;
+  card_number: string | null;
+  set_code: string | null;
   title: string | null;
-  sale_price: number | null;
+  sale_price: number;
+  currency: string | null;
   sold_at: string | null;
+  ebay_url: string | null;
 }
 
 export interface DashboardData {
   topCards: MarketWindowPayload<DashboardCard[]>;
   topGainers: MarketWindowPayload<DashboardCard[]>;
   topLosers: MarketWindowPayload<DashboardCard[]>;
+  topEbaySales: EbaySaleItem[];
   rarityRanking: MarketWindowPayload<RarityRankItem[]>;
   topCharacters: MarketWindowPayload<CharacterRankItem[]>;
   sealedBoxes: MarketWindowPayload<SealedRankItem[]>;
