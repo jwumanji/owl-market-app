@@ -1,7 +1,7 @@
 import PsaImportForm from "./PsaImportForm";
 
 export const metadata = {
-  title: "PSA Import - OWL Market",
+  title: "PSA Import - Moon Market",
 };
 
 type PsaImportSearchParams = {

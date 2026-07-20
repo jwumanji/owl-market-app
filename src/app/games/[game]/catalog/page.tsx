@@ -240,7 +240,7 @@ async function loadCatalog(gameRouteSlug: string, searchParams: CatalogSearchPar
 export async function generateMetadata(props: { params: Promise<{ game: string }> }) {
   const params = await props.params;
   return {
-    title: `${params.game.replace(/-/g, " ")} cards - OWL Market`,
+    title: `${params.game.replace(/-/g, " ")} cards - Moon Market`,
   };
 }
 

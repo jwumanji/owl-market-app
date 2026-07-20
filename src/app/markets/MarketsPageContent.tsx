@@ -28,7 +28,7 @@ const cachedMarketData = <T,>(key: string, load: () => Promise<T>) =>
   cachedPublicData(key, load, PRICE_DATA_TTL_SECONDS);
 
 export const metadata = {
-  title: "Markets — OWL Market",
+  title: "Markets — Moon Market",
   description: "One Piece TCG movers, top cards, box sets, characters, and rarity performance.",
 };
 

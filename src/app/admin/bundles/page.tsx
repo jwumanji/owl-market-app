@@ -9,7 +9,7 @@ import { createServiceClient } from "@/lib/supabase-server";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Inventory Bundles - OWL Market",
+  title: "Inventory Bundles - Moon Market",
 };
 
 function searchParamValue(value?: string | string[]) {

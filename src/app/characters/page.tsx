@@ -86,7 +86,7 @@ export default async function CharactersPage(
   return (
     <section className="chars-page">
       <div className="breadcrumb">
-        <Link href="/" prefetch={false}>OWL Market</Link>
+        <Link href="/" prefetch={false}>Moon Market</Link>
         <span className="bsep"> &rsaquo; </span>
         <span style={{ color: "var(--ink)" }}>Characters</span>
       </div>

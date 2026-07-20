@@ -15,7 +15,7 @@ export async function generateMetadata(
 ) {
   const params = await props.params;
   return {
-    title: `${decodeURIComponent(params.id)} - OWL Market`,
+    title: `${decodeURIComponent(params.id)} - Moon Market`,
   };
 }
 

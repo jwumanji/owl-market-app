@@ -10,8 +10,8 @@ export function generateStaticParams() {
 }
 
 export const metadata = {
-  title: "Top Cards — OWL Market",
-  description: "The full OWL Market card value ranking.",
+  title: "Top Cards — Moon Market",
+  description: "The full Moon Market card value ranking.",
 };
 
 export default async function TopCardsPage({

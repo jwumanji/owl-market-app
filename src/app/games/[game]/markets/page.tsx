@@ -9,7 +9,7 @@ export function generateStaticParams() {
 }
 
 export const metadata = {
-  title: "Markets - OWL Market",
+  title: "Markets - Moon Market",
   description: "TCG movers, top cards, box sets, characters, and rarity performance.",
 };
 
