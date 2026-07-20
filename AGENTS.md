@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file teaches AI coding agents how to work on **owl-market-app**. Read it before making changes.
+This file teaches AI coding agents how to work on the **owl-market-app** repository, whose product name is **Moon Market**. Read it before making changes.
 
 > Warning: **This is NOT the Next.js you know.** Do not rely on memory for framework behavior. Before writing or changing Next.js framework code, verify against the installed version in this repo. Prefer local installed docs at `node_modules/next/dist/docs/` when present; this checkout currently does not include that path, so inspect the installed package, types, and deprecation notices instead of guessing.
 >
@@ -12,7 +12,7 @@ This file teaches AI coding agents how to work on **owl-market-app**. Read it be
 
 ## What this repo is
 
-owl-market-app is the **One Piece TCG market intelligence platform**. It owns pricing, card catalog surfaces, set and rarity views, inventory management, PSA/admin workflows, orders, authentication, and the OWL visual system.
+owl-market-app is the repository for **Moon Market**, the One Piece TCG market intelligence platform. It owns pricing, card catalog surfaces, set and rarity views, inventory management, PSA/admin workflows, orders, authentication, and the Moon Market visual system.
 
 Sibling product **Owl Lens** provides card centering measurement. Per ADR 001 in this repo, centering is embedded here as a feature of owl-market-app. The CV pipeline lives in [`jwumanji/owl-lens`](https://github.com/jwumanji/owl-lens); this repo owns the user-facing integration.
 

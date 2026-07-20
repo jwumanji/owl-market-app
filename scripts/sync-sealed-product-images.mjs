@@ -14,7 +14,7 @@ import { loadGameScope, readArg, scriptGameSlug, withGameFilter } from "./lib/su
 
 const TCGCSV_CATEGORY_ID = 68;
 const TCGCSV_BASE = `https://tcgcsv.com/tcgplayer/${TCGCSV_CATEGORY_ID}`;
-const USER_AGENT = "OWLMarket/1.0 (+https://owl-market-app.vercel.app)";
+const USER_AGENT = "MoonMarket/1.0 (+https://owl-market-app.vercel.app)";
 const APPLY = process.argv.includes("--apply");
 const REPORT_PATH = readArg("--report") ?? "sealed-product-image-audit.md";
 
