@@ -325,7 +325,7 @@ function SetsSection({ data, gameRouteSlug }: { data: DashboardData; gameRouteSl
   return (
     <section className="qd-section" aria-labelledby="quickdash-sets">
       <SectionHeader
-        eyebrow="Ranked by % growth"
+        eyebrow="Ranked by booster box value"
         title="Box"
         emphasis="sets"
         selector={<WindowSelector data={data.sealedBoxes} value={window} onChange={setWindow} label="Box sets" />}

@@ -233,7 +233,7 @@ async function renderMarketsPageContent({
 
       return { characters, cards };
     }),
-    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "sealed"), async () =>
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v3", game.id, "sealed"), async () =>
       await supabase
         .from("sealed_products")
         .select(`
@@ -242,6 +242,7 @@ async function renderMarketsPageContent({
         `)
         .eq("game_id", game.id)
         .not("market_avg", "is", null)
+        .order("market_avg", { ascending: false })
         .limit(100)
     ),
     cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "catalog-count"), async () =>
@@ -431,19 +432,19 @@ async function renderMarketsPageContent({
   const boosterOnly = rawSealed.filter((item) =>
     `${item.product_type ?? ""} ${item.name}`.toLowerCase().includes("booster"),
   );
-  const sealedPool = boosterOnly.length >= 5 ? boosterOnly : rawSealed;
+  const sealedPool = boosterOnly.length > 0 ? boosterOnly : rawSealed;
+  const rankedSealed = [...sealedPool].sort(
+    (a, b) => (b.market_avg ?? Number.NEGATIVE_INFINITY) - (a.market_avg ?? Number.NEGATIVE_INFINITY),
+  );
   const candidateSets = Array.from(new Map(
-    [
-      ...sortByWindow(sealedPool, "1D").slice(0, 5),
-      ...sortByWindow(sealedPool, "7D").slice(0, 5),
-    ].map((item) => [item.set_id ?? `${item.set_code}:${item.name}`, item]),
-  ).values());
+    rankedSealed.map((item) => [item.set_id ?? `${item.set_code}:${item.name}`, item]),
+  ).values()).slice(0, 5);
   const candidateSetIds = candidateSets.flatMap((item) => item.set_id ? [item.set_id] : []);
   const setValueById = new Map<string, number>();
 
   if (candidateSetIds.length > 0) {
     const setValueRows = await cachedMarketData(
-      publicDataCacheKey("markets-quickdash-v2", game.id, "set-values", candidateSetIds.sort().join(",")),
+      publicDataCacheKey("markets-quickdash-v3", game.id, "set-values", candidateSetIds.sort().join(",")),
       async () => {
         const rows: Array<{
           set_id: string | null;
@@ -482,6 +483,9 @@ async function renderMarketsPageContent({
     ...item,
     total_set_value: item.set_id ? +(setValueById.get(item.set_id) ?? 0).toFixed(2) : 0,
   }));
+  const topBoosterBoxes = [...sealedWithValues].sort(
+    (a, b) => (b.market_avg ?? Number.NEGATIVE_INFINITY) - (a.market_avg ?? Number.NEGATIVE_INFINITY),
+  );
 
   const dashboardData: DashboardData = {
     topCards: {
@@ -505,8 +509,8 @@ async function renderMarketsPageContent({
       "7D": sortByWindow(allCharacters, "7D").slice(0, 5),
     },
     sealedBoxes: {
-      "1D": sortByWindow(sealedWithValues, "1D").slice(0, 5),
-      "7D": sortByWindow(sealedWithValues, "7D").slice(0, 5),
+      "1D": topBoosterBoxes,
+      "7D": topBoosterBoxes,
     },
   };
 
