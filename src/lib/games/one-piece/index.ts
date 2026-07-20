@@ -1,17 +1,21 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   SET_SLUG_MAP,
+  canonicalOnePieceRarity,
   classifyRarity,
   ensureSetExists,
   extractVariantLabel,
+  hasExplicitTreasureRareSignal,
   resolveSetCode,
 } from "@/lib/justtcg-match";
 
 export {
   SET_SLUG_MAP as ONE_PIECE_JUSTTCG_SET_SLUG_MAP,
+  canonicalOnePieceRarity,
   classifyRarity,
   ensureSetExists,
   extractVariantLabel,
+  hasExplicitTreasureRareSignal,
   resolveSetCode,
 };
 

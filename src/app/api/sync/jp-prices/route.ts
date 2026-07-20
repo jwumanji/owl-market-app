@@ -11,6 +11,11 @@ import {
   type YuyuteiRow,
 } from "@/lib/yuyutei";
 import { buildJpCardMatcher, type MatchCardRow } from "@/lib/jp-card-match";
+import {
+  readProviderSyncState,
+  writeProviderSyncState,
+  type ProviderSyncScope,
+} from "@/lib/provider-sync-state";
 
 // Vercel Hobby: 10s default, this raises it to 60s
 export const maxDuration = 60;
@@ -50,6 +55,15 @@ function prefixFromCardNumber(num: string): string | null {
 }
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
+
+function jpPriceSyncScope(gameId: string): ProviderSyncScope {
+  return {
+    gameId,
+    provider: "yuyutei",
+    jobKey: "current_prices",
+    legacyKey: CURSOR_KEY,
+  };
+}
 
 interface CursorState {
   nextOffset?: number;
@@ -104,23 +118,20 @@ function isMissingTableError(error: { code?: string; message?: string } | null |
   return Boolean(error?.code === "42P01" || error?.message?.includes("jp_prices"));
 }
 
-async function readCursor(supabase: ServiceClient): Promise<{ state: CursorState; error?: string }> {
-  const { data, error } = await supabase.from("sync_state").select("state").eq("key", CURSOR_KEY).maybeSingle();
-  if (error) {
-    const message = error.message ?? "sync_state read failed";
-    if (error.code === "42P01" || message.includes("sync_state")) {
-      return { state: {}, error: "Missing sync_state table. Run schema-migration-v15/v16 in Supabase." };
-    }
-    return { state: {}, error: message };
-  }
-  return { state: (data?.state ?? {}) as CursorState };
+async function readCursor(
+  supabase: ServiceClient,
+  gameId: string
+): Promise<{ state: CursorState; error?: string }> {
+  const result = await readProviderSyncState<CursorState>(supabase, jpPriceSyncScope(gameId));
+  return { state: result.row?.state ?? {}, error: result.error };
 }
 
-async function writeCursor(supabase: ServiceClient, state: CursorState): Promise<string | null> {
-  const { error } = await supabase
-    .from("sync_state")
-    .upsert({ key: CURSOR_KEY, state, updated_at: new Date().toISOString() }, { onConflict: "key" });
-  return error ? error.message ?? "sync_state write failed" : null;
+async function writeCursor(
+  supabase: ServiceClient,
+  gameId: string,
+  state: CursorState
+): Promise<string | null> {
+  return writeProviderSyncState(supabase, jpPriceSyncScope(gameId), state);
 }
 
 async function loadAllCards(supabase: ServiceClient, gameId: string): Promise<MatchCardRow[]> {
@@ -227,7 +238,7 @@ async function syncJpPrices(request: Request) {
   let startOffset: number;
   let cursorState: CursorState = {};
   if (cursorMode) {
-    const cursor = await readCursor(supabase);
+    const cursor = await readCursor(supabase, game.id);
     if (cursor.error) return NextResponse.json({ error: cursor.error }, { status: 500 });
     cursorState = cursor.state;
     startOffset = reset ? 0 : normalizeIndex(cursorState.nextOffset ?? 0, totalSets);
@@ -373,7 +384,7 @@ async function syncJpPrices(request: Request) {
     wrapped = processed === 0 || advanced >= totalSets;
     nextOffset = wrapped ? 0 : advanced;
     if (wrapped) completedCycles += 1;
-    const writeErr = await writeCursor(supabase, {
+    const writeErr = await writeCursor(supabase, game.id, {
       nextOffset,
       totalSets,
       completedCycles,

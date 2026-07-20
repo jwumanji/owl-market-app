@@ -1,6 +1,7 @@
 import { ONE_PIECE_JUSTTCG_GAME_SLUG, parseVariant } from "@/lib/games/one-piece";
+import { JUSTTCG_NORMALIZED_API_BASE } from "@/lib/games/provider-contract";
 
-const BASE = "https://api.justtcg.com/v1";
+const BASE = JUSTTCG_NORMALIZED_API_BASE;
 const GAME = ONE_PIECE_JUSTTCG_GAME_SLUG;
 
 function headers(): HeadersInit {
@@ -10,10 +11,12 @@ function headers(): HeadersInit {
 }
 
 export interface JustTCGVariant {
+  uuid?: string;
   id: string;
   condition: string;
   printing: string;
   language: string;
+  tcgplayerSkuId?: string | null;
   price: number | null;
   priceChange24hr: number | null;
   priceChange7d: number | null;
@@ -32,6 +35,7 @@ export interface JustTCGVariant {
 }
 
 export interface JustTCGCard {
+  uuid?: string;
   id: string;
   name: string;
   game: string;
