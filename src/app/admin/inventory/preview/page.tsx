@@ -2,7 +2,7 @@ import InventoryShell from "../InventoryShell";
 import { InventoryRow } from "../InventoryTabs";
 
 export const metadata = {
-  title: "Inventory Preview - OWL Market",
+  title: "Inventory Preview - Moon Market",
 };
 
 const sampleItems: InventoryRow[] = [

@@ -138,7 +138,7 @@ export async function GET(request: Request) {
   const pageTasks = cards.slice(0, pageCount).map((card) => async () => {
     const res = await fetch(
       `${origin}/games/${DEFAULT_PUBLIC_GAME_ROUTE_SLUG}/card/${encodeURIComponent(card.card_image_id)}`,
-      { cache: "no-store", headers: { "user-agent": "OwlMarketWarmer/1.0" } }
+      { cache: "no-store", headers: { "user-agent": "MoonMarketWarmer/1.0" } }
     );
     // Drain so the connection is reusable.
     await res.arrayBuffer();
@@ -159,7 +159,7 @@ export async function GET(request: Request) {
             headers: {
               // Matches what browsers send, so the CDN caches the AVIF variant.
               accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-              "user-agent": "OwlMarketWarmer/1.0",
+              "user-agent": "MoonMarketWarmer/1.0",
             },
           }
         );

@@ -9,7 +9,7 @@ import { createServiceClient } from "@/lib/supabase-server";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Card Centering Measurement - OWL Market",
+  title: "Card Centering Measurement - Moon Market",
 };
 
 const MEASUREMENTS_PAGE_SIZE = 5;

@@ -609,7 +609,7 @@ function UploadZone({
           <h2 className="font-grotesk text-2xl font-bold text-ink">Upload card image</h2>
           <p className="mt-3 text-sm leading-6 text-ink-2">
             Drop, paste, or browse for a JPEG, PNG, or WEBP image. The browser sends it through the
-            authenticated OWL proxy, never directly to the CV service.
+            authenticated Owl Lens proxy, never directly to the CV service.
           </p>
           <div className="admin-btn admin-btn-primary mt-6">Browse image</div>
         </div>

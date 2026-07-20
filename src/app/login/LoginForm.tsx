@@ -2,6 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import MoonMarketLogo from "@/components/brand/MoonMarketLogo";
 
 export default function LoginForm() {
   const searchParams = useSearchParams();
@@ -46,68 +47,8 @@ export default function LoginForm() {
   return (
     <div className="flex w-full max-w-[440px] flex-col items-center">
       {/* ── Hero lockup ── */}
-      <div className="mb-10 flex items-center gap-[10px]">
-        <svg
-          width="64"
-          height="64"
-          viewBox="0 0 120 120"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden="true"
-        >
-          <defs>
-            <linearGradient id="owl-mark-grad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#FF6BB8" />
-              <stop offset="50%" stopColor="#FF4936" />
-              <stop offset="100%" stopColor="#E89512" />
-            </linearGradient>
-            <mask id="owl-mark-moon">
-              <rect width="120" height="120" fill="white" />
-              <circle cx="70" cy="56" r="20" fill="black" />
-            </mask>
-          </defs>
-          <circle cx="60" cy="60" r="52" fill="url(#owl-mark-grad)" stroke="#1A0F08" strokeWidth="5" />
-          <circle cx="60" cy="60" r="38" fill="#1A0F08" />
-          <circle cx="58" cy="60" r="26" fill="#FFF5E4" mask="url(#owl-mark-moon)" />
-          <g transform="translate(80 60)">
-            <path
-              d="M 0,-11 Q 1.65,-1.65 11,0 Q 1.65,1.65 0,11 Q -1.65,1.65 -11,0 Q -1.65,-1.65 0,-11 Z"
-              fill="#FFF5E4"
-            />
-          </g>
-        </svg>
-        <span
-          className="font-grotesk"
-          style={{
-            fontWeight: 700,
-            letterSpacing: "-0.025em",
-            lineHeight: 1,
-            color: "var(--ink)",
-            fontSize: "56px",
-            display: "inline-flex",
-            alignItems: "baseline",
-          }}
-        >
-          Owl
-          <em
-            className="font-script"
-            style={{
-              fontStyle: "normal",
-              fontWeight: 700,
-              fontSize: "72px",
-              marginLeft: "-4px",
-              paddingRight: "18px",
-              paddingBottom: "6px",
-              display: "inline-block",
-              background: "var(--grad-brand)",
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              color: "transparent",
-            }}
-          >
-            Market
-          </em>
-        </span>
+      <div className="mb-10">
+        <MoonMarketLogo className="h-auto max-w-full" width={387} height={90} priority />
       </div>
 
       {/* ── Auth card ── */}
@@ -143,7 +84,7 @@ export default function LoginForm() {
             marginBottom: "8px",
           }}
         >
-          Sign in to OwlMarket
+          Sign in to Moon Market
         </h1>
         <p
           className="font-mono-2 text-center"

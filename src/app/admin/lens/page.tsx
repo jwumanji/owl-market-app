@@ -2,7 +2,7 @@ import Link from "next/link";
 import PreGradeHistorySection from "@/components/lens/PreGradeHistorySection";
 
 export const metadata = {
-  title: "Owl Lens - OWL Market",
+  title: "Owl Lens - Moon Market",
 };
 
 const TOOLS = [

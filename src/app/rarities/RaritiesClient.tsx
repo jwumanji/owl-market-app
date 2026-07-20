@@ -586,7 +586,7 @@ export default function RaritiesClient({
   return (
     <section className="rar-page">
       <div className="breadcrumb">
-        <Link href="/" prefetch={false}>OWL Market</Link>
+        <Link href="/" prefetch={false}>Moon Market</Link>
         <span className="bsep"> &rsaquo; </span>
         <span style={{ color: "var(--ink)" }}>Rarities</span>
       </div>

@@ -314,7 +314,7 @@ export default function NewInventoryForm({
                 Can’t find the card?
               </div>
               <div className="mt-1 text-sm text-ink-2">
-                Add it to your private card list now, then match it to the OWL card database later if needed.
+                Add it to your private card list now, then match it to the Moon Market card database later if needed.
               </div>
             </div>
             <button

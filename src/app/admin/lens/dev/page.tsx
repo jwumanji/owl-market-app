@@ -4,7 +4,7 @@ import LensComposersDev from "@/components/lens/LensComposersDev";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Owl Lens Dev - OWL Market",
+  title: "Owl Lens Dev - Moon Market",
 };
 
 export default function LensDevPage() {

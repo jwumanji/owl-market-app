@@ -6,7 +6,7 @@ import JpAuditPicker, { type PickerCard } from "./JpAuditPicker";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "JP Price Audit · OWL Dev",
+  title: "JP Price Audit · Moon Market Dev",
 };
 
 type JoinedRelation<T> = T | T[] | null;
@@ -138,7 +138,7 @@ export default async function JpAuditPage(props: {
     <div className="min-h-screen bg-void font-mono text-text">
       <div className="mx-auto max-w-[1240px] px-4 py-8">
         <header className="mb-6 border-b border-border pb-4">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-owl">OWL · Dev</p>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-owl">Moon Market · Dev</p>
           <h1 className="text-2xl font-bold text-text">JP Price Audit</h1>
           <p className="mt-1 text-sm text-text-2">
             Yuyu-tei (遊々亭) prices synced into <code className="text-text">jp_prices</code>. Select a card to inspect.

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 516 120" width="516" height="120" role="img" aria-label="Moon Market">
+  <defs>
+    <linearGradient id="moon-grad-3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FF6BB8"/>
+      <stop offset="50%" stop-color="#FF4936"/>
+      <stop offset="100%" stop-color="#E89512"/>
+    </linearGradient>
+    <mask id="moon-mask-3">
+      <rect width="480" height="120" fill="white"/>
+      <circle cx="70" cy="56" r="20" fill="black"/>
+    </mask>
+    <linearGradient id="wm-grad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#FF6BB8"/>
+      <stop offset="50%" stop-color="#FF4936"/>
+      <stop offset="100%" stop-color="#E89512"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Mark -->
+  <g transform="translate(0 0)">
+    <circle cx="60" cy="60" r="52" fill="url(#moon-grad-3)" stroke="#1A0F08" stroke-width="5"/>
+    <circle cx="60" cy="60" r="38" fill="#1A0F08"/>
+    <circle cx="58" cy="60" r="26" fill="#FFF5E4" mask="url(#moon-mask-3)"/>
+    <g transform="translate(80 60)">
+      <path d="M 0,-11 Q 1.65,-1.65 11,0 Q 1.65,1.65 0,11 Q -1.65,1.65 -11,0 Q -1.65,-1.65 0,-11 Z" fill="#FFF5E4"/>
+    </g>
+  </g>
+
+  <!-- Wordmark: "Moon" in Outfit 700 (ink), "Market" in Caveat 700 (gradient).
+       Use moon-lockup-paths.svg for font-independent rendering. -->
+  <text x="130" y="78"
+        font-family="'Outfit', system-ui, sans-serif"
+        font-weight="700"
+        font-size="56"
+        letter-spacing="-1.1"
+        fill="#1A0F08">Moon</text>
+  <text x="274" y="82"
+        font-family="'Caveat', cursive"
+        font-weight="700"
+        font-size="72"
+        fill="url(#wm-grad)">Market</text>
+</svg>

@@ -271,7 +271,7 @@ export async function lookupPsaCertDetails(certificationNumber: string | null | 
     const response = await fetch(`https://www.psacard.com/cert/${cert}/psa`, {
       signal: AbortSignal.timeout(5000),
       headers: {
-        "user-agent": "owl-market-app/1.0",
+        "user-agent": "moon-market-app/1.0",
       },
     });
 

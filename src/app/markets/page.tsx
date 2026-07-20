@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 export const metadata = {
-  title: "Markets — OWL Market",
+  title: "Markets — Moon Market",
   description: "One Piece TCG movers, top cards, box sets, characters, and rarity performance.",
 };
 

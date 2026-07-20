@@ -251,7 +251,7 @@ async function loadGameOverviewUncached(gameRouteSlug: string, publicOnly: boole
 export async function generateMetadata(props: { params: Promise<{ game: string }> }) {
   const params = await props.params;
   return {
-    title: `${params.game.replace(/-/g, " ")} catalog - OWL Market`,
+    title: `${params.game.replace(/-/g, " ")} catalog - Moon Market`,
   };
 }
 

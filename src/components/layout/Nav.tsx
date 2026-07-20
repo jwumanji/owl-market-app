@@ -3,8 +3,8 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import OwlMark from "@/components/brand/OwlMark";
-import Wordmark from "@/components/brand/Wordmark";
+import MoonMarketLogo from "@/components/brand/MoonMarketLogo";
+import MoonMark from "@/components/brand/MoonMark";
 import { DEFAULT_PUBLIC_GAME_DB_SLUG, DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
 import Ticker from "./Ticker";
@@ -202,9 +202,9 @@ function PublicNav({ pathname }: { pathname: string }) {
     <nav className="c-topnav" aria-label="Primary">
       <div className="c-topnav-inner c-public-masthead">
         <div className="c-nav-left">
-          <Link href="/" className="c-lockup" aria-label="OWL Market" prefetch={false}>
-            <OwlMark size={36} />
-            <Wordmark />
+          <Link href="/" className="c-lockup" aria-label="Moon Market" prefetch={false}>
+            <MoonMarketLogo className="c-lockup-brand" priority />
+            <MoonMark className="c-lockup-mark-mobile" size={36} />
           </Link>
 
           <PublicGameSwitcher gameRouteSlug={activeGameRouteSlug} />
@@ -270,9 +270,9 @@ function AdminNav({ pathname }: { pathname: string }) {
     <nav className="c-topnav" aria-label="Primary">
       <div className="c-topnav-inner is-admin">
         <div className="c-nav-left">
-          <Link href="/" className="c-lockup" aria-label="OWL Market" prefetch={false}>
-            <OwlMark size={36} />
-            <Wordmark />
+          <Link href="/" className="c-lockup" aria-label="Moon Market" prefetch={false}>
+            <MoonMarketLogo className="c-lockup-brand" priority />
+            <MoonMark className="c-lockup-mark-mobile" size={36} />
           </Link>
 
           <span className="c-internal-chip">INTERNAL</span>
