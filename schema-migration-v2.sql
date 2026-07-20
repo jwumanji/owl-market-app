@@ -1,5 +1,5 @@
 -- ============================================================
--- OWL Market — Schema Migration v2
+-- Moon Market — Schema Migration v2
 -- Tournament Promo Support for Cards Table
 -- Run in Supabase Studio → SQL Editor → New Query → Run
 -- ============================================================

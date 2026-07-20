@@ -1,4 +1,4 @@
-# OWL Market — C1.5 Mockups (visual source of truth)
+# Moon Market — C1.5 Mockups (visual source of truth)
 
 These are the locked HTML mockups for the C1.5 "Playful Modern" migration. Each file is a standalone, self-contained HTML page (open in any browser). **Build prompts point at these by filename.** Filenames are canonical (no version suffix); the latest approved version of each surface is the one here.
 

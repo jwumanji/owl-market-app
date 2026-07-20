@@ -345,7 +345,7 @@ async function downloadImage(url) {
     signal: controller.signal,
     headers: {
       Accept: "image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8,*/*;q=0.5",
-      "User-Agent": "OwlMarketImageMirror/1.0",
+      "User-Agent": "MoonMarketImageMirror/1.0",
     },
   }).catch((error) => {
     if (error?.name === "AbortError") {
