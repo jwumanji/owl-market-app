@@ -26,6 +26,14 @@ test("table thumbnails keep the smallest source first", () => {
   ]);
 });
 
+test("card-sized artwork prefers the preview over the thumbnail", () => {
+  assert.deepEqual(cardImageSources(variants, "preview"), [
+    "preview.webp",
+    "large.webp",
+    "thumb.webp",
+  ]);
+});
+
 test("missing and duplicate variants fall back without repeated requests", () => {
   assert.deepEqual(
     cardImageSources(
