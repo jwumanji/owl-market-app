@@ -215,6 +215,36 @@ function NewsSection() {
   );
 }
 
+function TrendThumbnail({
+  alt,
+  imageUrl,
+  imageUrlPreview,
+  imageUrlSmall,
+}: {
+  alt: string;
+  imageUrl?: string | null;
+  imageUrlPreview?: string | null;
+  imageUrlSmall?: string | null;
+}) {
+  return (
+    <span className="qd-trend-thumbnail">
+      <MarketCardImage
+        alt={`${alt} card art`}
+        className="qd-trend-thumbnail-image"
+        fallbackTimeoutMs={0}
+        fetchPriority="low"
+        height={42}
+        imageUrl={imageUrl}
+        imageUrlPreview={imageUrlPreview}
+        imageUrlSmall={imageUrlSmall}
+        loading="lazy"
+        sourceSize="thumbnail"
+        width={30}
+      />
+    </span>
+  );
+}
+
 function TrendRow({
   card,
   rank,
@@ -233,6 +263,12 @@ function TrendRow({
       prefetch={false}
     >
       <span className="qd-trend-rank">{rank}</span>
+      <TrendThumbnail
+        alt={card.name}
+        imageUrl={card.image_url}
+        imageUrlPreview={card.image_url_preview}
+        imageUrlSmall={card.image_url_small}
+      />
       <span className="qd-trend-name">
         {card.name}
         <span>{card.card_number ?? card.set_code}</span>
@@ -264,6 +300,12 @@ function EbaySaleRow({
   const content = (
     <>
       <span className="qd-trend-rank">{rank}</span>
+      <TrendThumbnail
+        alt={sale.card_name}
+        imageUrl={sale.image_url}
+        imageUrlPreview={sale.image_url_preview}
+        imageUrlSmall={sale.image_url_small}
+      />
       <span className="qd-trend-name" title={sale.title ?? sale.card_name}>
         {sale.card_name}
         <span>{sale.card_number ?? sale.set_code}</span>
