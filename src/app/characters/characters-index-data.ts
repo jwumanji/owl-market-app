@@ -16,7 +16,7 @@ import { firstRelation } from "@/lib/supabase-relations";
 
 type QueryResult<T> = PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
 
-const CHARACTER_TOP_CARD_LIMIT = 5;
+const CHARACTER_TOP_CARD_LIMIT = 10;
 const CHARACTER_SUMMARY_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 
 export interface CharacterIndexCard {
