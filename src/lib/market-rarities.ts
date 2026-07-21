@@ -45,30 +45,29 @@ export function marketRarityRanking(
     .flatMap((rarity) => {
       if (included && !included.has(rarity.slug)) return [];
 
-      const topCard = topMarketCard(rarity.topCards);
-      const topCardMarket = topCard ? marketPrice(topCard) : 0;
+      const representativeCard = topMarketCard(rarity.topCards) ?? rarity.topCards[0];
+      const indexValue = Number.isFinite(rarity.indexValue) ? rarity.indexValue : 0;
 
-      return topCard && topCardMarket > 0
-        ? [{ rarity, topCard, topCardMarket }]
+      return indexValue > 0
+        ? [{ rarity, representativeCard, indexValue }]
         : [];
     })
     .sort((a, b) =>
-      b.topCardMarket - a.topCardMarket || a.rarity.name.localeCompare(b.rarity.name),
+      b.indexValue - a.indexValue || a.rarity.name.localeCompare(b.rarity.name),
     )
     .slice(0, limit)
-    .map(({ rarity, topCard, topCardMarket }) => {
+    .map(({ rarity, representativeCard, indexValue }) => {
       return {
         slug: rarity.slug,
         code: rarity.code,
         name: rarity.name,
-        index_value: +rarity.indexValue.toFixed(2),
+        index_value: +indexValue.toFixed(2),
         card_count: rarity.cardCount,
-        top_card_name: topCard?.name ?? null,
-        top_card_image_id: topCard?.cardImageId ?? null,
-        top_card_market: +topCardMarket.toFixed(2),
-        image_url: topCard.imagePreview ?? topCard.imageSmall ?? null,
-        image_url_small: topCard.imageSmall ?? null,
-        image_url_preview: topCard.imagePreview ?? null,
+        top_card_name: representativeCard?.name ?? null,
+        top_card_image_id: representativeCard?.cardImageId ?? null,
+        image_url: representativeCard?.imagePreview ?? representativeCard?.imageSmall ?? null,
+        image_url_small: representativeCard?.imageSmall ?? null,
+        image_url_preview: representativeCard?.imagePreview ?? null,
         changes: {
           "7D": rarity.chg7d,
           "30D": rarity.chg30d,
