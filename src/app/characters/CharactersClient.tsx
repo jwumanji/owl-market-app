@@ -7,6 +7,7 @@ import { TIER_LABELS } from "./characters-data";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
 import { characterMatchesSearch } from "@/lib/character-search";
+import { cardImageSources } from "@/lib/card-image-variants";
 import "./characters-page.css";
 
 /* ── Types ── */
@@ -80,7 +81,12 @@ function rarityClass(rarity: string): string {
 /** Get character avatar from their top card image */
 function getCharAvatar(c: CharacterData): string | null {
   const firstCard = c.topCards?.[0];
-  return firstCard?.imageUrlSmall ?? firstCard?.imageUrlPreview ?? firstCard?.imageUrl ?? null;
+  if (!firstCard) return null;
+
+  // Rank cards render this artwork across the full card width, so the tiny
+  // thumbnail variant looks visibly pixelated. Prefer the preview-sized asset
+  // and retain the thumbnail as a last-resort fallback.
+  return cardImageSources(firstCard, "preview")[0] ?? null;
 }
 
 /* ── SVG Sparkline ── */
