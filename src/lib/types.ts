@@ -105,6 +105,9 @@ export interface EbaySaleItem {
   card_name: string;
   card_number: string | null;
   set_code: string | null;
+  image_url: string | null;
+  image_url_small: string | null;
+  image_url_preview: string | null;
   title: string | null;
   sale_price: number;
   currency: string | null;

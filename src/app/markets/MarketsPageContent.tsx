@@ -53,6 +53,9 @@ type EbaySaleCardRelation = {
   card_image_id?: string | null;
   card_number?: string | null;
   name?: string | null;
+  image_url?: string | null;
+  image_url_small?: string | null;
+  image_url_preview?: string | null;
   sets?: SetRelation | SetRelation[] | null;
 };
 
@@ -129,6 +132,9 @@ function mapTopEbaySales(data: unknown): EbaySaleItem[] {
       card_name: card.name,
       card_number: card.card_number ?? null,
       set_code: set?.code ?? null,
+      image_url: card.image_url ?? null,
+      image_url_small: card.image_url_small ?? null,
+      image_url_preview: card.image_url_preview ?? null,
       title: row.title ?? null,
       sale_price: row.sale_price,
       currency: row.currency ?? "USD",
@@ -238,13 +244,13 @@ async function renderMarketsPageContent({
         .eq("game_id", game.id)
         .limit(1000)
     ),
-    cachedMarketData(publicDataCacheKey("markets-quickdash-v4", game.id, "top-ebay-sales-90d-en"), async () =>
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v5", game.id, "top-ebay-sales-90d-en"), async () =>
       await supabase
         .from("ebay_sales")
         .select(`
           ebay_item_id, card_id, sale_price, currency, sold_at, title, ebay_url,
           cards!ebay_sales_card_id_fkey!inner (
-            id, card_image_id, card_number, name,
+            id, card_image_id, card_number, name, image_url, image_url_small, image_url_preview,
             sets!cards_set_game_fk (code)
           )
         `)
