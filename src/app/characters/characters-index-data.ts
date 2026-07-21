@@ -357,7 +357,7 @@ async function loadCharacterIndex(gameId: string): Promise<CharacterIndexEntry[]
  * GET /api/characters so page renders and API calls reuse the same entry.
  */
 export function loadCachedCharacterIndex(gameId: string): Promise<CharacterIndexEntry[]> {
-  return cachedPublicData(publicDataCacheKey("api-characters-v9", gameId), async () => {
+  return cachedPublicData(publicDataCacheKey("api-characters-v10", gameId), async () => {
     const summaryRows = await loadCharacterSummaries(gameId);
     return summaryRows ?? loadCharacterIndex(gameId);
   }, CATALOG_DATA_TTL_SECONDS);
