@@ -777,7 +777,7 @@ export async function syncRiftboundJustTcg(request: Request) {
       .map((match) => shadowPriceMatch(match.cardId, match.justTcgCard))
       .filter((row): row is JustTcgShadowPriceMatch => Boolean(row));
     let legacyPricing = { prices_written: 0, history_written: 0 };
-    let normalizedPricing = {
+    const normalizedPricing = {
       attempted: 0,
       observationsWritten: 0,
       preferredPricesWritten: 0,
