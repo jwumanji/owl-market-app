@@ -177,10 +177,10 @@ export default function CardDetailClient({
               // priority — PSI flagged the preload losing the bandwidth race.
               // This prop flows to the img and into ReactDOM.preload alike.
               fetchPriority="high"
-              className="w-full max-w-[300px] aspect-[5/7] object-cover rounded-c-md border-[1.5px] border-ink shadow-[0_10px_24px_rgba(26,15,8,0.10)]"
+              className="w-full max-w-[300px] aspect-[5/7] object-cover rounded-c-md shadow-[0_10px_24px_rgba(26,15,8,0.10)]"
             />
           ) : (
-            <div className="w-full max-w-[300px] aspect-[5/7] rounded-c-md border-[1.5px] border-ink bg-bg-3" />
+            <div className="w-full max-w-[300px] aspect-[5/7] rounded-c-md bg-bg-3" />
           )}
         </div>
 
