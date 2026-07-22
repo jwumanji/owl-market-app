@@ -6,8 +6,10 @@ import { RARITY_INDEX_SLUGS } from "@/app/rarities/rarities-data";
 import { getSetImageUrl } from "@/app/sets/set-images";
 import MarketDashboard from "@/components/market/MarketDashboard";
 import { gamePath } from "@/lib/game-routes";
+import { RIFTBOUND_DB_SLUG } from "@/lib/games/registry";
 import { characterIndexMarketRanking } from "@/lib/market-characters";
 import { marketRarityRanking } from "@/lib/market-rarities";
+import { riftboundChampionSpotlights } from "@/lib/market-riftbound-dashboard";
 import { attachCasePrices, rankBoosterBoxesByPrice, tcgPlayerProductImageUrl } from "@/lib/market-sealed";
 import {
   DEFAULT_PUBLIC_GAME_ROUTE_SLUG,
@@ -31,7 +33,7 @@ const cachedMarketData = <T,>(key: string, load: () => Promise<T>) =>
 
 export const metadata = {
   title: "Markets — Moon Market",
-  description: "One Piece TCG movers, top cards, box sets, characters, and rarity performance.",
+  description: "TCG movers, top cards, box sets, characters, and rarity performance.",
 };
 
 type PriceChangeStats = {
@@ -68,6 +70,11 @@ type EbaySaleRow = {
   title?: string | null;
   ebay_url?: string | null;
   cards?: EbaySaleCardRelation | EbaySaleCardRelation[] | null;
+};
+
+type ExternalProductIdRow = {
+  card_id: string;
+  external_id: string;
 };
 
 const DASHBOARD_PRICE_CARD_SELECT = `
@@ -110,6 +117,17 @@ function mapDashboardCards(data: unknown) {
     .map(flattenPriceStatsCardRow)
     .filter((row): row is Record<string, unknown> => row != null)
     .map(toDashboardCard);
+}
+
+function hydrateRiftboundCardImages(
+  cards: DashboardCard[],
+  productIdByCardId: ReadonlyMap<string, string>,
+) {
+  return cards.map((card) => {
+    if (card.image_url || card.image_url_small || card.image_url_preview) return card;
+    const imageUrl = tcgPlayerProductImageUrl(productIdByCardId.get(card.id));
+    return imageUrl ? { ...card, image_url: imageUrl } : card;
+  });
 }
 
 function mapTopEbaySales(data: unknown): EbaySaleItem[] {
@@ -271,17 +289,56 @@ async function renderMarketsPageContent({
     ),
   ]);
 
-  const topValueCards = mapDashboardCards(topValueCardsRes.data)
+  let topValueCards = mapDashboardCards(topValueCardsRes.data)
     .sort((a, b) => (b.market_avg ?? Number.NEGATIVE_INFINITY) - (a.market_avg ?? Number.NEGATIVE_INFINITY));
-  const topGainers1d = mapDashboardCards(gainers1dRes.data)
+  let topGainers1d = mapDashboardCards(gainers1dRes.data)
     .sort((a, b) => cardChange(b, "1D") - cardChange(a, "1D"));
-  const topGainers7d = mapDashboardCards(gainers7dRes.data)
+  let topGainers7d = mapDashboardCards(gainers7dRes.data)
     .sort((a, b) => cardChange(b, "7D") - cardChange(a, "7D"));
-  const topLosers1d = mapDashboardCards(losers1dRes.data)
+  let topLosers1d = mapDashboardCards(losers1dRes.data)
     .sort((a, b) => cardChange(a, "1D") - cardChange(b, "1D"));
-  const topLosers7d = mapDashboardCards(losers7dRes.data)
+  let topLosers7d = mapDashboardCards(losers7dRes.data)
     .sort((a, b) => cardChange(a, "7D") - cardChange(b, "7D"));
-  const topEbaySales = mapTopEbaySales(topEbaySalesRes.data);
+  let topEbaySales = mapTopEbaySales(topEbaySalesRes.data);
+
+  if (game.slug === RIFTBOUND_DB_SLUG) {
+    const dashboardCardIds = Array.from(new Set([
+      ...topValueCards,
+      ...topGainers1d,
+      ...topGainers7d,
+      ...topLosers1d,
+      ...topLosers7d,
+    ].map((card) => card.id).concat(topEbaySales.map((sale) => sale.card_id))));
+
+    if (dashboardCardIds.length > 0) {
+      const externalIdsRes = await cachedMarketData(
+        publicDataCacheKey("markets-riftbound-tcgplayer-images-v1", game.id, dashboardCardIds.slice().sort().join(",")),
+        async () => await supabase
+          .from("card_external_ids")
+          .select("card_id, external_id")
+          .eq("game_id", game.id)
+          .eq("provider", "tcgplayer")
+          .eq("external_type", "product_id")
+          .in("card_id", dashboardCardIds),
+      );
+      if (externalIdsRes.error) throw new Error(externalIdsRes.error.message);
+
+      const productIdByCardId = new Map(
+        ((externalIdsRes.data ?? []) as ExternalProductIdRow[])
+          .map((row) => [row.card_id, row.external_id] as const),
+      );
+      topValueCards = hydrateRiftboundCardImages(topValueCards, productIdByCardId);
+      topGainers1d = hydrateRiftboundCardImages(topGainers1d, productIdByCardId);
+      topGainers7d = hydrateRiftboundCardImages(topGainers7d, productIdByCardId);
+      topLosers1d = hydrateRiftboundCardImages(topLosers1d, productIdByCardId);
+      topLosers7d = hydrateRiftboundCardImages(topLosers7d, productIdByCardId);
+      topEbaySales = topEbaySales.map((sale) => {
+        if (sale.image_url || sale.image_url_small || sale.image_url_preview) return sale;
+        const imageUrl = tcgPlayerProductImageUrl(productIdByCardId.get(sale.card_id));
+        return imageUrl ? { ...sale, image_url: imageUrl } : sale;
+      });
+    }
+  }
 
   if (topValueCards.length === 0 && (catalogCountRes.count ?? 0) > 0) {
     return (
@@ -309,9 +366,26 @@ async function renderMarketsPageContent({
     );
   }
 
-  const allRarities = marketRarityRanking(rarityIndex.rarities, 5, RARITY_INDEX_SLUGS);
+  const allRarities = marketRarityRanking(
+    rarityIndex.rarities,
+    5,
+    game.slug === RIFTBOUND_DB_SLUG ? undefined : RARITY_INDEX_SLUGS,
+  );
+  const imageByCardImageId = new Map(topValueCards.map((card) => [card.card_image_id, card] as const));
+  const displayRarities = allRarities.map((rarity) => {
+    if (rarity.image_url || !rarity.top_card_image_id) return rarity;
+    const card = imageByCardImageId.get(rarity.top_card_image_id);
+    return card ? {
+      ...rarity,
+      image_url: card.image_url,
+      image_url_small: card.image_url_small,
+      image_url_preview: card.image_url_preview ?? null,
+    } : rarity;
+  });
 
-  const allCharacters: CharacterRankItem[] = characterIndexMarketRanking(characterIndex, 5);
+  const allCharacters: CharacterRankItem[] = game.slug === RIFTBOUND_DB_SLUG
+    ? riftboundChampionSpotlights(topValueCards, 5)
+    : characterIndexMarketRanking(characterIndex, 5);
 
   const rawSealed: SealedRankItem[] = ((sealedRes.data ?? []) as unknown as Array<Record<string, unknown>>)
     .map((row) => {
@@ -399,8 +473,8 @@ async function renderMarketsPageContent({
     },
     topEbaySales,
     rarityRanking: {
-      "7D": allRarities,
-      "30D": allRarities,
+      "7D": displayRarities,
+      "30D": displayRarities,
     },
     topCharacters: {
       "7D": allCharacters,

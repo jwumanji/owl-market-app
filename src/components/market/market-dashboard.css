@@ -461,6 +461,37 @@
   gap: 16px;
 }
 
+.qd-section-empty {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: center;
+  min-height: 210px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 32px;
+  border: 1.5px dashed var(--ink-3);
+  border-radius: var(--r-md);
+  color: var(--ink-2);
+  background: color-mix(in srgb, var(--bg-2) 78%, transparent);
+  text-align: center;
+}
+
+.qd-section-empty strong {
+  font-family: var(--font-space-grotesk-stack);
+  font-size: 17px;
+}
+
+.qd-section-empty span {
+  max-width: 520px;
+  font-family: var(--font-jetbrains-mono-stack);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.7;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
 .qd-market-card {
   display: flex;
   min-width: 0;

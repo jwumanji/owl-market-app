@@ -179,11 +179,11 @@ function PublicGameSwitcher({ gameRouteSlug }: { gameRouteSlug: string }) {
         >
           <span>
             <strong>Riftbound</strong>
-            <small>Catalog preview</small>
+            <small>Live market</small>
           </span>
           {isRiftbound
             ? <span className="c-game-option-check" aria-hidden="true">✓</span>
-            : <span className="c-nav-soon">Preview</span>}
+            : <span className="c-nav-soon">Live</span>}
         </Link>
       </div>
     </div>
@@ -218,6 +218,7 @@ export default function Nav({ variant }: NavProps) {
 function PublicNav({ pathname }: { pathname: string }) {
   const activeGameRouteSlug = gameRouteSlugFromPath(pathname);
   const isDefaultPublicGame = activeGameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
+  const hasLiveMarket = isDefaultPublicGame || activeGameRouteSlug === RIFTBOUND_ROUTE_SLUG;
   const links = publicLinks(activeGameRouteSlug);
 
   return (
@@ -243,7 +244,7 @@ function PublicNav({ pathname }: { pathname: string }) {
           </Link>
           <span className="c-live-chip">
             <span className="c-live-dot" />
-            {isDefaultPublicGame ? "LIVE" : "CATALOG"}
+            {hasLiveMarket ? "LIVE" : "CATALOG"}
           </span>
           <Link href="/login" className="c-signin-btn" prefetch={false}>
             Sign in
@@ -274,7 +275,7 @@ function PublicNav({ pathname }: { pathname: string }) {
         </ul>
       </div>
 
-      {isDefaultPublicGame && <Ticker />}
+      {hasLiveMarket && <Ticker gameRouteSlug={activeGameRouteSlug} />}
     </nav>
   );
 }

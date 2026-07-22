@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { gamePath } from "@/lib/game-routes";
+import { RIFTBOUND_ROUTE_SLUG } from "@/lib/games/registry";
 import {
   rankBoosterBoxesByPrice,
   rankBoosterBoxesByTotalSetValue,
@@ -25,34 +26,73 @@ import "./market-dashboard.css";
 const WINDOWS: MarketWindow[] = ["1D", "7D", "90D"];
 type SetRankingMode = "booster_box" | "tsv";
 
-const NEWS = [
+const ONE_PIECE_NEWS = [
   {
-    slug: "op16-round-one-reveals",
+    href: "/news/op16-round-one-reveals",
     title: "Round 1 cards revealed — OP16 first look",
     category: "reveal",
-    hero_image_url: null,
+    tone: "reveal",
+    heroLabel: "Article hero",
     published_at: "2026-07-14",
   },
   {
-    slug: "regional-market-movers",
+    href: "/news/regional-market-movers",
     title: "Top regional cards: what won and what it did to prices",
     category: "market",
-    hero_image_url: null,
+    tone: "market",
+    heroLabel: "Article hero",
     published_at: "2026-07-11",
   },
   {
-    slug: "one-piece-day-2026",
+    href: "/news/one-piece-day-2026",
     title: "One Piece Day 2026 — full reveal schedule",
     category: "event",
-    hero_image_url: null,
+    tone: "event",
+    heroLabel: "Article hero",
     published_at: "2026-07-08",
   },
   {
-    slug: "op16-secret-rare",
+    href: "/news/op16-secret-rare",
     title: "Round 2 cards revealed — secret rare chase confirmed",
     category: "release",
-    hero_image_url: null,
+    tone: "release",
+    heroLabel: "Article hero",
     published_at: "2026-07-05",
+  },
+] as const;
+
+const RIFTBOUND_GUIDES = [
+  {
+    href: "/champions",
+    title: "Explore champions, signature cards, and collector standouts",
+    category: "champions",
+    tone: "reveal",
+    heroLabel: "Champion index",
+    meta: "Champion-linked cards",
+  },
+  {
+    href: "/sets",
+    title: "Browse Origins, Spiritforged, Unleashed, and promo releases",
+    category: "sets",
+    tone: "market",
+    heroLabel: "Set library",
+    meta: "All Riftbound releases",
+  },
+  {
+    href: "/rarities",
+    title: "Compare Signature, Overnumbered, Metal, and promo treatments",
+    category: "treatments",
+    tone: "event",
+    heroLabel: "Treatment guide",
+    meta: "Collector rarity index",
+  },
+  {
+    href: "/languages",
+    title: "Track English, Chinese, and localized market editions",
+    category: "languages",
+    tone: "release",
+    heroLabel: "Language markets",
+    meta: "Edition coverage",
   },
 ] as const;
 
@@ -170,43 +210,49 @@ function SeeAll({ href, children }: { href: string; children: React.ReactNode })
   );
 }
 
-function NewsSection() {
+function NewsSection({ gameRouteSlug }: { gameRouteSlug?: string | null }) {
+  const isRiftbound = gameRouteSlug === RIFTBOUND_ROUTE_SLUG;
+  const stories = isRiftbound ? RIFTBOUND_GUIDES : ONE_PIECE_NEWS;
+  const seeAllHref = isRiftbound ? gamePath(gameRouteSlug, "/catalog") : "/news";
+
   return (
     <section className="qd-section" aria-labelledby="quickdash-news">
       <div className="qd-section-head">
         <div>
-          <div className="qd-section-kicker">What&apos;s happening</div>
+          <div className="qd-section-kicker">{isRiftbound ? "Build your market view" : "What's happening"}</div>
           <h2 id="quickdash-news" className="qd-section-title">
-            Events &amp; <em>news</em>
+            {isRiftbound ? <>Riftbound <em>market</em></> : <>Events &amp; <em>news</em></>}
           </h2>
         </div>
-        <Link href="/news" className="qd-see-all qd-see-all-top" prefetch={false}>
-          See more stories <span aria-hidden="true">→</span>
+        <Link href={seeAllHref} className="qd-see-all qd-see-all-top" prefetch={false}>
+          {isRiftbound ? "Browse all cards" : "See more stories"} <span aria-hidden="true">→</span>
         </Link>
       </div>
 
       <div className="qd-news-grid">
-        {NEWS.map((article, index) => (
+        {stories.map((article, index) => (
           <Link
-            key={article.slug}
-            href={`/news/${article.slug}`}
+            key={article.href}
+            href={isRiftbound ? gamePath(gameRouteSlug, article.href) : article.href}
             className="qd-news-card"
             prefetch={false}
           >
             <div className={`qd-news-image qd-art-${index + 1}`}>
-              <span>Article hero</span>
+              <span>{article.heroLabel}</span>
             </div>
             <div className="qd-news-body">
-              <span className={`qd-news-tag ${article.category}`}>{article.category}</span>
+              <span className={`qd-news-tag ${article.tone}`}>{article.category}</span>
               <span className="qd-news-title">{article.title}</span>
-              <time className="qd-news-date" dateTime={article.published_at}>
-                {new Intl.DateTimeFormat("en-US", {
-                  month: "short",
-                  day: "2-digit",
-                  year: "numeric",
-                  timeZone: "UTC",
-                }).format(new Date(`${article.published_at}T00:00:00Z`))}
-              </time>
+              {"published_at" in article ? (
+                <time className="qd-news-date" dateTime={article.published_at}>
+                  {new Intl.DateTimeFormat("en-US", {
+                    month: "short",
+                    day: "2-digit",
+                    year: "numeric",
+                    timeZone: "UTC",
+                  }).format(new Date(`${article.published_at}T00:00:00Z`))}
+                </time>
+              ) : <span className="qd-news-date">{article.meta}</span>}
             </div>
           </Link>
         ))}
@@ -498,7 +544,12 @@ function SetsSection({ data, gameRouteSlug }: { data: DashboardData; gameRouteSl
       />
       <h2 id="quickdash-sets" className="sr-only">Box sets</h2>
       <div className="qd-card-grid">
-        {sets.map((item, index) => {
+        {sets.length === 0 ? (
+          <div className="qd-section-empty">
+            <strong>Sealed pricing is coming online.</strong>
+            <span>Explore the Riftbound set library while booster box coverage fills in.</span>
+          </div>
+        ) : sets.map((item, index) => {
           const valueMultiple = sealedValueMultiple(item.total_set_value, item.market_avg);
           const valueFormula = valueMultiple == null
             ? "TSV or booster box price is unavailable"
@@ -570,21 +621,28 @@ function CharacterImage({ item }: { item: CharacterRankItem }) {
 function CharactersSection({ data, gameRouteSlug }: { data: DashboardData; gameRouteSlug?: string | null }) {
   const [window, setWindow] = useState<MarketWindow>("7D");
   const characters = data.topCharacters[window] ?? [];
+  const isRiftbound = gameRouteSlug === RIFTBOUND_ROUTE_SLUG;
+  const indexHref = gamePath(gameRouteSlug, isRiftbound ? "/champions" : "/characters");
 
   return (
     <section className="qd-section" aria-labelledby="quickdash-characters">
       <SectionHeader
-        eyebrow="Ranked only by total set value"
+        eyebrow={isRiftbound ? "Ranked by featured card market value" : "Ranked only by total set value"}
         title="Top"
-        emphasis="characters"
-        selector={<WindowSelector data={data.topCharacters} value={window} onChange={setWindow} label="Top characters" />}
+        emphasis={isRiftbound ? "champions" : "characters"}
+        selector={<WindowSelector data={data.topCharacters} value={window} onChange={setWindow} label={isRiftbound ? "Top champions" : "Top characters"} />}
       />
-      <h2 id="quickdash-characters" className="sr-only">Top characters</h2>
+      <h2 id="quickdash-characters" className="sr-only">{isRiftbound ? "Top champions" : "Top characters"}</h2>
       <div className="qd-card-grid">
-        {characters.map((item, index) => (
+        {characters.length === 0 ? (
+          <div className="qd-section-empty">
+            <strong>{isRiftbound ? "Champion rankings are coming online." : "Character rankings are unavailable."}</strong>
+            <span>Browse the full index while linked-card values fill in.</span>
+          </div>
+        ) : characters.map((item, index) => (
           <Link
             key={item.slug}
-            href={gamePath(gameRouteSlug, "/characters")}
+            href={isRiftbound ? `${indexHref}?q=${encodeURIComponent(item.name)}` : indexHref}
             className="qd-market-card"
             prefetch={false}
           >
@@ -595,7 +653,7 @@ function CharactersSection({ data, gameRouteSlug }: { data: DashboardData; gameR
             <CharacterImage item={item} />
             <div className="qd-stats qd-stats-wide">
               <div className="qd-stat">
-                <span>Total set value</span>
+                <span>{isRiftbound ? "Featured card value" : "Total set value"}</span>
                 <strong>{formatPrice(item.index_value)}</strong>
               </div>
               <div className="qd-stat">
@@ -606,7 +664,7 @@ function CharactersSection({ data, gameRouteSlug }: { data: DashboardData; gameR
           </Link>
         ))}
       </div>
-      <SeeAll href={gamePath(gameRouteSlug, "/characters")}>See all characters</SeeAll>
+      <SeeAll href={indexHref}>{isRiftbound ? "See all champions" : "See all characters"}</SeeAll>
     </section>
   );
 }
@@ -691,7 +749,7 @@ export default function MarketDashboard({
 }) {
   return (
     <div className="qd-dashboard">
-      <NewsSection />
+      <NewsSection gameRouteSlug={gameRouteSlug} />
       <TrendingSection data={data} gameRouteSlug={gameRouteSlug} />
       <TopCardsSection data={data} gameRouteSlug={gameRouteSlug} />
       <SetsSection data={data} gameRouteSlug={gameRouteSlug} />
