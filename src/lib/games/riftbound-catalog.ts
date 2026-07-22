@@ -49,3 +49,12 @@ export function riftboundChampionName(
   const tags = card.tags ?? [];
   return tags.find((tag) => knownChampions.has(tag)) ?? tags[0] ?? null;
 }
+
+export function compareRiftboundChampionValue(
+  a: { name: string; totalValue: number; pricedCards: number },
+  b: { name: string; totalValue: number; pricedCards: number },
+) {
+  return b.totalValue - a.totalValue
+    || b.pricedCards - a.pricedCards
+    || a.name.localeCompare(b.name);
+}

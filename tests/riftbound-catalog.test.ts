@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   asRiftboundPayload,
+  compareRiftboundChampionValue,
   riftboundChampionName,
   stringList,
 } from "../src/lib/games/riftbound-catalog.ts";
@@ -24,4 +25,14 @@ test("derives champion names from champion and signature printings", () => {
 
 test("stringList ignores invalid payload entries", () => {
   assert.deepEqual(stringList(["Fury", null, "", 7, "Body"]), ["Fury", "Body"]);
+});
+
+test("champion index ranks by total linked-card value", () => {
+  const champions = [
+    { name: "Ahri", totalValue: 125, pricedCards: 8 },
+    { name: "Yasuo", totalValue: 410, pricedCards: 5 },
+    { name: "Jinx", totalValue: 125, pricedCards: 10 },
+  ].sort(compareRiftboundChampionValue);
+
+  assert.deepEqual(champions.map((champion) => champion.name), ["Yasuo", "Jinx", "Ahri"]);
 });
