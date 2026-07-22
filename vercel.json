@@ -1,19 +1,19 @@
 {
   "crons": [
     {
-      "path": "/api/sync/justtcg?game=one_piece&cursor=1&maxSets=4",
+      "path": "/api/sync/justtcg?game=one_piece&cursor=1&maxSets=1",
       "schedule": "0 0 * * *"
     },
     {
-      "path": "/api/sync/justtcg?game=one_piece&cursor=1&maxSets=4",
+      "path": "/api/sync/justtcg?game=one_piece&cursor=1&maxSets=1",
       "schedule": "0 6 * * *"
     },
     {
-      "path": "/api/sync/justtcg?game=one_piece&cursor=1&maxSets=4",
+      "path": "/api/sync/justtcg?game=one_piece&cursor=1&maxSets=1",
       "schedule": "0 12 * * *"
     },
     {
-      "path": "/api/sync/justtcg?game=one_piece&cursor=1&maxSets=4",
+      "path": "/api/sync/justtcg?game=one_piece&cursor=1&maxSets=1",
       "schedule": "0 18 * * *"
     },
     {

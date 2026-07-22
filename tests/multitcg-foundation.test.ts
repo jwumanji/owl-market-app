@@ -91,6 +91,44 @@ test("hardening migration makes locks atomic and correlates pricing identities",
   assert.match(sql, /sealed_product_price_history_product_game_fk/);
 });
 
+test("JustTCG cursor uses one-set invocations and deterministic keyset pagination", () => {
+  const route = fs.readFileSync(
+    path.join(process.cwd(), "src/app/api/sync/justtcg/route.ts"),
+    "utf8"
+  );
+  const vercel = JSON.parse(
+    fs.readFileSync(path.join(process.cwd(), "vercel.json"), "utf8")
+  ) as { crons: Array<{ path: string; schedule: string }> };
+  const migration = fs.readFileSync(
+    path.join(
+      process.cwd(),
+      "supabase/migrations/20260722133000_justtcg_cursor_loader_performance.sql"
+    ),
+    "utf8"
+  );
+
+  assert.match(route, /export const maxDuration = 300/);
+  assert.match(route, /const LOCK_TTL_MS = 10 \* 60 \* 1000/);
+  assert.match(route, /const CURSOR_SETS_PER_INVOCATION = 1/);
+  assert.match(route, /\.order\("id", \{ ascending: true \}\)/);
+  assert.match(route, /query\.gt\("id", afterId\)/);
+  assert.doesNotMatch(route, /\.range\(offset, offset \+ PAGE - 1\)/);
+
+  const onePiecePriceCrons = vercel.crons.filter((cron) =>
+    cron.path.startsWith("/api/sync/justtcg?game=one_piece")
+  );
+  assert.equal(onePiecePriceCrons.length, 4);
+  for (const cron of onePiecePriceCrons) {
+    assert.match(cron.path, /[?&]maxSets=1(?:&|$)/);
+    assert.doesNotMatch(cron.path, /[?&]maxSets=4(?:&|$)/);
+  }
+
+  assert.match(
+    migration,
+    /create index if not exists idx_cards_game_region_id\s+on public\.cards\(game_id, region, id\)/
+  );
+});
+
 test("provider sync helper uses the atomic lock RPC when available", async () => {
   const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
   const supabase = {
