@@ -111,7 +111,7 @@ export default function MarketTable({ cards: initialCards, sets, gameRouteSlug }
                 <td className="py-2 px-1">
                   <MarketCardImage
                     alt={card.name ?? ""}
-                    className="h-[73px] w-[52px] rounded-[4px] border-[1.5px] border-ink object-cover"
+                    className="h-[73px] w-[52px] rounded-[4px] object-cover"
                     fetchPriority="low"
                     height={73}
                     imageUrl={card.image_url}

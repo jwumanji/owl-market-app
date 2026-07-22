@@ -252,7 +252,6 @@
   align-items: center;
   justify-content: center;
   height: 104px;
-  border-bottom: 1.5px solid var(--ink);
 }
 
 .qd-news-image span {
@@ -529,8 +528,6 @@
 .qd-market-image {
   position: relative;
   overflow: hidden;
-  border-top: 1.5px solid var(--ink);
-  border-bottom: 1.5px solid var(--ink);
   background: var(--bg-3);
 }
 
