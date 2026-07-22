@@ -12,14 +12,16 @@ import {
   type GameScope,
 } from "@/lib/game-scope";
 import { ONE_PIECE_DB_SLUG } from "@/lib/games/one-piece";
+import { representativeSealedImageBySet } from "@/lib/market-sealed";
 import { cachedPublicData, CATALOG_DATA_TTL_SECONDS, publicDataCacheKey } from "@/lib/public-data-cache";
 import { firstRelation } from "@/lib/supabase-relations";
+import { buildDistributionSetCodeIndex, distributionSetCode } from "@/lib/set-membership";
 import type { CatalogSetCard } from "./sets-data";
 
 // ---------------------------------------------------------------------------
-// loadSets() — groups cards by cards.printed_set_code so EB04, OP14, OP15 etc
-// surface as canonical print runs rather than mirroring the distribution
-// products in the `sets` table. Returns SetData[] consumed by /sets and /sets/[slug].
+// loadSets() — groups cards by cards.set_id so each physical printing belongs
+// to the product that distributed it. printed_set_code remains origin-lineage
+// metadata only. Returns SetData[] consumed by /sets and /sets/[slug].
 // ---------------------------------------------------------------------------
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -485,11 +487,30 @@ async function loadSetsUncached(options: {
   };
 
   const setByCode = new Map<string, SetMeta>();
-  for (const s of (allSets ?? []) as unknown as SetMeta[]) {
+  const setRows = (allSets ?? []) as unknown as SetMeta[];
+  for (const s of setRows) {
     if (s.code) setByCode.set(s.code, s);
   }
+  const distributionCodeBySetId = buildDistributionSetCodeIndex(setRows);
 
-  // 2. All cards. Group by printed_set_code in JS.
+  const { data: sealedProducts, error: sealedProductsError } = await supabase
+    .from("sealed_products")
+    .select("set_id, product_type, market_avg, image_url, tcg_product_id")
+    .eq("game_id", game.id)
+    .not("set_id", "is", null)
+    .limit(1000);
+
+  if (sealedProductsError) throw new Error(sealedProductsError.message);
+
+  const sealedImageBySetId = representativeSealedImageBySet((sealedProducts ?? []) as Array<{
+    set_id: string | null;
+    product_type: string | null;
+    market_avg: number | null;
+    image_url: string | null;
+    tcg_product_id: string | null;
+  }>);
+
+  // 2. All cards. Group by the distribution set relationship in JS.
   const allCards: Record<string, unknown>[] = [];
   const pageSize = 1000;
   let from = 0;
@@ -499,7 +520,6 @@ async function loadSetsUncached(options: {
       .select(`
         id,
         set_id,
-        printed_set_code,
         game_payload,
         name,
         card_number,
@@ -535,9 +555,12 @@ async function loadSetsUncached(options: {
   const totalRowsByCode: Record<string, number> = {};
 
   for (const cardRow of allCards) {
-    const rawCode = (withOnePiecePayloadFallbacks(cardRow).printed_set_code as string | null) ?? null;
-    if (!rawCode) continue;
-    const code = normalizeCode(rawCode);
+    const distributionCode = distributionSetCode(
+      { set_id: (cardRow.set_id as string | null) ?? null },
+      distributionCodeBySetId,
+    );
+    if (!distributionCode) continue;
+    const code = normalizeCode(distributionCode);
     totalRowsByCode[code] = (totalRowsByCode[code] ?? 0) + 1;
 
     const core = toCardCore(cardRow);
@@ -626,6 +649,7 @@ async function loadSetsUncached(options: {
         slug,
         code,
         name: meta?.name ?? code,
+        imageUrl: meta?.id ? sealedImageBySetId.get(meta.id) ?? null : null,
         year: meta?.year ?? null,
         type,
         color,
@@ -676,7 +700,7 @@ export async function loadSets(options: {
   const publicOnly = options.publicOnly ?? !allowsPrivateGamePreview();
   return cachedPublicData(
     publicDataCacheKey(
-      "sets-loader",
+      "sets-loader-v3",
       options.game ?? "default",
       publicOnly,
       Boolean(options.includeCatalogCards),
@@ -706,19 +730,20 @@ async function enrichSetDetailUncached(
 ): Promise<Record<string, unknown>> {
   const supabase = createCachedServiceClient();
 
+  const { data: setMeta, error: setMetaError } = await supabase
+    .from("sets")
+    .select("id")
+    .eq("game_id", game.id)
+    .eq("slug", String(setRow.slug))
+    .limit(1)
+    .maybeSingle();
+
+  if (setMetaError) throw new Error(setMetaError.message);
+  if (!setMeta) return setRow;
+
   if (game.slug !== ONE_PIECE_DB_SLUG) {
     // Catalog-only games: the first CATALOG_SET_CARD_LIMIT cards in
     // card_number order, exactly as loadCatalogOnlySets collects them.
-    const { data: setMeta } = await supabase
-      .from("sets")
-      .select("id")
-      .eq("game_id", game.id)
-      .eq("slug", String(setRow.slug))
-      .limit(1)
-      .maybeSingle();
-
-    if (!setMeta) return setRow;
-
     const { data: cardRows, error: cardsErr } = await supabase
       .from("cards")
       .select(`
@@ -751,11 +776,7 @@ async function enrichSetDetailUncached(
     };
   }
 
-  // One Piece: scoped card fetch by printed_set_code (N rolls into P upstream,
-  // so the P bin must pull both codes).
-  const code = String(setRow.code);
-  const codes = code === "P" ? ["P", "N"] : [code];
-
+  // One Piece: scope cards to the physical product that distributed them.
   const scopedCards: Record<string, unknown>[] = [];
   const pageSize = 1000;
   let from = 0;
@@ -764,7 +785,7 @@ async function enrichSetDetailUncached(
       .from("cards")
       .select(`
         id,
-        printed_set_code,
+        set_id,
         game_payload,
         name,
         card_number,
@@ -786,7 +807,7 @@ async function enrichSetDetailUncached(
       `)
       .eq("game_id", game.id)
       .eq("region", "en")
-      .in("printed_set_code", codes)
+      .eq("set_id", setMeta.id)
       .order("id", { ascending: true })
       .range(from, from + pageSize - 1);
 
@@ -825,7 +846,7 @@ export async function loadSetDetail(options: {
   }
 
   const set = await cachedPublicData(
-    publicDataCacheKey("set-detail-cards", options.game ?? "default", String(setRow.slug), publicOnly),
+    publicDataCacheKey("set-detail-cards-v2", options.game ?? "default", String(setRow.slug), publicOnly),
     () => enrichSetDetailUncached(setRow, game),
     CATALOG_DATA_TTL_SECONDS
   );

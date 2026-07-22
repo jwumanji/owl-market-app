@@ -3,6 +3,7 @@ export interface SetData {
   code: string;
   displayCode?: string;
   name: string;
+  imageUrl?: string | null;
   year: number | null;
   type?: "op" | "eb" | "prb" | "st" | "promo" | "main" | "organized" | "judge";
   color: string;

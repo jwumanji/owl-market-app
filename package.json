@@ -14,6 +14,7 @@
     "golden:gate4-expected-diffs": "node scripts/capture-gate4-expected-diffs.mjs",
     "audit:game-boundaries": "node scripts/audit-game-boundaries.mjs",
     "audit:public-performance": "node scripts/audit-public-performance.mjs",
+    "audit:set-membership": "node scripts/audit-set-membership.mjs",
     "audit:riftbound-pricing": "node scripts/audit-riftbound-pricing-readiness.mjs",
     "audit:riftbound-justtcg": "node scripts/audit-riftbound-justtcg.mjs",
     "riftbound:audit": "node scripts/riftbound-audit.mjs",

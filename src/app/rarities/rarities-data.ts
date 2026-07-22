@@ -35,8 +35,9 @@ export interface RarityData {
 }
 
 /* ── Fixed tier ordering ── */
-export const TOP_5_SLUGS = ["mr", "promo", "sp", "aa", "sar"] as const;
-export const TIER_2_SLUGS = ["sec", "tr", "sr", "l", "r", "sealed"] as const;
+export const TOP_5_SLUGS = ["mr", "promo", "sp", "aa", "sealed"] as const;
+export const TIER_2_SLUGS = ["sec", "tr", "sr", "l", "r"] as const;
+export const RARITY_INDEX_SLUGS = [...TOP_5_SLUGS, ...TIER_2_SLUGS] as const;
 
 export const RARITY_META: Record<string, { name: string; subtitle: string; color: string; colorD: string; colorBd: string }> = {
   MR:     { name: "Manga Rare",    subtitle: "Ultra-premium chase cards with manga panel art",       color: "#E8A020", colorD: "rgba(232,160,32,0.18)",  colorBd: "rgba(232,160,32,0.38)" },

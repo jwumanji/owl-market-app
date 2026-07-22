@@ -1,12 +1,14 @@
 import Link from "next/link";
 
 import { loadCachedCharacterIndex } from "@/app/characters/characters-index-data";
-import { RARITY_META } from "@/app/rarities/rarities-data";
+import { loadRarities } from "@/app/rarities/load-rarities";
+import { RARITY_INDEX_SLUGS } from "@/app/rarities/rarities-data";
 import { getSetImageUrl } from "@/app/sets/set-images";
 import MarketDashboard from "@/components/market/MarketDashboard";
 import { gamePath } from "@/lib/game-routes";
 import { characterIndexMarketRanking } from "@/lib/market-characters";
-import { rankBoosterBoxesByPrice, tcgPlayerProductImageUrl } from "@/lib/market-sealed";
+import { marketRarityRanking } from "@/lib/market-rarities";
+import { attachCasePrices, rankBoosterBoxesByPrice, tcgPlayerProductImageUrl } from "@/lib/market-sealed";
 import {
   DEFAULT_PUBLIC_GAME_ROUTE_SLUG,
   publicOnlyForCatalogPreview,
@@ -19,8 +21,8 @@ import type {
   CharacterRankItem,
   DashboardCard,
   DashboardData,
+  EbaySaleItem,
   MarketWindow,
-  RarityRankItem,
   SealedRankItem,
 } from "@/lib/types";
 
@@ -46,6 +48,28 @@ type SetRelation = {
   name?: string | null;
 };
 
+type EbaySaleCardRelation = {
+  id?: string | null;
+  card_image_id?: string | null;
+  card_number?: string | null;
+  name?: string | null;
+  image_url?: string | null;
+  image_url_small?: string | null;
+  image_url_preview?: string | null;
+  sets?: SetRelation | SetRelation[] | null;
+};
+
+type EbaySaleRow = {
+  ebay_item_id?: string | null;
+  card_id?: string | null;
+  sale_price?: number | null;
+  currency?: string | null;
+  sold_at?: string | null;
+  title?: string | null;
+  ebay_url?: string | null;
+  cards?: EbaySaleCardRelation | EbaySaleCardRelation[] | null;
+};
+
 const DASHBOARD_PRICE_CARD_SELECT = `
   market_avg, chg_1d, chg_7d, chg_30d,
   cards!price_stats_card_game_fk!inner (
@@ -54,8 +78,6 @@ const DASHBOARD_PRICE_CARD_SELECT = `
     sets!cards_set_game_fk (code)
   )
 `;
-
-const RARITY_CODES = ["MR", "SEC", "SP", "AA", "SR"];
 
 function cardChange(card: DashboardCard, window: MarketWindow) {
   return card.changes[window] ?? Number.NEGATIVE_INFINITY;
@@ -90,13 +112,39 @@ function mapDashboardCards(data: unknown) {
     .map(toDashboardCard);
 }
 
-function sortByWindow<T extends { changes: Partial<Record<MarketWindow, number | null>> }>(
-  rows: T[],
-  window: MarketWindow,
-) {
-  return [...rows].sort(
-    (a, b) => (b.changes[window] ?? Number.NEGATIVE_INFINITY) - (a.changes[window] ?? Number.NEGATIVE_INFINITY),
-  );
+function mapTopEbaySales(data: unknown): EbaySaleItem[] {
+  const sales: EbaySaleItem[] = [];
+  const seenCardIds = new Set<string>();
+
+  for (const row of (data ?? []) as EbaySaleRow[]) {
+    const card = firstRelation(row.cards);
+    const cardId = row.card_id ?? card?.id ?? null;
+    if (!cardId || seenCardIds.has(cardId) || !row.ebay_item_id || row.sale_price == null || !card?.card_image_id || !card.name) {
+      continue;
+    }
+
+    const set = firstRelation(card.sets);
+    seenCardIds.add(cardId);
+    sales.push({
+      ebay_item_id: row.ebay_item_id,
+      card_id: cardId,
+      card_image_id: card.card_image_id,
+      card_name: card.name,
+      card_number: card.card_number ?? null,
+      set_code: set?.code ?? null,
+      image_url: card.image_url ?? null,
+      image_url_small: card.image_url_small ?? null,
+      image_url_preview: card.image_url_preview ?? null,
+      title: row.title ?? null,
+      sale_price: row.sale_price,
+      currency: row.currency ?? "USD",
+      sold_at: row.sold_at ?? null,
+      ebay_url: row.ebay_url ?? null,
+    });
+    if (sales.length === 5) break;
+  }
+
+  return sales;
 }
 
 async function renderMarketsPageContent({
@@ -112,6 +160,7 @@ async function renderMarketsPageContent({
 
   if (gameResult.error) throw new Error(gameResult.error.message);
   const { game } = gameResult;
+  const ebaySalesSince = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
 
   const [
     topValueCardsRes,
@@ -119,9 +168,10 @@ async function renderMarketsPageContent({
     gainers7dRes,
     losers1dRes,
     losers7dRes,
-    rarityCardsRes,
+    rarityIndex,
     characterIndex,
     sealedRes,
+    topEbaySalesRes,
     catalogCountRes,
   ] = await Promise.all([
     cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "top-value-cards"), async () =>
@@ -182,27 +232,9 @@ async function renderMarketsPageContent({
         .order("chg_7d", { ascending: true })
         .limit(5)
     ),
-    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "rarity-cards"), async () => {
-      const rows: Record<string, unknown>[] = [];
-      const pageSize = 1000;
-      for (let from = 0; ; from += pageSize) {
-        const { data, error } = await supabase
-          .from("cards")
-          .select("id, rarity, price_stats!price_stats_card_game_fk!inner (market_avg, chg_1d, chg_7d, chg_30d)")
-          .eq("game_id", game.id)
-          .eq("region", "en")
-          .in("rarity", RARITY_CODES)
-          .order("id")
-          .range(from, from + pageSize - 1);
-        if (error) throw new Error(error.message);
-        if (!data || data.length === 0) break;
-        rows.push(...data as unknown as Record<string, unknown>[]);
-        if (data.length < pageSize) break;
-      }
-      return rows;
-    }),
+    loadRarities({ game: game.routeSlug }),
     loadCachedCharacterIndex(game.id),
-    cachedMarketData(publicDataCacheKey("markets-quickdash-v3", game.id, "sealed"), async () =>
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v4", game.id, "sealed"), async () =>
       await supabase
         .from("sealed_products")
         .select(`
@@ -210,8 +242,25 @@ async function renderMarketsPageContent({
           sets!sealed_products_set_game_fk (id, slug, code, name)
         `)
         .eq("game_id", game.id)
-        .not("market_avg", "is", null)
-        .limit(100)
+        .limit(1000)
+    ),
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v5", game.id, "top-ebay-sales-90d-en"), async () =>
+      await supabase
+        .from("ebay_sales")
+        .select(`
+          ebay_item_id, card_id, sale_price, currency, sold_at, title, ebay_url,
+          cards!ebay_sales_card_id_fkey!inner (
+            id, card_image_id, card_number, name, image_url, image_url_small, image_url_preview,
+            sets!cards_set_game_fk (code)
+          )
+        `)
+        .eq("game_id", game.id)
+        .eq("cards.region", "en")
+        .not("sale_price", "is", null)
+        .not("sold_at", "is", null)
+        .gte("sold_at", ebaySalesSince)
+        .order("sale_price", { ascending: false, nullsFirst: false })
+        .limit(250)
     ),
     cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "catalog-count"), async () =>
       await supabase
@@ -232,6 +281,7 @@ async function renderMarketsPageContent({
     .sort((a, b) => cardChange(a, "1D") - cardChange(b, "1D"));
   const topLosers7d = mapDashboardCards(losers7dRes.data)
     .sort((a, b) => cardChange(a, "7D") - cardChange(b, "7D"));
+  const topEbaySales = mapTopEbaySales(topEbaySalesRes.data);
 
   if (topValueCards.length === 0 && (catalogCountRes.count ?? 0) > 0) {
     return (
@@ -259,58 +309,7 @@ async function renderMarketsPageContent({
     );
   }
 
-  type RarityAggregate = {
-    indexValue: number;
-    count: number;
-    weighted: { "1D": number; "7D": number };
-    weight: { "1D": number; "7D": number };
-  };
-
-  const rarityAggregates = new Map<string, RarityAggregate>();
-  for (const row of rarityCardsRes as unknown as Array<{
-    rarity: string;
-    price_stats: PriceChangeStats | PriceChangeStats[] | null;
-  }>) {
-    const ps = firstRelation(row.price_stats);
-    if (ps?.market_avg == null) continue;
-
-    const aggregate = rarityAggregates.get(row.rarity) ?? {
-      indexValue: 0,
-      count: 0,
-      weighted: { "1D": 0, "7D": 0 },
-      weight: { "1D": 0, "7D": 0 },
-    };
-    aggregate.indexValue += ps.market_avg;
-    aggregate.count += 1;
-
-    if (ps.chg_1d != null) {
-      aggregate.weighted["1D"] += ps.market_avg * ps.chg_1d;
-      aggregate.weight["1D"] += ps.market_avg;
-    }
-    if (ps.chg_7d != null) {
-      aggregate.weighted["7D"] += ps.market_avg * ps.chg_7d;
-      aggregate.weight["7D"] += ps.market_avg;
-    }
-    rarityAggregates.set(row.rarity, aggregate);
-  }
-
-  const allRarities: RarityRankItem[] = RARITY_CODES.map((code) => {
-    const aggregate = rarityAggregates.get(code);
-    return {
-      code,
-      name: RARITY_META[code]?.name ?? code,
-      index_value: +(aggregate?.indexValue ?? 0).toFixed(2),
-      card_count: aggregate?.count ?? 0,
-      changes: {
-        "1D": aggregate?.weight["1D"]
-          ? +(aggregate.weighted["1D"] / aggregate.weight["1D"]).toFixed(1)
-          : null,
-        "7D": aggregate?.weight["7D"]
-          ? +(aggregate.weighted["7D"] / aggregate.weight["7D"]).toFixed(1)
-          : null,
-      },
-    };
-  }).filter((rarity) => rarity.card_count > 0);
+  const allRarities = marketRarityRanking(rarityIndex.rarities, 5, RARITY_INDEX_SLUGS);
 
   const allCharacters: CharacterRankItem[] = characterIndexMarketRanking(characterIndex, 5);
 
@@ -326,6 +325,7 @@ async function renderMarketsPageContent({
         set_code: set?.code ?? null,
         product_type: (row.product_type as string | null) ?? null,
         market_avg: (row.market_avg as number | null) ?? null,
+        case_market_avg: null,
         total_set_value: 0,
         image_url: (row.image_url as string | null) ?? productImageUrl ?? setImageUrl,
         image_url_fallback: setImageUrl,
@@ -336,23 +336,24 @@ async function renderMarketsPageContent({
       };
     });
 
-  const candidateSets = rankBoosterBoxesByPrice(rawSealed, 5);
-  const candidateSetIds = candidateSets.flatMap((item) => item.set_id ? [item.set_id] : []);
+  const pairedBoosterBoxes = attachCasePrices(rawSealed);
+  const candidateSets = rankBoosterBoxesByPrice(pairedBoosterBoxes, pairedBoosterBoxes.length);
+  const candidateSetIds = Array.from(new Set(candidateSets.flatMap((item) => item.set_id ? [item.set_id] : [])));
   const setValueById = new Map<string, number>();
 
   if (candidateSetIds.length > 0) {
     const setValueRows = await cachedMarketData(
-      publicDataCacheKey("markets-quickdash-v2", game.id, "set-values", candidateSetIds.sort().join(",")),
+      publicDataCacheKey("markets-quickdash-v3", game.id, "set-values", candidateSetIds.sort().join(",")),
       async () => {
         const rows: Array<{
           set_id: string | null;
-          price_stats: { market_avg: number | null } | Array<{ market_avg: number | null }> | null;
+          price_stats: { tcg_market: number | null; market_avg: number | null } | Array<{ tcg_market: number | null; market_avg: number | null }> | null;
         }> = [];
         const pageSize = 1000;
         for (let from = 0; ; from += pageSize) {
           const { data, error } = await supabase
             .from("cards")
-            .select("id, set_id, price_stats!price_stats_card_game_fk (market_avg)")
+            .select("id, set_id, price_stats!price_stats_card_game_fk (tcg_market, market_avg)")
             .eq("game_id", game.id)
             .eq("region", "en")
             .in("set_id", candidateSetIds)
@@ -369,10 +370,11 @@ async function renderMarketsPageContent({
 
     for (const row of setValueRows as unknown as Array<{
       set_id: string | null;
-      price_stats: { market_avg: number | null } | Array<{ market_avg: number | null }> | null;
+      price_stats: { tcg_market: number | null; market_avg: number | null } | Array<{ tcg_market: number | null; market_avg: number | null }> | null;
     }>) {
       if (!row.set_id) continue;
-      const marketValue = firstRelation(row.price_stats)?.market_avg ?? 0;
+      const priceStats = firstRelation(row.price_stats);
+      const marketValue = priceStats?.tcg_market ?? priceStats?.market_avg ?? 0;
       setValueById.set(row.set_id, (setValueById.get(row.set_id) ?? 0) + marketValue);
     }
   }
@@ -395,9 +397,10 @@ async function renderMarketsPageContent({
       "1D": topLosers1d.slice(0, 5),
       "7D": topLosers7d.slice(0, 5),
     },
+    topEbaySales,
     rarityRanking: {
-      "1D": sortByWindow(allRarities, "1D").slice(0, 5),
-      "7D": sortByWindow(allRarities, "7D").slice(0, 5),
+      "7D": allRarities,
+      "30D": allRarities,
     },
     topCharacters: {
       "7D": allCharacters,

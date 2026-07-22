@@ -55,6 +55,13 @@
   line-height: 1.15;
 }
 
+.qd-section-title-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .qd-section-title em {
   display: inline-block;
   padding-right: 12px;
@@ -103,7 +110,38 @@
   opacity: 0.42;
 }
 
+.qd-ranking-toggle {
+  display: inline-flex;
+  padding: 2px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-pill);
+  background: var(--bg-2);
+}
+
+.qd-ranking-toggle button {
+  padding: 4px 11px;
+  border: 0;
+  border-radius: var(--r-pill);
+  color: var(--ink-2);
+  background: transparent;
+  font-family: var(--font-jetbrains-mono-stack);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.qd-ranking-toggle button:hover {
+  color: var(--ink);
+}
+
+.qd-ranking-toggle button.is-active {
+  color: #fff;
+  background: var(--ink);
+}
+
 .qd-timeframes button:focus-visible,
+.qd-ranking-toggle button:focus-visible,
 .qd-see-all:focus-visible,
 .qd-market-card:focus-visible,
 .qd-news-card:focus-visible,
@@ -284,7 +322,7 @@
 
 .qd-trend-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -327,14 +365,25 @@
 
 .qd-dot.gain { background: var(--qd-gain); }
 .qd-dot.loss { background: var(--qd-loss); }
+.qd-dot.ebay { background: #3665f3; }
+
+.qd-panel-window {
+  margin-left: auto;
+  padding: 2px 7px;
+  border: 1px solid var(--bg-3);
+  border-radius: var(--r-pill);
+  color: var(--ink-3);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+}
 
 .qd-trend-row {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto auto;
-  gap: 12px;
+  grid-template-columns: 18px 30px minmax(0, 1fr) auto auto;
+  gap: 8px;
   align-items: center;
-  padding-top: 9px;
-  padding-bottom: 9px;
+  padding-top: 5px;
+  padding-bottom: 5px;
   border-bottom: 1.5px solid var(--bg-3);
   color: var(--ink);
   text-decoration: none;
@@ -356,6 +405,28 @@
   font-family: var(--font-jetbrains-mono-stack);
   font-size: 10.5px;
   font-weight: 600;
+}
+
+.qd-trend-thumbnail {
+  display: block;
+  overflow: hidden;
+  width: 30px;
+  height: 42px;
+  border: 1px solid rgba(24, 20, 18, 0.28);
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 1px 1px 0 rgba(24, 20, 18, 0.12);
+}
+
+.qd-trend-thumbnail .c-hzoom-wrap,
+.qd-trend-thumbnail-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.qd-trend-thumbnail-image {
+  object-fit: cover;
 }
 
 .qd-trend-name {
@@ -506,15 +577,84 @@
   font-weight: 700;
 }
 
+.qd-ebay-row {
+  grid-template-columns: 18px 30px minmax(0, 1fr) auto;
+}
+
+.qd-ebay-sale-meta {
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--ink-2);
+  font-family: var(--font-jetbrains-mono-stack);
+  text-align: right;
+}
+
+.qd-ebay-sale-meta strong {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.qd-ebay-sale-meta small {
+  color: var(--ink-3);
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.qd-value-formula {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+  color: var(--ink-2);
+  font-family: var(--font-jetbrains-mono-stack);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.qd-value-formula b {
+  color: var(--ink);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .qd-rarity-card {
   display: flex;
   flex-direction: column;
-  padding: 16px 18px;
+}
+
+.qd-rarity-card-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px 10px;
+}
+
+.qd-rarity-rank {
+  color: var(--ink-3);
+  font-family: var(--font-jetbrains-mono-stack);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.qd-rarity-name {
+  overflow: hidden;
+  font-family: var(--font-space-grotesk-stack);
+  font-size: 13px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .qd-rarity-badge {
-  align-self: flex-start;
-  margin-bottom: 10px;
+  justify-self: end;
   padding: 3px 10px;
   border: 1.5px solid var(--ink);
   border-radius: var(--r-pill);
@@ -529,11 +669,65 @@
 .qd-rarity-badge.rarity-sp { color: var(--bg); background: var(--ink-2); }
 .qd-rarity-badge.rarity-aa { color: #3d55c9; border-color: #3d55c9; background: rgba(79, 110, 247, 0.14); }
 .qd-rarity-badge.rarity-sr { color: var(--qd-gain); border-color: var(--qd-gain); background: rgba(45, 153, 97, 0.14); }
+.qd-rarity-badge.rarity-promo { color: #a76100; border-color: var(--gold); background: rgba(245, 190, 80, 0.18); }
+.qd-rarity-badge.rarity-r { color: #3d55c9; border-color: #8aa8e8; background: rgba(79, 110, 247, 0.1); }
 
-.qd-rarity-card > strong {
-  margin-bottom: 4px;
+.qd-rarity-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 168px;
+  background: #fff;
+}
+
+.qd-rarity-image .qd-image {
+  object-fit: contain;
+}
+
+.qd-rarity-top-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 14px 0;
+}
+
+.qd-rarity-top-card > span,
+.qd-rarity-index > span {
+  color: var(--ink-3);
   font-family: var(--font-jetbrains-mono-stack);
-  font-size: 24px;
+  font-size: 8.5px;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.qd-rarity-top-card strong {
+  overflow: hidden;
+  font-family: var(--font-space-grotesk-stack);
+  font-size: 12px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qd-rarity-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px 14px;
+}
+
+.qd-rarity-index {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.qd-rarity-index > strong {
+  font-family: var(--font-jetbrains-mono-stack);
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.5px;
 }
@@ -562,6 +756,8 @@
 
   .qd-section-title { font-size: 22px; }
   .qd-section-title em { font-size: 27px; }
+  .qd-ranking-toggle { width: 100%; }
+  .qd-ranking-toggle button { flex: 1; }
 }
 
 @media (max-width: 560px) {
@@ -577,11 +773,14 @@
   .qd-card-id { padding-left: 10px; }
   .qd-stats { padding-right: 10px; padding-left: 10px; }
   .qd-stat { align-items: flex-start; flex-direction: column; gap: 3px; }
-  .qd-rarity-card { padding: 13px 12px; }
+  .qd-rarity-card-head,
+  .qd-rarity-top-card,
+  .qd-rarity-stats { padding-right: 11px; padding-left: 11px; }
+  .qd-rarity-image { height: 150px; }
   .qd-rarity-meta { align-items: flex-start; flex-direction: column; }
   .qd-trend-panel { padding-right: 12px; padding-left: 12px; }
-  .qd-trend-row { grid-template-columns: 18px minmax(0, 1fr) auto; gap: 8px; }
-  .qd-trend-row .qd-chip { grid-column: 3; }
+  .qd-trend-row { grid-template-columns: 18px 30px minmax(0, 1fr) auto; gap: 8px; }
+  .qd-trend-row .qd-chip { grid-column: 4; }
   .qd-trend-price { display: none; }
   .qd-news-body { padding-right: 12px; padding-left: 12px; }
   .qd-see-all { padding-right: 18px; padding-left: 18px; }

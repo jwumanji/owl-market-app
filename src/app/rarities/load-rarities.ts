@@ -9,6 +9,7 @@ import { cachedPublicData, CATALOG_DATA_TTL_SECONDS, publicDataCacheKey } from "
 import { loadPublicRaritySummaryRows, type PublicRaritySummaryRow } from "@/lib/public-page-summaries";
 import { firstRelation } from "@/lib/supabase-relations";
 import { createCachedServiceClient, createServiceClient } from "@/lib/supabase-server";
+import { rankRarityCards, rarityMarketPrice } from "@/lib/rarity-ranking";
 
 // ---------------------------------------------------------------------------
 // loadRarities() — shared server-side loader for the rarity index. Consumed by
@@ -122,7 +123,7 @@ function stringValue(value: unknown, fallback = "") {
 function summaryTopCards(value: unknown) {
   if (!Array.isArray(value)) return [];
 
-  return value
+  return rankRarityCards(value
     .filter((card): card is Record<string, unknown> => card != null && typeof card === "object" && !Array.isArray(card))
     .map((card) => ({
       cardId: stringValue(card.cardId),
@@ -138,7 +139,7 @@ function summaryTopCards(value: unknown) {
       cardImageId: stringValue(card.cardImageId),
       imageSmall: typeof card.imageSmall === "string" ? card.imageSmall : null,
       imagePreview: typeof card.imagePreview === "string" ? card.imagePreview : null,
-    }));
+    })));
 }
 
 function mapOnePieceRaritySummary(row: PublicRaritySummaryRow) {
@@ -394,7 +395,6 @@ async function loadOnePieceRarityIndex(supabase: SupabaseServiceClient, gameId: 
         `)
         .eq("game_id", gameId)
         .eq("region", "en")
-        .not("price_stats.tcg_market", "is", null)
         .order("id")
         .range(from, to)
     ),
@@ -418,7 +418,8 @@ async function loadOnePieceRarityIndex(supabase: SupabaseServiceClient, gameId: 
   for (const card of pricedCards) {
     const code = onePieceRarityCode(card, promoSetId, nonPromoRarities);
     const ps = firstRelation(card.price_stats);
-    if (!code || ps?.tcg_market == null) continue;
+    const marketPrice = rarityMarketPrice({ avg: ps?.market_avg, tcg: ps?.tcg_market });
+    if (!code || !ps || marketPrice <= 0) continue;
 
     const agg = rarityAgg[code] ?? {
       indexValue: 0,
@@ -428,7 +429,7 @@ async function loadOnePieceRarityIndex(supabase: SupabaseServiceClient, gameId: 
       chg7dCount: 0,
       chg30dCount: 0,
     };
-    agg.indexValue += ps.tcg_market;
+    agg.indexValue += marketPrice;
     if (ps.chg_7d != null) {
       agg.totalChg7d += ps.chg_7d;
       agg.chg7dCount++;
@@ -448,8 +449,13 @@ async function loadOnePieceRarityIndex(supabase: SupabaseServiceClient, gameId: 
   const topCardsByRarity: Record<string, PricedRarityCardRow[]> = {};
 
   for (const code of distinctRarities) {
-    const topCards = (topCandidates[code] ?? [])
-      .sort((a, b) => (firstRelation(b.price_stats)?.tcg_market ?? 0) - (firstRelation(a.price_stats)?.tcg_market ?? 0))
+    const topCards = [...(topCandidates[code] ?? [])]
+      .sort((a, b) => {
+        const aStats = firstRelation(a.price_stats);
+        const bStats = firstRelation(b.price_stats);
+        return rarityMarketPrice({ avg: bStats?.market_avg, tcg: bStats?.tcg_market })
+          - rarityMarketPrice({ avg: aStats?.market_avg, tcg: aStats?.tcg_market });
+      })
       .slice(0, 10);
 
     topCardsByRarity[code] = topCards;
@@ -493,7 +499,7 @@ async function loadOnePieceRarityIndex(supabase: SupabaseServiceClient, gameId: 
             set: setInfo?.code ?? "",
             rarity: card.rarity ?? code,
             tcg: ps?.tcg_market ?? 0,
-            avg: ps?.market_avg ?? 0,
+            avg: rarityMarketPrice({ avg: ps?.market_avg, tcg: ps?.tcg_market }),
             chg1d: ps?.chg_1d ?? null,
             chg7d: ps?.chg_7d ?? null,
             chg30d: ps?.chg_30d ?? null,
@@ -527,10 +533,14 @@ export async function loadRarities(options: { game?: string | null } = {}): Prom
     return { game: gameResponsePayload(game), rarities };
   }
 
-  const rarities = await cachedPublicData(publicDataCacheKey("api-rarities-v6", game.id), async () => {
-    const summaryRows = await loadRaritySummaries(supabase, game.id, game.slug);
-    return summaryRows ?? loadOnePieceRarityIndex(supabase, game.id);
-  }, CATALOG_DATA_TTL_SECONDS);
+  // One Piece price data changes continuously. Calculate the index and its card
+  // rankings from the same current price rows so cached summary drift cannot
+  // mix an old tier total with a differently ordered top-card list.
+  const rarities = await cachedPublicData(
+    publicDataCacheKey("api-rarities-v7", game.id),
+    () => loadOnePieceRarityIndex(supabase, game.id),
+    CATALOG_DATA_TTL_SECONDS
+  );
 
   return { game: gameResponsePayload(game), rarities };
 }

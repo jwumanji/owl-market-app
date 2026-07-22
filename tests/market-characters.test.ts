@@ -9,20 +9,21 @@ const character = (
   indexValue: number,
   imageUrlSmall: string,
   imageUrlPreview: string,
+  chg7d = 2.4,
 ) => ({
   slug: name.toLowerCase().replaceAll(" ", "-"),
   name,
   indexValue,
-  chg7d: 2.4,
+  chg7d,
   topCards: [{ imageUrlSmall, imageUrlPreview }],
 });
 
-test("market characters match the Character Index value ranking", () => {
+test("market characters are ranked only by total set value", () => {
   const ranked = characterIndexMarketRanking([
-    character("Shanks", 17727.37, "shanks-small.webp", "shanks-preview.webp"),
-    character("Monkey D. Luffy", 102627.37, "luffy-small.webp", "luffy-preview.webp"),
-    character("Boa Hancock", 18765.56, "boa-small.webp", "boa-preview.webp"),
-    character("No priced cards", 0, "none-small.webp", "none-preview.webp"),
+    character("Shanks", 17727.37, "shanks-small.webp", "shanks-preview.webp", 800),
+    character("Monkey D. Luffy", 102627.37, "luffy-small.webp", "luffy-preview.webp", -50),
+    character("Boa Hancock", 18765.56, "boa-small.webp", "boa-preview.webp", 0.1),
+    character("No priced cards", 0, "none-small.webp", "none-preview.webp", 999),
   ]);
 
   assert.deepEqual(ranked.map((entry) => entry.name), [

@@ -216,7 +216,10 @@ console.log(`Using game scope: ${GAME.slug}`);
 
 const sets = await fetchAll(withGameFilter("sets?select=id,code,slug,name", GAME.id));
 const cards = await fetchAll(
-  withGameFilter("cards?select=id,set_id,card_image_id,card_number,name,variant_label,rarity,price_stats!price_stats_card_game_fk(tcg_market,market_avg)", GAME.id)
+  withGameFilter("cards?select=id,set_id,card_image_id,card_number,name,variant_label,rarity,price_stats!price_stats_card_game_fk(tcg_market,market_avg)&region=eq.en", GAME.id)
+);
+const summaries = await fetchAll(
+  `public_rarity_summaries?select=rarity_code,index_value,avg_card_price,card_count,priced_count,top_cards,updated_at&game_id=eq.${encodeURIComponent(GAME.id)}`
 );
 
 const setById = new Map(sets.map((s) => [s.id, s]));
@@ -229,6 +232,7 @@ const perSetCounts = new Map(sets.map((s) => [s.id, emptyCounts()]));
 const rawCounts = new Map();
 const nonstandard = [];
 const agg = Object.fromEntries(RARITY_ORDER.map((code) => [code, emptyAgg()]));
+const pricedCardsByRarity = Object.fromEntries(RARITY_ORDER.map((code) => [code, []]));
 
 for (const card of cards) {
   const set = setById.get(card.set_id);
@@ -254,6 +258,14 @@ for (const card of cards) {
       agg[code].allowedTcgMarket += Number(ps.tcg_market) || 0;
       agg[code].allowedMarketAvg += Number(ps.market_avg) || 0;
     }
+
+    pricedCardsByRarity[code].push({
+      name: card.name,
+      cardNumber: card.card_number,
+      set: set?.code ?? "",
+      tcgMarket: Number(ps.tcg_market) || 0,
+      marketAvg: Number(ps.market_avg) || 0,
+    });
   }
 
   if (!CANONICAL_RAW.has(raw) && raw !== "(blank)") {
@@ -313,6 +325,56 @@ report.push(
   )
 );
 report.push("");
+report.push("## Cached Summary Cross-Check");
+report.push("");
+report.push(mdTable(
+  ["Rarity", "Cached index", "Raw sum_market_avg", "Raw sum_tcg_market", "Cached #1", "Correct #1 by market_avg", "Status"],
+  summaries
+    .map((summary) => {
+      const code = rawRarity(summary.rarity_code);
+      const cachedTop = Array.isArray(summary.top_cards) ? summary.top_cards[0] : null;
+      const correctTop = [...(pricedCardsByRarity[code] ?? [])]
+        .sort((a, b) => b.marketAvg - a.marketAvg || b.tcgMarket - a.tcgMarket || a.name.localeCompare(b.name))[0];
+      const cachedName = cachedTop?.name ?? "";
+      return [
+        code,
+        fmtMoney(Number(summary.index_value) || 0),
+        fmtMoney(agg[code]?.sumMarketAvg ?? 0),
+        fmtMoney(agg[code]?.sumTcgMarket ?? 0),
+        cachedName,
+        correctTop?.name ?? "",
+        cachedName === (correctTop?.name ?? "") ? "OK" : "WRONG ORDER",
+      ];
+    })
+    .sort((a, b) => RARITY_ORDER.indexOf(a[0]) - RARITY_ORDER.indexOf(b[0]))
+));
+report.push("");
+
+report.push("## Top Cards by Rarity");
+report.push("");
+report.push("Rankings use the displayed average market price, with TCGPlayer market as the deterministic tie-breaker.");
+report.push("");
+for (const code of RARITY_ORDER) {
+  const ranked = pricedCardsByRarity[code]
+    .sort((a, b) => b.marketAvg - a.marketAvg || b.tcgMarket - a.tcgMarket || a.name.localeCompare(b.name))
+    .slice(0, 10);
+  if (ranked.length === 0) continue;
+  report.push(`### ${code} — ${RARITY_LABELS[code] ?? code}`);
+  report.push("");
+  report.push(mdTable(
+    ["Rank", "Card", "Set", "Card #", "market_avg", "tcg_market"],
+    ranked.map((card, index) => [
+      index + 1,
+      card.name,
+      card.set,
+      card.cardNumber ?? "",
+      fmtMoney(card.marketAvg),
+      fmtMoney(card.tcgMarket),
+    ])
+  ));
+  report.push("");
+}
+
 report.push("## Per-Set Rarity Counts");
 report.push("");
 report.push(

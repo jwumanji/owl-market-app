@@ -42,7 +42,7 @@ export type SortKey = "value" | "chg_1d" | "chg_7d" | "chg_30d";
 
 /* ── Dashboard widget types ── */
 
-export type MarketWindow = "1D" | "7D" | "90D";
+export type MarketWindow = "1D" | "7D" | "30D" | "90D";
 
 export type MarketWindowPayload<T> = Partial<Record<MarketWindow, T>>;
 
@@ -61,10 +61,16 @@ export interface DashboardCard {
 }
 
 export interface RarityRankItem {
+  slug: string;
   code: string;
   name: string;
   index_value: number;
   card_count: number;
+  top_card_name: string | null;
+  top_card_image_id: string | null;
+  image_url: string | null;
+  image_url_small: string | null;
+  image_url_preview: string | null;
   changes: MarketWindowPayload<number | null>;
 }
 
@@ -85,6 +91,7 @@ export interface SealedRankItem {
   set_code: string | null;
   product_type: string | null;
   market_avg: number | null;
+  case_market_avg: number | null;
   total_set_value: number;
   image_url: string | null;
   image_url_fallback: string | null;
@@ -92,15 +99,27 @@ export interface SealedRankItem {
 }
 
 export interface EbaySaleItem {
+  ebay_item_id: string;
+  card_id: string;
+  card_image_id: string;
+  card_name: string;
+  card_number: string | null;
+  set_code: string | null;
+  image_url: string | null;
+  image_url_small: string | null;
+  image_url_preview: string | null;
   title: string | null;
-  sale_price: number | null;
+  sale_price: number;
+  currency: string | null;
   sold_at: string | null;
+  ebay_url: string | null;
 }
 
 export interface DashboardData {
   topCards: MarketWindowPayload<DashboardCard[]>;
   topGainers: MarketWindowPayload<DashboardCard[]>;
   topLosers: MarketWindowPayload<DashboardCard[]>;
+  topEbaySales: EbaySaleItem[];
   rarityRanking: MarketWindowPayload<RarityRankItem[]>;
   topCharacters: MarketWindowPayload<CharacterRankItem[]>;
   sealedBoxes: MarketWindowPayload<SealedRankItem[]>;

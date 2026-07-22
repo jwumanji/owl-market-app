@@ -4,10 +4,16 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { gamePath } from "@/lib/game-routes";
+import {
+  rankBoosterBoxesByPrice,
+  rankBoosterBoxesByTotalSetValue,
+  sealedValueMultiple,
+} from "@/lib/market-sealed";
 import type {
   CharacterRankItem,
   DashboardCard,
   DashboardData,
+  EbaySaleItem,
   MarketWindow,
   MarketWindowPayload,
   SealedRankItem,
@@ -17,6 +23,7 @@ import MarketCardImage from "./MarketCardImage";
 import "./market-dashboard.css";
 
 const WINDOWS: MarketWindow[] = ["1D", "7D", "90D"];
+type SetRankingMode = "booster_box" | "tsv";
 
 const NEWS = [
   {
@@ -54,15 +61,17 @@ function WindowSelector<T>({
   value,
   onChange,
   label,
+  windows = WINDOWS,
 }: {
   data: MarketWindowPayload<T>;
   value: MarketWindow;
   onChange: (window: MarketWindow) => void;
   label: string;
+  windows?: MarketWindow[];
 }) {
   return (
     <div className="qd-timeframes" role="group" aria-label={`${label} timeframe`}>
-      {WINDOWS.map((window) => {
+      {windows.map((window) => {
         const available = data[window] != null;
         return (
           <button
@@ -82,6 +91,35 @@ function WindowSelector<T>({
   );
 }
 
+function SetRankingToggle({
+  value,
+  onChange,
+}: {
+  value: SetRankingMode;
+  onChange: (mode: SetRankingMode) => void;
+}) {
+  return (
+    <div className="qd-ranking-toggle" role="group" aria-label="Rank box sets by">
+      <button
+        type="button"
+        className={value === "booster_box" ? "is-active" : undefined}
+        aria-pressed={value === "booster_box"}
+        onClick={() => onChange("booster_box")}
+      >
+        Booster box
+      </button>
+      <button
+        type="button"
+        className={value === "tsv" ? "is-active" : undefined}
+        aria-pressed={value === "tsv"}
+        onClick={() => onChange("tsv")}
+      >
+        TSV
+      </button>
+    </div>
+  );
+}
+
 function DeltaChip({ value }: { value: number | null | undefined }) {
   const direction = value == null || value === 0 ? "flat" : value > 0 ? "gain" : "loss";
   return (
@@ -96,21 +134,26 @@ function SectionHeader({
   eyebrow,
   title,
   emphasis,
+  titleAddon,
   selector,
 }: {
   eyebrow: string;
   title: string;
   emphasis: string;
+  titleAddon?: React.ReactNode;
   selector?: React.ReactNode;
 }) {
   return (
     <div className="qd-section-head">
       <div>
         <div className="qd-section-kicker">{eyebrow}</div>
-        <h2 className="qd-section-title">
-          {title && <>{title} </>}
-          <em>{emphasis}</em>
-        </h2>
+        <div className="qd-section-title-line">
+          <h2 className="qd-section-title">
+            {title && <>{title} </>}
+            <em>{emphasis}</em>
+          </h2>
+          {titleAddon}
+        </div>
       </div>
       {selector}
     </div>
@@ -172,6 +215,36 @@ function NewsSection() {
   );
 }
 
+function TrendThumbnail({
+  alt,
+  imageUrl,
+  imageUrlPreview,
+  imageUrlSmall,
+}: {
+  alt: string;
+  imageUrl?: string | null;
+  imageUrlPreview?: string | null;
+  imageUrlSmall?: string | null;
+}) {
+  return (
+    <span className="qd-trend-thumbnail">
+      <MarketCardImage
+        alt={`${alt} card art`}
+        className="qd-trend-thumbnail-image"
+        fallbackTimeoutMs={0}
+        fetchPriority="low"
+        height={42}
+        imageUrl={imageUrl}
+        imageUrlPreview={imageUrlPreview}
+        imageUrlSmall={imageUrlSmall}
+        loading="lazy"
+        sourceSize="thumbnail"
+        width={30}
+      />
+    </span>
+  );
+}
+
 function TrendRow({
   card,
   rank,
@@ -190,12 +263,81 @@ function TrendRow({
       prefetch={false}
     >
       <span className="qd-trend-rank">{rank}</span>
+      <TrendThumbnail
+        alt={card.name}
+        imageUrl={card.image_url}
+        imageUrlPreview={card.image_url_preview}
+        imageUrlSmall={card.image_url_small}
+      />
       <span className="qd-trend-name">
         {card.name}
         <span>{card.card_number ?? card.set_code}</span>
       </span>
       <span className="qd-trend-price">{formatPrice(card.market_avg)}</span>
       <DeltaChip value={card.changes[window]} />
+    </Link>
+  );
+}
+
+function formatSaleDate(value: string | null) {
+  if (!value) return "Recent";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(value));
+}
+
+function EbaySaleRow({
+  sale,
+  rank,
+  gameRouteSlug,
+}: {
+  sale: EbaySaleItem;
+  rank: number;
+  gameRouteSlug?: string | null;
+}) {
+  const content = (
+    <>
+      <span className="qd-trend-rank">{rank}</span>
+      <TrendThumbnail
+        alt={sale.card_name}
+        imageUrl={sale.image_url}
+        imageUrlPreview={sale.image_url_preview}
+        imageUrlSmall={sale.image_url_small}
+      />
+      <span className="qd-trend-name" title={sale.title ?? sale.card_name}>
+        {sale.card_name}
+        <span>{sale.card_number ?? sale.set_code}</span>
+      </span>
+      <span className="qd-ebay-sale-meta">
+        <strong>{formatPrice(sale.sale_price)}</strong>
+        <small>{formatSaleDate(sale.sold_at)}{sale.ebay_url ? " ↗" : ""}</small>
+      </span>
+    </>
+  );
+
+  if (sale.ebay_url) {
+    return (
+      <a
+        href={sale.ebay_url}
+        className="qd-trend-row qd-ebay-row"
+        target="_blank"
+        rel="noreferrer"
+        aria-label={`${sale.card_name}, sold for ${formatPrice(sale.sale_price)} on eBay`}
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <Link
+      href={gamePath(gameRouteSlug, `/card/${sale.card_image_id}`)}
+      className="qd-trend-row qd-ebay-row"
+      prefetch={false}
+    >
+      {content}
     </Link>
   );
 }
@@ -230,6 +372,23 @@ function TrendingSection({ data, gameRouteSlug }: { data: DashboardData; gameRou
                 <TrendRow key={card.id} card={card} rank={index + 1} window={window} gameRouteSlug={gameRouteSlug} />
               ))
             : <div className="qd-trend-empty">No qualifying losers</div>}
+        </div>
+        <div className="qd-trend-panel">
+          <h3>
+            <span className="qd-dot ebay" />
+            Top eBay sales
+            <span className="qd-panel-window">90D</span>
+          </h3>
+          {data.topEbaySales.length > 0
+            ? data.topEbaySales.map((sale, index) => (
+                <EbaySaleRow
+                  key={sale.ebay_item_id}
+                  sale={sale}
+                  rank={index + 1}
+                  gameRouteSlug={gameRouteSlug}
+                />
+              ))
+            : <div className="qd-trend-empty">No recent eBay sales</div>}
         </div>
       </div>
     </section>
@@ -322,46 +481,66 @@ function SetImage({ item }: { item: SealedRankItem }) {
 
 function SetsSection({ data, gameRouteSlug }: { data: DashboardData; gameRouteSlug?: string | null }) {
   const [window, setWindow] = useState<MarketWindow>("1D");
-  const sets = data.sealedBoxes[window] ?? [];
+  const [rankingMode, setRankingMode] = useState<SetRankingMode>("booster_box");
+  const allSets = data.sealedBoxes[window] ?? [];
+  const sets = rankingMode === "tsv"
+    ? rankBoosterBoxesByTotalSetValue(allSets, 5)
+    : rankBoosterBoxesByPrice(allSets, 5);
 
   return (
     <section className="qd-section" aria-labelledby="quickdash-sets">
       <SectionHeader
-        eyebrow="Ranked by booster box cost"
+        eyebrow={rankingMode === "tsv" ? "Ranked by total set value" : "Ranked by booster box cost"}
         title="Box"
         emphasis="sets"
+        titleAddon={<SetRankingToggle value={rankingMode} onChange={setRankingMode} />}
         selector={<WindowSelector data={data.sealedBoxes} value={window} onChange={setWindow} label="Box sets" />}
       />
       <h2 id="quickdash-sets" className="sr-only">Box sets</h2>
       <div className="qd-card-grid">
-        {sets.map((item, index) => (
-          <Link
-            key={`${item.set_code ?? item.name}-${index}`}
-            href={item.set_slug ? gamePath(gameRouteSlug, `/sets/${item.set_slug}`) : gamePath(gameRouteSlug, "/sets")}
-            className="qd-market-card"
-            prefetch={false}
-          >
-            <div className="qd-card-head">
-              <span className="qd-rank">#{index + 1}</span>
-              <span className="qd-card-name">{item.name}</span>
-            </div>
-            <SetImage item={item} />
-            <div className="qd-stats qd-stats-wide">
-              <div className="qd-stat">
-                <span>Booster box</span>
-                <strong>{formatPrice(item.market_avg)}</strong>
+        {sets.map((item, index) => {
+          const valueMultiple = sealedValueMultiple(item.total_set_value, item.market_avg);
+          const valueFormula = valueMultiple == null
+            ? "TSV or booster box price is unavailable"
+            : `${formatPrice(item.total_set_value)} ÷ ${formatPrice(item.market_avg)} = ${valueMultiple.toFixed(1)}×`;
+
+          return (
+            <Link
+              key={`${item.set_code ?? item.name}-${index}`}
+              href={item.set_slug ? gamePath(gameRouteSlug, `/sets/${item.set_slug}`) : gamePath(gameRouteSlug, "/sets")}
+              className="qd-market-card"
+              prefetch={false}
+            >
+              <div className="qd-card-head">
+                <span className="qd-rank">#{index + 1}</span>
+                <span className="qd-card-name">{item.name}</span>
               </div>
-              <div className="qd-stat">
-                <span>Total set value</span>
-                <b>{formatPrice(item.total_set_value)}</b>
+              <SetImage item={item} />
+              <div className="qd-stats qd-stats-wide">
+                <div className="qd-stat">
+                  <span>Booster box</span>
+                  <strong>{formatPrice(item.market_avg)}</strong>
+                </div>
+                <div className="qd-stat">
+                  <span>Case price</span>
+                  <b>{formatPrice(item.case_market_avg)}</b>
+                </div>
+                <div className="qd-stat">
+                  <span>Total set value</span>
+                  <b>{formatPrice(item.total_set_value)}</b>
+                </div>
+                <div className="qd-value-formula" title={valueFormula} aria-label={valueFormula}>
+                  <span>TSV ÷ box</span>
+                  <b>{valueMultiple == null ? "—" : `= ${valueMultiple.toFixed(1)}×`}</b>
+                </div>
+                <div className="qd-stat">
+                  <span>{window}</span>
+                  <DeltaChip value={item.changes[window]} />
+                </div>
               </div>
-              <div className="qd-stat">
-                <span>{window}</span>
-                <DeltaChip value={item.changes[window]} />
-              </div>
-            </div>
-          </Link>
-        ))}
+            </Link>
+          );
+        })}
       </div>
       <SeeAll href={gamePath(gameRouteSlug, "/sets")}>See all sets</SeeAll>
     </section>
@@ -395,7 +574,7 @@ function CharactersSection({ data, gameRouteSlug }: { data: DashboardData; gameR
   return (
     <section className="qd-section" aria-labelledby="quickdash-characters">
       <SectionHeader
-        eyebrow="Ranked by total card value"
+        eyebrow="Ranked only by total set value"
         title="Top"
         emphasis="characters"
         selector={<WindowSelector data={data.topCharacters} value={window} onChange={setWindow} label="Top characters" />}
@@ -433,32 +612,68 @@ function CharactersSection({ data, gameRouteSlug }: { data: DashboardData; gameR
 }
 
 function RaritySection({ data, gameRouteSlug }: { data: DashboardData; gameRouteSlug?: string | null }) {
-  const [window, setWindow] = useState<MarketWindow>("1D");
+  const [window, setWindow] = useState<MarketWindow>("7D");
   const rarities = data.rarityRanking[window] ?? [];
 
   return (
     <section className="qd-section qd-section-last" aria-labelledby="quickdash-rarities">
       <SectionHeader
-        eyebrow="Market cap by rarity"
+        eyebrow="Ranked by total set value"
         title="Rarity"
         emphasis="index"
-        selector={<WindowSelector data={data.rarityRanking} value={window} onChange={setWindow} label="Rarity index" />}
+        selector={(
+          <WindowSelector
+            data={data.rarityRanking}
+            value={window}
+            onChange={setWindow}
+            label="Rarity index"
+            windows={["7D", "30D"]}
+          />
+        )}
       />
       <h2 id="quickdash-rarities" className="sr-only">Rarity index</h2>
       <div className="qd-rarity-grid">
-        {rarities.map((item) => (
+        {rarities.map((item, index) => (
           <Link
             key={item.code}
             href={gamePath(gameRouteSlug, "/rarities")}
             className="qd-rarity-card"
             prefetch={false}
           >
-            <span className={`qd-rarity-badge rarity-${item.code.toLowerCase()}`}>{item.code}</span>
-            <strong>{formatPrice(item.index_value)}</strong>
-            <span className="qd-rarity-meta">
-              <span>{item.card_count} cards</span>
-              <DeltaChip value={item.changes[window]} />
-            </span>
+            <div className="qd-rarity-card-head">
+              <span className="qd-rarity-rank">#{index + 1}</span>
+              <span className="qd-rarity-name" title={item.name}>{item.name}</span>
+              <span className={`qd-rarity-badge rarity-${item.code.toLowerCase()}`}>{item.code}</span>
+            </div>
+            <div className="qd-market-image qd-rarity-image">
+              <MarketCardImage
+                alt={item.top_card_name ?? `${item.name} top card`}
+                className="qd-image"
+                fallbackTimeoutMs={0}
+                fetchPriority={index < 2 ? "high" : "low"}
+                height={180}
+                imageUrl={item.image_url}
+                imageUrlPreview={item.image_url_preview}
+                imageUrlSmall={item.image_url_small}
+                loading={index < 2 ? "eager" : "lazy"}
+                sourceSize="display"
+                width={128}
+              />
+            </div>
+            <div className="qd-rarity-top-card">
+              <span>Top card</span>
+              <strong title={item.top_card_name ?? undefined}>{item.top_card_name ?? "Preview unavailable"}</strong>
+            </div>
+            <div className="qd-rarity-stats">
+              <div className="qd-rarity-index">
+                <span>Total set value</span>
+                <strong>{formatPrice(item.index_value)}</strong>
+              </div>
+              <span className="qd-rarity-meta">
+                <span>{item.card_count} cards</span>
+                <DeltaChip value={item.changes[window]} />
+              </span>
+            </div>
           </Link>
         ))}
       </div>
