@@ -14,6 +14,9 @@ import { tcgPlayerProductImageUrl } from "@/lib/market-sealed";
 import "../riftbound-pages.css";
 
 export const revalidate = 3600;
+// Champion search comes from searchParams; the underlying data loader remains
+// cached independently of the route render.
+export const dynamic = "force-dynamic";
 
 export function generateStaticParams() {
   return publicGameStaticParams();

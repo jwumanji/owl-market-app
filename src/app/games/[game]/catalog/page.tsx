@@ -19,6 +19,9 @@ import "./catalog.css";
 
 // Keep in sync with CATALOG_DATA_TTL_SECONDS (Next 15 requires a literal).
 export const revalidate = 3600;
+// Catalog filters come from searchParams. Keep the route request-dynamic while
+// loadCatalog retains its explicit public-data cache.
+export const dynamic = "force-dynamic";
 
 export function generateStaticParams() {
   return publicGameStaticParams();
