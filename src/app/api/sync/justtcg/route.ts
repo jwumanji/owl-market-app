@@ -29,8 +29,9 @@ import {
   type JustTcgShadowPriceMatch,
 } from "@/lib/multitcg/justtcg-shadow-write";
 
-// Vercel Hobby: 10s default, this raises it to 60s
-export const maxDuration = 60;
+// Leave enough headroom for one provider set plus the catalog match preload.
+// Cursor mode is intentionally capped at one set per invocation below.
+export const maxDuration = 300;
 
 // Reverse map: internal code → all JustTCG set slugs
 const CODE_TO_SLUGS = buildJustTcgCodeToSlugs(onePieceGame.justTcgSetSlugMap);
@@ -40,8 +41,8 @@ const CODE_TO_SLUGS = buildJustTcgCodeToSlugs(onePieceGame.justTcgSetSlugMap);
 const GAME = ONE_PIECE_JUSTTCG_GAME_SLUG;
 const CARD_UPSERT_CONFLICT = "game_id,card_image_id";
 const PRICE_STATS_UPSERT_CONFLICT = "game_id,card_id";
-const LOCK_TTL_MS = 55 * 60 * 1000;
-const DEFAULT_MAX_SETS = 4;
+const LOCK_TTL_MS = 10 * 60 * 1000;
+const CURSOR_SETS_PER_INVOCATION = 1;
 const PRICE_SYNC_STATE_KEY = "justtcg_price_sync_current";
 
 interface DbSet {
@@ -172,7 +173,12 @@ async function syncPrices(request: Request) {
         game.slug,
         allDbSets,
         syncableSets,
-        clampInt(searchParams.get("maxSets"), DEFAULT_MAX_SETS, 1, 8),
+        clampInt(
+          searchParams.get("maxSets"),
+          CURSOR_SETS_PER_INVOCATION,
+          1,
+          CURSOR_SETS_PER_INVOCATION
+        ),
         searchParams.get("reset") === "1",
         availableJustTcgSlugs,
         allowCatalogMutations,
@@ -181,7 +187,7 @@ async function syncPrices(request: Request) {
     }
 
     return NextResponse.json({
-      message: "Provide ?sets=OP01 or use ?cursor=1&maxSets=4 to advance the scheduled cursor",
+      message: "Provide ?sets=OP01 or use ?cursor=1&maxSets=1 to advance the scheduled cursor",
       available: syncableSets.map((s) => s.code),
       total: syncableSets.length,
       multitcg: rollout,
@@ -554,22 +560,33 @@ interface CardMaps {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function loadAllCards(supabase: any, gameId: string): Promise<DbCard[]> {
-  // Supabase JS defaults to 1000-row max per query — we need to page.
+  // Supabase JS defaults to 1000 rows. Keyset pagination keeps every page
+  // deterministic and avoids repeatedly scanning/discarding earlier offsets.
   const all: DbCard[] = [];
   const PAGE = 1000;
-  let offset = 0;
+  let afterId: string | null = null;
   while (true) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("cards")
       .select("id, game_id, card_image_id, card_number, name, variant_label, rarity, set_id, tcg_product_id")
       .eq("game_id", gameId)
       .eq("region", "en")
-      .range(offset, offset + PAGE - 1);
+      .order("id", { ascending: true })
+      .limit(PAGE);
+    if (afterId) query = query.gt("id", afterId);
+
+    const { data, error } = await query;
     if (error) throw new Error(`loadAllCards: ${error.message}`);
     if (!data || data.length === 0) break;
-    all.push(...(data as DbCard[]));
-    if (data.length < PAGE) break;
-    offset += PAGE;
+    const page = data as DbCard[];
+    all.push(...page);
+    if (page.length < PAGE) break;
+
+    const lastId = page[page.length - 1]?.id;
+    if (!lastId || lastId === afterId) {
+      throw new Error("loadAllCards: keyset pagination did not advance");
+    }
+    afterId = lastId;
   }
   return all;
 }
