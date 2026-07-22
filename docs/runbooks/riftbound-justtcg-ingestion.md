@@ -1,50 +1,66 @@
-# Riftbound JustTCG Staged Ingestion
+# Riftbound catalog reconciliation and pricing
 
-Moon Market keeps Riftcodex as the authoritative Riftbound catalog for
-gameplay metadata, images, set codes, collector numbers, and treatments.
-JustTCG v1 is a staged secondary source for provider identity, variant payloads,
-and raw market data.
+Moon Market assigns authority by field:
+
+- Riot Riftbound API: canonical card identity, rules text, set membership,
+  release status, and official assets.
+- TCGplayer: commercial product and SKU identity.
+- JustTCG v1: current market prices, price history, conditions, and printings.
+- RiftCodex: temporary fallback and discrepancy monitor, never the long-term
+  canonical authority.
+
+The Riot adapter remains closed until `RIOT_RIFTBOUND_API_KEY` and the approved
+`RIOT_RIFTBOUND_CATALOG_URL` are configured. Do not invent or scrape an endpoint.
 
 ## Safety policy
 
-- Match cards only through exact TCGplayer product IDs already stored in
-  `card_external_ids`.
-- Retain every fetched JustTCG set/card payload in `tcg_source_records`, even
-  when no exact Moon Market card match exists.
-- Add JustTCG card/set external IDs only for deterministic matches.
-- Do not update `cards`, `price_stats`, `price_history`,
-  `preferred_card_prices`, or public Riftbound pricing from this job.
-- Keep `games.metadata.pricing_status = deferred` until variant, condition,
-  currency, and publishing rules are approved.
+- Publish prices only for exact, unique TCGplayer product-ID matches already
+  present in `card_external_ids`.
+- Prefer an English Near Mint Normal variant, then Near Mint Foil, then another
+  English Near Mint printing.
+- Keep unmatched commercial records out of the public catalog. Store and
+  classify them in `catalog_reconciliation_candidates`.
+- Never resolve a card by name alone. A set plus collector-number similarity is
+  an `identity_conflict` requiring review unless a canonical ID confirms it.
+- Keep canonical cards public when commercial pricing is missing; classify
+  those records as `catalog_only`.
+
+## Candidate statuses
+
+- `official_new`: Riot-confirmed card missing from Moon Market.
+- `official_preview`: Riot-confirmed preview, public with an unreleased label.
+- `commercial_variant`: a new SKU/treatment for a known canonical card.
+- `provider_ahead`: JustTCG/TCGplayer record awaiting Riot confirmation.
+- `catalog_only`: canonical card without a current JustTCG match.
+- `identity_conflict`: identifiers disagree or a required product ID is absent.
+- `sealed_product`: non-card record routed away from the card catalog.
+- `resolved` and `ignored`: terminal reconciliation outcomes.
+
+Vendetta is a known official set with a July 31, 2026 English release. Its
+JustTCG cards remain `provider_ahead` until Riot confirms each card through the
+approved catalog source.
 
 ## Deployment order
 
-1. Apply `20260722123000_riftbound_justtcg_staged_ingestion.sql` after the
-   multi-TCG foundation migrations.
+1. Apply `20260722140000_riftbound_reconciliation_and_live_pricing.sql`.
 2. Deploy the application and cron configuration.
-3. Run the read-only reconciliation:
-
-   ```powershell
-   npm run audit:riftbound-justtcg
-   ```
-
-4. Trigger one explicit set before relying on the cursor:
+3. Trigger a complete reconciliation:
 
    ```text
-   POST /api/sync/justtcg?game=riftbound&sets=origins-riftbound-league-of-legends-trading-card-game
+   POST /api/sync/justtcg?game=riftbound&mode=full&cursor=1&maxSets=50
    Authorization: Bearer <CRON_SECRET>
    ```
 
-5. Confirm the response reports `mode: staged_raw_only` and
-   `pricesPublished: false`, then verify the corresponding
-   `source_ingest_runs` row completed.
+4. Confirm `pricesPublished: true`, inspect the candidate status counts, and
+   verify that both the catalog reconciliation and normalized-price ingest runs
+   completed.
+5. Run `npm run audit:riftbound-justtcg`.
 
 ## Scheduled behavior
 
-The Vercel cron processes one JustTCG set every six hours. Eight provider sets
-therefore complete a normal cycle in roughly two days. The cursor is scoped by
-game, provider, API version, catalog, and job, so it does not share One Piece's
-JustTCG state.
-
-New JustTCG-only content such as Vendetta remains raw-only until Riftcodex or a
-separate canonical Riftbound adapter supplies the game-specific catalog fields.
+- Hourly: all provider sets are queried with JustTCG's `updated_after`
+  watermark, including a five-minute overlap for safe retries.
+- Nightly: a complete reconciliation catches catalog drift, stale identifiers,
+  and canonical cards that lack commercial matches.
+- One daily legacy history point is written per card while normalized provider
+  observations retain provider/SKU timestamps.

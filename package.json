@@ -18,6 +18,7 @@
     "audit:riftbound-pricing": "node scripts/audit-riftbound-pricing-readiness.mjs",
     "audit:riftbound-justtcg": "node scripts/audit-riftbound-justtcg.mjs",
     "riftbound:audit": "node scripts/riftbound-audit.mjs",
+    "test:riftbound": "node --test tests/riftbound-justtcg.test.ts tests/riftbound-catalog.test.ts tests/card-image-variants.test.ts",
     "owl-lens:sync-contract": "node scripts/owl-lens-sync.mjs",
     "owl-lens:generate-types": "openapi-typescript contracts/owl-lens.openapi.yaml -o src/lib/owl-lens/openapi.generated.ts",
     "owl-lens:check-types": "node scripts/owl-lens-check.mjs"

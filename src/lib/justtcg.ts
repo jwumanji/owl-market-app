@@ -102,17 +102,42 @@ export async function fetchSets(
   return all;
 }
 
+export interface FetchCardsBySetOptions {
+  updatedAfter?: number | null;
+  includePriceHistory?: boolean;
+}
+
+export function buildJustTcgCardsUrl(
+  setSlug: string,
+  gameSlug: string,
+  offset: number,
+  options: FetchCardsBySetOptions = {}
+): string {
+  const params = new URLSearchParams({
+    game: gameSlug,
+    set: setSlug,
+    include_price_history: String(options.includePriceHistory ?? false),
+    limit: "100",
+    offset: String(offset),
+  });
+  if (typeof options.updatedAfter === "number" && Number.isFinite(options.updatedAfter)) {
+    params.set("updated_after", String(Math.max(0, Math.floor(options.updatedAfter))));
+  }
+  return BASE + "/cards?" + params.toString();
+}
+
 /** Fetch every card in one provider set, handling pagination (100 per page). */
 export async function fetchCardsBySet(
   setSlug: string,
-  gameSlug = ONE_PIECE_JUSTTCG_GAME_SLUG
+  gameSlug = ONE_PIECE_JUSTTCG_GAME_SLUG,
+  options: FetchCardsBySetOptions = {}
 ): Promise<JustTCGCard[]> {
   const all: JustTCGCard[] = [];
   let offset = 0;
 
   while (true) {
     const res = await fetchJSON<PaginatedResponse<JustTCGCard>>(
-      `${BASE}/cards?game=${encodeURIComponent(gameSlug)}&set=${encodeURIComponent(setSlug)}&include_price_history=false&limit=100&offset=${offset}`
+      buildJustTcgCardsUrl(setSlug, gameSlug, offset, options)
     );
     all.push(...res.data);
     if (!hasMore(res)) break;

@@ -1,5 +1,5 @@
-// Read-only reconciliation of Moon Market's Riftcodex-owned Riftbound catalog
-// against the live JustTCG v1 catalog.
+// Read-only reconciliation of Moon Market's canonical Riftbound catalog,
+// durable candidate queue, and live JustTCG v1 catalog.
 
 import fs from "node:fs";
 
@@ -79,6 +79,17 @@ const gameId = games[0].id;
 const tcgplayerIds = await supabaseRows(
   `card_external_ids?select=card_id,external_id&game_id=eq.${gameId}&provider=eq.tcgplayer&external_type=eq.product_id`
 );
+const priceRows = await supabaseRows(
+  `price_stats?select=card_id,tcg_market,market_avg&game_id=eq.${gameId}`
+);
+let reconciliationCandidates = [];
+try {
+  reconciliationCandidates = await supabaseRows(
+    `catalog_reconciliation_candidates?select=entity_type,status,reason,last_seen_at&game_id=eq.${gameId}&provider=eq.justtcg`
+  );
+} catch (error) {
+  if (!String(error).includes("catalog_reconciliation_candidates")) throw error;
+}
 const sets = await justTcgAll(`/sets?game=${encodeURIComponent(SOURCE_GAME)}`);
 
 const perSet = [];
@@ -117,6 +128,18 @@ console.log(
       variantsFetched,
       exactMatches: matched,
       unmatched,
+      pricedCatalogCards: priceRows.filter(
+        (row) => Number(row.market_avg ?? row.tcg_market) >= 0
+      ).length,
+      reconciliation: {
+        total: reconciliationCandidates.length,
+        byStatus: Object.fromEntries(
+          reconciliationCandidates.reduce((counts, row) => {
+            counts.set(row.status, (counts.get(row.status) ?? 0) + 1);
+            return counts;
+          }, new Map())
+        ),
+      },
       perSet,
     },
     null,

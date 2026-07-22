@@ -9,27 +9,41 @@ import {
 } from "@/lib/justtcg";
 import {
   RIFTBOUND_JUSTTCG_GAME_SLUG,
+  classifyRiftboundUnmatchedCard,
   justTcgCardExternalId,
   justTcgSourceUpdatedAt,
+  knownRiftboundSet,
   matchRiftboundJustTcgCards,
   matchRiftboundJustTcgSet,
   normalizeRiftboundSetName,
+  selectRiftboundMarketVariant,
   type RiftboundCatalogSet,
+  type RiftboundReconciliationStatus,
   type RiftboundTcgplayerExternalId,
 } from "@/lib/games/riftbound-justtcg";
 import { JUSTTCG_NORMALIZED_API_VERSION } from "@/lib/games/provider-contract";
+import {
+  justTcgObservedAt,
+  writeJustTcgShadowPrices,
+  type JustTcgShadowPriceMatch,
+} from "@/lib/multitcg/justtcg-shadow-write";
 import {
   acquireProviderSyncState,
   releaseProviderSyncState,
   type ProviderSyncScope,
 } from "@/lib/provider-sync-state";
+import { refreshPublicGameSummaries } from "@/lib/public-page-summaries";
 import { createServiceClient } from "@/lib/supabase-server";
 
 const RIFTBOUND_DB_SLUG = "riftbound";
 const LOCK_TTL_MS = 55 * 60 * 1000;
 const DEFAULT_MAX_SETS = 1;
-const MAX_SETS_PER_RUN = 2;
+const MAX_SETS_PER_RUN = 50;
 const UPSERT_CHUNK_SIZE = 250;
+const INCREMENTAL_OVERLAP_SECONDS = 5 * 60;
+const FIRST_INCREMENTAL_LOOKBACK_SECONDS = 6 * 60 * 60;
+
+type SyncMode = "full" | "incremental";
 
 interface CursorState {
   nextIndex?: number;
@@ -40,6 +54,7 @@ interface CursorState {
   lastFetchedCards?: number;
   lastMatchedCards?: number;
   lastUnmatchedCards?: number;
+  lastSuccessfulWatermark?: string;
   lastError?: string | null;
 }
 
@@ -53,6 +68,17 @@ interface SetExternalIdRow {
   set_id: string;
   external_id: string;
   external_type: string;
+}
+
+interface CatalogCardRow {
+  id: string;
+  set_id: string | null;
+  card_number: string | null;
+  name: string | null;
+}
+
+interface ReconciliationCandidateRow {
+  external_id: string;
 }
 
 interface PagedQueryResult {
@@ -75,7 +101,7 @@ function stableHash(payload: unknown): string {
 
 function sourceRecord(
   gameId: string,
-  recordType: "set" | "card",
+  recordType: "set" | "card" | "price_variant",
   externalId: string,
   payload: unknown,
   options: { parentExternalId?: string | null; sourceUpdatedAt?: string | null; ingestRunId: string }
@@ -93,7 +119,7 @@ function sourceRecord(
     payload,
     ingest_run_id: options.ingestRunId,
     payload_schema_version: 1,
-    adapter_version: "justtcg_v1_riftbound_stage",
+    adapter_version: "justtcg_v1_riftbound_reconciliation",
     is_tombstone: false,
     last_seen_at: now,
     updated_at: now,
@@ -139,14 +165,70 @@ async function insertChunks(
   }
 }
 
-function syncScope(gameId: string): ProviderSyncScope {
+function syncScope(gameId: string, mode: SyncMode): ProviderSyncScope {
   return {
     gameId,
     catalogScope: "en-global",
     provider: "justtcg",
     providerApiVersion: JUSTTCG_NORMALIZED_API_VERSION,
-    jobKey: "riftbound_catalog_stage",
+    jobKey: mode === "incremental" ? "riftbound_prices_incremental" : "riftbound_catalog_full",
     scopeKey: RIFTBOUND_JUSTTCG_GAME_SLUG,
+  };
+}
+
+function normalizeCollectorNumber(value: string | null | undefined): string {
+  return (value ?? "").trim().toUpperCase().replace(/\s+/g, "");
+}
+
+function catalogCardKey(setId: string | null, number: string | null | undefined) {
+  const normalized = normalizeCollectorNumber(number);
+  return setId && normalized ? setId + ":" + normalized : "";
+}
+
+function priceRow(cardId: string, card: JustTCGCard) {
+  const variant = selectRiftboundMarketVariant(card);
+  if (!variant || variant.price == null) return null;
+  const observedAt = justTcgObservedAt(variant.lastUpdated);
+  return {
+    card_id: cardId,
+    tcg_market: variant.price,
+    tcg_low: variant.minPrice30d ?? variant.minPrice7d ?? null,
+    tcg_mid: variant.avgPrice30d ?? variant.avgPrice ?? null,
+    tcg_high: variant.maxPrice30d ?? variant.maxPrice7d ?? null,
+    market_avg: variant.avgPrice30d ?? variant.avgPrice ?? variant.price,
+    chg_1d: variant.priceChange24hr ?? null,
+    chg_7d: variant.priceChange7d ?? null,
+    chg_30d: variant.priceChange30d ?? null,
+    ath: variant.maxPriceAllTime ?? null,
+    ath_date: null,
+    atl: variant.minPriceAllTime ?? null,
+    atl_date: null,
+    observed_at: observedAt,
+    provider_variant_id: variant.uuid?.trim() || variant.id,
+  };
+}
+
+function shadowPriceMatch(
+  cardId: string,
+  card: JustTCGCard
+): JustTcgShadowPriceMatch | null {
+  const variant = selectRiftboundMarketVariant(card);
+  if (!variant || variant.price == null) return null;
+  const cardUuid = card.uuid?.trim();
+  return {
+    legacyCardId: cardId,
+    providerProductExternalId: cardUuid || card.tcgplayerId || card.id,
+    providerProductNamespace: cardUuid ? "card_uuid" : "product_id",
+    providerSkuExternalId: variant.uuid?.trim() || variant.id,
+    providerSkuNamespace: variant.uuid?.trim() ? "variant_uuid" : "variant_id",
+    tcgplayerSkuId: variant.tcgplayerSkuId ?? null,
+    condition: variant.condition,
+    printing: variant.printing,
+    amount: variant.price,
+    observedAt: justTcgObservedAt(variant.lastUpdated),
+    sourceSetSlug: card.set,
+    rawProduct: card as unknown as Record<string, unknown>,
+    rawVariant: variant as unknown as Record<string, unknown>,
   };
 }
 
@@ -215,6 +297,8 @@ export async function syncRiftboundJustTcg(request: Request) {
       { status: 503 }
     );
   }
+  const publishPrices =
+    (mapping.pricing_capabilities as Record<string, unknown> | null)?.publish_prices === true;
 
   const { data: provider, error: providerError } = await supabase
     .from("data_providers")
@@ -249,17 +333,20 @@ export async function syncRiftboundJustTcg(request: Request) {
     );
   }
 
+  const syncMode: SyncMode =
+    searchParams.get("mode") === "incremental" ? "incremental" : "full";
   const setsParam = searchParams.get("sets");
-  const cursorMode = searchParams.get("cursor") === "1";
+  const cursorMode = searchParams.get("cursor") === "1" || syncMode === "incremental";
   if (!setsParam && !cursorMode) {
     return NextResponse.json({
       provider: "justtcg",
       game: RIFTBOUND_DB_SLUG,
-      mode: "staged_raw_only",
+      mode: "discovery",
       available: providerSets.map((set) => ({ id: set.id, name: set.name, cards: set.cards_count })),
     });
   }
 
+  const runStartedAt = new Date();
   let cursor: CursorState = {};
   let lockOwner: string | null = null;
   let selectedSets: JustTCGSet[] = [];
@@ -268,7 +355,7 @@ export async function syncRiftboundJustTcg(request: Request) {
   } else {
     const acquired = await acquireProviderSyncState<CursorState>({
       supabase,
-      scope: syncScope(game.id),
+      scope: syncScope(game.id, syncMode),
       lockTtlMs: LOCK_TTL_MS,
       reset: searchParams.get("reset") === "1",
       resetState: () => ({ nextIndex: 0, completedCycles: 0, totalSets: providerSets.length }),
@@ -287,18 +374,29 @@ export async function syncRiftboundJustTcg(request: Request) {
     lockOwner = acquired.lockOwner;
     const maxSets = clampInt(
       searchParams.get("maxSets"),
-      DEFAULT_MAX_SETS,
+      syncMode === "incremental" ? providerSets.length : DEFAULT_MAX_SETS,
       1,
       MAX_SETS_PER_RUN
     );
-    selectedSets = providerSets.slice(cursor.nextIndex ?? 0, (cursor.nextIndex ?? 0) + maxSets);
+    selectedSets =
+      syncMode === "incremental"
+        ? providerSets.slice(0, maxSets)
+        : providerSets.slice(cursor.nextIndex ?? 0, (cursor.nextIndex ?? 0) + maxSets);
   }
+
+  const priorWatermark = cursor.lastSuccessfulWatermark
+    ? Math.floor(new Date(cursor.lastSuccessfulWatermark).getTime() / 1000)
+    : Math.floor(runStartedAt.getTime() / 1000) - FIRST_INCREMENTAL_LOOKBACK_SECONDS;
+  const updatedAfter =
+    syncMode === "incremental"
+      ? Math.max(0, priorWatermark - INCREMENTAL_OVERLAP_SECONDS)
+      : null;
 
   if (selectedSets.length === 0) {
     if (lockOwner) {
       await releaseProviderSyncState({
         supabase,
-        scope: syncScope(game.id),
+        scope: syncScope(game.id, syncMode),
         lockOwner,
         state: { ...cursor, nextIndex: 0, totalSets: providerSets.length },
       });
@@ -312,18 +410,22 @@ export async function syncRiftboundJustTcg(request: Request) {
     game_id: game.id,
     provider_id: provider.id,
     source_catalog_key: RIFTBOUND_JUSTTCG_GAME_SLUG,
-    adapter_version: "justtcg_v1_riftbound_stage",
+    adapter_version: "justtcg_v1_riftbound_reconciliation",
     provider_api_version: JUSTTCG_NORMALIZED_API_VERSION,
-    job_key: "catalog_stage",
+    job_key: syncMode === "incremental" ? "current_prices" : "catalog_reconciliation",
     status: "running",
-    cursor: { sets: selectedSets.map((set) => set.id) },
+    cursor: {
+      mode: syncMode,
+      sets: selectedSets.map((set) => set.id),
+      updated_after: updatedAfter,
+    },
     counts: {},
   });
   if (runError) {
     if (lockOwner) {
       await releaseProviderSyncState({
         supabase,
-        scope: syncScope(game.id),
+        scope: syncScope(game.id, syncMode),
         lockOwner,
         state: {
           ...cursor,
@@ -361,12 +463,28 @@ export async function syncRiftboundJustTcg(request: Request) {
         .eq("game_id", game.id)
         .eq("provider", "justtcg")
     );
+    const catalogCards = await loadPaged<CatalogCardRow>(() =>
+      supabase
+        .from("cards")
+        .select("id,set_id,card_number,name")
+        .eq("game_id", game.id)
+    );
+    const existingCandidates = await loadPaged<ReconciliationCandidateRow>(() =>
+      supabase
+        .from("catalog_reconciliation_candidates")
+        .select("external_id")
+        .eq("game_id", game.id)
+        .eq("provider", "justtcg")
+        .eq("entity_type", "card")
+    );
 
     const cardsBySet = new Map<string, JustTCGCard[]>();
     for (const set of selectedSets) {
       cardsBySet.set(
         set.id,
-        await fetchCardsBySet(set.id, RIFTBOUND_JUSTTCG_GAME_SLUG)
+        await fetchCardsBySet(set.id, RIFTBOUND_JUSTTCG_GAME_SLUG, {
+          updatedAfter,
+        })
       );
     }
 
@@ -388,13 +506,39 @@ export async function syncRiftboundJustTcg(request: Request) {
         variantCount += card.variants.length;
         const externalId = justTcgCardExternalId(card);
         if (!externalId) continue;
-        rawRows.push(
-          sourceRecord(game.id, "card", externalId, card, {
-            ingestRunId,
-            parentExternalId: set.id,
-            sourceUpdatedAt: justTcgSourceUpdatedAt(card),
-          })
-        );
+        if (syncMode === "incremental") {
+          for (const variant of card.variants) {
+            const variantId = variant.uuid?.trim() || variant.id;
+            if (!variantId) continue;
+            rawRows.push(
+              sourceRecord(
+                game.id,
+                "price_variant",
+                externalId + ":" + variantId,
+                {
+                  card_uuid: card.uuid ?? null,
+                  card_id: card.id,
+                  tcgplayer_product_id: card.tcgplayerId,
+                  set: card.set,
+                  variant,
+                },
+                {
+                  ingestRunId,
+                  parentExternalId: externalId,
+                  sourceUpdatedAt: justTcgSourceUpdatedAt(card),
+                }
+              )
+            );
+          }
+        } else {
+          rawRows.push(
+            sourceRecord(game.id, "card", externalId, card, {
+              ingestRunId,
+              parentExternalId: set.id,
+              sourceUpdatedAt: justTcgSourceUpdatedAt(card),
+            })
+          );
+        }
       }
     }
 
@@ -459,6 +603,130 @@ export async function syncRiftboundJustTcg(request: Request) {
       });
     }
 
+    const catalogSetByProviderSet = new Map(
+      matchedSetRows.map(({ providerSet, catalogSet }) => [providerSet.id, catalogSet])
+    );
+    const catalogCardByKey = new Map<string, CatalogCardRow | null>();
+    for (const card of catalogCards) {
+      const key = catalogCardKey(card.set_id, card.card_number);
+      if (!key) continue;
+      catalogCardByKey.set(key, catalogCardByKey.has(key) ? null : card);
+    }
+
+    const priorCandidateIds = new Set(existingCandidates.map((row) => row.external_id));
+    const candidateRows: Record<string, unknown>[] = [];
+    const now = new Date().toISOString();
+    const candidateStatusCounts = new Map<RiftboundReconciliationStatus, number>();
+    const addCandidate = (
+      status: RiftboundReconciliationStatus,
+      row: Record<string, unknown>
+    ) => {
+      candidateRows.push({
+        game_id: game.id,
+        provider: "justtcg",
+        status,
+        last_seen_at: now,
+        updated_at: now,
+        ...row,
+      });
+      candidateStatusCounts.set(status, (candidateStatusCounts.get(status) ?? 0) + 1);
+    };
+
+    for (const match of matchedCards) {
+      const externalId = justTcgCardExternalId(match.justTcgCard);
+      if (!externalId || !priorCandidateIds.has(externalId)) continue;
+      addCandidate("resolved", {
+        entity_type: "card",
+        external_id: externalId,
+        reason: "exact_tcgplayer_product_id_match",
+        canonical_card_id: match.cardId,
+        source_set_external_id: match.justTcgCard.set,
+        tcgplayer_product_id: match.justTcgCard.tcgplayerId,
+        source_updated_at: justTcgSourceUpdatedAt(match.justTcgCard),
+        resolved_at: now,
+        payload: match.justTcgCard,
+        metadata: { resolution: "automatic_exact_id" },
+      });
+    }
+
+    for (const card of unmatchedCards) {
+      const externalId = justTcgCardExternalId(card);
+      if (!externalId) continue;
+      const catalogSet = catalogSetByProviderSet.get(card.set) ?? null;
+      const possibleCard = catalogSet
+        ? catalogCardByKey.get(catalogCardKey(catalogSet.id, card.number)) ?? null
+        : null;
+      const classification = classifyRiftboundUnmatchedCard(card, {
+        hasCatalogSet: Boolean(catalogSet),
+        possibleCardId: possibleCard?.id ?? null,
+      });
+      const knownSet = knownRiftboundSet(card.set_name);
+      addCandidate(classification.status, {
+        entity_type:
+          classification.status === "sealed_product" ? "sealed_product" : "card",
+        external_id: externalId,
+        reason: classification.reason,
+        canonical_card_id: possibleCard?.id ?? null,
+        canonical_set_id: catalogSet?.id ?? null,
+        source_set_external_id: card.set,
+        tcgplayer_product_id: card.tcgplayerId,
+        source_updated_at: justTcgSourceUpdatedAt(card),
+        resolved_at: null,
+        payload: card,
+        metadata: {
+          possible_card_name: possibleCard?.name ?? null,
+          known_official_set: knownSet?.name ?? null,
+          official_release_date: knownSet?.releaseDate ?? null,
+          release_status: knownSet?.status ?? null,
+          publication_gate: knownSet ? "riot_card_confirmation" : null,
+        },
+      });
+    }
+
+    for (const set of selectedSets) {
+      const catalogSet = catalogSetByProviderSet.get(set.id);
+      const knownSet = knownRiftboundSet(set.name);
+      addCandidate(catalogSet ? "resolved" : "provider_ahead", {
+        entity_type: "set",
+        external_id: set.id,
+        reason: catalogSet
+          ? "exact_normalized_set_name_match"
+          : knownSet
+            ? "known_official_set_waiting_for_riot_catalog"
+            : "commercial_provider_set_missing_from_canonical_catalog",
+        canonical_set_id: catalogSet?.id ?? null,
+        source_set_external_id: set.id,
+        source_updated_at: null,
+        resolved_at: catalogSet ? now : null,
+        payload: set,
+        metadata: {
+          known_official_set: knownSet?.name ?? null,
+          official_release_date: knownSet?.releaseDate ?? null,
+          release_status: knownSet?.status ?? null,
+          publication_gate: knownSet ? "riot_catalog_confirmation" : null,
+        },
+      });
+    }
+
+    const completeFullCatalog =
+      syncMode === "full" && selectedSets.length === providerSets.length;
+    if (completeFullCatalog) {
+      const matchedCardIds = new Set(matchedCards.map((match) => match.cardId));
+      for (const row of tcgplayerIds) {
+        if (matchedCardIds.has(row.card_id)) continue;
+        addCandidate("catalog_only", {
+          entity_type: "card",
+          external_id: "moon:" + row.card_id,
+          reason: "canonical_card_missing_current_justtcg_match",
+          canonical_card_id: row.card_id,
+          tcgplayer_product_id: row.external_id,
+          resolved_at: null,
+          payload: { tcgplayer_product_id: row.external_id },
+          metadata: { publication: "catalog_live_pricing_pending" },
+        });
+      }
+    }
+
     await upsertChunks(
       supabase,
       "tcg_source_records",
@@ -467,8 +735,53 @@ export async function syncRiftboundJustTcg(request: Request) {
     );
     await insertChunks(supabase, "card_external_ids", cardExternalRows);
     await insertChunks(supabase, "set_external_ids", setExternalRows);
+    await upsertChunks(
+      supabase,
+      "catalog_reconciliation_candidates",
+      candidateRows,
+      "game_id,provider,entity_type,external_id"
+    );
 
-    const nextIndexRaw = (cursor.nextIndex ?? 0) + selectedSets.length;
+    const legacyPriceRows = Array.from(
+      new Map(
+        matchedCards
+          .map((match) => priceRow(match.cardId, match.justTcgCard))
+          .filter((row): row is NonNullable<typeof row> => Boolean(row))
+          .map((row) => [row.card_id, row])
+      ).values()
+    );
+    const shadowMatches = matchedCards
+      .map((match) => shadowPriceMatch(match.cardId, match.justTcgCard))
+      .filter((row): row is JustTcgShadowPriceMatch => Boolean(row));
+    let legacyPricing = { prices_written: 0, history_written: 0 };
+    let normalizedPricing = {
+      attempted: 0,
+      observationsWritten: 0,
+      preferredPricesWritten: 0,
+    };
+    if (publishPrices && legacyPriceRows.length > 0) {
+      const { data: published, error: publishError } = await supabase.rpc(
+        "publish_riftbound_justtcg_prices",
+        { p_game_id: game.id, p_rows: legacyPriceRows }
+      );
+      if (publishError) throw new Error("publish Riftbound prices: " + publishError.message);
+      legacyPricing = {
+        prices_written: Number(published?.prices_written ?? 0),
+        history_written: Number(published?.history_written ?? 0),
+      };
+      normalizedPricing = await writeJustTcgShadowPrices({
+        supabase,
+        gameId: game.id,
+        sourceCatalogKey: RIFTBOUND_JUSTTCG_GAME_SLUG,
+        matches: shadowMatches,
+      });
+      await refreshPublicGameSummaries(supabase, game.id);
+    }
+
+    const nextIndexRaw =
+      syncMode === "incremental"
+        ? 0
+        : (cursor.nextIndex ?? 0) + selectedSets.length;
     const wrapped = nextIndexRaw >= providerSets.length;
     const nextState: CursorState = {
       ...cursor,
@@ -476,6 +789,7 @@ export async function syncRiftboundJustTcg(request: Request) {
       completedCycles: (cursor.completedCycles ?? 0) + (wrapped ? 1 : 0),
       totalSets: providerSets.length,
       lastRunAt: new Date().toISOString(),
+      lastSuccessfulWatermark: runStartedAt.toISOString(),
       lastSetSlugs: selectedSets.map((set) => set.id),
       lastFetchedCards: matchedCards.length + unmatchedCards.length,
       lastMatchedCards: matchedCards.length,
@@ -495,6 +809,12 @@ export async function syncRiftboundJustTcg(request: Request) {
       set_external_ids_inserted: setExternalRows.length,
       card_identity_conflicts: cardIdentityConflicts.length,
       set_identity_conflicts: setIdentityConflicts.length,
+      reconciliation_candidates_written: candidateRows.length,
+      reconciliation_statuses: Object.fromEntries(candidateStatusCounts),
+      legacy_prices_written: legacyPricing.prices_written,
+      legacy_history_written: legacyPricing.history_written,
+      normalized_observations_written: normalizedPricing.observationsWritten,
+      normalized_preferred_prices_written: normalizedPricing.preferredPricesWritten,
     };
     const { error: completeError } = await supabase
       .from("source_ingest_runs")
@@ -507,7 +827,7 @@ export async function syncRiftboundJustTcg(request: Request) {
     if (lockOwner) {
       releaseError = await releaseProviderSyncState({
         supabase,
-        scope: syncScope(game.id),
+        scope: syncScope(game.id, syncMode),
         lockOwner,
         state: nextState,
       });
@@ -517,8 +837,9 @@ export async function syncRiftboundJustTcg(request: Request) {
       provider: "justtcg",
       game: RIFTBOUND_DB_SLUG,
       sourceGameSlug: RIFTBOUND_JUSTTCG_GAME_SLUG,
-      mode: "staged_raw_only",
-      pricesPublished: false,
+      mode: syncMode,
+      updatedAfter,
+      pricesPublished: publishPrices,
       ingestRunId,
       sets: selectedSets.map((set) => set.id),
       counts,
@@ -550,7 +871,7 @@ export async function syncRiftboundJustTcg(request: Request) {
     if (lockOwner) {
       await releaseProviderSyncState({
         supabase,
-        scope: syncScope(game.id),
+        scope: syncScope(game.id, syncMode),
         lockOwner,
         state: { ...cursor, lastRunAt: new Date().toISOString(), lastError: message },
       });

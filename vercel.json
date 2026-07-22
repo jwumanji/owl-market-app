@@ -17,8 +17,12 @@
       "schedule": "0 18 * * *"
     },
     {
-      "path": "/api/sync/justtcg?game=riftbound&cursor=1&maxSets=1",
-      "schedule": "15 1,7,13,19 * * *"
+      "path": "/api/sync/justtcg?game=riftbound&mode=incremental&maxSets=50",
+      "schedule": "15 * * * *"
+    },
+    {
+      "path": "/api/sync/justtcg?game=riftbound&mode=full&cursor=1&maxSets=50",
+      "schedule": "35 4 * * *"
     },
     {
       "path": "/api/sync/justtcg-history?game=one_piece&maxSets=1&historyDuration=1y",
