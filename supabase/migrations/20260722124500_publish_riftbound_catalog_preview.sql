@@ -1,5 +1,5 @@
--- Publish the Riftbound catalog as a data-only preview. Third-party card
--- imagery stays deferred until the separate asset approval gate is cleared.
+-- Publish the Riftbound catalog preview with approved TCGplayer product
+-- imagery. Other third-party asset sources remain deferred.
 
 begin;
 
@@ -9,9 +9,9 @@ set
   is_public = true,
   metadata = coalesce(metadata, '{}'::jsonb) || jsonb_build_object(
     'launch_status', 'public_catalog_preview',
-    'public_launch_scope', 'catalog_metadata_only',
-    'public_launch_gate', 'catalog_only_no_unapproved_assets',
-    'asset_status', 'deferred_pending_approval',
+    'public_launch_scope', 'catalog_and_tcgplayer_images',
+    'public_launch_gate', 'tcgplayer_images_only',
+    'asset_status', 'tcgplayer_images_approved',
     'pricing_status', 'deferred'
   ),
   updated_at = now()

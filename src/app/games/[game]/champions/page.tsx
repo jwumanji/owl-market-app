@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import FastCardImage from "@/components/ui/FastCardImage";
 import { createCachedServiceClient } from "@/lib/supabase-server";
 import { gamePath } from "@/lib/game-routes";
 import { publicGameStaticParams } from "@/lib/static-game-params";
@@ -9,6 +10,7 @@ import {
   riftboundChampionName,
   stringList,
 } from "@/lib/games/riftbound-catalog";
+import { tcgPlayerProductImageUrl } from "@/lib/market-sealed";
 import "../riftbound-pages.css";
 
 export const revalidate = 3600;
@@ -30,11 +32,12 @@ type CardRow = {
 };
 
 type PriceRow = { card_id: string; tcg_market: number | string | null; market_avg: number | string | null };
+type ExternalIdRow = { card_id: string; external_id: string };
 
 type ChampionGroup = {
   name: string;
   sets: Set<string>;
-  cards: Array<CardRow & { price: number | null }>;
+  cards: Array<CardRow & { price: number | null; imageUrl: string | null }>;
   signatures: number;
   totalValue: number;
   pricedCards: number;
@@ -65,6 +68,7 @@ async function loadRows(gameId: string) {
   const supabase = createCachedServiceClient();
   const cards: CardRow[] = [];
   const prices: PriceRow[] = [];
+  const externalIds: ExternalIdRow[] = [];
 
   for (let from = 0; ; from += 1000) {
     const result = await supabase
@@ -92,10 +96,24 @@ async function loadRows(gameId: string) {
     if (page.length < 1000) break;
   }
 
-  return { cards, prices };
+  for (let from = 0; ; from += 1000) {
+    const result = await supabase
+      .from("card_external_ids")
+      .select("card_id, external_id")
+      .eq("game_id", gameId)
+      .eq("provider", "tcgplayer")
+      .eq("external_type", "product_id")
+      .range(from, from + 999);
+    if (result.error) throw new Error(result.error.message);
+    const page = (result.data ?? []) as ExternalIdRow[];
+    externalIds.push(...page);
+    if (page.length < 1000) break;
+  }
+
+  return { cards, prices, externalIds };
 }
 
-function groupChampions(cards: CardRow[], prices: PriceRow[]) {
+function groupChampions(cards: CardRow[], prices: PriceRow[], externalIds: ExternalIdRow[]) {
   const knownChampions = new Set<string>();
   for (const card of cards) {
     const payload = asRiftboundPayload(card.game_payload);
@@ -108,6 +126,7 @@ function groupChampions(cards: CardRow[], prices: PriceRow[]) {
   }
 
   const priceByCard = new Map(prices.map((row) => [row.card_id, finitePrice(row.tcg_market) ?? finitePrice(row.market_avg)]));
+  const productIdByCard = new Map(externalIds.map((row) => [row.card_id, row.external_id]));
   const groups = new Map<string, ChampionGroup>();
 
   for (const card of cards) {
@@ -130,7 +149,7 @@ function groupChampions(cards: CardRow[], prices: PriceRow[]) {
     const set = joinedSet(card);
     if (set?.code || set?.name) group.sets.add(set.code ?? set.name ?? "");
     const price = priceByCard.get(card.id) ?? null;
-    group.cards.push({ ...card, price });
+    group.cards.push({ ...card, price, imageUrl: tcgPlayerProductImageUrl(productIdByCard.get(card.id)) });
     if (supertype === "Signature") group.signatures += 1;
     if (price != null) {
       group.totalValue += price;
@@ -160,14 +179,15 @@ export default async function RiftboundChampionsPage(props: {
 
   let cards: CardRow[] = [];
   let prices: PriceRow[] = [];
+  let externalIds: ExternalIdRow[] = [];
   let loadError: string | null = null;
   try {
-    ({ cards, prices } = await loadRows(gameResult.game.id));
+    ({ cards, prices, externalIds } = await loadRows(gameResult.game.id));
   } catch (error) {
     loadError = error instanceof Error ? error.message : "The champion index could not be loaded.";
   }
 
-  const allChampions = groupChampions(cards, prices);
+  const allChampions = groupChampions(cards, prices, externalIds);
   const query = cleanQuery(searchParams.q);
   const champions = allChampions.filter((champion) =>
     (!query || champion.name.toLowerCase().includes(query.toLowerCase()))
@@ -205,8 +225,9 @@ export default async function RiftboundChampionsPage(props: {
           {champions.length ? <section className="rb-champion-grid">
             {champions.map((champion) => {
               const topCards = [...champion.cards].sort((a, b) => (b.price ?? -1) - (a.price ?? -1) || a.name.localeCompare(b.name)).slice(0, 3);
+              const championImage = topCards.find((card) => card.imageUrl)?.imageUrl ?? null;
               return <article className="rb-card" key={champion.name}>
-                <div className="rb-card-head"><span className="rb-monogram" aria-hidden="true">{initials(champion.name)}</span><div><h3 className="rb-card-title">{champion.name}</h3><span className="rb-meta">RIFTBOUND CHAMPION</span></div></div>
+                <div className="rb-card-head">{championImage ? <FastCardImage className="rb-card-thumb" src={championImage} alt={`${champion.name} card`} width={48} height={67} sizes="48px" /> : <span className="rb-monogram" aria-hidden="true">{initials(champion.name)}</span>}<div><h3 className="rb-card-title">{champion.name}</h3><span className="rb-meta">RIFTBOUND CHAMPION</span></div></div>
                 <div className="rb-metrics">
                   <div className="rb-metric"><strong>{champion.cards.length}</strong><span>Cards</span></div>
                   <div className="rb-metric"><strong>{champion.sets.size}</strong><span>Sets</span></div>

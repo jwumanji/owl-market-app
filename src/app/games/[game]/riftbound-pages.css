@@ -66,6 +66,7 @@
 .rb-card { display: flex; flex-direction: column; min-width: 0; padding: 18px; border: 1.5px solid var(--ink); border-radius: var(--r-md); background: var(--bg-2); box-shadow: 3px 3px 0 rgba(26, 15, 8, .13); }
 .rb-card-head { display: flex; align-items: center; gap: 12px; }
 .rb-monogram { display: grid; flex: 0 0 48px; width: 48px; height: 48px; place-items: center; border: 1.5px solid var(--ink); border-radius: 14px; background: linear-gradient(135deg, #6e3aa6, #c42a45); color: #fff5e4; font-family: var(--font-space-grotesk), system-ui, sans-serif; font-size: 19px; font-weight: 800; }
+.rb-card-thumb { flex: 0 0 48px; width: 48px; height: 67px; border: 1.5px solid var(--ink); border-radius: 7px; background: var(--bg-3); object-fit: contain; }
 .rb-card-title { min-width: 0; margin: 0; overflow: hidden; color: var(--ink); font-family: var(--font-space-grotesk), system-ui, sans-serif; font-size: 18px; text-overflow: ellipsis; white-space: nowrap; }
 .rb-card-copy { margin: 12px 0 0; color: var(--ink-2); font-size: 13px; line-height: 1.55; }
 .rb-domain-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 13px 0; }
