@@ -7,6 +7,7 @@ import MoonMarketLogo from "@/components/brand/MoonMarketLogo";
 import MoonMark from "@/components/brand/MoonMark";
 import { DEFAULT_PUBLIC_GAME_DB_SLUG, DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
+import { RIFTBOUND_ROUTE_SLUG } from "@/lib/games/registry";
 import Ticker from "./Ticker";
 
 type NavVariant = "public" | "admin";
@@ -30,6 +31,18 @@ type PublicNavLink = {
 };
 
 function publicLinks(gameRouteSlug: string): PublicNavLink[] {
+  if (gameRouteSlug === RIFTBOUND_ROUTE_SLUG) {
+    return [
+      { label: "Markets", href: gamePath(gameRouteSlug, "/markets") },
+      { label: "Champions", href: gamePath(gameRouteSlug, "/champions") },
+      { label: "Sets", href: gamePath(gameRouteSlug, "/sets") },
+      { label: "Rarities", href: gamePath(gameRouteSlug, "/rarities") },
+      { label: "Languages", href: gamePath(gameRouteSlug, "/languages") },
+      { label: "eBay Sales", href: gamePath(gameRouteSlug, "/sales") },
+      { label: "All Cards", href: gamePath(gameRouteSlug, "/catalog"), divider: true },
+    ];
+  }
+
   return [
     { label: "Markets", href: gamePath(gameRouteSlug, "/markets") },
     { label: "Characters", href: gamePath(gameRouteSlug, "/characters") },
@@ -106,7 +119,8 @@ function PublicGameSwitcher({ gameRouteSlug }: { gameRouteSlug: string }) {
   const [open, setOpen] = useState(false);
   const switcherRef = useRef<HTMLDivElement>(null);
   const isDefaultGame = gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
-  const currentLabel = isDefaultGame ? "One Piece" : gameRouteSlug.replace(/-/g, " ");
+  const isRiftbound = gameRouteSlug === RIFTBOUND_ROUTE_SLUG;
+  const currentLabel = isDefaultGame ? "One Piece" : isRiftbound ? "Riftbound" : gameRouteSlug.replace(/-/g, " ");
 
   useEffect(() => {
     if (!open) return;
@@ -145,7 +159,7 @@ function PublicGameSwitcher({ gameRouteSlug }: { gameRouteSlug: string }) {
         <div className="c-game-switcher-heading">Switch game</div>
         <Link
           href={gamePath(DEFAULT_PUBLIC_GAME_ROUTE_SLUG, "/markets")}
-          className="c-game-option is-active"
+          className={`c-game-option${isDefaultGame ? " is-active" : ""}`}
           aria-current={isDefaultGame ? "true" : undefined}
           prefetch={false}
           onClick={() => setOpen(false)}
@@ -156,13 +170,21 @@ function PublicGameSwitcher({ gameRouteSlug }: { gameRouteSlug: string }) {
           </span>
           <span className="c-game-option-check" aria-hidden="true">✓</span>
         </Link>
-        <div className="c-game-option is-disabled" aria-disabled="true">
+        <Link
+          href={gamePath(RIFTBOUND_ROUTE_SLUG, "/markets")}
+          className={`c-game-option${isRiftbound ? " is-active" : ""}`}
+          aria-current={isRiftbound ? "true" : undefined}
+          prefetch={false}
+          onClick={() => setOpen(false)}
+        >
           <span>
             <strong>Riftbound</strong>
-            <small>Coming next</small>
+            <small>Live market</small>
           </span>
-          <span className="c-nav-soon">Soon</span>
-        </div>
+          {isRiftbound
+            ? <span className="c-game-option-check" aria-hidden="true">✓</span>
+            : <span className="c-nav-soon">Live</span>}
+        </Link>
       </div>
     </div>
   );
@@ -196,6 +218,7 @@ export default function Nav({ variant }: NavProps) {
 function PublicNav({ pathname }: { pathname: string }) {
   const activeGameRouteSlug = gameRouteSlugFromPath(pathname);
   const isDefaultPublicGame = activeGameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
+  const hasLiveMarket = isDefaultPublicGame || activeGameRouteSlug === RIFTBOUND_ROUTE_SLUG;
   const links = publicLinks(activeGameRouteSlug);
 
   return (
@@ -221,7 +244,7 @@ function PublicNav({ pathname }: { pathname: string }) {
           </Link>
           <span className="c-live-chip">
             <span className="c-live-dot" />
-            {isDefaultPublicGame ? "LIVE" : "CATALOG"}
+            {hasLiveMarket ? "LIVE" : "CATALOG"}
           </span>
           <Link href="/login" className="c-signin-btn" prefetch={false}>
             Sign in
@@ -252,7 +275,7 @@ function PublicNav({ pathname }: { pathname: string }) {
         </ul>
       </div>
 
-      {isDefaultPublicGame && <Ticker />}
+      {hasLiveMarket && <Ticker gameRouteSlug={activeGameRouteSlug} />}
     </nav>
   );
 }

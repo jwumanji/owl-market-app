@@ -11,11 +11,28 @@ import {
   onePieceGame,
   extractVariantLabel,
   classifyRarity,
+  hasExplicitTreasureRareSignal,
 } from "@/lib/games/one-piece";
 import { resolveOnePieceSyncGame } from "@/lib/games/one-piece/sync-scope";
+import { JUSTTCG_NORMALIZED_API_VERSION } from "@/lib/games/provider-contract";
+import {
+  acquireProviderSyncState,
+  releaseProviderSyncState,
+  type ProviderSyncScope,
+} from "@/lib/provider-sync-state";
+import {
+  getMultiTcgRolloutConfig,
+} from "@/lib/multitcg/rollout";
+import {
+  justTcgObservedAt,
+  writeJustTcgShadowPrices,
+  type JustTcgShadowPriceMatch,
+} from "@/lib/multitcg/justtcg-shadow-write";
+import { syncRiftboundJustTcg } from "./riftbound-sync";
 
-// Vercel Hobby: 10s default, this raises it to 60s
-export const maxDuration = 60;
+// Leave enough headroom for one provider set plus the catalog match preload.
+// Cursor mode is intentionally capped at one set per invocation below.
+export const maxDuration = 300;
 
 // Reverse map: internal code → all JustTCG set slugs
 const CODE_TO_SLUGS = buildJustTcgCodeToSlugs(onePieceGame.justTcgSetSlugMap);
@@ -25,8 +42,8 @@ const CODE_TO_SLUGS = buildJustTcgCodeToSlugs(onePieceGame.justTcgSetSlugMap);
 const GAME = ONE_PIECE_JUSTTCG_GAME_SLUG;
 const CARD_UPSERT_CONFLICT = "game_id,card_image_id";
 const PRICE_STATS_UPSERT_CONFLICT = "game_id,card_id";
-const LOCK_TTL_MS = 55 * 60 * 1000;
-const DEFAULT_MAX_SETS = 4;
+const LOCK_TTL_MS = 10 * 60 * 1000;
+const CURSOR_SETS_PER_INVOCATION = 1;
 const PRICE_SYNC_STATE_KEY = "justtcg_price_sync_current";
 
 interface DbSet {
@@ -51,6 +68,8 @@ interface SyncSetResult {
   code: string;
   updated: number;
   errors: string[];
+  shadowAttempted?: number;
+  shadowObservationsWritten?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -65,8 +84,17 @@ interface SyncSetResult {
 // ?allowCatalogMutations=1.
 // ---------------------------------------------------------------------------
 
-async function syncPrices(request: Request) {
+async function syncOnePiecePrices(request: Request) {
   const { searchParams } = new URL(request.url);
+  let rollout: ReturnType<typeof getMultiTcgRolloutConfig>;
+  try {
+    rollout = getMultiTcgRolloutConfig();
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Invalid multi-TCG rollout configuration" },
+      { status: 500 }
+    );
+  }
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
     return NextResponse.json({ error: "CRON_SECRET is not set" }, { status: 500 });
@@ -126,7 +154,14 @@ async function syncPrices(request: Request) {
   if (!setsParam) {
     const indexParam = searchParams.get("_index");
     if (indexParam !== null) {
-      return await syncByIndex(request, syncableSets, parseInt(indexParam ?? "0", 10), availableJustTcgSlugs, allowCatalogMutations);
+      return await syncByIndex(
+        request,
+        syncableSets,
+        parseInt(indexParam ?? "0", 10),
+        availableJustTcgSlugs,
+        allowCatalogMutations,
+        rollout.dualWriteEnabled
+      );
     }
 
     const cursorMode =
@@ -139,17 +174,24 @@ async function syncPrices(request: Request) {
         game.slug,
         allDbSets,
         syncableSets,
-        clampInt(searchParams.get("maxSets"), DEFAULT_MAX_SETS, 1, 8),
+        clampInt(
+          searchParams.get("maxSets"),
+          CURSOR_SETS_PER_INVOCATION,
+          1,
+          CURSOR_SETS_PER_INVOCATION
+        ),
         searchParams.get("reset") === "1",
         availableJustTcgSlugs,
-        allowCatalogMutations
+        allowCatalogMutations,
+        rollout.dualWriteEnabled
       );
     }
 
     return NextResponse.json({
-      message: "Provide ?sets=OP01 or use ?cursor=1&maxSets=4 to advance the scheduled cursor",
+      message: "Provide ?sets=OP01 or use ?cursor=1&maxSets=1 to advance the scheduled cursor",
       available: syncableSets.map((s) => s.code),
       total: syncableSets.length,
+      multitcg: rollout,
     });
   }
 
@@ -173,7 +215,11 @@ async function syncPrices(request: Request) {
   const cardMaps = buildCardMaps(allCards);
 
   for (const dbSet of setsToSync) {
-    const result = await syncOneSet(client, supabase, game.id, dbSet, prefixToSetId, cardMaps, { allowCatalogMutations, availableSlugs: availableJustTcgSlugs });
+    const result = await syncOneSet(client, supabase, game.id, dbSet, prefixToSetId, cardMaps, {
+      allowCatalogMutations,
+      availableSlugs: availableJustTcgSlugs,
+      dualWriteEnabled: rollout.dualWriteEnabled,
+    });
     results.push(result);
   }
 
@@ -186,6 +232,7 @@ async function syncPrices(request: Request) {
     provider: "justtcg",
     synced: totalUpdated,
     errors: totalErrors,
+    multitcg: rollout,
     summaries,
     sets: results,
   });
@@ -201,9 +248,16 @@ async function syncByCursor(
   maxSets: number,
   reset: boolean,
   availableSlugs: ReadonlySet<string>,
-  allowCatalogMutations = false
+  allowCatalogMutations = false,
+  dualWriteEnabled = false
 ) {
-  const cursor = await acquireCursor(supabase, PRICE_SYNC_STATE_KEY, syncableSets.length, reset);
+  const cursor = await acquireCursor(
+    supabase,
+    gameId,
+    PRICE_SYNC_STATE_KEY,
+    syncableSets.length,
+    reset
+  );
   if (cursor.error) {
     return NextResponse.json(cursor.error, { status: cursor.status ?? 500 });
   }
@@ -228,7 +282,11 @@ async function syncByCursor(
     const cardMaps = buildCardMaps(allCards);
 
     for (const dbSet of setsToSync) {
-      const result = await syncOneSet(client, supabase, gameId, dbSet, prefixToSetId, cardMaps, { allowCatalogMutations, availableSlugs });
+      const result = await syncOneSet(client, supabase, gameId, dbSet, prefixToSetId, cardMaps, {
+        allowCatalogMutations,
+        availableSlugs,
+        dualWriteEnabled,
+      });
       results.push(result);
       processedForCursor++;
     }
@@ -239,6 +297,7 @@ async function syncByCursor(
   if (cursor.lockOwner) {
     await releaseCursor(
       supabase,
+      gameId,
       PRICE_SYNC_STATE_KEY,
       cursor.lockOwner,
       advanceState(cursor.state, syncableSets.length, startIndex, processedForCursor, results, fatalError)
@@ -262,6 +321,7 @@ async function syncByCursor(
       processedSets: processedForCursor,
       synced,
       errors: errorCount,
+      multitcg: { dualWriteEnabled },
       error: fatalError,
       nextIndex: normalizeIndex(startIndex + processedForCursor, syncableSets.length),
       nextSet: syncableSets[normalizeIndex(startIndex + processedForCursor, syncableSets.length)]?.code ?? null,
@@ -282,7 +342,8 @@ async function syncByIndex(
   syncableSets: DbSet[],
   index: number,
   availableSlugs: ReadonlySet<string>,
-  allowCatalogMutations = false
+  allowCatalogMutations = false,
+  dualWriteEnabled = false
 ) {
   if (index >= syncableSets.length) {
     return NextResponse.json({
@@ -313,7 +374,11 @@ async function syncByIndex(
   const allCards = await loadAllCards(supabase, game.id);
   const cardMaps = buildCardMaps(allCards);
 
-  const result = await syncOneSet(client, supabase, game.id, dbSet, prefixToSetId, cardMaps, { allowCatalogMutations, availableSlugs });
+  const result = await syncOneSet(client, supabase, game.id, dbSet, prefixToSetId, cardMaps, {
+    allowCatalogMutations,
+    availableSlugs,
+    dualWriteEnabled,
+  });
 
   // Trigger next set in the chain (fire-and-forget)
   const nextIndex = index + 1;
@@ -336,6 +401,7 @@ async function syncByIndex(
   return NextResponse.json({
     game: game.slug,
     provider: "justtcg",
+    multitcg: { dualWriteEnabled },
     current: `${index + 1}/${syncableSets.length}`,
     ...result,
     summaries,
@@ -354,6 +420,7 @@ function buildPrefixToSetId(dbSets: Pick<DbSet, "id" | "code">[]): Record<string
 async function acquireCursor(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
+  gameId: string,
   key: string,
   totalSets: number,
   reset: boolean
@@ -365,83 +432,43 @@ async function acquireCursor(
   error?: Record<string, unknown>;
   status?: number;
 }> {
-  const { data, error } = await supabase
-    .from("sync_state")
-    .select("key,state,locked_at,lock_owner")
-    .eq("key", key)
-    .maybeSingle();
-
-  if (error) return syncStateError(error);
-
-  const now = new Date().toISOString();
-  const existingState = (data?.state ?? {}) as CursorState;
-  const lockedAt = data?.locked_at ? new Date(data.locked_at).getTime() : 0;
-  if (!reset && lockedAt && Date.now() - lockedAt < LOCK_TTL_MS) {
-    return { state: existingState, lockOwner: null, locked: true, row: data };
-  }
-
-  const state: CursorState = reset
-    ? { nextIndex: 0, completedCycles: 0, totalSets }
-    : { ...existingState, nextIndex: normalizeIndex(existingState.nextIndex ?? 0, totalSets), totalSets };
-  const lockOwner = randomId();
-
-  const { error: upsertError } = await supabase
-    .from("sync_state")
-    .upsert(
-      {
-        key,
-        state,
-        locked_at: now,
-        lock_owner: lockOwner,
-        updated_at: now,
-      },
-      { onConflict: "key" }
-    );
-
-  if (upsertError) return syncStateError(upsertError);
-  return { state, lockOwner, locked: false };
+  return acquireProviderSyncState<CursorState>({
+    supabase,
+    scope: justTcgCurrentPriceScope(gameId, key),
+    lockTtlMs: LOCK_TTL_MS,
+    reset,
+    resetState: () => ({ nextIndex: 0, completedCycles: 0, totalSets }),
+    normalizeState: (existingState) => ({
+      ...existingState,
+      nextIndex: normalizeIndex(existingState.nextIndex ?? 0, totalSets),
+      totalSets,
+    }),
+  });
 }
 
 async function releaseCursor(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
+  gameId: string,
   key: string,
   lockOwner: string,
   state: CursorState
 ) {
-  await supabase
-    .from("sync_state")
-    .update({
-      state,
-      locked_at: null,
-      lock_owner: null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("key", key)
-    .eq("lock_owner", lockOwner);
+  await releaseProviderSyncState({
+    supabase,
+    scope: justTcgCurrentPriceScope(gameId, key),
+    lockOwner,
+    state,
+  });
 }
 
-function syncStateError(error: { code?: string; message?: string }) {
-  const message = error.message ?? "sync_state error";
-  if (error.code === "42P01" || message.includes("sync_state")) {
-    return {
-      state: {},
-      lockOwner: null,
-      locked: false,
-      status: 500,
-      error: {
-        error: "Missing sync_state table.",
-        migration: "Run schema-migration-v15-price-history-backfill.sql or schema-migration-v16-price-history-hardening.sql in Supabase.",
-        details: message,
-      },
-    };
-  }
+function justTcgCurrentPriceScope(gameId: string, legacyKey: string): ProviderSyncScope {
   return {
-    state: {},
-    lockOwner: null,
-    locked: false,
-    status: 500,
-    error: { error: message },
+    gameId,
+    provider: "justtcg",
+    providerApiVersion: JUSTTCG_NORMALIZED_API_VERSION,
+    jobKey: "current_prices",
+    legacyKey,
   };
 }
 
@@ -485,10 +512,6 @@ function pickSets(sets: DbSet[], startIndex: number, count: number): DbSet[] {
     picked.push(sets[normalizeIndex(startIndex + i, total)]);
   }
   return picked;
-}
-
-function randomId() {
-  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
 }
 
 async function tryRefreshPublicSummaries(supabase: ReturnType<typeof createServiceClient>, gameId: string) {
@@ -538,21 +561,33 @@ interface CardMaps {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function loadAllCards(supabase: any, gameId: string): Promise<DbCard[]> {
-  // Supabase JS defaults to 1000-row max per query — we need to page.
+  // Supabase JS defaults to 1000 rows. Keyset pagination keeps every page
+  // deterministic and avoids repeatedly scanning/discarding earlier offsets.
   const all: DbCard[] = [];
   const PAGE = 1000;
-  let offset = 0;
+  let afterId: string | null = null;
   while (true) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("cards")
       .select("id, game_id, card_image_id, card_number, name, variant_label, rarity, set_id, tcg_product_id")
       .eq("game_id", gameId)
-      .range(offset, offset + PAGE - 1);
+      .eq("region", "en")
+      .order("id", { ascending: true })
+      .limit(PAGE);
+    if (afterId) query = query.gt("id", afterId);
+
+    const { data, error } = await query;
     if (error) throw new Error(`loadAllCards: ${error.message}`);
     if (!data || data.length === 0) break;
-    all.push(...(data as DbCard[]));
-    if (data.length < PAGE) break;
-    offset += PAGE;
+    const page = data as DbCard[];
+    all.push(...page);
+    if (page.length < PAGE) break;
+
+    const lastId = page[page.length - 1]?.id;
+    if (!lastId || lastId === afterId) {
+      throw new Error("loadAllCards: keyset pagination did not advance");
+    }
+    afterId = lastId;
   }
   return all;
 }
@@ -601,6 +636,7 @@ function shouldSyncJustTcgCard(
   setCode: string,
   cardNumber: string | null | undefined,
   name: string | null | undefined,
+  providerRarity: string | null | undefined,
   productId: string | null | undefined,
   byNumber: Map<string, DbCard[]>
 ): boolean {
@@ -609,6 +645,9 @@ function shouldSyncJustTcgCard(
   // Treasure/SP/etc. cards are often distributed in a later set while keeping
   // the original card number, e.g. OP13 contains OP11-058 (TR).
   if (prefixFromCardNumber(cardNumber) && extractVariantLabel(name ?? "")) return true;
+  if (prefixFromCardNumber(cardNumber) && hasExplicitTreasureRareSignal(name, null, providerRarity)) {
+    return true;
+  }
 
   // For an unrecognized cross-set label, trust an existing provider link only
   // when it points to a non-base physical row. Base rows remain protected.
@@ -637,8 +676,12 @@ async function syncOneSet(
   dbSet: any,
   prefixToSetId: Record<string, string> = {},
   cardMaps: CardMaps,
-  options: { allowCatalogMutations?: boolean; availableSlugs?: ReadonlySet<string> } = {}
-): Promise<{ code: string; updated: number; errors: string[] }> {
+  options: {
+    allowCatalogMutations?: boolean;
+    availableSlugs?: ReadonlySet<string>;
+    dualWriteEnabled?: boolean;
+  } = {}
+): Promise<SyncSetResult> {
   const setCode = dbSet.code;
   const configuredSlugs = CODE_TO_SLUGS[setCode] ?? [];
   const justTcgSlugs = options.availableSlugs
@@ -651,6 +694,8 @@ async function syncOneSet(
 
   const setErrors: string[] = [];
   let updatedCount = 0;
+  let shadowAttempted = 0;
+  let shadowObservationsWritten = 0;
 
   // Use the globally pre-loaded card maps. Aliased to the existing names so
   // the rest of the function reads unchanged.
@@ -679,13 +724,34 @@ async function syncOneSet(
       const priceUpserts: PriceUpsert[] = [];
       const historyInserts: HistoryInsert[] = [];
       const rarityUpdates: RarityUpdate[] = [];
+      const shadowMatches: JustTcgShadowPriceMatch[] = [];
       const matchedCardIds = new Set<string>();
       const unmatchedCards: JTCard[] = [];
 
       for (const jtCard of cards) {
         try {
-          if (!shouldSyncJustTcgCard(setCode, jtCard.number, jtCard.name, jtCard.id, byNumber)) continue;
-          matchAndCollect(jtCard, byNumber, byNameLower, priceUpserts, historyInserts, rarityUpdates, matchedCardIds, gameId, dbSet.id, unmatchedCards);
+          if (!shouldSyncJustTcgCard(
+            setCode,
+            jtCard.number,
+            jtCard.name,
+            jtCard.rarity,
+            jtCard.id,
+            byNumber
+          )) continue;
+          matchAndCollect(
+            jtCard,
+            byNumber,
+            byNameLower,
+            priceUpserts,
+            historyInserts,
+            rarityUpdates,
+            shadowMatches,
+            matchedCardIds,
+            gameId,
+            dbSet.id,
+            justTcgSlug,
+            unmatchedCards
+          );
         } catch (err) {
           setErrors.push(
             `Card ${jtCard.name}: ${err instanceof Error ? err.message : String(err)}`
@@ -693,14 +759,21 @@ async function syncOneSet(
         }
       }
 
-      // Create new card rows for unmatched JustTCG cards only when explicitly
-      // requested. Normal sync must enrich existing optcg rows, not invent or
-      // replace catalog data.
-      if (options.allowCatalogMutations && unmatchedCards.length > 0) {
-        const newCards = unmatchedCards
+      // Broad catalog creation remains opt-in. Treasure Rares are the narrow
+      // exception: an explicit provider TR signal is strong enough to safely
+      // create a missing variant during the normal cron, preventing new set
+      // releases from silently disappearing from the rarity index.
+      const catalogCandidates = options.allowCatalogMutations
+        ? unmatchedCards
+        : unmatchedCards.filter((card) =>
+            hasExplicitTreasureRareSignal(card.name, null, card.rarity)
+          );
+      if (catalogCandidates.length > 0) {
+        const newCards = catalogCandidates
           .filter((jt) => jt.number) // must have a card number
           .map((jt) => {
-            const variantLabel = extractVariantLabel(jt.name);
+            const variantLabel = extractVariantLabel(jt.name) ??
+              (hasExplicitTreasureRareSignal(jt.name, null, jt.rarity) ? "TR" : null);
             const baseName = jt.name.replace(/\s*\([^)]*\)\s*/g, " ").trim();
             const baseRarity = jt.rarity ?? "R";
             const rarity = classifyRarity(jt.name, variantLabel, baseRarity);
@@ -737,6 +810,7 @@ async function syncOneSet(
                 variant_label: variantLabel,
                 set_id: dbSet.id,
                 rarity,
+                region: "en",
                 tcg_product_id: jt.id,
                 image_url: imageUrl,
                 image_url_small: null,
@@ -757,6 +831,7 @@ async function syncOneSet(
               variant_label: variantLabel,
               set_id: resolvedSetId,
               rarity,
+              region: "en",
               tcg_product_id: jt.id,
               image_url: imageUrl,
               image_url_small: null,
@@ -801,9 +876,21 @@ async function syncOneSet(
             }
 
             // Now match the previously unmatched cards to get their prices
-            for (const jtCard of unmatchedCards) {
+            for (const jtCard of catalogCandidates) {
               try {
-                matchAndCollect(jtCard, byNumber, byNameLower, priceUpserts, historyInserts, rarityUpdates, matchedCardIds, gameId, dbSet.id);
+                matchAndCollect(
+                  jtCard,
+                  byNumber,
+                  byNameLower,
+                  priceUpserts,
+                  historyInserts,
+                  rarityUpdates,
+                  shadowMatches,
+                  matchedCardIds,
+                  gameId,
+                  dbSet.id,
+                  justTcgSlug
+                );
               } catch { /* already tracked */ }
             }
           }
@@ -835,8 +922,27 @@ async function syncOneSet(
         if (hiErr) setErrors.push(`price_history batch: ${hiErr.message}`);
       }
 
+      // Legacy price tables remain authoritative. This optional second write
+      // proves the new provider/SKU/fact path without changing page reads.
+      if (options.dualWriteEnabled && shadowMatches.length > 0) {
+        try {
+          const shadow = await writeJustTcgShadowPrices({
+            supabase,
+            gameId,
+            sourceCatalogKey: GAME,
+            matches: shadowMatches,
+          });
+          shadowAttempted += shadow.attempted;
+          shadowObservationsWritten += shadow.observationsWritten;
+        } catch (error) {
+          setErrors.push(
+            `multitcg shadow (${justTcgSlug}): ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+      }
+
       // Apply rarity reclassifications
-      if (options.allowCatalogMutations && rarityUpdates.length > 0) {
+      if (rarityUpdates.length > 0) {
         const byRarity = new Map<string, string[]>();
         for (const u of rarityUpdates) {
           const ids = byRarity.get(u.rarity) ?? [];
@@ -863,7 +969,13 @@ async function syncOneSet(
   }
   } // end slug loop
 
-  return { code: setCode, updated: updatedCount, errors: setErrors };
+  return {
+    code: setCode,
+    updated: updatedCount,
+    errors: setErrors,
+    shadowAttempted,
+    shadowObservationsWritten,
+  };
 }
 
 function utcDay(value: string | null | undefined): string | null {
@@ -976,6 +1088,7 @@ interface RarityUpdate {
 }
 
 interface JTCard {
+  uuid?: string;
   id: string;
   name: string;
   game: string;
@@ -988,11 +1101,13 @@ interface JTCard {
 }
 
 interface JTVariant {
+  uuid?: string;
   id: string;
   condition: string;
   printing: string;
   price: number;
   lastUpdated: number;
+  tcgplayerSkuId?: string | null;
   priceChange24hr?: number | null;
   priceChange7d?: number | null;
   priceChange30d?: number | null;
@@ -1019,9 +1134,11 @@ function matchAndCollect(
   priceUpserts: PriceUpsert[],
   historyInserts: HistoryInsert[],
   rarityUpdates: RarityUpdate[],
+  shadowMatches: JustTcgShadowPriceMatch[],
   matchedCardIds: Set<string>,
   gameId: string,
   dbSetId: string,
+  sourceSetSlug: string,
   unmatchedCards?: JTCard[]
 ): void {
   const nmVariant = jtCard.variants.find(
@@ -1036,7 +1153,9 @@ function matchAndCollect(
   // Best variant: prefer foil for parallels/alt-arts, normal for base cards
   const bestVariant = nmVariant ?? foilVariant;
   if (!bestVariant) return;
-  const jtVariantKey = variantKey(extractVariantLabel(jtCard.name));
+  const jtVariantLabel = extractVariantLabel(jtCard.name) ??
+    (hasExplicitTreasureRareSignal(jtCard.name, null, jtCard.rarity) ? "TR" : null);
+  const jtVariantKey = variantKey(jtVariantLabel);
   const jtNumber = jtCard.number ?? null;
 
   // Normalize: strip card number like "(119)" from names for comparison
@@ -1128,7 +1247,17 @@ function matchAndCollect(
           ? foilVariant ?? nmVariant
           : nmVariant ?? foilVariant;
         if (variant) {
-          addToBatch(gameId, direct.id, variant, priceUpserts, historyInserts, rarityUpdates, direct, jtCard.name);
+          addMatchedPrice(
+            gameId,
+            direct,
+            jtCard,
+            variant,
+            sourceSetSlug,
+            priceUpserts,
+            historyInserts,
+            rarityUpdates,
+            shadowMatches
+          );
           matchedCardIds.add(direct.id);
         }
         return;
@@ -1170,7 +1299,10 @@ function matchAndCollect(
         // doesn't matter. This handles ST10-TR being attributed to OP07
         // even when JT lists it under ST10.
         chosen = bestOverall;
-      } else if (bestSameSet) {
+      } else if (
+        bestSameSet &&
+        (!jtVariantKey || variantsEquivalent(jtVariantKey, cardVariantKey(bestSameSet.card)))
+      ) {
         // No high-confidence match anywhere; preserve pre-refactor behavior
         // by falling back to the best same-set candidate. This guards
         // against cross-set name collisions hijacking unrelated cards.
@@ -1184,7 +1316,17 @@ function matchAndCollect(
           ? foilVariant ?? nmVariant
           : nmVariant ?? foilVariant;
         if (variant) {
-          addToBatch(gameId, chosen.card.id, variant, priceUpserts, historyInserts, rarityUpdates, chosen.card, jtCard.name);
+          addMatchedPrice(
+            gameId,
+            chosen.card,
+            jtCard,
+            variant,
+            sourceSetSlug,
+            priceUpserts,
+            historyInserts,
+            rarityUpdates,
+            shadowMatches
+          );
           matchedCardIds.add(chosen.card.id);
         }
         return;
@@ -1197,7 +1339,7 @@ function matchAndCollect(
   // so a loose `unmatchedNames[0]` fallback silently mis-assigns prices.
   // Require either an exact variant_label match OR a tag overlap; otherwise
   // bail to the unmatchedCards path so the insert logic can handle it.
-  const variantLabel = extractVariantLabel(jtCard.name);
+  const variantLabel = jtVariantLabel;
   const baseName = jtCard.name.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase();
   const nameMatches = byNameLower.get(baseName);
 
@@ -1213,6 +1355,7 @@ function matchAndCollect(
       const jtTags = (jtCard.name.match(/\(([^)]+)\)/g) || []).map((s) =>
         s.slice(1, -1).toLowerCase()
       );
+      if (jtVariantKey && !jtTags.includes(jtVariantKey)) jtTags.push(jtVariantKey);
 
       // 1. Exact variant_label match
       let target = unmatchedNames.find(
@@ -1237,7 +1380,17 @@ function matchAndCollect(
           ? foilVariant ?? nmVariant
           : nmVariant ?? foilVariant;
         if (variant) {
-          addToBatch(gameId, target.id, variant, priceUpserts, historyInserts, rarityUpdates, target, jtCard.name);
+          addMatchedPrice(
+            gameId,
+            target,
+            jtCard,
+            variant,
+            sourceSetSlug,
+            priceUpserts,
+            historyInserts,
+            rarityUpdates,
+            shadowMatches
+          );
           matchedCardIds.add(target.id);
         }
         return;
@@ -1297,6 +1450,56 @@ function variantsEquivalent(a: string, b: string): boolean {
   return Boolean(a && b && a === b);
 }
 
+function addMatchedPrice(
+  gameId: string,
+  dbCard: DbCard,
+  jtCard: JTCard,
+  variant: JTVariant,
+  sourceSetSlug: string,
+  priceUpserts: PriceUpsert[],
+  historyInserts: HistoryInsert[],
+  rarityUpdates: RarityUpdate[],
+  shadowMatches: JustTcgShadowPriceMatch[]
+): void {
+  addToBatch(
+    gameId,
+    dbCard.id,
+    variant,
+    priceUpserts,
+    historyInserts,
+    rarityUpdates,
+    dbCard,
+    jtCard.name,
+    jtCard.rarity
+  );
+
+  shadowMatches.push({
+    legacyCardId: dbCard.id,
+    providerProductExternalId: jtCard.uuid ?? jtCard.id,
+    providerProductNamespace: jtCard.uuid ? "card_uuid" : "product_id",
+    providerSkuExternalId: variant.uuid ?? variant.id,
+    providerSkuNamespace: variant.uuid ? "variant_uuid" : "variant_id",
+    tcgplayerSkuId: variant.tcgplayerSkuId ?? null,
+    condition: variant.condition,
+    printing: variant.printing,
+    amount: variant.price,
+    observedAt: justTcgObservedAt(variant.lastUpdated),
+    sourceSetSlug,
+    rawProduct: {
+      id: jtCard.id,
+      uuid: jtCard.uuid ?? null,
+      name: jtCard.name,
+      game: jtCard.game,
+      set: jtCard.set,
+      setName: jtCard.setName ?? null,
+      number: jtCard.number,
+      rarity: jtCard.rarity,
+      tcgplayerId: jtCard.tcgplayerId,
+    },
+    rawVariant: { ...variant },
+  });
+}
+
 function addToBatch(
   gameId: string,
   cardId: string,
@@ -1305,7 +1508,8 @@ function addToBatch(
   historyInserts: HistoryInsert[],
   rarityUpdates?: RarityUpdate[],
   dbCard?: DbCard,
-  jtCardName?: string
+  jtCardName?: string,
+  jtCardRarity?: string | null
 ): void {
   // Reclassify rarity if we have enough info
   // Check BOTH DB name and JustTCG name — DB names often lack variant tags
@@ -1319,7 +1523,7 @@ function addToBatch(
     const fromJt = classifyRarity(
       jtCardName,
       dbCard.variant_label ?? null,
-      dbCard.rarity
+      jtCardRarity ?? dbCard.rarity
     );
     // Prefer the more specific reclassification (non-base rarity wins)
     const newRarity = fromDb !== dbCard.rarity ? fromDb : fromJt;
@@ -1359,5 +1563,11 @@ function addToBatch(
 // ---------------------------------------------------------------------------
 // Route exports
 // ---------------------------------------------------------------------------
+
+async function syncPrices(request: Request) {
+  const game = new URL(request.url).searchParams.get("game");
+  if (game === "riftbound") return syncRiftboundJustTcg(request);
+  return syncOnePiecePrices(request);
+}
 
 export { syncPrices as GET, syncPrices as POST };

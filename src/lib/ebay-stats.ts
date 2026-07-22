@@ -38,6 +38,19 @@ export const GRADE_TIERS = [
 
 export type GradeTier = (typeof GRADE_TIERS)[number];
 
+export const GRADE_TIER_LABELS: Record<GradeTier, string> = {
+  BLACK_LABEL: "Black Label",
+  PRISTINE_10: "Pristine 10",
+  PSA_10: "PSA 10",
+  BGS_10: "BGS 10",
+  OTHER_10: "Other Grader 10",
+  GRADE_9: "Grade 9–9.5",
+};
+
+export function gradeLabelForTier(tier: GradeTier | null): string | null {
+  return tier ? GRADE_TIER_LABELS[tier] : null;
+}
+
 export interface ParsedGrade {
   grader: string | null;
   grade: number | null;

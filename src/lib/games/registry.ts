@@ -5,12 +5,17 @@ import {
   ONE_PIECE_ROUTE_SLUG,
   OPTCGAPI_PROVIDER,
 } from "@/lib/games/one-piece";
+import { RIFTBOUND_JUSTTCG_GAME_SLUG } from "@/lib/games/riftbound-justtcg";
 
 export type GameAdapterStatus = "active" | "seeded" | "planned";
 
 export type GameProviderDefinition = {
   provider: string;
-  sourceGameSlug: string;
+  sourceGameSlug?: string;
+  sourceCatalogs?: readonly {
+    slug: string;
+    editionCode: string;
+  }[];
   status: GameAdapterStatus;
   notes?: string;
 };
@@ -26,6 +31,8 @@ export type GameDefinition = {
 
 export const POKEMON_DB_SLUG = "pokemon";
 export const POKEMON_ROUTE_SLUG = "pokemon";
+export const RIFTBOUND_DB_SLUG = "riftbound";
+export const RIFTBOUND_ROUTE_SLUG = "riftbound";
 
 export const GAME_DEFINITIONS = {
   [ONE_PIECE_DB_SLUG]: {
@@ -56,16 +63,119 @@ export const GAME_DEFINITIONS = {
     providers: {
       justtcg: {
         provider: JUSTTCG_PROVIDER,
-        sourceGameSlug: "pokemon",
+        sourceCatalogs: [
+          { slug: "pokemon", editionCode: "en-global" },
+          { slug: "pokemon-japan", editionCode: "ja-jp" },
+        ],
         status: "planned",
-        notes: "Provider slug and product mapping must be verified before enabling sync.",
+        notes: "Keep English and Japanese provider catalogs under explicit game editions.",
       },
     },
+  },
+  [RIFTBOUND_DB_SLUG]: {
+    dbSlug: RIFTBOUND_DB_SLUG,
+    routeSlug: RIFTBOUND_ROUTE_SLUG,
+    name: "Riftbound",
+    isPublic: false,
+    status: "seeded",
+    providers: {
+      justtcg: {
+        provider: JUSTTCG_PROVIDER,
+        sourceGameSlug: RIFTBOUND_JUSTTCG_GAME_SLUG,
+        status: "active",
+        notes: "Staged raw ingestion is active; exact TCGplayer joins are retained without publishing prices.",
+      },
+      tcgplayer: {
+        provider: "tcgplayer",
+        sourceGameSlug: "riftbound",
+        status: "seeded",
+      },
+    },
+  },
+  magic_the_gathering: {
+    dbSlug: "magic_the_gathering",
+    routeSlug: "magic-the-gathering",
+    name: "Magic: The Gathering",
+    isPublic: false,
+    status: "planned",
+    providers: {
+      justtcg: {
+        provider: JUSTTCG_PROVIDER,
+        sourceGameSlug: "magic-the-gathering",
+        status: "planned",
+      },
+    },
+  },
+  lorcana: {
+    dbSlug: "lorcana",
+    routeSlug: "lorcana",
+    name: "Disney Lorcana",
+    isPublic: false,
+    status: "planned",
+    providers: {
+      justtcg: {
+        provider: JUSTTCG_PROVIDER,
+        sourceGameSlug: "disney-lorcana",
+        status: "planned",
+      },
+    },
+  },
+  gundam: {
+    dbSlug: "gundam",
+    routeSlug: "gundam",
+    name: "Gundam Card Game",
+    isPublic: false,
+    status: "planned",
+    providers: {
+      justtcg: {
+        provider: JUSTTCG_PROVIDER,
+        sourceGameSlug: "gundam-card-game",
+        status: "planned",
+      },
+    },
+  },
+  dragon_ball_fusion_world: {
+    dbSlug: "dragon_ball_fusion_world",
+    routeSlug: "dragon-ball-fusion-world",
+    name: "Dragon Ball Super: Fusion World",
+    isPublic: false,
+    status: "planned",
+    providers: {
+      justtcg: {
+        provider: JUSTTCG_PROVIDER,
+        sourceGameSlug: "dragon-ball-super-fusion-world",
+        status: "planned",
+      },
+    },
+  },
+  dragon_ball_masters: {
+    dbSlug: "dragon_ball_masters",
+    routeSlug: "dragon-ball-masters",
+    name: "Dragon Ball Super: Masters",
+    isPublic: false,
+    status: "planned",
+    providers: {
+      justtcg: {
+        provider: JUSTTCG_PROVIDER,
+        sourceGameSlug: "dragon-ball-super-masters",
+        status: "planned",
+      },
+    },
+  },
+  naruto_card_game: {
+    dbSlug: "naruto_card_game",
+    routeSlug: "naruto-card-game",
+    name: "Naruto Card Game",
+    isPublic: false,
+    status: "planned",
+    providers: {},
   },
 } as const satisfies Record<string, GameDefinition>;
 
 export const DEFAULT_PUBLIC_GAME = GAME_DEFINITIONS[ONE_PIECE_DB_SLUG];
-export const HIDDEN_GAME_DEFINITIONS = [GAME_DEFINITIONS[POKEMON_DB_SLUG]] as const;
+export const HIDDEN_GAME_DEFINITIONS = Object.values(GAME_DEFINITIONS).filter(
+  (game) => !game.isPublic
+);
 
 export function getGameDefinitionByDbSlug(slug: string) {
   return GAME_DEFINITIONS[slug as keyof typeof GAME_DEFINITIONS] ?? null;

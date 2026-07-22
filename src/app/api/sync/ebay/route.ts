@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase-server";
 import { resolveOnePieceSyncGame } from "@/lib/games/one-piece/sync-scope";
 import { fetchSoldListings } from "@/lib/scrapingdog-ebay";
-import { parseGrade } from "@/lib/ebay-stats";
+import { gradeLabelForTier, parseGrade } from "@/lib/ebay-stats";
+import {
+  readProviderSyncState,
+  writeProviderSyncState,
+  type ProviderSyncScope,
+} from "@/lib/provider-sync-state";
 
 // Vercel Hobby: 10s default, this raises it to 60s
 export const maxDuration = 60;
@@ -63,6 +68,8 @@ interface EbaySaleUpsert {
   currency: string;
   grader: string | null;
   grade: number | null;
+  grade_label: string | null;
+  grade_tier_code: string | null;
   sale_type: string;
   condition: string | null;
   title: string | null;
@@ -82,41 +89,34 @@ interface EbayCursorState {
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
+function ebaySyncScope(gameId: string): ProviderSyncScope {
+  return {
+    gameId,
+    provider: "ebay",
+    jobKey: "sold_listings",
+    legacyKey: CURSOR_KEY,
+  };
+}
+
+function isMissingGradeTierColumns(error: { code?: string; message?: string } | null | undefined) {
+  const message = error?.message?.toLowerCase() ?? "";
+  return error?.code === "PGRST204" || message.includes("grade_label") || message.includes("grade_tier_code");
+}
+
 async function readEbayCursor(
-  supabase: ServiceClient
+  supabase: ServiceClient,
+  gameId: string
 ): Promise<{ state: EbayCursorState; error?: string }> {
-  const { data, error } = await supabase
-    .from("sync_state")
-    .select("state")
-    .eq("key", CURSOR_KEY)
-    .maybeSingle();
-
-  if (error) {
-    const message = error.message ?? "sync_state read failed";
-    if (error.code === "42P01" || message.includes("sync_state")) {
-      return {
-        state: {},
-        error:
-          "Missing sync_state table. Run schema-migration-v15-price-history-backfill.sql (or v16) in Supabase.",
-      };
-    }
-    return { state: {}, error: message };
-  }
-
-  return { state: (data?.state ?? {}) as EbayCursorState };
+  const result = await readProviderSyncState<EbayCursorState>(supabase, ebaySyncScope(gameId));
+  return { state: result.row?.state ?? {}, error: result.error };
 }
 
 async function writeEbayCursor(
   supabase: ServiceClient,
+  gameId: string,
   state: EbayCursorState
 ): Promise<string | null> {
-  const { error } = await supabase
-    .from("sync_state")
-    .upsert(
-      { key: CURSOR_KEY, state, updated_at: new Date().toISOString() },
-      { onConflict: "key" }
-    );
-  return error ? error.message ?? "sync_state write failed" : null;
+  return writeProviderSyncState(supabase, ebaySyncScope(gameId), state);
 }
 
 // ---------------------------------------------------------------------------
@@ -185,7 +185,7 @@ async function syncEbay(request: Request) {
       });
     }
 
-    const cursor = await readEbayCursor(supabase);
+    const cursor = await readEbayCursor(supabase, game.id);
     if (cursor.error) {
       return NextResponse.json({ error: cursor.error }, { status: 500 });
     }
@@ -234,7 +234,7 @@ async function syncEbay(request: Request) {
           if (price !== null) skippedLowPrice++;
           continue;
         }
-        const { grader, grade, sale_type } = parseGrade(listing.title ?? "");
+        const { grader, grade, sale_type, tier } = parseGrade(listing.title ?? "");
         byItemId.set(listing.itemId, {
           card_id: card.id,
           game_id: game.id,
@@ -243,6 +243,8 @@ async function syncEbay(request: Request) {
           currency: "USD",
           grader,
           grade,
+          grade_label: gradeLabelForTier(tier),
+          grade_tier_code: tier,
           sale_type,
           condition: listing.condition,
           title: listing.title || null,
@@ -254,9 +256,19 @@ async function syncEbay(request: Request) {
 
       const rows = Array.from(byItemId.values());
       if (rows.length > 0) {
-        const { error: upErr } = await supabase
+        let { error: upErr } = await supabase
           .from("ebay_sales")
           .upsert(rows, { onConflict: "ebay_item_id" });
+        if (upErr && isMissingGradeTierColumns(upErr)) {
+          const legacyRows = rows.map((row) =>
+            Object.fromEntries(
+              Object.entries(row).filter(([key]) => key !== "grade_label" && key !== "grade_tier_code")
+            )
+          );
+          ({ error: upErr } = await supabase
+            .from("ebay_sales")
+            .upsert(legacyRows, { onConflict: "ebay_item_id" }));
+        }
         if (upErr) errors.push(`${query}: ${upErr.message}`);
         else salesUpserted += rows.length;
       }
@@ -279,7 +291,7 @@ async function syncEbay(request: Request) {
     nextOffset = wrapped ? 0 : advanced;
     if (wrapped) completedCycles += 1;
 
-    const writeErr = await writeEbayCursor(supabase, {
+    const writeErr = await writeEbayCursor(supabase, game.id, {
       nextOffset,
       totalCards,
       completedCycles,

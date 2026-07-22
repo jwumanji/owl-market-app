@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-19T17:10:33.115Z",
+  "mode": "read-only GET enumeration",
+  "projectRef": "kiquytaevufssveqmqix",
+  "game": "one_piece",
+  "cardCount": 11,
+  "selectorCounts": {
+    "20260719113000.corrected_cards": 2,
+    "20260719113000.variant_label_backfill": 0,
+    "20260719114500.tr_reference_reconcile": 11
+  },
+  "routeIds": [
+    "OP07-109_p2",
+    "OP08-052_p2",
+    "OP09-015_p1",
+    "OP10-063",
+    "OP11-058_p1",
+    "OP12-108",
+    "OP13-037_tr_op15",
+    "OP16-OP16-011-TR",
+    "ST01-007_p3",
+    "ST10-010",
+    "ST18-004_p1"
+  ],
+  "cards": [
+    {
+      "id": "831054e8-5982-42ec-8743-dd11fe42baba",
+      "routeId": "OP07-109_p2",
+      "setCode": "OP08",
+      "selectors": [
+        "20260719113000.corrected_cards",
+        "20260719114500.tr_reference_reconcile"
+      ],
+      "expectedChanges": {}
+    },
+    {
+      "id": "cc751d70-28b4-4ae4-ade6-526cf6f1ddab",
+      "routeId": "OP08-052_p2",
+      "setCode": "OP10",
+      "selectors": [
+        "20260719114500.tr_reference_reconcile"
+      ],
+      "expectedChanges": {}
+    },
+    {
+      "id": "1eb65848-ce0e-4a5b-b815-f88ff6bd0169",
+      "routeId": "OP09-015_p1",
+      "setCode": "OP11",
+      "selectors": [
+        "20260719114500.tr_reference_reconcile"
+      ],
+      "expectedChanges": {}
+    },
+    {
+      "id": "9d0800ae-c435-46cc-b868-f59d6821d1d1",
+      "routeId": "OP10-063",
+      "setCode": "OP10",
+      "selectors": [
+        "20260719114500.tr_reference_reconcile"
+      ],
+      "expectedChanges": {}
+    },
+    {
+      "id": "0c967010-5a2e-49ca-b829-1119be520ad1",
+      "routeId": "OP11-058_p1",
+      "setCode": "OP13",
+      "selectors": [
+        "20260719114500.tr_reference_reconcile"
+      ],
+      "expectedChanges": {}
+    },
+    {
+      "id": "a08e5175-7245-49cc-8139-9edd2252e127",
+      "routeId": "OP12-108",
+      "setCode": "EB04",
+      "selectors": [
+        "20260719114500.tr_reference_reconcile"
+      ],
+      "expectedChanges": {}
+    },
+    {
+      "id": "27075e41-19b2-4a46-aa7b-c5b42674c7e0",
+      "routeId": "OP13-037_tr_op15",
+      "setCode": "OP15",
+      "selectors": [
+        "20260719114500.tr_reference_reconcile"
+      ],
+      "expectedChanges": {}
+    },
+    {
+      "id": "2232550e-2733-4c59-b69a-5c42efd1df5e",
+      "routeId": "OP16-OP16-011-TR",
+      "setCode": "OP16",
+      "selectors": [
+        "20260719114500.tr_reference_reconcile"
+      ],
+      "expectedChanges": {}
+    },
+    {
+      "id": "c299c2cb-ea0f-413d-9e50-6df6d4c8d0e7",
+      "routeId": "ST01-007_p3",
+      "setCode": "OP06",
+      "selectors": [
+        "20260719114500.tr_reference_reconcile"
+      ],
+      "expectedChanges": {}
+    },
+    {
+      "id": "afc64417-dd87-4260-832e-f1c47150ebea",
+      "routeId": "ST10-010",
+      "setCode": "ST10",
+      "selectors": [
+        "20260719114500.tr_reference_reconcile"
+      ],
+      "expectedChanges": {}
+    },
+    {
+      "id": "cef8a444-793c-4db2-98f1-ea9971547132",
+      "routeId": "ST18-004_p1",
+      "setCode": "OP09",
+      "selectors": [
+        "20260719113000.corrected_cards",
+        "20260719114500.tr_reference_reconcile"
+      ],
+      "expectedChanges": {}
+    }
+  ]
+}

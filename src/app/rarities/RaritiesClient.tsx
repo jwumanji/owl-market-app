@@ -176,12 +176,13 @@ function RarityPerformanceTable({
   onViewModeChange: (mode: RarityViewMode) => void;
 }) {
   const rankedRows = [...rows].sort((a, b) => {
-    const valueA = safeNumber(a.indexValue);
-    const valueB = safeNumber(b.indexValue);
-    const pricedA = valueA > 0 ? 1 : 0;
-    const pricedB = valueB > 0 ? 1 : 0;
+    const averageA = safeNumber(a.avgCardPrice);
+    const averageB = safeNumber(b.avgCardPrice);
+    const pricedA = averageA > 0 ? 1 : 0;
+    const pricedB = averageB > 0 ? 1 : 0;
     if (pricedA !== pricedB) return pricedB - pricedA;
-    return valueB - valueA;
+    if (averageA !== averageB) return averageB - averageA;
+    return safeNumber(b.indexValue) - safeNumber(a.indexValue);
   });
 
   return (
@@ -189,7 +190,7 @@ function RarityPerformanceTable({
       <div className="rar-panel-head">
         <div>
           <div className="section-title">Rarity Performance</div>
-          <div className="section-sub">Compare value, card count, and growth across rarity groups</div>
+          <div className="section-sub">Ranked by average card value · Compare count and growth across rarity groups</div>
         </div>
         <div className="rar-panel-controls">
           <div className="rar-view-toggle" aria-label="Rarity display mode">
