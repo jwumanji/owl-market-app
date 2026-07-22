@@ -72,10 +72,10 @@ export default async function CharactersPage(
   // the "No character index yet" empty state.
   const allCharacters = assignColors(loaded ?? (isDefaultGame ? FALLBACK_CHARS : []));
   const totalCharacterCount = allCharacters.length;
-  const characters = allCharacters.slice(0, 20).map((character) => ({
+  const characters = allCharacters.slice(0, 44).map((character) => ({
     ...character,
-    // Index cards only need one large thumbnail. The complete ten-card detail
-    // is fetched when the character modal opens.
+    // The Top 20 and 24 compact discovery cards only need one image. The
+    // complete ten-card detail is fetched when the character modal opens.
     topCards: character.topCards.slice(0, 1),
   }));
 

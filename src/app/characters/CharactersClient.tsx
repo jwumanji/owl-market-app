@@ -175,7 +175,10 @@ function RankCard({ c, rank, active, onClick }: { c: CharacterData; rank: number
         </div>
         <div className="ch-rank-market">
           <div className="ch-rank-market-line">
-            <div className="ch-rank-price">${c.indexValue.toLocaleString()}</div>
+            <div className="ch-rank-value">
+              <div className="ch-rank-price">${c.indexValue.toLocaleString()}</div>
+              <div className="ch-rank-value-label">Total Set Value</div>
+            </div>
             <div
               className="ch-rank-chg"
               style={{ color: changeColor(c.chg7d) }}
@@ -187,6 +190,42 @@ function RankCard({ c, rank, active, onClick }: { c: CharacterData; rank: number
             <SparkSvg data={c.spark || [0, 0]} up={c.up} w={200} h={34} pad={3} />
           </div>
         </div>
+      </div>
+    </button>
+  );
+}
+
+/* ── Compact discovery card (characters beyond the Top 20) ── */
+function CompactCharacterCard({
+  c,
+  rank,
+  active,
+  onClick,
+}: {
+  c: CharacterData;
+  rank: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const tier = TIER_LABELS[c.tier] || TIER_LABELS[3];
+  const avatar = getCharAvatar(c);
+
+  return (
+    <button
+      type="button"
+      className={`ch-compact-card${active ? " active" : ""}`}
+      aria-label={`Open ${c.name} character details`}
+      onClick={onClick}
+    >
+      <div className="ch-compact-image">
+        <CharAvatar src={avatar} name={c.name} size={150} />
+        <span className="ch-compact-rank">#{rank}</span>
+        <span className="ch-compact-tier" style={{ background: tier.bg, color: tier.color }}>{tier.label}</span>
+      </div>
+      <div className="ch-compact-copy">
+        <span className="ch-compact-name" title={c.name}>{c.name}</span>
+        <strong className="ch-compact-value">${c.indexValue.toLocaleString()}</strong>
+        <span className="ch-compact-label">Total Set Value</span>
       </div>
     </button>
   );
@@ -413,6 +452,7 @@ function CharacterCards({ c, gameRouteSlug }: { c: CharacterData; gameRouteSlug:
 /* ── Main Page (client shell — data arrives server-loaded via props) ── */
 
 const INITIAL_CHARACTER_COUNT = 20;
+const DISCOVERY_CHARACTER_COUNT = 24;
 const ALL_CHARACTER_BATCH_SIZE = 60;
 
 export default function CharactersClient({
@@ -606,6 +646,12 @@ export default function CharactersClient({
     0,
     search.trim() || showAll ? visibleAllCount : INITIAL_CHARACTER_COUNT,
   );
+  const discoveryCharacters = !search.trim() && !showAll
+    ? availableCharacters.slice(
+        INITIAL_CHARACTER_COUNT,
+        INITIAL_CHARACTER_COUNT + DISCOVERY_CHARACTER_COUNT,
+      )
+    : [];
   const modalPool = search.trim() && searchResults.length > 0 ? searchResults : availableCharacters;
   const modalIndex = c ? modalPool.findIndex((character) => character.slug === c.slug) : -1;
   const previousCharacter = modalIndex > 0 ? modalPool[modalIndex - 1] : null;
@@ -645,6 +691,32 @@ export default function CharactersClient({
               <RankCard key={ch.slug} c={ch} rank={i + 1} active={modalOpen && activeChar === ch.slug} onClick={() => openCharacter(ch.slug)} />
             ))}
           </div>
+
+          {discoveryCharacters.length > 0 && (
+            <section className="ch-discovery" aria-labelledby="more-characters-title">
+              <div className="ch-discovery-head">
+                <div>
+                  <div className="ch-discovery-kicker">Beyond the Top 20</div>
+                  <h2 id="more-characters-title" className="ch-discovery-title">More <em>characters</em></h2>
+                  <p>Fan favorites and more of the ranked character index.</p>
+                </div>
+                <button type="button" className="ch-discovery-all" onClick={toggleAllCharacters}>
+                  Browse all characters <span aria-hidden="true">→</span>
+                </button>
+              </div>
+              <div className="ch-discovery-grid">
+                {discoveryCharacters.map((character, index) => (
+                  <CompactCharacterCard
+                    key={character.slug}
+                    c={character}
+                    rank={INITIAL_CHARACTER_COUNT + index + 1}
+                    active={modalOpen && activeChar === character.slug}
+                    onClick={() => openCharacter(character.slug)}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
 
           {displayedCharacters.length === 0 && (
             <div className="ch-empty-results">No characters found.</div>
