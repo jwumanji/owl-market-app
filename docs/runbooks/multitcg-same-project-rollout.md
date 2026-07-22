@@ -239,6 +239,20 @@ In a separate change window:
    facts, preferred-price selection, and zero True Market observations.
 6. Expand shadow coverage gradually only after the selected-set check passes.
 
+### Production Gate 6 evidence — 2026-07-22
+
+- Deployed commit `f129558` with dual writing enabled and legacy reads retained.
+- Synced JustTCG v1 set `ST15` twice: both runs returned HTTP 200, five
+  attempted shadow rows, and zero errors.
+- The repeat left SKU, observation, latest-fact, and preferred-price cardinality
+  at five rows while ingest-run history advanced from one to two rows.
+- Uniqueness, latest-fact linkage, preferred selection, and zero-True-Market
+  checks passed.
+- The 200-card `shape_identity` comparison and game-boundary audit passed with
+  zero unexpected differences or cross-game issues.
+- Detailed evidence is recorded in
+  `docs/reports/multitcg-gate6-selected-set-proof.md`.
+
 The current implementation proves JustTCG v1 shadow writing. eBay exact-variant
 resolution and JP/eBay canonical observation backfills remain later work and
 continue to block read cutover.

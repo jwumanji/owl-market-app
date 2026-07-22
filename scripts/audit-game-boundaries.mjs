@@ -256,12 +256,20 @@ async function main() {
   );
 
   const privateGateIssues = [];
+  const riftboundCatalogPreviewApproved =
+    riftbound?.is_public !== false &&
+    riftbound?.metadata?.launch_status === "public_catalog_preview" &&
+    riftbound?.metadata?.public_launch_scope === "catalog_and_tcgplayer_images" &&
+    riftbound?.metadata?.public_launch_gate === "tcgplayer_images_only" &&
+    riftbound?.metadata?.pricing_status === "deferred";
   if (!onePiece) privateGateIssues.push("Missing one_piece game row");
   if (!riftbound) privateGateIssues.push("Missing riftbound game row");
   if (onePiece && onePiece.is_active === false) privateGateIssues.push("one_piece is not active");
   if (onePiece && onePiece.is_public === false) privateGateIssues.push("one_piece is not public");
   if (riftbound && riftbound.is_active === false) privateGateIssues.push("riftbound is not active");
-  if (riftbound && riftbound.is_public !== false) privateGateIssues.push("riftbound should remain private until launch approval");
+  if (riftbound && riftbound.is_public !== false && !riftboundCatalogPreviewApproved) {
+    privateGateIssues.push("riftbound is public without the approved catalog-preview launch metadata");
+  }
 
   const gameCounts = [];
   for (const game of games) {
