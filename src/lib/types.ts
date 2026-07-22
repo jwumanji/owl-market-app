@@ -66,6 +66,7 @@ export interface RarityRankItem {
   name: string;
   index_value: number;
   card_count: number;
+  top_card_id: string | null;
   top_card_name: string | null;
   top_card_image_id: string | null;
   image_url: string | null;
