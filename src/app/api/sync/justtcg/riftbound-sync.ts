@@ -782,6 +782,7 @@ export async function syncRiftboundJustTcg(request: Request) {
       observationsWritten: 0,
       preferredPricesWritten: 0,
     };
+    let normalizedPricingError: string | null = null;
     if (publishPrices && legacyPriceRows.length > 0) {
       const { data: published, error: publishError } = await supabase.rpc(
         "publish_riftbound_justtcg_prices",
@@ -792,12 +793,22 @@ export async function syncRiftboundJustTcg(request: Request) {
         prices_written: Number(published?.prices_written ?? 0),
         history_written: Number(published?.history_written ?? 0),
       };
-      normalizedPricing = await writeJustTcgShadowPrices({
-        supabase,
-        gameId: game.id,
-        sourceCatalogKey: RIFTBOUND_JUSTTCG_GAME_SLUG,
-        matches: shadowMatches,
-      });
+      try {
+        for (let index = 0; index < shadowMatches.length; index += 100) {
+          const batch = await writeJustTcgShadowPrices({
+            supabase,
+            gameId: game.id,
+            sourceCatalogKey: RIFTBOUND_JUSTTCG_GAME_SLUG,
+            matches: shadowMatches.slice(index, index + 100),
+          });
+          normalizedPricing.attempted += batch.attempted;
+          normalizedPricing.observationsWritten += batch.observationsWritten;
+          normalizedPricing.preferredPricesWritten += batch.preferredPricesWritten;
+        }
+      } catch (error) {
+        normalizedPricingError =
+          error instanceof Error ? error.message : String(error);
+      }
       await refreshPublicGameSummaries(supabase, game.id);
     }
 
@@ -838,6 +849,7 @@ export async function syncRiftboundJustTcg(request: Request) {
       legacy_history_written: legacyPricing.history_written,
       normalized_observations_written: normalizedPricing.observationsWritten,
       normalized_preferred_prices_written: normalizedPricing.preferredPricesWritten,
+      normalized_pricing_error: normalizedPricingError,
     };
     const { error: completeError } = await supabase
       .from("source_ingest_runs")

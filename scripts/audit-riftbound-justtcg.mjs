@@ -85,7 +85,7 @@ const priceRows = await supabaseRows(
 let reconciliationCandidates = [];
 try {
   reconciliationCandidates = await supabaseRows(
-    `catalog_reconciliation_candidates?select=entity_type,status,reason,last_seen_at&game_id=eq.${gameId}&provider=eq.justtcg`
+    `catalog_reconciliation_candidates?select=entity_type,status,reason,source_set_external_id,last_seen_at&game_id=eq.${gameId}&provider=eq.justtcg`
   );
 } catch (error) {
   if (!String(error).includes("catalog_reconciliation_candidates")) throw error;
@@ -137,6 +137,15 @@ console.log(
           reconciliationCandidates.reduce((counts, row) => {
             counts.set(row.status, (counts.get(row.status) ?? 0) + 1);
             return counts;
+          }, new Map())
+        ),
+        bySet: Object.fromEntries(
+          reconciliationCandidates.reduce((sets, row) => {
+            const setKey = row.source_set_external_id ?? "unknown";
+            const counts = sets.get(setKey) ?? {};
+            counts[row.status] = (counts[row.status] ?? 0) + 1;
+            sets.set(setKey, counts);
+            return sets;
           }, new Map())
         ),
       },
