@@ -14,6 +14,7 @@ import {
 } from "@/lib/catalog-card-fields";
 import { catalogPageDescription } from "@/lib/game-catalog-copy";
 import { cachedPublicData, publicDataCacheKey } from "@/lib/public-data-cache";
+import { RIFTBOUND_CARD_TYPES, RIFTBOUND_DOMAINS } from "@/lib/games/riftbound-catalog";
 import "./catalog.css";
 
 // Keep in sync with CATALOG_DATA_TTL_SECONDS (Next 15 requires a literal).
@@ -29,6 +30,8 @@ type CatalogSearchParams = {
   set?: string;
   rarity?: string;
   variant?: string;
+  domain?: string;
+  type?: string;
   q?: string;
   page?: string;
 };
@@ -78,6 +81,8 @@ type CatalogData =
       selectedSet: SetRow | null;
       selectedRarity: TaxonomyRow | null;
       selectedVariant: TaxonomyRow | null;
+      selectedDomain: string | null;
+      selectedType: string | null;
       query: string;
       warning: string | null;
     }
@@ -110,6 +115,8 @@ function hrefFor(gameRouteSlug: string, params: CatalogSearchParams) {
   if (params.set) query.set("set", params.set);
   if (params.rarity) query.set("rarity", params.rarity);
   if (params.variant) query.set("variant", params.variant);
+  if (params.domain) query.set("domain", params.domain);
+  if (params.type) query.set("type", params.type);
   if (params.q) query.set("q", params.q);
   if (params.page && params.page !== "1") query.set("page", params.page);
   const suffix = query.toString();
@@ -155,12 +162,18 @@ async function loadCatalogUncached(gameRouteSlug: string, searchParams: CatalogS
     const selectedSet = sets.find((set) => set.slug === searchParams.set || set.code === searchParams.set) ?? null;
     const selectedRarity = rarities.find((rarity) => rarity.code === searchParams.rarity) ?? null;
     const selectedVariant = variants.find((variant) => variant.code === searchParams.variant) ?? null;
+    const selectedDomain = game.slug === "riftbound" && RIFTBOUND_DOMAINS.includes(searchParams.domain as typeof RIFTBOUND_DOMAINS[number])
+      ? searchParams.domain ?? null
+      : null;
+    const selectedType = game.slug === "riftbound" && RIFTBOUND_CARD_TYPES.includes(searchParams.type as typeof RIFTBOUND_CARD_TYPES[number])
+      ? searchParams.type ?? null
+      : null;
     const query = cleanSearch(searchParams.q);
     const currentPage = pageIndex(searchParams.page);
     const from = currentPage * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
 
-    const hasCardFilters = Boolean(selectedSet || selectedRarity || selectedVariant || query);
+    const hasCardFilters = Boolean(selectedSet || selectedRarity || selectedVariant || selectedDomain || selectedType || query);
     let cardsQuery = supabase
       .from("cards")
       .select(`
@@ -185,6 +198,8 @@ async function loadCatalogUncached(gameRouteSlug: string, searchParams: CatalogS
     if (selectedSet) cardsQuery = cardsQuery.eq("set_id", selectedSet.id);
     if (selectedRarity?.id) cardsQuery = cardsQuery.eq("rarity_id", selectedRarity.id);
     if (selectedVariant?.id) cardsQuery = cardsQuery.eq("variant_id", selectedVariant.id);
+    if (selectedDomain) cardsQuery = cardsQuery.contains("color", [selectedDomain]);
+    if (selectedType) cardsQuery = cardsQuery.eq("card_type", selectedType);
     if (query) cardsQuery = cardsQuery.or(`name.ilike.%${query}%,card_number.ilike.%${query}%`);
 
     const cardsRes = await cardsQuery
@@ -210,6 +225,8 @@ async function loadCatalogUncached(gameRouteSlug: string, searchParams: CatalogS
       selectedSet,
       selectedRarity,
       selectedVariant,
+      selectedDomain,
+      selectedType,
       query,
       warning: warnings.length > 0 ? warnings.join(" / ") : null,
     };
@@ -230,6 +247,8 @@ async function loadCatalog(gameRouteSlug: string, searchParams: CatalogSearchPar
       searchParams.set ?? "",
       searchParams.rarity ?? "",
       searchParams.variant ?? "",
+      searchParams.domain ?? "",
+      searchParams.type ?? "",
       cleanSearch(searchParams.q),
       pageIndex(searchParams.page) + 1
     ),
@@ -274,6 +293,8 @@ export default async function GameCatalogPage(
     set: data.selectedSet?.slug,
     rarity: data.selectedRarity?.code ?? undefined,
     variant: data.selectedVariant?.code ?? undefined,
+    domain: data.selectedDomain ?? undefined,
+    type: data.selectedType ?? undefined,
     q: data.query || undefined,
   };
 
@@ -302,6 +323,8 @@ export default async function GameCatalogPage(
           {data.selectedSet && <input type="hidden" name="set" value={data.selectedSet.slug} />}
           {data.selectedRarity?.code && <input type="hidden" name="rarity" value={data.selectedRarity.code} />}
           {data.selectedVariant?.code && <input type="hidden" name="variant" value={data.selectedVariant.code} />}
+          {data.selectedDomain && <input type="hidden" name="domain" value={data.selectedDomain} />}
+          {data.selectedType && <input type="hidden" name="type" value={data.selectedType} />}
           <input type="search" name="q" defaultValue={data.query} placeholder="Search card name or number" />
           <button type="submit">Search</button>
         </form>
@@ -338,6 +361,28 @@ export default async function GameCatalogPage(
             active: data.selectedVariant?.id === variant.id,
           }))}
         />
+        {data.game.slug === "riftbound" && (
+          <FilterGroup
+            title="Domains"
+            items={RIFTBOUND_DOMAINS.map((domain) => ({
+              key: domain,
+              label: domain,
+              href: hrefFor(data.game.routeSlug, { ...activeParams, domain, page: "1" }),
+              active: data.selectedDomain === domain,
+            }))}
+          />
+        )}
+        {data.game.slug === "riftbound" && (
+          <FilterGroup
+            title="Card types"
+            items={RIFTBOUND_CARD_TYPES.map((type) => ({
+              key: type,
+              label: type,
+              href: hrefFor(data.game.routeSlug, { ...activeParams, type, page: "1" }),
+              active: data.selectedType === type,
+            }))}
+          />
+        )}
       </div>
 
       {data.warning && <div className="catalog-warning">{data.warning}</div>}

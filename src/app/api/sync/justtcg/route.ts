@@ -28,6 +28,7 @@ import {
   writeJustTcgShadowPrices,
   type JustTcgShadowPriceMatch,
 } from "@/lib/multitcg/justtcg-shadow-write";
+import { syncRiftboundJustTcg } from "./riftbound-sync";
 
 // Vercel Hobby: 10s default, this raises it to 60s
 export const maxDuration = 60;
@@ -82,7 +83,7 @@ interface SyncSetResult {
 // ?allowCatalogMutations=1.
 // ---------------------------------------------------------------------------
 
-async function syncPrices(request: Request) {
+async function syncOnePiecePrices(request: Request) {
   const { searchParams } = new URL(request.url);
   let rollout: ReturnType<typeof getMultiTcgRolloutConfig>;
   try {
@@ -1545,5 +1546,11 @@ function addToBatch(
 // ---------------------------------------------------------------------------
 // Route exports
 // ---------------------------------------------------------------------------
+
+async function syncPrices(request: Request) {
+  const game = new URL(request.url).searchParams.get("game");
+  if (game === "riftbound") return syncRiftboundJustTcg(request);
+  return syncOnePiecePrices(request);
+}
 
 export { syncPrices as GET, syncPrices as POST };

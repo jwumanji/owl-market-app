@@ -2,7 +2,6 @@ import { ONE_PIECE_JUSTTCG_GAME_SLUG, parseVariant } from "@/lib/games/one-piece
 import { JUSTTCG_NORMALIZED_API_BASE } from "@/lib/games/provider-contract";
 
 const BASE = JUSTTCG_NORMALIZED_API_BASE;
-const GAME = ONE_PIECE_JUSTTCG_GAME_SLUG;
 
 function headers(): HeadersInit {
   const key = process.env.JUSTTCG_API_KEY;
@@ -32,6 +31,7 @@ export interface JustTCGVariant {
   trendSlope30d: number | null;
   minPriceAllTime: number | null;
   maxPriceAllTime: number | null;
+  lastUpdated?: number | null;
 }
 
 export interface JustTCGCard {
@@ -83,14 +83,16 @@ async function fetchJSON<T>(url: string): Promise<T> {
   return res.json();
 }
 
-/** Fetch all One Piece TCG sets, handling future pagination growth. */
-export async function fetchSets(): Promise<JustTCGSet[]> {
+/** Fetch every set for one provider game, handling future pagination growth. */
+export async function fetchSets(
+  gameSlug = ONE_PIECE_JUSTTCG_GAME_SLUG
+): Promise<JustTCGSet[]> {
   const all: JustTCGSet[] = [];
   let offset = 0;
 
   while (true) {
     const res = await fetchJSON<PaginatedResponse<JustTCGSet>>(
-      `${BASE}/sets?game=${GAME}&limit=100&offset=${offset}`
+      `${BASE}/sets?game=${encodeURIComponent(gameSlug)}&limit=100&offset=${offset}`
     );
     all.push(...res.data);
     if (!hasMore(res)) break;
@@ -100,14 +102,17 @@ export async function fetchSets(): Promise<JustTCGSet[]> {
   return all;
 }
 
-/** Fetch all cards in a set, handling pagination (100 per page) */
-export async function fetchCardsBySet(setSlug: string): Promise<JustTCGCard[]> {
+/** Fetch every card in one provider set, handling pagination (100 per page). */
+export async function fetchCardsBySet(
+  setSlug: string,
+  gameSlug = ONE_PIECE_JUSTTCG_GAME_SLUG
+): Promise<JustTCGCard[]> {
   const all: JustTCGCard[] = [];
   let offset = 0;
 
   while (true) {
     const res = await fetchJSON<PaginatedResponse<JustTCGCard>>(
-      `${BASE}/cards?game=${GAME}&set=${encodeURIComponent(setSlug)}&include_price_history=false&limit=100&offset=${offset}`
+      `${BASE}/cards?game=${encodeURIComponent(gameSlug)}&set=${encodeURIComponent(setSlug)}&include_price_history=false&limit=100&offset=${offset}`
     );
     all.push(...res.data);
     if (!hasMore(res)) break;

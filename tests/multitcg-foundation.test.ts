@@ -81,6 +81,9 @@ test("hardening migration makes locks atomic and correlates pricing identities",
 
   assert.match(sql, /create or replace function public\.acquire_provider_sync_state/);
   assert.match(sql, /on conflict \(game_id, catalog_scope, provider, provider_api_version, job_key, scope_key\)/);
+  assert.match(sql, /scoped_release\.lock_owner = p_lock_owner/);
+  assert.match(sql, /legacy_release\.lock_owner = p_lock_owner/);
+  assert.doesNotMatch(sql, /^\s+and lock_owner = p_lock_owner;/m);
   assert.match(sql, /provider_skus_product_provider_game_fk/);
   assert.match(sql, /price_observations_sku_identity_fk/);
   assert.match(sql, /latest_price_facts_observation_identity_fk/);

@@ -5,6 +5,7 @@ import {
   ONE_PIECE_ROUTE_SLUG,
   OPTCGAPI_PROVIDER,
 } from "@/lib/games/one-piece";
+import { RIFTBOUND_JUSTTCG_GAME_SLUG } from "@/lib/games/riftbound-justtcg";
 
 export type GameAdapterStatus = "active" | "seeded" | "planned";
 
@@ -80,9 +81,9 @@ export const GAME_DEFINITIONS = {
     providers: {
       justtcg: {
         provider: JUSTTCG_PROVIDER,
-        sourceGameSlug: "riftbound-league-of-legends-trading-card-game",
-        status: "planned",
-        notes: "Reconcile against the existing Riftcodex/TCGplayer bootstrap before enabling prices.",
+        sourceGameSlug: RIFTBOUND_JUSTTCG_GAME_SLUG,
+        status: "active",
+        notes: "Staged raw ingestion is active; exact TCGplayer joins are retained without publishing prices.",
       },
       tcgplayer: {
         provider: "tcgplayer",
