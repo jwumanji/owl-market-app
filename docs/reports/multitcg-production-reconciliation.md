@@ -1,6 +1,6 @@
 # Multi-TCG Reconciliation
 
-Generated: 2026-07-22T09:33:56.232Z
+Generated: 2026-07-22T09:53:27.600Z
 Supabase project: kiquytaevufssveqmqix
 Mode: read-only
 Foundation: PASS
@@ -18,8 +18,8 @@ Read cutover: BLOCKED
 | One Piece TR rarity taxonomy | 1 | 0 |
 | External provider-code mapping | 4 | 0 |
 | eBay exact variant match | 1755 | 1755 |
-| Immutable price observations | 15 | 0 |
-| Preferred priced-card coverage | 4594 | 4579 |
+| Immutable price observations | 47 | 0 |
+| Preferred priced-card coverage | 4594 | 4547 |
 
 ## Pending manual catalog identity
 
@@ -33,7 +33,7 @@ _None._
 ## Read-cutover blockers
 
 - 1755 eBay sales do not resolve to exactly one commercial variant
-- 4579 legacy priced cards lack a preferred-price projection
+- 4547 legacy priced cards lack a preferred-price projection
 
 ## Interpretation
 

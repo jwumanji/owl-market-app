@@ -1,6 +1,6 @@
 # Game Boundary Audit
 
-Generated: 2026-07-22T09:34:26.037Z
+Generated: 2026-07-22T09:54:15.168Z
 Result: PASS
 
 ## Game Rows
@@ -18,7 +18,7 @@ Result: PASS
 | one_piece | sets | 53 |
 | one_piece | cards | 5053 |
 | one_piece | price_stats | 4594 |
-| one_piece | price_history | 87147 |
+| one_piece | price_history | 87179 |
 | one_piece | inventory_items | 101 |
 | one_piece | custom_cards | 0 |
 | one_piece | card_match_aliases | 3 |
