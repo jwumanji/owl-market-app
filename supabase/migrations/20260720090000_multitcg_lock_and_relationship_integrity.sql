@@ -398,10 +398,10 @@ begin
 
   if not found then
     if p_legacy_key is not null then
-      update public.sync_state
+      update public.sync_state as legacy_rollback
       set locked_at = null, lock_owner = null, updated_at = v_now
-      where key = p_legacy_key
-        and lock_owner = p_lock_owner;
+      where legacy_rollback.key = p_legacy_key
+        and legacy_rollback.lock_owner = p_lock_owner;
     end if;
 
     return query
@@ -417,10 +417,10 @@ begin
   end if;
 
   if p_legacy_key is not null then
-    update public.sync_state
+    update public.sync_state as legacy_refresh
     set state = v_state, updated_at = v_now
-    where key = p_legacy_key
-      and lock_owner = p_lock_owner;
+    where legacy_refresh.key = p_legacy_key
+      and legacy_refresh.lock_owner = p_lock_owner;
   end if;
 
   return query select v_state, v_locked_at, v_lock_owner, true;
@@ -447,19 +447,19 @@ declare
   v_now timestamptz := clock_timestamp();
   v_released boolean;
 begin
-  update public.provider_sync_states
+  update public.provider_sync_states as scoped_release
   set
     state = coalesce(p_state, '{}'::jsonb),
     locked_at = null,
     lock_owner = null,
     updated_at = v_now
-  where game_id = p_game_id
-    and catalog_scope = coalesce(p_catalog_scope, '')
-    and provider = p_provider
-    and provider_api_version = coalesce(p_provider_api_version, '')
-    and job_key = p_job_key
-    and scope_key = coalesce(p_scope_key, '')
-    and lock_owner = p_lock_owner;
+  where scoped_release.game_id = p_game_id
+    and scoped_release.catalog_scope = coalesce(p_catalog_scope, '')
+    and scoped_release.provider = p_provider
+    and scoped_release.provider_api_version = coalesce(p_provider_api_version, '')
+    and scoped_release.job_key = p_job_key
+    and scoped_release.scope_key = coalesce(p_scope_key, '')
+    and scoped_release.lock_owner = p_lock_owner;
 
   v_released := found;
   if not v_released then
@@ -467,14 +467,14 @@ begin
   end if;
 
   if p_legacy_key is not null then
-    update public.sync_state
+    update public.sync_state as legacy_release
     set
       state = coalesce(p_state, '{}'::jsonb),
       locked_at = null,
       lock_owner = null,
       updated_at = v_now
-    where key = p_legacy_key
-      and lock_owner = p_lock_owner;
+    where legacy_release.key = p_legacy_key
+      and legacy_release.lock_owner = p_lock_owner;
   end if;
 
   return true;
