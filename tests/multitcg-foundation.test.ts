@@ -129,6 +129,17 @@ test("JustTCG cursor uses one-set invocations and deterministic keyset paginatio
   );
 });
 
+test("game boundary audit gates Riftbound live pricing on exact JustTCG ingestion", () => {
+  const audit = fs.readFileSync(
+    path.join(process.cwd(), "scripts/audit-game-boundaries.mjs"),
+    "utf8"
+  );
+
+  assert.match(audit, /pricing_status === "live"/);
+  assert.match(audit, /pricing_provider === "justtcg"/);
+  assert.match(audit, /justtcg_ingestion_status === "live_exact_matches"/);
+});
+
 test("provider sync helper uses the atomic lock RPC when available", async () => {
   const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
   const supabase = {

@@ -256,19 +256,26 @@ async function main() {
   );
 
   const privateGateIssues = [];
+  const riftboundPricingGateApproved =
+    riftbound?.metadata?.pricing_status === "deferred" ||
+    (
+      riftbound?.metadata?.pricing_status === "live" &&
+      riftbound?.metadata?.pricing_provider === "justtcg" &&
+      riftbound?.metadata?.justtcg_ingestion_status === "live_exact_matches"
+    );
   const riftboundCatalogPreviewApproved =
     riftbound?.is_public !== false &&
     riftbound?.metadata?.launch_status === "public_catalog_preview" &&
     riftbound?.metadata?.public_launch_scope === "catalog_and_tcgplayer_images" &&
     riftbound?.metadata?.public_launch_gate === "tcgplayer_images_only" &&
-    riftbound?.metadata?.pricing_status === "deferred";
+    riftboundPricingGateApproved;
   if (!onePiece) privateGateIssues.push("Missing one_piece game row");
   if (!riftbound) privateGateIssues.push("Missing riftbound game row");
   if (onePiece && onePiece.is_active === false) privateGateIssues.push("one_piece is not active");
   if (onePiece && onePiece.is_public === false) privateGateIssues.push("one_piece is not public");
   if (riftbound && riftbound.is_active === false) privateGateIssues.push("riftbound is not active");
   if (riftbound && riftbound.is_public !== false && !riftboundCatalogPreviewApproved) {
-    privateGateIssues.push("riftbound is public without the approved catalog-preview launch metadata");
+    privateGateIssues.push("riftbound is public without an approved catalog-preview and pricing gate");
   }
 
   const gameCounts = [];
