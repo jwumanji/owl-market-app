@@ -20,9 +20,9 @@ const nextConfig = {
     // stylesheet requests PSI flagged ~570ms on every page — ~20KB br of CSS
     // total, and no Early Hints on this deployment to parallelize them.
     inlineCss: true,
-    // The hot-card prerender still queries Supabase during builds. Keep its
-    // concurrency bounded so deployments and live traffic do not stampede
-    // the database when multiple builds overlap.
+    // If a hot-card prerender is enabled with CARD_STATIC_PARAMS_COUNT, keep
+    // its concurrency bounded so builds and live traffic do not stampede the
+    // database when multiple deployments overlap.
     staticGenerationMaxConcurrency: 4,
     staticGenerationRetryCount: 3,
   },

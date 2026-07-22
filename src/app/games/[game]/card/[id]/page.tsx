@@ -8,11 +8,11 @@ import { ONE_PIECE_DB_SLUG } from "@/lib/games/one-piece";
 // Keep in sync with CATALOG_DATA_TTL_SECONDS (Next 15 requires a literal).
 export const revalidate = 3600;
 
-// Pre-render only the highest-value cards at build time. The rest of the
-// catalog stays available through on-demand rendering (dynamicParams defaults
-// to true) and is cached by ISR after the first request. Rebuilding the entire
-// catalog made deployments increasingly fragile as additional games were added.
-const STATIC_CARD_COUNT = Number(process.env.CARD_STATIC_PARAMS_COUNT ?? 250);
+// Card detail pages stay available through on-demand rendering (dynamicParams
+// defaults to true) and are cached by ISR after the first request. Operators
+// can opt a small hot set into build-time rendering, but the safe default is
+// zero so deployments do not depend on catalog size or database headroom.
+const STATIC_CARD_COUNT = Number(process.env.CARD_STATIC_PARAMS_COUNT ?? 0);
 
 export async function generateStaticParams() {
   try {
