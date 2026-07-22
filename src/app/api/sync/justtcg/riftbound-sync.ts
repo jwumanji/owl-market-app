@@ -727,18 +727,41 @@ export async function syncRiftboundJustTcg(request: Request) {
       }
     }
 
+    const dedupedRawRows = Array.from(
+      new Map(
+        rawRows.map((row) => [
+          [row.game_id, row.provider, row.record_type, row.external_id].join(":"),
+          row,
+        ])
+      ).values()
+    );
+    const dedupedCardExternalRows = Array.from(
+      new Map(cardExternalRows.map((row) => [String(row.external_id), row])).values()
+    );
+    const dedupedSetExternalRows = Array.from(
+      new Map(setExternalRows.map((row) => [String(row.external_id), row])).values()
+    );
+    const dedupedCandidateRows = Array.from(
+      new Map(
+        candidateRows.map((row) => [
+          [row.entity_type, row.external_id].join(":"),
+          row,
+        ])
+      ).values()
+    );
+
     await upsertChunks(
       supabase,
       "tcg_source_records",
-      rawRows,
+      dedupedRawRows,
       "game_id,provider,record_type,external_id"
     );
-    await insertChunks(supabase, "card_external_ids", cardExternalRows);
-    await insertChunks(supabase, "set_external_ids", setExternalRows);
+    await insertChunks(supabase, "card_external_ids", dedupedCardExternalRows);
+    await insertChunks(supabase, "set_external_ids", dedupedSetExternalRows);
     await upsertChunks(
       supabase,
       "catalog_reconciliation_candidates",
-      candidateRows,
+      dedupedCandidateRows,
       "game_id,provider,entity_type,external_id"
     );
 
@@ -804,12 +827,12 @@ export async function syncRiftboundJustTcg(request: Request) {
       cards_matched: matchedCards.length,
       cards_unmatched: unmatchedCards.length,
       variants_fetched: variantCount,
-      raw_records_written: rawRows.length,
-      card_external_ids_inserted: cardExternalRows.length,
-      set_external_ids_inserted: setExternalRows.length,
+      raw_records_written: dedupedRawRows.length,
+      card_external_ids_inserted: dedupedCardExternalRows.length,
+      set_external_ids_inserted: dedupedSetExternalRows.length,
       card_identity_conflicts: cardIdentityConflicts.length,
       set_identity_conflicts: setIdentityConflicts.length,
-      reconciliation_candidates_written: candidateRows.length,
+      reconciliation_candidates_written: dedupedCandidateRows.length,
       reconciliation_statuses: Object.fromEntries(candidateStatusCounts),
       legacy_prices_written: legacyPricing.prices_written,
       legacy_history_written: legacyPricing.history_written,
