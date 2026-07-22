@@ -53,7 +53,7 @@ v2 beta fields, or ingest True Market during this rollout.
 Review the migration SQL, rollout flags, audit scripts, and this runbook as one
 change. In particular, verify:
 
-1. The five new migrations are additive and safe for the live schema.
+1. The six rollout migrations are additive and safe for the live schema.
 2. `cards.updated_at` is added in `20260719090000` before the later Treasure
    Rare migrations use it.
 3. The two summary tables do not require an `id` column.
@@ -142,6 +142,7 @@ by the dry run, in timestamp order. The multi-TCG portion is:
 3. `20260719100000_multitcg_pricing_foundation.sql`
 4. `20260719113000_one_piece_treasure_rare_integrity.sql`
 5. `20260719114500_one_piece_tr_rarity_reference.sql`
+6. `20260720090000_multitcg_lock_and_relationship_integrity.sql`
 
 Each file is transactional. If one fails, stop; do not retry blindly or edit
 the live database manually. Capture the error and compare the live schema with
@@ -179,6 +180,24 @@ forward compatibility fix. Do not drop the newly created tables as an
 emergency response.
 
 ## Gate 5 — deploy dormant dual-write code
+
+### Production Gate 4 evidence — 2026-07-22
+
+- Local and remote migration histories match through
+  `20260720130000_market_avg_public_summaries.sql`.
+- No scoped or legacy sync lock was active during the verification window.
+- A fresh 200-card exact fixture was captured at
+  `tests/fixtures/golden/card-api-one-piece-gate4-current.json` and the
+  immediate exact comparison passed with zero differences.
+- Foundation reconciliation passed; read cutover remains blocked as expected.
+- One Piece and Riftbound game-boundary checks passed with zero cross-game or
+  missing-`game_id` findings.
+
+Evidence is recorded in:
+
+- `docs/reports/card-api-gate4-current-comparison.md`
+- `docs/reports/multitcg-production-reconciliation.md`
+- `docs/reports/game-boundary-gate4.md`
 
 Deploy the application with dual writing explicitly off and legacy reads
 explicitly selected. Repeat the golden comparison and smoke tests, then resume

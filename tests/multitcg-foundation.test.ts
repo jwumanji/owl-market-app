@@ -13,11 +13,16 @@ import { buildGradeKey, toPriceObservationRow } from "../src/lib/multitcg/pricin
 import {
   justTcgObservedAt,
   normalizeProviderCondition,
+  writeJustTcgShadowPrices,
 } from "../src/lib/multitcg/justtcg-shadow-write.ts";
 import {
   assertSafeMultiTcgRollout,
   getMultiTcgRolloutConfig,
 } from "../src/lib/multitcg/rollout.ts";
+import {
+  acquireProviderSyncState,
+  releaseProviderSyncState,
+} from "../src/lib/provider-sync-state.ts";
 import {
   classifyExpectedDifferences,
   stableJson,
@@ -63,6 +68,74 @@ test("Gate 1 SQL bundle contains the five migrations verbatim in apply order", (
     assert.equal(bundledSql, source, `${migration} differs from its bundled SQL`);
     priorBlockEnd = blockEnd;
   }
+});
+
+test("hardening migration makes locks atomic and correlates pricing identities", () => {
+  const sql = fs.readFileSync(
+    path.join(
+      process.cwd(),
+      "supabase/migrations/20260720090000_multitcg_lock_and_relationship_integrity.sql"
+    ),
+    "utf8"
+  );
+
+  assert.match(sql, /create or replace function public\.acquire_provider_sync_state/);
+  assert.match(sql, /on conflict \(game_id, catalog_scope, provider, provider_api_version, job_key, scope_key\)/);
+  assert.match(sql, /provider_skus_product_provider_game_fk/);
+  assert.match(sql, /price_observations_sku_identity_fk/);
+  assert.match(sql, /latest_price_facts_observation_identity_fk/);
+  assert.match(sql, /preferred_card_prices_fact_variant_fk/);
+  assert.match(sql, /sealed_product_price_history_product_game_fk/);
+});
+
+test("provider sync helper uses the atomic lock RPC when available", async () => {
+  const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
+  const supabase = {
+    rpc: async (name: string, args: Record<string, unknown>) => {
+      calls.push({ name, args });
+      if (name === "acquire_provider_sync_state") {
+        return {
+          data: [{
+            state: { nextIndex: 3 },
+            locked_at: "2026-07-20T00:00:00.000Z",
+            lock_owner: String(args.p_lock_owner),
+            acquired: true,
+          }],
+          error: null,
+        };
+      }
+      return { data: true, error: null };
+    },
+  };
+  const scope = {
+    gameId: "game-id",
+    provider: "justtcg",
+    providerApiVersion: "v1",
+    jobKey: "current_prices",
+    legacyKey: "legacy-cursor",
+  };
+
+  const acquired = await acquireProviderSyncState({
+    supabase,
+    scope,
+    lockTtlMs: 60_000,
+    reset: false,
+    resetState: () => ({ nextIndex: 0 }),
+    normalizeState: (state: { nextIndex: number }) => state,
+  });
+  assert.equal(acquired.locked, false);
+  assert.equal(acquired.state.nextIndex, 3);
+  assert.ok(acquired.lockOwner);
+  assert.equal(calls[0]?.name, "acquire_provider_sync_state");
+  assert.equal(calls[0]?.args.p_lock_ttl_seconds, 60);
+
+  assert.equal(await releaseProviderSyncState({
+    supabase,
+    scope,
+    lockOwner: acquired.lockOwner!,
+    state: acquired.state,
+  }), null);
+  assert.equal(calls[1]?.name, "release_provider_sync_state");
 });
 
 test("JustTCG v1 is normalized while v2 beta remains raw-only", () => {
@@ -143,6 +216,94 @@ test("JustTCG shadow normalization is deterministic and does not use True Market
   assert.equal(normalizeProviderCondition("Near Mint"), "near_mint");
   assert.equal(justTcgObservedAt(1_752_883_200), "2025-07-19T00:00:00.000Z");
   assert.equal(justTcgObservedAt(1_752_883_200_000), "2025-07-19T00:00:00.000Z");
+});
+
+test("JustTCG shadow writes use one transactional batch and an ingest run", async () => {
+  const calls: Array<{ operation: string; value?: unknown }> = [];
+  const updateChain = {
+    eq() {
+      return this;
+    },
+    then(resolve: (value: { error: null }) => void) {
+      resolve({ error: null });
+    },
+  };
+  const supabase = {
+    from(table: string) {
+      if (table === "data_providers") {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  maybeSingle: async () => ({
+                    data: {
+                      id: "provider-id",
+                      is_active: true,
+                      normalized_api_version: "v1",
+                    },
+                    error: null,
+                  }),
+                };
+              },
+            };
+          },
+        };
+      }
+      if (table === "source_ingest_runs") {
+        return {
+          insert: async (value: unknown) => {
+            calls.push({ operation: "insert-run", value });
+            return { error: null };
+          },
+          update: (value: unknown) => {
+            calls.push({ operation: "update-run", value });
+            return updateChain;
+          },
+        };
+      }
+      throw new Error("Unexpected table " + table);
+    },
+    rpc: async (name: string, value: unknown) => {
+      calls.push({ operation: name, value });
+      return {
+        data: {
+          attempted: 1,
+          observations_written: 1,
+          preferred_prices_written: 1,
+        },
+        error: null,
+      };
+    },
+  };
+
+  const result = await writeJustTcgShadowPrices({
+    supabase,
+    gameId: "game-id",
+    sourceCatalogKey: "one-piece-card-game",
+    matches: [{
+      legacyCardId: "legacy-card-id",
+      providerProductExternalId: "product-id",
+      providerProductNamespace: "product_id",
+      providerSkuExternalId: "sku-id",
+      providerSkuNamespace: "variant_id",
+      condition: "Near Mint",
+      printing: "Normal",
+      amount: 12.34,
+      observedAt: "2026-07-20T00:00:00.000Z",
+      sourceSetSlug: "op-01",
+      rawProduct: { id: "product-id" },
+      rawVariant: { id: "sku-id" },
+    }],
+  });
+
+  assert.equal(result.observationsWritten, 1);
+  assert.equal(result.preferredPricesWritten, 1);
+  assert.ok(result.ingestRunId);
+  assert.deepEqual(
+    calls.map((call) => call.operation),
+    ["insert-run", "write_justtcg_shadow_price_batch", "update-run"]
+  );
 });
 
 test("rollout defaults to legacy reads and blocks an unsafe direct cutover", () => {

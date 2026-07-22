@@ -205,6 +205,15 @@ create table public.ebay_sales (
   sold_at timestamptz
 );
 
+create table public.sealed_products (
+  id uuid primary key default gen_random_uuid(),
+  game_id uuid not null references public.games(id),
+  set_id uuid references public.sets(id),
+  tcg_product_id text,
+  product_type text not null default 'booster_box',
+  tcg_price numeric
+);
+
 with game_row as (
   insert into public.games (slug, name, is_public)
   values ('one_piece', 'One Piece Card Game', true)
@@ -306,3 +315,7 @@ insert into public.ebay_sales (
 )
 select game_id, id, 'ebay-1', 125.00, 'USD', 'BGS 10 Black Label Monkey.D.Luffy OP01-024', now()
 from public.cards;
+
+insert into public.sealed_products (game_id, set_id, tcg_product_id, product_type, tcg_price)
+select game_id, id, 'sealed-op01', 'booster_box', 99.00
+from public.sets;

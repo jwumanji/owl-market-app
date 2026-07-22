@@ -143,6 +143,9 @@ async function main() {
     setExternalIds,
     sourceRecords,
     priceMappings,
+    sealedProducts,
+    sealedPriceHistory,
+    cardMarketSyncStatus,
   ] = await Promise.all([
     sbFetchAll("sets?select=id,game_id,slug,code,name"),
     sbFetchAll("cards?select=id,game_id,set_id,card_image_id,card_number,name"),
@@ -162,6 +165,9 @@ async function main() {
     sbFetchAll("set_external_ids?select=id,game_id,provider,external_id,set_id"),
     sbFetchAll("tcg_source_records?select=id,game_id,provider,record_type,external_id"),
     sbFetchAll("price_provider_mappings?select=id,game_id,provider,source_game_slug,is_active"),
+    sbFetchAll("sealed_products?select=id,game_id,set_id"),
+    sbFetchAll("sealed_product_price_history?select=id,game_id,sealed_product_id"),
+    sbFetchAll("card_market_sync_status?select=game_id,card_id,provider"),
   ]);
 
   const tables = [
@@ -183,6 +189,9 @@ async function main() {
     ["set_external_ids", setExternalIds],
     ["tcg_source_records", sourceRecords],
     ["price_provider_mappings", priceMappings],
+    ["sealed_products", sealedProducts],
+    ["sealed_product_price_history", sealedPriceHistory],
+    ["card_market_sync_status", cardMarketSyncStatus],
   ];
 
   const setsById = indexById(sets);
@@ -192,6 +201,7 @@ async function main() {
   const bundlesById = indexById(bundles);
   const ordersById = indexById(orders);
   const psaSubmissionsById = indexById(psaSubmissions);
+  const sealedProductsById = indexById(sealedProducts);
 
   const crossGameIssues = [
     ...findCrossGameRows(cards, setsById, "set_id", "cards.set_id"),
@@ -209,6 +219,19 @@ async function main() {
     ...findCrossGameRows(centeringMeasurements, inventoryItemsById, "inventory_item_id", "centering_measurements.inventory_item_id"),
     ...findCrossGameRows(cardExternalIds, cardsById, "card_id", "card_external_ids.card_id"),
     ...findCrossGameRows(setExternalIds, setsById, "set_id", "set_external_ids.set_id"),
+    ...findCrossGameRows(sealedProducts, setsById, "set_id", "sealed_products.set_id"),
+    ...findCrossGameRows(
+      sealedPriceHistory,
+      sealedProductsById,
+      "sealed_product_id",
+      "sealed_product_price_history.sealed_product_id"
+    ),
+    ...findCrossGameRows(
+      cardMarketSyncStatus,
+      cardsById,
+      "card_id",
+      "card_market_sync_status.card_id"
+    ),
   ];
 
   const globalCardDuplicates = duplicateKeys(cards, (card) => card.card_image_id);

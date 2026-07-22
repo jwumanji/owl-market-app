@@ -60,6 +60,19 @@ function isMissingRelation(error: { code?: string; message?: string } | null | u
   );
 }
 
+function isMissingFunction(
+  error: { code?: string; message?: string } | null | undefined,
+  functionName: string
+) {
+  const message = error?.message?.toLowerCase() ?? "";
+  return (
+    error?.code === "42883" ||
+    error?.code === "PGRST202" ||
+    (message.includes(functionName.toLowerCase()) &&
+      (message.includes("does not exist") || message.includes("could not find")))
+  );
+}
+
 async function readLegacyState<TState>(
   supabase: SupabaseLike,
   legacyKey: string | undefined
@@ -188,10 +201,71 @@ export async function acquireProviderSyncState<TState>(options: {
   resetState: () => TState;
   normalizeState: (existing: TState) => TState;
 }): Promise<AcquireProviderSyncStateResult<TState>> {
+  const resetState = options.resetState();
+  const requestedLockOwner = globalThis.crypto.randomUUID();
+  const values = scopeValues(options.scope);
+  const atomicResult = await options.supabase.rpc("acquire_provider_sync_state", {
+    p_game_id: values.game_id,
+    p_catalog_scope: values.catalog_scope,
+    p_provider: values.provider,
+    p_provider_api_version: values.provider_api_version,
+    p_job_key: values.job_key,
+    p_scope_key: values.scope_key,
+    p_legacy_key: values.legacy_key,
+    p_lock_owner: requestedLockOwner,
+    p_lock_ttl_seconds: Math.max(1, Math.ceil(options.lockTtlMs / 1000)),
+    p_reset: options.reset,
+    p_reset_state: resetState,
+  });
+
+  if (!atomicResult.error) {
+    const atomicRow = (
+      Array.isArray(atomicResult.data) ? atomicResult.data[0] : atomicResult.data
+    ) as {
+      state?: TState;
+      locked_at?: string | null;
+      lock_owner?: string | null;
+      acquired?: boolean;
+    } | null;
+    const state = options.reset
+      ? resetState
+      : options.normalizeState((atomicRow?.state ?? resetState) as TState);
+
+    if (!atomicRow?.acquired) {
+      return {
+        state,
+        lockOwner: null,
+        locked: true,
+        row: { locked_at: atomicRow?.locked_at ?? null },
+      };
+    }
+
+    return {
+      state,
+      lockOwner: atomicRow.lock_owner ?? requestedLockOwner,
+      locked: false,
+      row: { locked_at: atomicRow.locked_at ?? null },
+    };
+  }
+
+  if (!isMissingFunction(atomicResult.error, "acquire_provider_sync_state")) {
+    return {
+      state: resetState,
+      lockOwner: null,
+      locked: false,
+      status: 500,
+      error: {
+        error: atomicResult.error.message ?? "acquire_provider_sync_state failed",
+      },
+    };
+  }
+
+  // Compatibility fallback for deployments where the additive lock RPC has
+  // not landed yet. The rollout never enables new-game jobs in this state.
   const current = await readProviderSyncState<TState>(options.supabase, options.scope);
   if (current.error) {
     return {
-      state: options.resetState(),
+      state: resetState,
       lockOwner: null,
       locked: false,
       status: 500,
@@ -214,9 +288,9 @@ export async function acquireProviderSyncState<TState>(options: {
   }
 
   const state = options.reset || !current.row
-    ? options.resetState()
+    ? resetState
     : options.normalizeState(current.row.state);
-  const lockOwner = globalThis.crypto.randomUUID();
+  const lockOwner = requestedLockOwner;
   const lockedAt = new Date().toISOString();
   const error = await writeProviderSyncState(options.supabase, options.scope, state, {
     lockedAt,
@@ -241,6 +315,31 @@ export async function releaseProviderSyncState<TState>(options: {
   state: TState;
 }): Promise<string | null> {
   const values = scopeValues(options.scope);
+  const atomicResult = await options.supabase.rpc("release_provider_sync_state", {
+    p_game_id: values.game_id,
+    p_catalog_scope: values.catalog_scope,
+    p_provider: values.provider,
+    p_provider_api_version: values.provider_api_version,
+    p_job_key: values.job_key,
+    p_scope_key: values.scope_key,
+    p_legacy_key: values.legacy_key,
+    p_lock_owner: options.lockOwner,
+    p_state: options.state,
+  });
+
+  if (!atomicResult.error) {
+    const released = Array.isArray(atomicResult.data)
+      ? atomicResult.data[0]
+      : atomicResult.data;
+    return released === false
+      ? "Provider sync lock ownership was lost before release."
+      : null;
+  }
+  if (!isMissingFunction(atomicResult.error, "release_provider_sync_state")) {
+    return atomicResult.error.message ?? "release_provider_sync_state failed";
+  }
+
+  // Compatibility fallback for the pre-RPC schema.
   const now = new Date().toISOString();
   const { error } = await options.supabase
     .from("provider_sync_states")

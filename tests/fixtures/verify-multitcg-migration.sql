@@ -227,6 +227,178 @@ begin
 end
 $$;
 
+do $$
+declare
+  v_game_id uuid;
+  v_provider_id uuid;
+  v_card_id uuid;
+  v_run_id uuid := gen_random_uuid();
+  v_acquired boolean;
+  v_owner text;
+  v_result jsonb;
+begin
+  select id into v_game_id from public.games where slug = 'one_piece';
+  select id into v_provider_id from public.data_providers where code = 'justtcg';
+  select id into v_card_id from public.cards where game_id = v_game_id limit 1;
+
+  select acquired, lock_owner
+  into v_acquired, v_owner
+  from public.acquire_provider_sync_state(
+    v_game_id, '', 'justtcg', 'v1', 'rehearsal', '', null,
+    'rehearsal-owner-1', 60, false, '{"cursor":0}'::jsonb
+  );
+  if not v_acquired or v_owner <> 'rehearsal-owner-1' then
+    raise exception 'Atomic provider lock was not acquired';
+  end if;
+
+  select acquired
+  into v_acquired
+  from public.acquire_provider_sync_state(
+    v_game_id, '', 'justtcg', 'v1', 'rehearsal', '', null,
+    'rehearsal-owner-2', 60, false, '{"cursor":0}'::jsonb
+  );
+  if v_acquired then
+    raise exception 'Concurrent provider lock acquisition should be rejected';
+  end if;
+
+  if not public.release_provider_sync_state(
+    v_game_id, '', 'justtcg', 'v1', 'rehearsal', '', null,
+    'rehearsal-owner-1', '{"cursor":1}'::jsonb
+  ) then
+    raise exception 'Atomic provider lock was not released by its owner';
+  end if;
+
+  insert into public.source_ingest_runs (
+    id,
+    game_id,
+    provider_id,
+    source_catalog_key,
+    adapter_version,
+    provider_api_version,
+    job_key,
+    status
+  )
+  values (
+    v_run_id,
+    v_game_id,
+    v_provider_id,
+    'one-piece-card-game',
+    'rehearsal',
+    'v1',
+    'current_prices',
+    'running'
+  );
+
+  select public.write_justtcg_shadow_price_batch(
+    v_game_id,
+    v_provider_id,
+    'one-piece-card-game',
+    v_run_id,
+    jsonb_build_array(jsonb_build_object(
+      'legacy_card_id', v_card_id,
+      'provider_product_external_id', 'legacy-card-slug',
+      'provider_product_namespace', 'product_id',
+      'provider_sku_external_id', 'variant-rpc-1',
+      'provider_sku_namespace', 'variant_id',
+      'condition_code', 'near_mint',
+      'printing', 'Normal',
+      'amount', 13.45,
+      'observed_at', '2026-07-20T00:00:00.000Z',
+      'source_set_slug', 'op-01',
+      'raw_product', '{}'::jsonb,
+      'raw_variant', '{}'::jsonb
+    ))
+  ) into v_result;
+
+  if (v_result ->> 'observations_written')::integer <> 1 then
+    raise exception 'Transactional shadow batch did not write exactly one observation';
+  end if;
+end
+$$;
+
+do $$
+declare
+  v_game_id uuid;
+  v_provider_id uuid;
+  v_card_id uuid;
+  v_run_id uuid := gen_random_uuid();
+begin
+  select id into v_game_id from public.games where slug = 'one_piece';
+  select id into v_provider_id from public.data_providers where code = 'justtcg';
+  select id into v_card_id from public.cards where game_id = v_game_id limit 1;
+
+  insert into public.source_ingest_runs (
+    id,
+    game_id,
+    provider_id,
+    source_catalog_key,
+    adapter_version,
+    provider_api_version,
+    job_key,
+    status
+  )
+  values (
+    v_run_id,
+    v_game_id,
+    v_provider_id,
+    'one-piece-card-game',
+    'rollback-rehearsal',
+    'v1',
+    'current_prices',
+    'running'
+  );
+
+  begin
+    perform public.write_justtcg_shadow_price_batch(
+      v_game_id,
+      v_provider_id,
+      'one-piece-card-game',
+      v_run_id,
+      jsonb_build_array(
+        jsonb_build_object(
+          'legacy_card_id', v_card_id,
+          'provider_product_external_id', 'legacy-card-slug',
+          'provider_product_namespace', 'product_id',
+          'provider_sku_external_id', 'variant-rollback-good',
+          'provider_sku_namespace', 'variant_id',
+          'condition_code', 'near_mint',
+          'printing', 'Normal',
+          'amount', 10,
+          'observed_at', '2026-07-21T00:00:00.000Z',
+          'source_set_slug', 'op-01'
+        ),
+        jsonb_build_object(
+          'legacy_card_id', v_card_id,
+          'provider_product_external_id', 'legacy-card-slug',
+          'provider_product_namespace', 'product_id',
+          'provider_sku_external_id', 'variant-rollback-bad',
+          'provider_sku_namespace', 'variant_id',
+          'condition_code', 'near_mint',
+          'printing', 'Normal',
+          'amount', -1,
+          'observed_at', '2026-07-21T00:00:00.000Z',
+          'source_set_slug', 'op-01'
+        )
+      )
+    );
+    raise exception 'Invalid batch unexpectedly succeeded';
+  exception
+    when others then
+      if sqlerrm = 'Invalid batch unexpectedly succeeded' then
+        raise;
+      end if;
+  end;
+
+  if exists (
+    select 1
+    from public.provider_skus
+    where external_id in ('variant-rollback-good', 'variant-rollback-bad')
+  ) then
+    raise exception 'Transactional shadow batch left partial SKU writes';
+  end if;
+end
+$$;
+
 select
   (select count(*) from public.card_definitions) as definitions,
   (select count(*) from public.card_printings) as printings,

@@ -27,6 +27,7 @@ export interface JustTcgShadowWriteResult {
   attempted: number;
   observationsWritten: number;
   preferredPricesWritten: number;
+  ingestRunId?: string;
 }
 
 interface PrintingRow {
@@ -105,7 +106,144 @@ export function justTcgObservedAt(lastUpdated: number | null | undefined, fallba
   return fallback.toISOString();
 }
 
+function shadowRpcMatch(match: JustTcgShadowPriceMatch) {
+  if (!Number.isFinite(match.amount) || match.amount < 0) {
+    throw new Error("Invalid JustTCG shadow price for " + match.providerSkuExternalId);
+  }
+  const observedAt = new Date(match.observedAt);
+  if (Number.isNaN(observedAt.getTime())) {
+    throw new Error("Invalid JustTCG observation time for " + match.providerSkuExternalId);
+  }
+  if (
+    !match.legacyCardId ||
+    !match.providerProductExternalId ||
+    !match.providerSkuExternalId
+  ) {
+    throw new Error("JustTCG shadow matches require card, product, and SKU identities");
+  }
+
+  return {
+    legacy_card_id: match.legacyCardId,
+    provider_product_external_id: match.providerProductExternalId,
+    provider_product_namespace: match.providerProductNamespace,
+    provider_sku_external_id: match.providerSkuExternalId,
+    provider_sku_namespace: match.providerSkuNamespace,
+    tcgplayer_sku_id: match.tcgplayerSkuId ?? null,
+    condition_code: normalizeProviderCondition(match.condition),
+    printing: match.printing,
+    amount: match.amount,
+    observed_at: observedAt.toISOString(),
+    source_set_slug: match.sourceSetSlug,
+    raw_product: match.rawProduct,
+    raw_variant: match.rawVariant,
+  };
+}
+
 export async function writeJustTcgShadowPrices(options: {
+  supabase: SupabaseLike;
+  gameId: string;
+  sourceCatalogKey: string;
+  matches: JustTcgShadowPriceMatch[];
+}): Promise<JustTcgShadowWriteResult> {
+  const matches = dedupeMatches(options.matches);
+  if (matches.length === 0) {
+    return { attempted: 0, observationsWritten: 0, preferredPricesWritten: 0 };
+  }
+  const payload = matches.map(shadowRpcMatch);
+
+  const { data: provider, error: providerError } = await options.supabase
+    .from("data_providers")
+    .select("id,is_active,normalized_api_version")
+    .eq("code", "justtcg")
+    .maybeSingle();
+  if (providerError) resultError(providerError, "read JustTCG provider");
+  if (!provider?.id) throw new Error("read JustTCG provider: provider seed is missing");
+  if (provider.is_active === false) throw new Error("read JustTCG provider: provider is disabled");
+  if (provider.normalized_api_version !== JUSTTCG_NORMALIZED_API_VERSION) {
+    throw new Error(
+      "read JustTCG provider: expected " +
+      JUSTTCG_NORMALIZED_API_VERSION +
+      ", got " +
+      (provider.normalized_api_version || "unset")
+    );
+  }
+
+  const ingestRunId = globalThis.crypto.randomUUID();
+  const { error: runError } = await options.supabase
+    .from("source_ingest_runs")
+    .insert({
+      id: ingestRunId,
+      game_id: options.gameId,
+      provider_id: provider.id,
+      source_catalog_key: options.sourceCatalogKey,
+      adapter_version: "justtcg_v1_shadow_rpc",
+      provider_api_version: JUSTTCG_NORMALIZED_API_VERSION,
+      job_key: "current_prices",
+      status: "running",
+      counts: { attempted: matches.length },
+      started_at: new Date().toISOString(),
+    });
+  if (runError) resultError(runError, "create JustTCG source ingest run");
+
+  try {
+    const { data, error } = await options.supabase.rpc(
+      "write_justtcg_shadow_price_batch",
+      {
+        p_game_id: options.gameId,
+        p_provider_id: provider.id,
+        p_source_catalog_key: options.sourceCatalogKey,
+        p_ingest_run_id: ingestRunId,
+        p_matches: payload,
+      }
+    );
+    if (error) resultError(error, "write transactional JustTCG shadow batch");
+
+    const result = (Array.isArray(data) ? data[0] : data) as {
+      attempted?: number;
+      observations_written?: number;
+      preferred_prices_written?: number;
+    } | null;
+    const completed: JustTcgShadowWriteResult = {
+      attempted: result?.attempted ?? matches.length,
+      observationsWritten: result?.observations_written ?? 0,
+      preferredPricesWritten: result?.preferred_prices_written ?? 0,
+      ingestRunId,
+    };
+    const { error: completeError } = await options.supabase
+      .from("source_ingest_runs")
+      .update({
+        status: "completed",
+        counts: {
+          attempted: completed.attempted,
+          observations_written: completed.observationsWritten,
+          preferred_prices_written: completed.preferredPricesWritten,
+        },
+        finished_at: new Date().toISOString(),
+      })
+      .eq("id", ingestRunId)
+      .eq("game_id", options.gameId)
+      .eq("provider_id", provider.id);
+    if (completeError) resultError(completeError, "complete JustTCG source ingest run");
+    return completed;
+  } catch (error) {
+    await options.supabase
+      .from("source_ingest_runs")
+      .update({
+        status: "failed",
+        counts: { attempted: matches.length },
+        error_summary: (error instanceof Error ? error.message : String(error)).slice(0, 2000),
+        finished_at: new Date().toISOString(),
+      })
+      .eq("id", ingestRunId)
+      .eq("game_id", options.gameId)
+      .eq("provider_id", provider.id);
+    throw error;
+  }
+}
+
+// Retained temporarily for rollback comparison only. Production dual-write
+// callers use the transactional RPC path above.
+export async function writeJustTcgShadowPricesLegacy(options: {
   supabase: SupabaseLike;
   gameId: string;
   sourceCatalogKey: string;

@@ -122,15 +122,44 @@ async function main() {
   const unmappedInventory = resources.inventory_items.filter(
     (row) => row.card_id && (!row.card_printing_id || !row.commercial_variant_id)
   );
+  const inventoryById = indexBy(resources.inventory_items, "id");
+  const catalogLinkedPsa = resources.psa_submission_items.filter(
+    (row) => row.inventory_item_id && inventoryById.get(row.inventory_item_id)?.card_id
+  );
   const unmappedPsa = resources.psa_submission_items.filter(
-    (row) => row.inventory_item_id && (!row.card_printing_id || !row.commercial_variant_id)
+    (row) => row.inventory_item_id
+      && inventoryById.get(row.inventory_item_id)?.card_id
+      && (!row.card_printing_id || !row.commercial_variant_id)
+  );
+  const pendingPsaCatalogMatch = resources.psa_submission_items.filter(
+    (row) => row.inventory_item_id
+      && inventoryById.has(row.inventory_item_id)
+      && !inventoryById.get(row.inventory_item_id)?.card_id
+  );
+  const orphanedPsaInventory = resources.psa_submission_items.filter(
+    (row) => row.inventory_item_id && !inventoryById.has(row.inventory_item_id)
+  );
+  const catalogLinkedLens = resources.centering_measurements.filter(
+    (row) => row.inventory_item_id && inventoryById.get(row.inventory_item_id)?.card_id
   );
   const unmappedLens = resources.centering_measurements.filter(
-    (row) => row.inventory_item_id && (!row.card_printing_id || !row.commercial_variant_id)
+    (row) => row.inventory_item_id
+      && inventoryById.get(row.inventory_item_id)?.card_id
+      && (!row.card_printing_id || !row.commercial_variant_id)
+  );
+  const pendingLensCatalogMatch = resources.centering_measurements.filter(
+    (row) => row.inventory_item_id
+      && inventoryById.has(row.inventory_item_id)
+      && !inventoryById.get(row.inventory_item_id)?.card_id
+  );
+  const orphanedLensInventory = resources.centering_measurements.filter(
+    (row) => row.inventory_item_id && !inventoryById.has(row.inventory_item_id)
   );
   foundationFailures.push(...unmappedInventory.map((row) => `Inventory ${row.id} is not mapped`));
   foundationFailures.push(...unmappedPsa.map((row) => `PSA item ${row.id} is not mapped`));
   foundationFailures.push(...unmappedLens.map((row) => `Centering measurement ${row.id} is not mapped`));
+  foundationFailures.push(...orphanedPsaInventory.map((row) => `PSA item ${row.id} references missing inventory`));
+  foundationFailures.push(...orphanedLensInventory.map((row) => `Centering measurement ${row.id} references missing inventory`));
 
   const matchesBySale = countBy(resources.ebay_sale_variant_matches, (row) => row.ebay_sale_id);
   for (const sale of resources.ebay_sales) {
@@ -207,8 +236,8 @@ async function main() {
         ["Legacy cards → printings", resources.cards.length, foundationFailures.filter((row) => row.startsWith("Card ")).length],
         ["Printings → legacy variants", resources.card_printings.length, foundationFailures.filter((row) => row.startsWith("Printing ")).length],
         ["Inventory identity", resources.inventory_items.length, unmappedInventory.length],
-        ["PSA identity", resources.psa_submission_items.length, unmappedPsa.length],
-        ["Owl Lens identity", resources.centering_measurements.length, unmappedLens.length],
+        ["PSA identity (catalog-linked)", catalogLinkedPsa.length, unmappedPsa.length],
+        ["Owl Lens identity (catalog-linked)", catalogLinkedLens.length, unmappedLens.length],
         ["One Piece TR rarity taxonomy", trRarities.length, trRarities.length === 1 ? 0 : 1],
         ["External provider-code mapping", externalProviderCodes.length, unmappedProviderCodes.length],
         ["eBay exact variant match", resources.ebay_sales.length, unresolvedEbay.length],
@@ -216,6 +245,11 @@ async function main() {
         ["Preferred priced-card coverage", pricedCardIds.size, missingPreferred.length],
       ]
     ),
+    "",
+    "## Pending manual catalog identity",
+    "",
+    `- PSA items intentionally pending a catalog match: ${pendingPsaCatalogMatch.length}`,
+    `- Owl Lens measurements intentionally pending a catalog match: ${pendingLensCatalogMatch.length}`,
     "",
     "## Foundation failures",
     "",
