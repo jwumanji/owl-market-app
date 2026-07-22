@@ -17,6 +17,9 @@ function gameDisplayName(gameRouteSlug: string) {
 
 // Keep in sync with CATALOG_DATA_TTL_SECONDS (Next 15 requires a literal).
 export const revalidate = 3600;
+// This legacy path redirects to the game-scoped route in next.config.mjs.
+// Avoid running its database loader during the production build.
+export const dynamic = "force-dynamic";
 
 // Per-character accent palette — dynamic, not semantic. Hues shifted to
 // read well on cream (closer to brand sunset stops + Option-A jewel tones).
