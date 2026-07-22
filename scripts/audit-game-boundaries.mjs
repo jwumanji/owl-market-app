@@ -255,13 +255,28 @@ async function main() {
     rows.filter((row) => !row.game_id).map((row) => ({ table, id: row.id }))
   );
 
-  const privateGateIssues = [];
-  if (!onePiece) privateGateIssues.push("Missing one_piece game row");
-  if (!riftbound) privateGateIssues.push("Missing riftbound game row");
-  if (onePiece && onePiece.is_active === false) privateGateIssues.push("one_piece is not active");
-  if (onePiece && onePiece.is_public === false) privateGateIssues.push("one_piece is not public");
-  if (riftbound && riftbound.is_active === false) privateGateIssues.push("riftbound is not active");
-  if (riftbound && riftbound.is_public !== false) privateGateIssues.push("riftbound should remain private until launch approval");
+  const launchGateIssues = [];
+  const riftboundPricingGateApproved =
+    riftbound?.metadata?.pricing_status === "deferred" ||
+    (
+      riftbound?.metadata?.pricing_status === "live" &&
+      riftbound?.metadata?.pricing_provider === "justtcg" &&
+      riftbound?.metadata?.justtcg_ingestion_status === "live_exact_matches"
+    );
+  const riftboundCatalogPreviewApproved =
+    riftbound?.is_public !== false &&
+    riftbound?.metadata?.launch_status === "public_catalog_preview" &&
+    riftbound?.metadata?.public_launch_scope === "catalog_and_tcgplayer_images" &&
+    riftbound?.metadata?.public_launch_gate === "tcgplayer_images_only" &&
+    riftboundPricingGateApproved;
+  if (!onePiece) launchGateIssues.push("Missing one_piece game row");
+  if (!riftbound) launchGateIssues.push("Missing riftbound game row");
+  if (onePiece && onePiece.is_active === false) launchGateIssues.push("one_piece is not active");
+  if (onePiece && onePiece.is_public === false) launchGateIssues.push("one_piece is not public");
+  if (riftbound && riftbound.is_active === false) launchGateIssues.push("riftbound is not active");
+  if (riftbound && riftbound.is_public !== false && !riftboundCatalogPreviewApproved) {
+    launchGateIssues.push("riftbound is public without an approved catalog-preview and pricing gate");
+  }
 
   const gameCounts = [];
   for (const game of games) {
@@ -271,7 +286,7 @@ async function main() {
   }
 
   const hardFailures = [
-    ...privateGateIssues,
+    ...launchGateIssues,
     ...missingGameRows.map((row) => `${row.table}.${row.id} missing game_id`),
     ...crossGameIssues.map((row) => `${row.table}.${row.id} ${row.reason}`),
     ...scopedCardDuplicates.map((row) => `duplicate scoped card key ${row.key}`),
