@@ -243,6 +243,7 @@ export default function Nav({ variant }: NavProps) {
 function PublicNav({ pathname }: { pathname: string }) {
   const activeGameRouteSlug = gameRouteSlugFromPath(pathname);
   const isDefaultPublicGame = activeGameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
+  const hasLiveMarket = isDefaultPublicGame || activeGameRouteSlug === RIFTBOUND_ROUTE_SLUG;
   const links = publicLinks(activeGameRouteSlug);
 
   return (
@@ -268,7 +269,7 @@ function PublicNav({ pathname }: { pathname: string }) {
           </Link>
           <span className="c-live-chip">
             <span className="c-live-dot" />
-            {isDefaultPublicGame ? "LIVE" : "CATALOG"}
+            {hasLiveMarket ? "LIVE" : "CATALOG"}
           </span>
           <Link href="/login" className="c-signin-btn" prefetch={false}>
             Sign in
@@ -299,7 +300,7 @@ function PublicNav({ pathname }: { pathname: string }) {
         </ul>
       </div>
 
-      {isDefaultPublicGame && <Ticker />}
+      {hasLiveMarket && <Ticker gameRouteSlug={activeGameRouteSlug} />}
     </nav>
   );
 }
