@@ -30,7 +30,7 @@
 .sets-v2-hl-code { font-family: var(--font-jetbrains-mono), ui-monospace, monospace; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; }
 .sets-v2-hl-year { font-family: var(--font-jetbrains-mono), ui-monospace, monospace; font-size: 10px; padding: 2px 8px; border-radius: var(--r-pill); background: var(--bg-3); color: var(--ink-2); letter-spacing: 0.06em; font-weight: 600; }
 .sets-v2-hl-title-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; position: relative; min-height: 48px; }
-.sets-v2-hl-thumb { width: 64px; height: 44px; border-radius: var(--r-sm); overflow: hidden; flex-shrink: 0; background: var(--bg-3); border: 1.5px solid var(--ink); display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(26, 15, 8, 0.10); cursor: pointer; transition: transform .14s, box-shadow .14s; }
+.sets-v2-hl-thumb { width: 64px; height: 44px; border-radius: var(--r-sm); overflow: hidden; flex-shrink: 0; background: var(--bg-3); display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(26, 15, 8, 0.10); cursor: pointer; transition: transform .14s, box-shadow .14s; }
 .sets-v2-hl-thumb:hover { transform: scale(1.05); box-shadow: 0 6px 16px rgba(26, 15, 8, 0.16); }
 .sets-v2-hl-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .sets-v2-hl-thumb-placeholder { font-family: var(--font-space-grotesk), system-ui, sans-serif; font-size: 18px; font-weight: 700; color: var(--thumb-color, var(--ink-2)); letter-spacing: 0.04em; }
@@ -85,7 +85,7 @@ table.sets-v2-table col.c-spark { width: 124px; }
 
 .sv2-rank { font-family: var(--font-jetbrains-mono), ui-monospace, monospace; font-size: 12px; color: var(--ink-2); text-align: center; font-weight: 600; }
 .sv2-thumb-cell { padding: 8px 6px !important; }
-.sv2-thumb { width: 52px; height: 36px; border-radius: var(--r-sm); overflow: hidden; background: var(--bg-3); border: 1.5px solid var(--ink); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; transition: transform .14s; }
+.sv2-thumb { width: 52px; height: 36px; border-radius: var(--r-sm); overflow: hidden; background: var(--bg-3); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; transition: transform .14s; }
 .sv2-thumb:hover { transform: scale(1.05); }
 .sv2-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .sv2-thumb-placeholder { font-family: var(--font-space-grotesk), system-ui, sans-serif; font-size: 13px; font-weight: 700; color: var(--thumb-color, var(--ink-2)); letter-spacing: 0.04em; }

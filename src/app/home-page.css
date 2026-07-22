@@ -320,7 +320,6 @@
   width: 52px;
   height: 73px;
   border-radius: var(--r-sm);
-  border: 1.5px solid var(--ink);
   display: flex;
   align-items: center;
   justify-content: center;
