@@ -713,6 +713,8 @@
 
 .qd-rarity-image .qd-image {
   object-fit: contain;
+  transform: scale(1.18);
+  transform-origin: center 42%;
 }
 
 .qd-rarity-top-card {

@@ -7,7 +7,7 @@ import { marketRarityRanking } from "../src/lib/market-rarities.ts";
 function rarity(
   code: string,
   indexValue: number,
-  topCard: { name: string; avg: number; cardImageId: string; imageSmall: string; imagePreview: string },
+  topCard: { cardId?: string; name: string; avg: number; cardImageId: string; imageSmall: string; imagePreview: string },
 ) {
   return {
     slug: code.toLowerCase(),
@@ -55,9 +55,10 @@ test("Markets rarity ranking does not depend on an individual card price", () =>
 
 test("Markets rarity previews use the top card from the Rarity Index", () => {
   const [ranked] = marketRarityRanking([
-    rarity("AA", 22_000, { name: "Top alternate art", avg: 2_200, cardImageId: "AA-1", imageSmall: "small-aa", imagePreview: "preview-aa" }),
+    rarity("AA", 22_000, { cardId: "card-aa-1", name: "Top alternate art", avg: 2_200, cardImageId: "AA-1", imageSmall: "small-aa", imagePreview: "preview-aa" }),
   ]);
 
+  assert.equal(ranked.top_card_id, "card-aa-1");
   assert.equal(ranked.top_card_name, "Top alternate art");
   assert.equal(ranked.top_card_image_id, "AA-1");
   assert.equal(ranked.index_value, 22_000);

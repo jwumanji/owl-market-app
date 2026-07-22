@@ -1,6 +1,7 @@
 import type { RarityRankItem } from "@/lib/types";
 
 export interface RarityIndexCardSource {
+  cardId?: string;
   name: string;
   avg: number;
   tcg?: number;
@@ -63,6 +64,7 @@ export function marketRarityRanking(
         name: rarity.name,
         index_value: +indexValue.toFixed(2),
         card_count: rarity.cardCount,
+        top_card_id: representativeCard?.cardId ?? null,
         top_card_name: representativeCard?.name ?? null,
         top_card_image_id: representativeCard?.cardImageId ?? null,
         image_url: representativeCard?.imagePreview ?? representativeCard?.imageSmall ?? null,

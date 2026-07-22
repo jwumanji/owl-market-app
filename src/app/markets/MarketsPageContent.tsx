@@ -300,6 +300,11 @@ async function renderMarketsPageContent({
   let topLosers7d = mapDashboardCards(losers7dRes.data)
     .sort((a, b) => cardChange(a, "7D") - cardChange(b, "7D"));
   let topEbaySales = mapTopEbaySales(topEbaySalesRes.data);
+  let allRarities = marketRarityRanking(
+    rarityIndex.rarities,
+    5,
+    game.slug === RIFTBOUND_DB_SLUG ? undefined : RARITY_INDEX_SLUGS,
+  );
 
   if (game.slug === RIFTBOUND_DB_SLUG) {
     const dashboardCardIds = Array.from(new Set([
@@ -308,7 +313,9 @@ async function renderMarketsPageContent({
       ...topGainers7d,
       ...topLosers1d,
       ...topLosers7d,
-    ].map((card) => card.id).concat(topEbaySales.map((sale) => sale.card_id))));
+    ].map((card) => card.id)
+      .concat(topEbaySales.map((sale) => sale.card_id))
+      .concat(allRarities.flatMap((rarity) => rarity.top_card_id ? [rarity.top_card_id] : []))));
 
     if (dashboardCardIds.length > 0) {
       const externalIdsRes = await cachedMarketData(
@@ -336,6 +343,11 @@ async function renderMarketsPageContent({
         if (sale.image_url || sale.image_url_small || sale.image_url_preview) return sale;
         const imageUrl = tcgPlayerProductImageUrl(productIdByCardId.get(sale.card_id));
         return imageUrl ? { ...sale, image_url: imageUrl } : sale;
+      });
+      allRarities = allRarities.map((rarity) => {
+        if (rarity.image_url || !rarity.top_card_id) return rarity;
+        const imageUrl = tcgPlayerProductImageUrl(productIdByCardId.get(rarity.top_card_id));
+        return imageUrl ? { ...rarity, image_url: imageUrl } : rarity;
       });
     }
   }
@@ -366,11 +378,6 @@ async function renderMarketsPageContent({
     );
   }
 
-  const allRarities = marketRarityRanking(
-    rarityIndex.rarities,
-    5,
-    game.slug === RIFTBOUND_DB_SLUG ? undefined : RARITY_INDEX_SLUGS,
-  );
   const imageByCardImageId = new Map(topValueCards.map((card) => [card.card_image_id, card] as const));
   const displayRarities = allRarities.map((rarity) => {
     if (rarity.image_url || !rarity.top_card_image_id) return rarity;
