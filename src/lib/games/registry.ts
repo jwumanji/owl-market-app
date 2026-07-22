@@ -8,6 +8,20 @@ import {
 import { RIFTBOUND_JUSTTCG_GAME_SLUG } from "@/lib/games/riftbound-justtcg";
 
 export type GameAdapterStatus = "active" | "seeded" | "planned";
+export type GameCapabilityStatus = "live" | "preview" | "planned" | "unsupported";
+
+export type GameCapabilities = {
+  catalog: GameCapabilityStatus;
+  markets: GameCapabilityStatus;
+  pricing: GameCapabilityStatus;
+  sets: GameCapabilityStatus;
+  rarities: GameCapabilityStatus;
+  characters: GameCapabilityStatus;
+  champions: GameCapabilityStatus;
+  languages: GameCapabilityStatus;
+  sales: GameCapabilityStatus;
+  sealedProducts: GameCapabilityStatus;
+};
 
 export type GameProviderDefinition = {
   provider: string;
@@ -26,6 +40,7 @@ export type GameDefinition = {
   name: string;
   isPublic: boolean;
   status: GameAdapterStatus;
+  capabilities: GameCapabilities;
   providers: Record<string, GameProviderDefinition>;
 };
 
@@ -34,6 +49,19 @@ export const POKEMON_ROUTE_SLUG = "pokemon";
 export const RIFTBOUND_DB_SLUG = "riftbound";
 export const RIFTBOUND_ROUTE_SLUG = "riftbound";
 
+const PLANNED_GAME_CAPABILITIES = {
+  catalog: "planned",
+  markets: "planned",
+  pricing: "planned",
+  sets: "planned",
+  rarities: "planned",
+  characters: "planned",
+  champions: "planned",
+  languages: "planned",
+  sales: "planned",
+  sealedProducts: "planned",
+} as const satisfies GameCapabilities;
+
 export const GAME_DEFINITIONS = {
   [ONE_PIECE_DB_SLUG]: {
     dbSlug: ONE_PIECE_DB_SLUG,
@@ -41,6 +69,18 @@ export const GAME_DEFINITIONS = {
     name: "One Piece Card Game",
     isPublic: true,
     status: "active",
+    capabilities: {
+      catalog: "live",
+      markets: "live",
+      pricing: "live",
+      sets: "live",
+      rarities: "live",
+      characters: "live",
+      champions: "unsupported",
+      languages: "planned",
+      sales: "planned",
+      sealedProducts: "live",
+    },
     providers: {
       justtcg: {
         provider: JUSTTCG_PROVIDER,
@@ -60,6 +100,7 @@ export const GAME_DEFINITIONS = {
     name: "Pokemon TCG",
     isPublic: false,
     status: "seeded",
+    capabilities: PLANNED_GAME_CAPABILITIES,
     providers: {
       justtcg: {
         provider: JUSTTCG_PROVIDER,
@@ -78,6 +119,18 @@ export const GAME_DEFINITIONS = {
     name: "Riftbound",
     isPublic: true,
     status: "active",
+    capabilities: {
+      catalog: "live",
+      markets: "live",
+      pricing: "live",
+      sets: "live",
+      rarities: "live",
+      characters: "unsupported",
+      champions: "live",
+      languages: "live",
+      sales: "preview",
+      sealedProducts: "planned",
+    },
     providers: {
       justtcg: {
         provider: JUSTTCG_PROVIDER,
@@ -99,6 +152,7 @@ export const GAME_DEFINITIONS = {
     name: "Magic: The Gathering",
     isPublic: false,
     status: "planned",
+    capabilities: PLANNED_GAME_CAPABILITIES,
     providers: {
       justtcg: {
         provider: JUSTTCG_PROVIDER,
@@ -113,6 +167,7 @@ export const GAME_DEFINITIONS = {
     name: "Disney Lorcana",
     isPublic: false,
     status: "planned",
+    capabilities: PLANNED_GAME_CAPABILITIES,
     providers: {
       justtcg: {
         provider: JUSTTCG_PROVIDER,
@@ -127,6 +182,7 @@ export const GAME_DEFINITIONS = {
     name: "Gundam Card Game",
     isPublic: false,
     status: "planned",
+    capabilities: PLANNED_GAME_CAPABILITIES,
     providers: {
       justtcg: {
         provider: JUSTTCG_PROVIDER,
@@ -141,6 +197,7 @@ export const GAME_DEFINITIONS = {
     name: "Dragon Ball Super: Fusion World",
     isPublic: false,
     status: "planned",
+    capabilities: PLANNED_GAME_CAPABILITIES,
     providers: {
       justtcg: {
         provider: JUSTTCG_PROVIDER,
@@ -155,6 +212,7 @@ export const GAME_DEFINITIONS = {
     name: "Dragon Ball Super: Masters",
     isPublic: false,
     status: "planned",
+    capabilities: PLANNED_GAME_CAPABILITIES,
     providers: {
       justtcg: {
         provider: JUSTTCG_PROVIDER,
@@ -169,14 +227,22 @@ export const GAME_DEFINITIONS = {
     name: "Naruto Card Game",
     isPublic: false,
     status: "planned",
+    capabilities: PLANNED_GAME_CAPABILITIES,
     providers: {},
   },
 } as const satisfies Record<string, GameDefinition>;
 
 export const DEFAULT_PUBLIC_GAME = GAME_DEFINITIONS[ONE_PIECE_DB_SLUG];
+export const PUBLIC_GAME_DEFINITIONS = Object.values(GAME_DEFINITIONS).filter(
+  (game) => game.isPublic
+);
 export const HIDDEN_GAME_DEFINITIONS = Object.values(GAME_DEFINITIONS).filter(
   (game) => !game.isPublic
 );
+
+export function isNavigableCapability(status: GameCapabilityStatus) {
+  return status === "live" || status === "preview";
+}
 
 export function getGameDefinitionByDbSlug(slug: string) {
   return GAME_DEFINITIONS[slug as keyof typeof GAME_DEFINITIONS] ?? null;

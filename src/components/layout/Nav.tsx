@@ -7,7 +7,14 @@ import MoonMarketLogo from "@/components/brand/MoonMarketLogo";
 import MoonMark from "@/components/brand/MoonMark";
 import { DEFAULT_PUBLIC_GAME_DB_SLUG, DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
-import { RIFTBOUND_ROUTE_SLUG } from "@/lib/games/registry";
+import {
+  DEFAULT_PUBLIC_GAME,
+  PUBLIC_GAME_DEFINITIONS,
+  getGameDefinitionByRouteSlug,
+  isNavigableCapability,
+  type GameCapabilityStatus,
+  type GameDefinition,
+} from "@/lib/games/registry";
 import Ticker from "./Ticker";
 
 type NavVariant = "public" | "admin";
@@ -31,27 +38,40 @@ type PublicNavLink = {
 };
 
 function publicLinks(gameRouteSlug: string): PublicNavLink[] {
-  if (gameRouteSlug === RIFTBOUND_ROUTE_SLUG) {
-    return [
-      { label: "Markets", href: gamePath(gameRouteSlug, "/markets") },
-      { label: "Champions", href: gamePath(gameRouteSlug, "/champions") },
-      { label: "Sets", href: gamePath(gameRouteSlug, "/sets") },
-      { label: "Rarities", href: gamePath(gameRouteSlug, "/rarities") },
-      { label: "Languages", href: gamePath(gameRouteSlug, "/languages") },
-      { label: "eBay Sales", href: gamePath(gameRouteSlug, "/sales") },
-      { label: "All Cards", href: gamePath(gameRouteSlug, "/catalog"), divider: true },
-    ];
-  }
-
-  return [
-    { label: "Markets", href: gamePath(gameRouteSlug, "/markets") },
-    { label: "Characters", href: gamePath(gameRouteSlug, "/characters") },
-    { label: "Sets", href: gamePath(gameRouteSlug, "/sets") },
-    { label: "Rarities", href: gamePath(gameRouteSlug, "/rarities") },
-    { label: "Japan Market", status: "coming-soon" },
-    { label: "eBay Sales", status: "coming-soon" },
-    { label: "All Cards", href: gamePath(gameRouteSlug, "/catalog"), divider: true },
+  const game = getGameDefinitionByRouteSlug(gameRouteSlug) ?? DEFAULT_PUBLIC_GAME;
+  const links: Array<PublicNavLink | null> = [
+    capabilityLink(game, "Markets", "/markets", game.capabilities.markets),
+    capabilityLink(game, "Champions", "/champions", game.capabilities.champions),
+    capabilityLink(game, "Characters", "/characters", game.capabilities.characters),
+    capabilityLink(game, "Sets", "/sets", game.capabilities.sets),
+    capabilityLink(game, "Rarities", "/rarities", game.capabilities.rarities),
+    capabilityLink(
+      game,
+      game.dbSlug === DEFAULT_PUBLIC_GAME_DB_SLUG ? "Japan Market" : "Languages",
+      "/languages",
+      game.capabilities.languages
+    ),
+    capabilityLink(game, "eBay Sales", "/sales", game.capabilities.sales),
+    capabilityLink(game, "All Cards", "/catalog", game.capabilities.catalog, true),
   ];
+
+  return links.filter((link): link is PublicNavLink => link !== null);
+}
+
+function capabilityLink(
+  game: GameDefinition,
+  label: string,
+  path: string,
+  status: GameCapabilityStatus,
+  divider = false
+): PublicNavLink | null {
+  if (status === "unsupported") return null;
+  return {
+    label,
+    href: isNavigableCapability(status) ? gamePath(game.routeSlug, path) : undefined,
+    status: status === "planned" ? "coming-soon" : undefined,
+    divider,
+  };
 }
 
 function adminLinks(gameSlug: string): NavLink[] {
@@ -118,9 +138,8 @@ function SearchIcon() {
 function PublicGameSwitcher({ gameRouteSlug }: { gameRouteSlug: string }) {
   const [open, setOpen] = useState(false);
   const switcherRef = useRef<HTMLDivElement>(null);
-  const isDefaultGame = gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
-  const isRiftbound = gameRouteSlug === RIFTBOUND_ROUTE_SLUG;
-  const currentLabel = isDefaultGame ? "One Piece" : isRiftbound ? "Riftbound" : gameRouteSlug.replace(/-/g, " ");
+  const activeGame = getGameDefinitionByRouteSlug(gameRouteSlug) ?? DEFAULT_PUBLIC_GAME;
+  const currentLabel = gameSwitcherLabel(activeGame);
 
   useEffect(() => {
     if (!open) return;
@@ -157,37 +176,33 @@ function PublicGameSwitcher({ gameRouteSlug }: { gameRouteSlug: string }) {
 
       <div id="public-game-menu" className="c-game-switcher-menu" hidden={!open}>
         <div className="c-game-switcher-heading">Switch game</div>
-        <Link
-          href={gamePath(DEFAULT_PUBLIC_GAME_ROUTE_SLUG, "/markets")}
-          className={`c-game-option${isDefaultGame ? " is-active" : ""}`}
-          aria-current={isDefaultGame ? "true" : undefined}
-          prefetch={false}
-          onClick={() => setOpen(false)}
-        >
-          <span>
-            <strong>One Piece</strong>
-            <small>Main market</small>
-          </span>
-          <span className="c-game-option-check" aria-hidden="true">✓</span>
-        </Link>
-        <Link
-          href={gamePath(RIFTBOUND_ROUTE_SLUG, "/markets")}
-          className={`c-game-option${isRiftbound ? " is-active" : ""}`}
-          aria-current={isRiftbound ? "true" : undefined}
-          prefetch={false}
-          onClick={() => setOpen(false)}
-        >
-          <span>
-            <strong>Riftbound</strong>
-            <small>Catalog preview</small>
-          </span>
-          {isRiftbound
-            ? <span className="c-game-option-check" aria-hidden="true">✓</span>
-            : <span className="c-nav-soon">Preview</span>}
-        </Link>
+        {PUBLIC_GAME_DEFINITIONS.map((game) => {
+          const isActive = game.routeSlug === activeGame.routeSlug;
+          const defaultPath = isNavigableCapability(game.capabilities.markets) ? "/markets" : "/catalog";
+          return (
+            <Link
+              key={game.dbSlug}
+              href={gamePath(game.routeSlug, defaultPath)}
+              className={`c-game-option${isActive ? " is-active" : ""}`}
+              aria-current={isActive ? "true" : undefined}
+              prefetch={false}
+              onClick={() => setOpen(false)}
+            >
+              <span>
+                <strong>{gameSwitcherLabel(game)}</strong>
+                <small>{game.capabilities.pricing === "live" ? "Live market" : "Catalog preview"}</small>
+              </span>
+              {isActive && <span className="c-game-option-check" aria-hidden="true">✓</span>}
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
+}
+
+function gameSwitcherLabel(game: GameDefinition) {
+  return game.dbSlug === DEFAULT_PUBLIC_GAME_DB_SLUG ? "One Piece" : game.name;
 }
 
 // The public nav must not read useSearchParams(): doing so bails static

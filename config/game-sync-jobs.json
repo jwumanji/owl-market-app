@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "jobs": [
+    {
+      "id": "one_piece.justtcg.current_prices",
+      "game": "one_piece",
+      "provider": "justtcg",
+      "kind": "pricing",
+      "path": "/api/sync/justtcg?game=one_piece&cursor=1&maxSets=1",
+      "schedules": ["0 0 * * *", "0 6 * * *", "0 12 * * *", "0 18 * * *"]
+    },
+    {
+      "id": "riftbound.justtcg.incremental",
+      "game": "riftbound",
+      "provider": "justtcg",
+      "kind": "pricing",
+      "path": "/api/sync/justtcg?game=riftbound&mode=incremental&maxSets=50",
+      "schedules": ["15 * * * *"]
+    },
+    {
+      "id": "riftbound.justtcg.full_catalog",
+      "game": "riftbound",
+      "provider": "justtcg",
+      "kind": "catalog",
+      "path": "/api/sync/justtcg?game=riftbound&mode=full&cursor=1&maxSets=50",
+      "schedules": ["35 4 * * *"]
+    },
+    {
+      "id": "one_piece.justtcg.price_history",
+      "game": "one_piece",
+      "provider": "justtcg",
+      "kind": "history",
+      "path": "/api/sync/justtcg-history?game=one_piece&maxSets=1&historyDuration=1y",
+      "schedules": ["30 7 * * *"]
+    },
+    {
+      "id": "one_piece.ebay.completed_sales",
+      "game": "one_piece",
+      "provider": "ebay",
+      "kind": "sales",
+      "path": "/api/sync/ebay?game=one_piece&cursor=1",
+      "schedules": ["0 */6 * * *"]
+    },
+    {
+      "id": "one_piece.yuyutei.jp_prices",
+      "game": "one_piece",
+      "provider": "yuyutei",
+      "kind": "pricing",
+      "path": "/api/sync/jp-prices?game=one_piece&cursor=1",
+      "schedules": ["30 */6 * * *"]
+    },
+    {
+      "id": "one_piece.characters.index",
+      "game": "one_piece",
+      "provider": "internal",
+      "kind": "taxonomy",
+      "path": "/api/sync/characters?game=one_piece",
+      "schedules": ["45 23 * * *"]
+    },
+    {
+      "id": "one_piece.summaries.public",
+      "game": "one_piece",
+      "provider": "internal",
+      "kind": "summary",
+      "path": "/api/sync/summaries?game=one_piece",
+      "schedules": ["20 0,6,12,18 * * *"]
+    }
+  ]
+}
