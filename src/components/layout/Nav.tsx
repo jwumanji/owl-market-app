@@ -7,6 +7,7 @@ import MoonMarketLogo from "@/components/brand/MoonMarketLogo";
 import MoonMark from "@/components/brand/MoonMark";
 import { DEFAULT_PUBLIC_GAME_DB_SLUG, DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
+import { LORCANA_ROUTE_SLUG } from "@/lib/games/lorcana";
 import { RIFTBOUND_ROUTE_SLUG } from "@/lib/games/registry";
 import Ticker from "./Ticker";
 
@@ -31,6 +32,18 @@ type PublicNavLink = {
 };
 
 function publicLinks(gameRouteSlug: string): PublicNavLink[] {
+  if (gameRouteSlug === LORCANA_ROUTE_SLUG) {
+    return [
+      { label: "Markets", href: gamePath(gameRouteSlug, "/markets") },
+      { label: "Characters", href: gamePath(gameRouteSlug, "/characters") },
+      { label: "Sets", href: gamePath(gameRouteSlug, "/sets") },
+      { label: "Franchises", href: gamePath(gameRouteSlug, "/franchises") },
+      { label: "Rarities", href: gamePath(gameRouteSlug, "/rarities") },
+      { label: "Promos", href: gamePath(gameRouteSlug, "/promos") },
+      { label: "All Cards", href: gamePath(gameRouteSlug, "/catalog"), divider: true },
+    ];
+  }
+
   if (gameRouteSlug === RIFTBOUND_ROUTE_SLUG) {
     return [
       { label: "Markets", href: gamePath(gameRouteSlug, "/markets") },
@@ -120,7 +133,14 @@ function PublicGameSwitcher({ gameRouteSlug }: { gameRouteSlug: string }) {
   const switcherRef = useRef<HTMLDivElement>(null);
   const isDefaultGame = gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
   const isRiftbound = gameRouteSlug === RIFTBOUND_ROUTE_SLUG;
-  const currentLabel = isDefaultGame ? "One Piece" : isRiftbound ? "Riftbound" : gameRouteSlug.replace(/-/g, " ");
+  const isLorcana = gameRouteSlug === LORCANA_ROUTE_SLUG;
+  const currentLabel = isDefaultGame
+    ? "One Piece"
+    : isRiftbound
+      ? "Riftbound"
+      : isLorcana
+        ? "Lorcana"
+        : gameRouteSlug.replace(/-/g, " ");
 
   useEffect(() => {
     if (!open) return;
@@ -182,6 +202,21 @@ function PublicGameSwitcher({ gameRouteSlug }: { gameRouteSlug: string }) {
             <small>Live market</small>
           </span>
           {isRiftbound
+            ? <span className="c-game-option-check" aria-hidden="true">✓</span>
+            : <span className="c-nav-soon">Live</span>}
+        </Link>
+        <Link
+          href={gamePath(LORCANA_ROUTE_SLUG, "/markets")}
+          className={`c-game-option${isLorcana ? " is-active" : ""}`}
+          aria-current={isLorcana ? "true" : undefined}
+          prefetch={false}
+          onClick={() => setOpen(false)}
+        >
+          <span>
+            <strong>Lorcana</strong>
+            <small>Live catalog</small>
+          </span>
+          {isLorcana
             ? <span className="c-game-option-check" aria-hidden="true">✓</span>
             : <span className="c-nav-soon">Live</span>}
         </Link>
