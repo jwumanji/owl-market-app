@@ -44,7 +44,9 @@ function publicLinks(gameRouteSlug: string): PublicNavLink[] {
     capabilityLink(game, "Champions", "/champions", game.capabilities.champions),
     capabilityLink(game, "Characters", "/characters", game.capabilities.characters),
     capabilityLink(game, "Sets", "/sets", game.capabilities.sets),
+    capabilityLink(game, "Franchises", "/franchises", game.capabilities.franchises),
     capabilityLink(game, "Rarities", "/rarities", game.capabilities.rarities),
+    capabilityLink(game, "Promos", "/promos", game.capabilities.promos),
     capabilityLink(
       game,
       game.dbSlug === DEFAULT_PUBLIC_GAME_DB_SLUG ? "Japan Market" : "Languages",
@@ -190,7 +192,13 @@ function PublicGameSwitcher({ gameRouteSlug }: { gameRouteSlug: string }) {
             >
               <span>
                 <strong>{gameSwitcherLabel(game)}</strong>
-                <small>{game.capabilities.pricing === "live" ? "Live market" : "Catalog preview"}</small>
+                <small>
+                  {game.capabilities.pricing === "live"
+                    ? "Live market"
+                    : game.capabilities.catalog === "live"
+                      ? "Live catalog"
+                      : "Catalog preview"}
+                </small>
               </span>
               {isActive && <span className="c-game-option-check" aria-hidden="true">✓</span>}
             </Link>

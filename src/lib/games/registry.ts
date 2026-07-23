@@ -5,6 +5,12 @@ import {
   ONE_PIECE_ROUTE_SLUG,
   OPTCGAPI_PROVIDER,
 } from "@/lib/games/one-piece";
+import {
+  LORCANA_DB_SLUG,
+  LORCANA_JUSTTCG_GAME_SLUG,
+  LORCANA_ROUTE_SLUG,
+  LORCANAJSON_PROVIDER,
+} from "@/lib/games/lorcana";
 import { RIFTBOUND_JUSTTCG_GAME_SLUG } from "@/lib/games/riftbound-justtcg";
 
 export type GameAdapterStatus = "active" | "seeded" | "planned";
@@ -18,6 +24,8 @@ export type GameCapabilities = {
   rarities: GameCapabilityStatus;
   characters: GameCapabilityStatus;
   champions: GameCapabilityStatus;
+  franchises: GameCapabilityStatus;
+  promos: GameCapabilityStatus;
   languages: GameCapabilityStatus;
   sales: GameCapabilityStatus;
   sealedProducts: GameCapabilityStatus;
@@ -57,6 +65,8 @@ const PLANNED_GAME_CAPABILITIES = {
   rarities: "planned",
   characters: "planned",
   champions: "planned",
+  franchises: "planned",
+  promos: "planned",
   languages: "planned",
   sales: "planned",
   sealedProducts: "planned",
@@ -77,6 +87,8 @@ export const GAME_DEFINITIONS = {
       rarities: "live",
       characters: "live",
       champions: "unsupported",
+      franchises: "unsupported",
+      promos: "unsupported",
       languages: "planned",
       sales: "planned",
       sealedProducts: "live",
@@ -127,6 +139,8 @@ export const GAME_DEFINITIONS = {
       rarities: "live",
       characters: "unsupported",
       champions: "live",
+      franchises: "unsupported",
+      promos: "unsupported",
       languages: "live",
       sales: "preview",
       sealedProducts: "planned",
@@ -161,18 +175,40 @@ export const GAME_DEFINITIONS = {
       },
     },
   },
-  lorcana: {
-    dbSlug: "lorcana",
-    routeSlug: "lorcana",
+  [LORCANA_DB_SLUG]: {
+    dbSlug: LORCANA_DB_SLUG,
+    routeSlug: LORCANA_ROUTE_SLUG,
     name: "Disney Lorcana",
-    isPublic: false,
-    status: "planned",
-    capabilities: PLANNED_GAME_CAPABILITIES,
+    isPublic: true,
+    status: "active",
+    capabilities: {
+      catalog: "live",
+      markets: "preview",
+      pricing: "planned",
+      sets: "live",
+      rarities: "live",
+      characters: "preview",
+      champions: "unsupported",
+      franchises: "live",
+      promos: "live",
+      languages: "unsupported",
+      sales: "unsupported",
+      sealedProducts: "planned",
+    },
     providers: {
+      lorcanajson: {
+        provider: LORCANAJSON_PROVIDER,
+        sourceGameSlug: "current/en",
+        status: "active",
+        notes:
+          "Canonical English catalog is public; source image URLs are retained but asset writes remain disabled.",
+      },
       justtcg: {
         provider: JUSTTCG_PROVIDER,
-        sourceGameSlug: "disney-lorcana",
-        status: "planned",
+        sourceGameSlug: LORCANA_JUSTTCG_GAME_SLUG,
+        status: "seeded",
+        notes:
+          "Read-only audit and exact TCGplayer product-ID reconciliation; price publication remains disabled.",
       },
     },
   },

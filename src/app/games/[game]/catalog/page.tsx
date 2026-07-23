@@ -14,6 +14,7 @@ import {
 } from "@/lib/catalog-card-fields";
 import { catalogPageDescription } from "@/lib/game-catalog-copy";
 import { cachedPublicData, publicDataCacheKey } from "@/lib/public-data-cache";
+import { LORCANA_DB_SLUG } from "@/lib/games/lorcana";
 import { RIFTBOUND_CARD_TYPES, RIFTBOUND_DOMAINS } from "@/lib/games/riftbound-catalog";
 import "./catalog.css";
 
@@ -35,6 +36,7 @@ type CatalogSearchParams = {
   variant?: string;
   domain?: string;
   type?: string;
+  franchise?: string;
   q?: string;
   page?: string;
 };
@@ -86,6 +88,7 @@ type CatalogData =
       selectedVariant: TaxonomyRow | null;
       selectedDomain: string | null;
       selectedType: string | null;
+      selectedFranchise: string | null;
       query: string;
       warning: string | null;
     }
@@ -120,6 +123,7 @@ function hrefFor(gameRouteSlug: string, params: CatalogSearchParams) {
   if (params.variant) query.set("variant", params.variant);
   if (params.domain) query.set("domain", params.domain);
   if (params.type) query.set("type", params.type);
+  if (params.franchise) query.set("franchise", params.franchise);
   if (params.q) query.set("q", params.q);
   if (params.page && params.page !== "1") query.set("page", params.page);
   const suffix = query.toString();
@@ -171,12 +175,23 @@ async function loadCatalogUncached(gameRouteSlug: string, searchParams: CatalogS
     const selectedType = game.slug === "riftbound" && RIFTBOUND_CARD_TYPES.includes(searchParams.type as typeof RIFTBOUND_CARD_TYPES[number])
       ? searchParams.type ?? null
       : null;
+    const selectedFranchise = game.slug === LORCANA_DB_SLUG
+      ? (searchParams.franchise ?? "").trim().slice(0, 100) || null
+      : null;
     const query = cleanSearch(searchParams.q);
     const currentPage = pageIndex(searchParams.page);
     const from = currentPage * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
 
-    const hasCardFilters = Boolean(selectedSet || selectedRarity || selectedVariant || selectedDomain || selectedType || query);
+    const hasCardFilters = Boolean(
+      selectedSet ||
+      selectedRarity ||
+      selectedVariant ||
+      selectedDomain ||
+      selectedType ||
+      selectedFranchise ||
+      query
+    );
     let cardsQuery = supabase
       .from("cards")
       .select(`
@@ -203,6 +218,7 @@ async function loadCatalogUncached(gameRouteSlug: string, searchParams: CatalogS
     if (selectedVariant?.id) cardsQuery = cardsQuery.eq("variant_id", selectedVariant.id);
     if (selectedDomain) cardsQuery = cardsQuery.contains("color", [selectedDomain]);
     if (selectedType) cardsQuery = cardsQuery.eq("card_type", selectedType);
+    if (selectedFranchise) cardsQuery = cardsQuery.eq("attribute", selectedFranchise);
     if (query) cardsQuery = cardsQuery.or(`name.ilike.%${query}%,card_number.ilike.%${query}%`);
 
     const cardsRes = await cardsQuery
@@ -230,6 +246,7 @@ async function loadCatalogUncached(gameRouteSlug: string, searchParams: CatalogS
       selectedVariant,
       selectedDomain,
       selectedType,
+      selectedFranchise,
       query,
       warning: warnings.length > 0 ? warnings.join(" / ") : null,
     };
@@ -252,6 +269,7 @@ async function loadCatalog(gameRouteSlug: string, searchParams: CatalogSearchPar
       searchParams.variant ?? "",
       searchParams.domain ?? "",
       searchParams.type ?? "",
+      searchParams.franchise ?? "",
       cleanSearch(searchParams.q),
       pageIndex(searchParams.page) + 1
     ),
@@ -298,6 +316,7 @@ export default async function GameCatalogPage(
     variant: data.selectedVariant?.code ?? undefined,
     domain: data.selectedDomain ?? undefined,
     type: data.selectedType ?? undefined,
+    franchise: data.selectedFranchise ?? undefined,
     q: data.query || undefined,
   };
 
@@ -311,9 +330,13 @@ export default async function GameCatalogPage(
 
       <header className="catalog-hero">
         <div>
-          <div className="catalog-kicker">Catalog cards</div>
-          <h1>{data.game.name}</h1>
-          <p>{catalogPageDescription(data.game)}</p>
+          <div className="catalog-kicker">{data.selectedFranchise ? "Franchise cards" : "Catalog cards"}</div>
+          <h1>{data.selectedFranchise ?? data.game.name}</h1>
+          <p>
+            {data.selectedFranchise
+              ? `Browse every ${data.selectedFranchise} card in the ${data.game.name} catalog.`
+              : catalogPageDescription(data.game)}
+          </p>
         </div>
         <div className="catalog-count">
           <span>{formatNumber(data.totalCards)}</span>
@@ -328,6 +351,7 @@ export default async function GameCatalogPage(
           {data.selectedVariant?.code && <input type="hidden" name="variant" value={data.selectedVariant.code} />}
           {data.selectedDomain && <input type="hidden" name="domain" value={data.selectedDomain} />}
           {data.selectedType && <input type="hidden" name="type" value={data.selectedType} />}
+          {data.selectedFranchise && <input type="hidden" name="franchise" value={data.selectedFranchise} />}
           <input type="search" name="q" defaultValue={data.query} placeholder="Search card name or number" />
           <button type="submit">Search</button>
         </form>
