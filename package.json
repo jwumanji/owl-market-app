@@ -15,6 +15,7 @@
     "audit:game-boundaries": "node scripts/audit-game-boundaries.mjs",
     "audit:public-performance": "node scripts/audit-public-performance.mjs",
     "audit:set-membership": "node scripts/audit-set-membership.mjs",
+    "test:image-health": "node --test tests/card-image-health.test.ts",
     "audit:riftbound-pricing": "node scripts/audit-riftbound-pricing-readiness.mjs",
     "audit:riftbound-justtcg": "node scripts/audit-riftbound-justtcg.mjs",
     "audit:sync-schedule": "node scripts/sync-schedule-manifest.mjs",
