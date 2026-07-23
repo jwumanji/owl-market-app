@@ -324,7 +324,7 @@ export default async function RiftboundChampionsPage(props: {
         Champion <span>Index</span>
       </div>
       <div className="ph-sub">
-        {champions.length} champions tracked &middot; Ranked by total linked-card value &middot; {pricedCards.toLocaleString()} of {linkedCards.toLocaleString()} linked cards priced
+        {champions.length} champions tracked &middot; Ranked by total set value &middot; {pricedCards.toLocaleString()} of {linkedCards.toLocaleString()} linked cards priced
       </div>
 
       {loadError ? (

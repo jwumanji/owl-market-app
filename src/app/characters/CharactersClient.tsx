@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, type ComponentProps, type ReactNode } from "react";
 import Link from "next/link";
 import FastCardImage from "@/components/ui/FastCardImage";
 import { TIER_LABELS } from "./characters-data";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
 import { characterMatchesSearch } from "@/lib/character-search";
-import { cardImageSources } from "@/lib/card-image-variants";
+import { cardImageSources, cardImageSourcesAcrossCards } from "@/lib/card-image-variants";
 import "./characters-page.css";
 
 /* ── Types ── */
@@ -57,7 +57,7 @@ function indexCopy(mode: IndexMode) {
     plural: champions ? "champions" : "characters",
     pluralTitle: champions ? "Champions" : "Characters",
     indexLabel: champions ? "Champion Index" : "Character Index",
-    valueLabel: champions ? "Total Linked Value" : "Total Set Value",
+    valueLabel: "Total Set Value",
     queryParam: champions ? "champion" : "character",
   };
 }
@@ -94,15 +94,9 @@ function rarityClass(rarity: string): string {
   return "rb-r";
 }
 
-/** Get character avatar from their top card image */
-function getCharAvatar(c: CharacterData): string | null {
-  const firstCard = c.topCards?.[0];
-  if (!firstCard) return null;
-
-  // Rank cards render this artwork across the full card width, so the tiny
-  // thumbnail variant looks visibly pixelated. Prefer the preview-sized asset
-  // and retain the thumbnail as a last-resort fallback.
-  return cardImageSources(firstCard, "preview")[0] ?? null;
+/** Get representative artwork candidates in market-rank order. */
+function getCharAvatarSources(c: CharacterData) {
+  return cardImageSourcesAcrossCards(c.topCards ?? [], "preview");
 }
 
 /* ── SVG Sparkline ── */
@@ -133,31 +127,59 @@ function SparkSvg({ data, up, w, h, pad }: { data: number[]; up: boolean; w: num
   );
 }
 
-/* ── Character Avatar ── */
-function CharAvatar({ src, name, size = 28 }: { src: string | null; name: string; size?: number }) {
-  const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-  if (src) {
-    return (
-      <FastCardImage
-        src={src}
-        alt={name}
-        width={size}
-        height={Math.round(size * 1.4)}
-        loading="lazy"
-        fetchPriority="low"
-        sizes={`${size}px`}
-        className="ch-avatar-img"
-        style={{ width: size, height: Math.round(size * 1.4) }}
-      />
-    );
-  }
+type ResilientCardImageProps = Omit<ComponentProps<typeof FastCardImage>, "onError" | "src"> & {
+  fallback: ReactNode;
+  sources: string[];
+};
+
+function ResilientCardImage({ fallback, sources, ...props }: ResilientCardImageProps) {
+  const sourceKey = sources.join("\n");
+  const [sourceState, setSourceState] = useState({ key: sourceKey, index: 0 });
+  const sourceIndex = sourceState.key === sourceKey ? sourceState.index : 0;
+  const src = sources[sourceIndex] ?? null;
+
+  if (!src) return fallback;
+
   return (
+    <FastCardImage
+      {...props}
+      key={src}
+      src={src}
+      onError={() => {
+        setSourceState((current) => ({
+          key: sourceKey,
+          index: (current.key === sourceKey ? current.index : 0) + 1,
+        }));
+      }}
+    />
+  );
+}
+
+/* ── Character Avatar ── */
+function CharAvatar({ sources, name, size = 28 }: { sources: string[]; name: string; size?: number }) {
+  const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+  const fallback = (
     <div
       className="ch-avatar-placeholder"
       style={{ width: size, height: Math.round(size * 1.4), fontSize: Math.round(size * 0.35) }}
     >
       {initials}
     </div>
+  );
+
+  return (
+    <ResilientCardImage
+      sources={sources}
+      fallback={fallback}
+      alt={name}
+      width={size}
+      height={Math.round(size * 1.4)}
+      loading="lazy"
+      fetchPriority="low"
+      sizes={`${size}px`}
+      className="ch-avatar-img"
+      style={{ width: size, height: Math.round(size * 1.4) }}
+    />
   );
 }
 
@@ -177,7 +199,7 @@ function RankCard({
 }) {
   const tier = TIER_LABELS[c.tier] || TIER_LABELS[3];
   const color = c.color || "#E89512";
-  const avatar = getCharAvatar(c);
+  const avatarSources = getCharAvatarSources(c);
   const copy = indexCopy(mode);
   return (
     <button
@@ -200,7 +222,7 @@ function RankCard({
       </div>
       <div className="ch-rank-body">
         <div className="ch-rank-image">
-          <CharAvatar src={avatar} name={c.name} size={200} />
+          <CharAvatar sources={avatarSources} name={c.name} size={200} />
         </div>
         <div className="ch-rank-market">
           <div className="ch-rank-market-line">
@@ -239,7 +261,7 @@ function CompactCharacterCard({
   mode: IndexMode;
 }) {
   const tier = TIER_LABELS[c.tier] || TIER_LABELS[3];
-  const avatar = getCharAvatar(c);
+  const avatarSources = getCharAvatarSources(c);
   const copy = indexCopy(mode);
 
   return (
@@ -250,7 +272,7 @@ function CompactCharacterCard({
       onClick={onClick}
     >
       <div className="ch-compact-image">
-        <CharAvatar src={avatar} name={c.name} size={150} />
+        <CharAvatar sources={avatarSources} name={c.name} size={150} />
         <span className="ch-compact-rank">#{rank}</span>
         {mode === "characters" && <span className="ch-compact-tier" style={{ background: tier.bg, color: tier.color }}>{tier.label}</span>}
       </div>
@@ -376,15 +398,16 @@ function CharacterTopCard({
   rank: number;
   gameRouteSlug: string;
 }) {
-  const imageSrc = card.imageUrlPreview ?? card.imageUrlSmall ?? card.imageUrl;
+  const imageSources = cardImageSources(card, "preview");
   const content = (
     <>
       <div className="ch-showcase-image">
         <span className="ch-showcase-rank">#{rank}</span>
         <span className={`rb ${rarityClass(card.rarity)} ch-showcase-rarity`}>{card.rarity}</span>
-        {imageSrc ? (
-          <FastCardImage
-            src={imageSrc}
+        {imageSources.length ? (
+          <ResilientCardImage
+            sources={imageSources}
+            fallback={<div className="ch-showcase-placeholder" aria-hidden="true" />}
             alt={card.name}
             width={256}
             height={358}
@@ -434,7 +457,7 @@ function CharacterCards({
   mode: IndexMode;
 }) {
   const tier = TIER_LABELS[c.tier] || TIER_LABELS[3];
-  const avatar = getCharAvatar(c);
+  const avatarSources = getCharAvatarSources(c);
   const copy = indexCopy(mode);
   const indexValue = c.indexValue.toLocaleString(undefined, {
     minimumFractionDigits: 2,
@@ -445,7 +468,7 @@ function CharacterCards({
     <div className="ch-cards-section">
       <div className="ch-character-strip">
         <div className="ch-cards-identity">
-          <CharAvatar src={avatar} name={c.name} size={48} />
+          <CharAvatar sources={avatarSources} name={c.name} size={48} />
           <div className="ch-cards-identity-copy">
             <span className="ch-cards-character-name" style={{ color: c.color }}>{c.name}</span>
             <span className="ch-cards-subtitle">{c.subtitle}</span>
