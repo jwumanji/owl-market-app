@@ -39,8 +39,8 @@ Five sections on the detail page, one dashboard.
 | Phase | Deliverable | Blocked on |
 |---|---|---|
 | A | Tokens + Terminal shell + sub-nav | nothing |
-| B | Migration v46 (four tables) | hand-application, no DDL via client |
-| C | Catalog seed + ingestion + backfill | JustTCG sealed coverage confirmed |
+| B | Migration v49 (3 ALTERs + 1 new table) | hand-application, no DDL via client |
+| C | Sealed price job + cron + catalog reconcile | nothing — coverage confirmed, set-value job already exists |
 | D | Dashboard | B, C |
 | E | Detail §3.1 hero + §3.2 price history | D |
 | F | Detail §3.3 stats + §3.4 top 10 | E |
@@ -60,71 +60,114 @@ All four new tables therefore carry `game_id`. Match the column type used by `ca
 
 `region` follows the v45 convention (`'en'`, `'jp'`), lowercase. There is no `language` column anywhere in this codebase and we are not introducing a second vocabulary.
 
-### 2.2 Migration v46
+### 2.2 Migration v49
 
-Head is currently v45. Numbering has collided historically (two each of v14, v22, v24, v25, v34, v41, v44), so **verify no v46 exists before writing it**.
+**This is v49, not v46.** v46 (`character-price-index`), v47 (`character-links`) and v48 (`nullable-price-changes`) were all written on 2026-07-12 and are all applied to the live database. Head is v48. There is no backlog of unapplied migrations — v44 `jp_prices` and v45 `region-aware-cards` are live too (7,740 and 373 rows respectively).
 
-There is no DDL access through the Supabase client. This migration is hand-applied via the SQL editor, same as v44 `jp_prices`.
+There is no DDL access through the Supabase client. This migration is hand-applied via the SQL editor.
+
+**Three of the four tables already existed.** v1.1 and v2.0 both assumed greenfield. Recon of the live database found otherwise:
+
+| Spec called for | Reality | Resolution |
+|---|---|---|
+| `create table sealed_products` | exists — `schema.sql:112`, **380 live rows**, read by `/markets`, guarded by v40 | **ALTER**, never create |
+| `create table sealed_weekly_prices` | `sealed_product_price_history` exists at **daily** grain (356 rows) | **dropped from the plan** — extend the daily table |
+| `create table set_weekly_values` | `market_index_snapshots` exists — `entity_type='set'`, 53 set rows, `index_value`, `card_count`, `chg_7d`, `chg_30d` | **dropped from the plan** — add `region`, use it |
+| `create table pull_rates` | nothing in the database; dead TS constant at `src/app/sets/sets-data.ts:109` | genuinely new — the only CREATE TABLE |
+
+**Daily beats weekly.** JustTCG returns 90 days of daily points, so storing a weekly aggregate throws away resolution we already have. The dashboard's `WEEKLY | MONTHLY` toggle is a rollup query over daily rows — last price in each period — not a storage format. `week_ending` as a stored Saturday column does not exist and is not needed.
+
+**No `set_code` anywhere.** `sealed_products.set_id` and `market_index_snapshots.set_id` both FK to `sets(id)`; join for the code rather than denormalizing a second copy. The set-value rollup is keyed on `set_id` for the same reason.
+
+**`game_id` is `uuid`**, `references public.games(id) on delete restrict` — confirmed against `cards.game_id`, not assumed.
 
 ```sql
--- schema-migration-v46-terminal-sealed.sql
+-- schema-migration-v49-terminal-sealed.sql  (abridged; see the file for the
+-- idempotency guards, comments, constraints and verification block)
 
-create table sealed_products (
-  id                 uuid primary key default gen_random_uuid(),
-  game_id            <match cards.game_id> not null references games(id),
-  slug               text not null,
-  set_code           text not null,
-  product_type       text not null,          -- 'booster_box' | 'case' | 'starter_deck' | 'premium'
-  region             text not null default 'en',
-  display_name       text not null,
-  packs_per_unit     int,
-  cards_per_pack     int,
-  msrp_usd           numeric(10,2),
-  release_date       date,
-  justtcg_variant_id text,
-  image_url          text,
-  is_tracked         boolean not null default true,
-  created_at         timestamptz default now(),
-  unique (game_id, slug)
-);
-create index on sealed_products (game_id, region, set_code);
+-- 1. sealed_products — extend the live table
+alter table public.sealed_products
+  add column if not exists slug            text,
+  add column if not exists region          text not null default 'en',
+  add column if not exists display_name    text,
+  add column if not exists packs_per_unit  int,
+  add column if not exists cards_per_pack  int,
+  add column if not exists msrp_usd        numeric(10,2),
+  add column if not exists release_date    date,
+  add column if not exists external_source text not null default 'justtcg',
+  add column if not exists external_ref    text,
+  add column if not exists is_tracked      boolean not null default false;
 
-create table sealed_weekly_prices (
-  product_id   uuid not null references sealed_products(id) on delete cascade,
-  game_id      <match> not null references games(id),
-  week_ending  date not null,               -- Saturday, UTC, always
-  market_price numeric(10,2) not null,
-  low_price    numeric(10,2),
-  sellers      int,
-  source       text not null default 'justtcg',
-  captured_at  timestamptz not null default now(),
-  primary key (product_id, week_ending)
-);
-create index on sealed_weekly_prices (game_id, week_ending);
+create unique index uq_sealed_products_game_slug
+  on public.sealed_products (game_id, slug) where slug is not null;
+create index idx_sealed_products_game_region_set
+  on public.sealed_products (game_id, region, set_id);
 
-create table set_weekly_values (
-  game_id     <match> not null references games(id),
-  set_code    text not null,
+-- 2. sealed_product_price_history — extend the daily table
+alter table public.sealed_product_price_history
+  add column if not exists low_price         numeric(10,2),
+  add column if not exists source_updated_at timestamptz,
+  add column if not exists sellers           int;
+
+create unique index uq_sealed_price_history_product_source_day
+  on public.sealed_product_price_history (sealed_product_id, source, price_date);
+
+-- 3. market_index_snapshots — the set-value rollup, plus region
+alter table public.market_index_snapshots
+  add column if not exists region text not null default 'en';
+
+-- 4. pull_rates — new
+create table public.pull_rates (
+  id          uuid primary key default gen_random_uuid(),
+  game_id     uuid not null references public.games(id) on delete restrict,
+  set_id      uuid not null references public.sets(id) on delete cascade,
   region      text not null default 'en',
-  week_ending date not null,
-  total_value numeric(12,2) not null,
-  card_count  int not null,
-  primary key (game_id, set_code, region, week_ending)
-);
-
-create table pull_rates (
-  game_id     <match> not null references games(id),
-  set_code    text not null,
-  rarity      text not null,                -- 'GMR'|'MR'|'SEC'|'SP'|'TR'|'AA'|'SR'|'L'|'BULK'
+  rarity_id   uuid references public.game_rarities(id) on delete restrict,
+  slot_label  text not null,                  -- 'MR', 'GMR', … or 'R / UC / C bulk'
+  per_pack    numeric(6,3),
   per_box     numeric(6,3) not null,
+  per_case    numeric(6,3),
   source_note text,
-  confidence  text not null default 'medium', -- 'high'|'medium'|'low'
-  updated_at  timestamptz default now(),
-  primary key (game_id, set_code, rarity)
+  confidence  text not null default 'medium', -- 'high' | 'medium' | 'low'
+  sort_order  int not null default 100,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
 );
+create unique index uq_pull_rates_set_slot
+  on public.pull_rates (game_id, set_id, region, slot_label);
 ```
 
-RLS: public read, no public write, matching how existing public tables are configured.
+**`external_source` / `external_ref` replace the spec's `justtcg_variant_id`.** A provider-named column would need a migration if sealed pricing ever falls back to eBay completed sales; source-agnostic means only the ingestion job changes. This is not hypothetical — `sealed_products.ebay_avg` is already a live column, so the table is already multi-source. `external_ref` is backfilled from the `justtcg_id` all 380 rows carry; `justtcg_id` is retained for the existing sync and is not dropped.
+
+**`is_tracked` defaults `false`, not `true`.** With 380 pre-existing rows, defaulting true would enrol binders, promo packs and sleeved singles into Terminal. The 46 booster boxes and cases opt in via the separate, reversible data step at the end of the migration file. Two of those 46 have a null `set_id` and are excluded until a set is assigned.
+
+**`rarity_id` FKs to `game_rarities`, nullable for BULK.** One rarity vocabulary, not two. The BULK slot has no rarity code, so `rarity_id` is null there and `slot_label` carries the plain text — matching §3.5's rule that `'BULK'` is never passed to `RarityBadge`.
+
+Both `pull_rates` FKs are composite `(set_id, game_id) → sets(id, game_id)` and `(rarity_id, game_id) → game_rarities(id, game_id)`, `NOT VALID` then `VALIDATE`, exactly as v40 does for every other game-scoped table. A row cannot point at another game's set or rarity.
+
+RLS: public read, no public write, matching v47's convention — `enable row level security`, a `for select using (true)` policy, `grant select to anon, authenticated`, `grant all to service_role`.
+
+**Real `product_type` vocabulary.** The four-value list in earlier drafts was fiction. All 17 live values, One Piece row counts (all 380 sealed products are One Piece; all are `is_active`):
+
+| type | rows | | type | rows |
+|---|---:|---|---|---:|
+| `pack` | 90 | | `booster_pack` | 19 |
+| `starter_deck` | 45 | | `promotion_pack` | 12 |
+| `starter_deck_display` | 39 | | `other` | 9 |
+| `collection` | 34 | | `display` | 6 |
+| `double_pack` | 26 | | `bundle` | 5 |
+| `tournament_pack` | 24 | | `deck_set` | 4 |
+| `booster_box_case` | 23 | | `binder` | 1 |
+| `booster_box` | 23 | | `battle_kit` | 1 |
+| `sleeved_booster_pack` | 19 | | | |
+
+Note `booster_box_case`, **not** `case`. Phase D's filter chips must be built from this list.
+
+**`region` on `market_index_snapshots` is inert, deliberately.** The natural key is confirmed as **`market_index_snapshots_entity_day_key` on `(game_id, entity_type, entity_key, snapshot_date)`** — no `region`. v49 adds the column but **does not touch the constraint**, because `capture_market_index_snapshots` writes with explicit column lists and would keep writing EN-only rows regardless.
+
+**JP rollups need both changes, together:** the function must stop hardcoding `cards.region = 'en'`, *and* the unique key must gain `region`. Doing either alone is worse than doing neither — widening the key without changing the function adds a column that is always `'en'`; changing the function without widening the key makes JP rows collide with EN rows on the same `(entity_key, snapshot_date)` and silently overwrite them. Existing rows are genuinely EN: the hardcode makes `region='en'` accurate, not an assumption.
+
+**Set membership for index purposes is `printed_set_code`, not `set_id`.** The function groups on `cards.printed_set_code` and resolves `set_id` afterwards via a lateral join matching `sets` by code. The two populations differ materially — OP05 has 137 cards by `set_id` and 287 by `printed_set_code`. Consumers join the snapshot on `set_id` (it is resolved and correct); anything that *recomputes* a set value must group on `printed_set_code` or it will be ~65% low. See `moon-terminal-justtcg-findings.md` §8.
 
 **`card_image_id` is the canonical key.** Anywhere singles are aggregated — set value rollup, rarity averages for Box EV, top 10 — group on `card_image_id`, never `card_number`. Parallels and alt-arts share numbers but have unique `_p1` / `_p2` suffixed image ids. Variant detection uses explicit `includes()` checks; **no regex catch-alls**.
 
@@ -134,12 +177,14 @@ RLS: public read, no public write, matching how existing public tables are confi
 |---|---|
 | `off_ath` | `(current − ath) / ath × 100`, ath = max across all snapshots |
 | `vs_msrp` | `(current − msrp) / msrp × 100` |
-| `value_ratio` | `set_weekly_values.total_value / market_price`, same `week_ending` |
+| `value_ratio` | `market_index_snapshots.index_value / price`, same `set_id`, **carrying forward** the last `snapshot_date` ≤ `price_date` |
 | `volatility_12w` | mean of `abs(w/w %)` over trailing 12 weeks |
-| `price_per_pack` | `market_price / packs_per_unit` |
+| `price_per_pack` | `price / packs_per_unit` |
 | `box_ev` | `Σ (pull_rates.per_box × avg_price_of_rarity)` |
-| `sealed_premium` | `(market_price − box_ev) / box_ev × 100` |
-| `sealed_rank` | rank by `market_price` among `is_tracked`, same `game_id` + `product_type` + `region` |
+| `sealed_premium` | `(price − box_ev) / box_ev × 100` |
+
+**The set-value rollup is weekly; box prices are daily.** So on six days out of seven there is no same-day set value. **Carry the last known one forward — never blank the ratio, never render a gap.** A ratio that vanishes for six days and reappears on Sundays reads as broken data. The chart's `VALUE RATIO` overlay is a step function between snapshots, and that is correct: the set value genuinely did not get remeasured in between. Label the axis so it can't be misread as a daily series.
+| `sealed_rank` | rank by latest `price` among `is_tracked`, same `game_id` + `product_type` + `region` |
 
 ---
 
@@ -163,11 +208,17 @@ No `.container` class exists. Follow the per-page pattern:
 
 Breadcrumb, then a three-column grid: box art (5:6, 1.5px ink border, `6px 6px 0` hard shadow) · main · key facts panel.
 
-Main column: mono eyebrow, H1 with the last two words in Caveat gradient (**`padding-right: 13px` required** — Caveat clips its tail under `background-clip:text`), price at 48px mono, four delta chips (7D/30D/90D/1Y), then the 52-week range bar.
+Main column: mono eyebrow, H1 with the last two words in Caveat gradient (**`padding-right: 13px` required** — Caveat clips its tail under `background-clip:text`), price at 48px mono, **three delta chips (7D/30D/90D)**, then the range bar.
+
+**The range bar is not 52 weeks at launch.** With a ~90-day history ceiling (findings §2) it spans at most 13 weeks from our own rows. The existing edge-case rule already covers this — relabel to the real span — so it degrades correctly, but treat the short span as the *normal* case, not an exception, and never hardcode the string `52-WEEK RANGE`.
+
+Note `sealed_products.ath` / `atl` are pre-populated live columns and may reflect a wider window than our own history. If the bar's endpoints come from those columns while the marker comes from our 90 days, the two disagree. **Pick one source for all three values** — our own rows are the defensible choice, since they're the ones we can show on the chart underneath.
 
 Range bar: gradient track, 4px ink marker at `(current − atl) / (ath − atl) × 100%`, value label above, ATL and ATH with dates below.
 
-Facts panel: MSRP · vs MSRP · released · set value · value ratio · sellers with W/W delta. Then `+ WATCHLIST` and `CSV`.
+Facts panel: MSRP · vs MSRP · released · set value · value ratio · **price activity** and **last move**. Then `+ WATCHLIST` and `CSV`.
+
+**There is no sellers row.** JustTCG exposes no `sellers`/`listings`/`quantity` field on sealed variants — confirmed by probe, see `moon-terminal-justtcg-findings.md` §3. `PRICE ACTIVITY` (`priceChangesCount30d`) and `LAST MOVE` (age of `lastUpdated`) replace it. Both are honest liquidity reads: a price that hasn't moved in three weeks is illiquid, which is what a thin seller count was meant to convey.
 
 **Edge cases.** Null `msrp_usd` → hide both MSRP rows. Fewer than 52 weeks of history → relabel to the real span (`"38-WEEK RANGE"`). `ath === current` → marker at 100%, show `AT ATH` in `--gain-2` instead of an off-ATH figure.
 
@@ -177,13 +228,17 @@ Facts panel: MSRP · vs MSRP · released · set value · value ratio · sellers 
 
 Do not port the mockup's hand-rolled SVG chart. It exists because the mockup was standalone.
 
-**View toggle:** cobalt `CHART | TABLE`, chart default. **Timeframes:** 30D (daily) · 90D (daily) · 1Y (weekly) · ALL (monthly, since release). Default 90D. Timeframe drives both views and survives toggling between them.
+**View toggle:** cobalt `CHART | TABLE`, chart default. **Timeframes at launch: 30D (daily) · 90D (daily). Default 90D.** Timeframe drives both views and survives toggling between them.
+
+**1Y and ALL do not ship in v1.** JustTCG's `historyDuration=1y` is broken — it returns ~7 points, all days old, so **~90 days is the hard ceiling on available history** (findings §2). Rendering a 1Y axis over 90 days of data would misrepresent the range. Gate both on our own accumulated depth: once `sealed_product_price_history` has collected daily for long enough, 1Y becomes real from our rows and the toggle grows a button. Build the timeframe list data-driven so adding them later is config, not surgery.
+
+The hero's four delta chips (7D/30D/90D/1Y) have the same problem — **drop the 1Y chip** until the depth exists.
 
 **Overlays:** `SET VALUE` (gold, dashed) and `VALUE RATIO` (`--select` cobalt, dashed), independent toggles.
 
 **The scale rule — this is the part that's easy to get wrong.** With no overlay, the y-axis is raw USD and the price line carries a 12%-opacity area fill. The moment *any* overlay activates, all series switch to **indexed at 100 = first point in window**, the area fill drops, and the axis label becomes `INDEXED · 100 = <start date>`. Plotting dollars against a multiplier on one axis is meaningless. This is the CoinGecko "compare against BTC" behaviour.
 
-**Table view:** active timeframe's raw snapshots — date, box price, change, set value, ratio, sellers — newest first, sticky header, `max-height: 452px` with internal scroll. Footer states the resolution (`DAILY` / `WEEKLY` / `MONTHLY`).
+**Table view:** active timeframe's raw snapshots — date, box price, change, set value, ratio — newest first, sticky header, `max-height: 452px` with internal scroll. No sellers column. Footer states the resolution, which is `DAILY` for both launch timeframes.
 
 Overlay buttons **hide** in table mode. They only affect the chart; leaving them visible implies they filter columns.
 
@@ -193,9 +248,11 @@ Chart hover works on mouse and touch; tooltip stays inside its container at both
 
 6-up stat cards, **3-up at 1180px**, 2-up at 720px. Hover: `translate(-2px,-2px)` + `4px 4px 0` ink shadow.
 
-Off ATH · 12W volatility · sellers · cards per box · $ per pack · sealed rank.
+Off ATH · 12W volatility · **price activity** · cards per box · $ per pack · sealed rank.
 
-Sellers falling while price rises is the supply-drying signal. The sub-label says so (`TIGHTENING` / `LOOSENING`) rather than just printing a number.
+**`PRICE ACTIVITY` replaces the sellers card**, and the `TIGHTENING` / `LOOSENING` supply signal is removed with it — JustTCG exposes no seller count for sealed variants (findings §3). The card shows `priceChangesCount30d` with a sub-label reading the age of `lastUpdated` (`MOVED 2D AGO` / `FLAT 23D`). A box that hasn't repriced in three weeks is illiquid; that is the signal, stated directly rather than inferred from a seller count we don't have.
+
+Do not reintroduce a supply reading from `market_avg` volatility — volatility is already its own card, and calling the same number a supply signal would double-count it.
 
 ### 3.4 Top 10 cards
 
@@ -252,6 +309,13 @@ Route `/games/[game]/terminal/sealed`, mirrored at `/terminal/sealed`.
 `CASES`, `DECKS`, and `JP` render disabled with `SOON` labels.
 
 Missing weeks render as em-dashes, **never zeros**. Exactly-zero deltas render `--ink-3`, **never green**.
+
+**Two distinct empty states — do not collapse them into one.**
+
+- **No snapshot this week** (the set-value rollup hasn't run for this period): carry the last known value forward per §2.3. The grid still renders; the ratio is a step, not a gap.
+- **No snapshots for this game at all**: the rollup has never run for it. Today `market_index_snapshots` holds One Piece only — Lorcana has 18 sets and Riftbound 7, with **zero** set snapshots between them. Every Value Ratio for those games is null, permanently, until the cron is extended.
+
+The second case must **hide the `VALUE RATIO` ranking chip and the ratio column entirely**, with a one-line explanation, rather than rendering a full grid of em-dashes. A column of dashes reads as "this data is missing today"; the truth is "this metric does not exist for this game yet". Terminal launches on One Piece so this is not v1-blocking, but it is cheap now and expensive to retrofit once the grid logic assumes a ratio always exists.
 
 Sparklines in table view stay hand-rolled inline SVG — one chart.js instance per row is not worth it. chart.js is for the detail page's main chart only.
 
@@ -338,16 +402,45 @@ Same shape for `[productSlug]`.
 
 | Job | Cadence | Writes |
 |---|---|---|
-| `sealed-weekly-snapshot` | Sat 06:00 UTC | `sealed_weekly_prices` |
-| `set-value-rollup` | Sat 06:15 UTC | `set_weekly_values` |
+| `sealed-daily-snapshot` | daily 06:00 UTC | `sealed_product_price_history` |
+| `set-value-rollup` | daily 06:15 UTC | `market_index_snapshots` (`entity_type='set'`) |
 
-Rollup runs **after** the snapshot so value ratio has both sides for the same `week_ending`. Both idempotent — re-running a week overwrites rather than duplicating. `week_ending` is always the Saturday, UTC.
+**Daily, not weekly.** JustTCG returns 90 days of daily points, so a weekly job would discard resolution we already have. Rollup runs **after** the snapshot so value ratio has both sides for the same date. Both idempotent — the unique key `(sealed_product_id, source, price_date)` makes a re-run overwrite rather than duplicate.
 
-**Capture `sellers` from the first run.** JustTCG returns a current count and nothing stores it over time. Section 3.2's sellers column and 3.3's supply signal both depend on history that doesn't exist yet.
+The dashboard's `WEEKLY | MONTHLY` toggle is a **query-time rollup** — last price in each period — not a second storage format.
+
+**Only the sealed price job is greenfield.** The set-value job already exists:
+
+| Table | Scheduled by |
+|---|---|
+| `market_index_snapshots` | **`pg_cron` job 1**, active, `40 23 * * 0` (Sunday 23:40 UTC), calling `capture_market_index_snapshots(games.id, current_date)` for one_piece |
+| `sealed_product_price_history` | **nothing** — no cron, no route, no function |
+
+`capture_market_index_snapshots` computes `index_value = sum(tcg_market)` over priced cards in the set for `entity_type='set'`. **That is set value — already computed, scheduled and game-scoped. Do not build a second rollup.** Join on `set_id` + `snapshot_date`.
+
+So Phase C is: **build the sealed price job, add one cron entry, reconcile the catalog.** Smaller than two jobs.
+
+**Unverified — has the cron ever fired?** The only snapshot is `2026-07-23`, a **Thursday**, captured at `09:45 UTC`. A Sunday 23:40 job produces Sunday dates. So the existing rows came from a manual invocation, and there are no rows for 07-19 or 07-12. Either the job was created after 07-19 and has not yet run, or it fails silently. **Check `cron.job_run_details` before Phase C depends on it** — if it has never succeeded, the sealed job is not the only thing that needs building.
+
+Until both sides produce rows, **Value Ratio computes to null for every product**: one price date (07-14), one snapshot (07-23), and §2.3's join finds no snapshot at or before any price.
+
+**History backfill is cheap and confirmed.** 354 of 364 sealed products carry `{p, t}` daily history, median 90 points; full catalog plus history is **4 requests** (findings §1). The earlier concern that snapshots would accumulate from day one is void.
+
+**~90 days is the ceiling.** `historyDuration=1y` is broken — it returns ~7 points, all days old (findings §2). This is why §3.2 ships 30D and 90D only.
+
+**`sellers` is not available.** JustTCG exposes no `sellers`/`listings`/`quantity` field on sealed variants — confirmed by payload inspection, not inferred. The column exists on `sealed_product_price_history` (v49), stays null on `justtcg` rows, and is reserved for a possible eBay-sourced future. §3.1, §3.2 and §3.3 use `priceChangesCount30d` and `lastUpdated` age instead.
 
 JustTCG notes: auth header is `x-api-key`; `OP01-001` format returned natively; price history as `{p, t}` objects with Unix seconds; set slugs are full descriptive slugs.
 
-**Verify sealed coverage before building the jobs** — confirm boxes *and* cases return, and confirm sealed variants carry price history. If history is missing, snapshots accumulate from day one and the ALL timeframe stays short until enough weeks land.
+**Open discrepancy — catalog staleness.** The API returns 86 booster boxes and 29 cases against 23 and 23 in the live table. Either the existing sync filters them or the catalog is stale. Resolve during Phase C before backfilling, or Terminal launches missing roughly two thirds of the boxes that exist.
+
+Full probe results: **`docs/moon-terminal-justtcg-findings.md`** (2026-07-26).
+
+### Backfilling set-value history
+
+`price_history` reaches further back than the 90-day sealed ceiling, so ~6 additional weekly set-value points can be reconstructed — moving Value Ratio from 1 point to ~6. **Feasible and validated to within +0.04%–4.17%, but shallow**: the singles pipeline only reached full weekly catalog coverage on 2026-06-14, and reconstructions before that freeze into an identical repeated value. Roughly half a day of work.
+
+**If built, group on `printed_set_code`, not `set_id`** — grouping on `set_id` comes out 65% low. Full method, validation table, depth analysis and constraints are in `moon-terminal-justtcg-findings.md` §8. Not scheduled; decide during Phase C.
 
 ---
 
@@ -361,7 +454,11 @@ JustTCG notes: auth header is `x-api-key`; `OP01-001` format returned natively; 
 - Every new query carries `game_id` and `region` filters
 - Dashboard: 3 views × 2 periods × 6 ranking modes render without error
 - View preference persists across reload
-- Detail: 4 timeframes × 4 overlay combinations render; overlay activation switches the axis to indexed mode and deactivating all restores USD + area fill
+- Detail: 2 timeframes (30D, 90D) × 4 overlay combinations render; overlay activation switches the axis to indexed mode and deactivating all restores USD + area fill
+- No `sellers` reference survives in any Terminal component — grep both pages
+- Audit asserts `market_index_snapshots` has zero rows with `entity_type='set' and set_id is null` — currently 0/53, and a future set-code mismatch must fail the build rather than silently null the Value Ratio
+- No `is_tracked` product has a null `set_id`
+- Dashboard renders for a game with zero set snapshots without a grid of em-dashes
 - `CHART | TABLE` preserves timeframe in both directions
 - Range bar marker correct at ATH (100%) and ATL (0%)
 - Box EV total equals the sum of slot contributions, no rounding drift; weights sum to 100%
@@ -398,12 +495,12 @@ Recorded so the schema isn't designed into a corner.
 
 Pick before writing schema — row shape differs materially.
 
-**Design constraints.** Pop is monotonic, so momentum requires snapshots from the first day the source lands, same as `sellers`. Gem rate is **submitter-biased** — people grade copies that already look clean, so 45% gem rate is not a 45% population estimate. Label it *submitted* gem rate, never implied population quality. That bias is precisely the argument for Owl Pregrade: measured centering is the unbiased signal gem rate can't be.
+**Design constraints.** Pop is monotonic, so momentum requires snapshots from the first day the source lands — the same trap the sealed price history fell into (§7: one date, written once, no cron). Gem rate is **submitter-biased** — people grade copies that already look clean, so 45% gem rate is not a 45% population estimate. Label it *submitted* gem rate, never implied population quality. That bias is precisely the argument for Owl Pregrade: measured centering is the unbiased signal gem rate can't be.
 
 ```sql
 create table psa_pop_snapshots (
   card_image_id text not null,
-  game_id       <match> not null references games(id),
+  game_id       uuid not null references public.games(id) on delete restrict,
   psa_spec_id   text,
   week_ending   date not null,
   total_graded  int not null,
