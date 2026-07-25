@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Moon Terminal — Sealed Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Caveat:wght@700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FFF5E4; --bg-2:#FFFFFF; --bg-3:#FCE6BE;
+  --ink:#1A0F08; --ink-2:#5C4534; --ink-3:#9A8475;
+  --pink:#FF6BB8; --coral:#FF4936; --gold:#E89512;
+  --gain:#2D9961; --loss:#E04E4E;
+  --grad-brand:linear-gradient(135deg,#FF6BB8 0%,#FF4936 50%,#E89512 100%);
+  --grad-terminal:linear-gradient(100deg,#1E7FA8 0%,#1C9C9C 40%,#1FAE86 72%,#3EC08A 100%);
+  --line:#EEDFC8;
+  --r-sm:8px; --r-md:14px; --r-lg:22px; --r-pill:999px;
+  --w-metric:112px; --w-prod:248px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:'Space Grotesk',sans-serif;-webkit-font-smoothing:antialiased}
+.mono{font-family:'JetBrains Mono',monospace}
+.container{max-width:1460px;margin:0 auto;padding-left:28px;padding-right:28px}
+
+/* NAV — matches main Moon Market nav */
+nav{position:sticky;top:0;z-index:60;background:rgba(255,245,228,.96);backdrop-filter:blur(8px);border-bottom:1.5px solid var(--ink)}
+.nav-row{max-width:1460px;margin:0 auto;padding:0 28px;display:flex;align-items:center;gap:18px;height:60px}
+.logo{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--ink);flex-shrink:0}
+.logo-mark{width:26px;height:26px;border:1.5px solid var(--ink);border-radius:50%;background:var(--grad-brand);display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1}
+.logo-name{display:flex;align-items:baseline;gap:2px}
+.logo-name .wm-moon{font-weight:700;font-size:20px;letter-spacing:-.3px}
+.logo-name .wm-market{font-family:'Caveat',cursive;font-weight:700;font-size:25px;background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;color:transparent;padding-right:8px;padding-bottom:2px}
+.nav-mid{display:flex;align-items:center;gap:16px;margin-left:6px}
+.nav-link{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11.5px;letter-spacing:1px;color:var(--ink-2);text-decoration:none;padding:4px 0;border-bottom:2px solid transparent;white-space:nowrap}
+.nav-link:hover{color:var(--ink)}
+.nav-link.active{color:var(--ink);border-bottom-color:var(--coral)}
+.nav-link.terminal{display:flex;align-items:center;gap:5px;color:var(--ink);border-bottom-color:transparent}
+.nav-link.terminal .tchip{font-size:9px;letter-spacing:1.1px;background:var(--grad-terminal);color:#FFFFFF;border-radius:var(--r-pill);padding:3px 8px 2px}
+.nav-link.terminal.active .tchip{background:var(--grad-terminal);color:#FFFFFF}
+.nav-right{display:flex;align-items:center;gap:10px;margin-left:auto}
+.live-badge{display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:9.5px;letter-spacing:1.1px;color:var(--gain);border:1.5px solid var(--gain);border-radius:var(--r-pill);padding:3px 9px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--gain);animation:pulse 1.8s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.nav-search{font-family:'Space Grotesk',sans-serif;font-size:12.5px;color:var(--ink);background:var(--bg-2);border:1.5px solid var(--ink);border-radius:var(--r-pill);padding:7px 14px;width:150px;outline:none}
+.nav-search::placeholder{color:var(--ink-3)}
+.btn-login{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;letter-spacing:.8px;color:var(--ink-2);text-decoration:none}
+.btn-signup{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;letter-spacing:.8px;color:#fff;background:var(--grad-brand);border:1.5px solid var(--ink);border-radius:var(--r-pill);padding:7px 15px;cursor:pointer}
+/* ticker */
+.ticker-bar{border-top:1.5px solid var(--ink);background:var(--bg-3);overflow:hidden;height:30px;display:flex;align-items:center}
+.ticker-track{display:flex;gap:26px;white-space:nowrap;animation:slide 42s linear infinite;padding-left:28px}
+@keyframes slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.tk{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10.5px;letter-spacing:.5px;color:var(--ink-2)}
+.tk b{color:var(--ink);font-weight:600}
+/* terminal sub-nav */
+.subnav{border-top:1.5px solid var(--ink);background:var(--grad-terminal);box-shadow:inset 0 1px 0 rgba(255,255,255,.28)}
+.subnav-row{max-width:1460px;margin:0 auto;padding-left:28px;padding-right:28px;display:flex;align-items:center;gap:20px;height:44px;overflow-x:auto}
+.sn-label{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:9.5px;letter-spacing:1.4px;color:rgba(255,255,255,.68);flex-shrink:0}
+.sn-link{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;letter-spacing:1px;color:rgba(255,255,255,.86);text-decoration:none;padding:3px 0;border-bottom:2px solid transparent;white-space:nowrap;transition:color .12s}
+.sn-link:hover{color:#FFFFFF}
+.sn-link.active{color:#FFFFFF;border-bottom-color:#FFD166}
+.sn-link.soon-link{color:rgba(255,255,255,.52)}
+
+/* HEADER */
+.head{padding-top:34px;padding-bottom:6px}
+.eyebrow{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;letter-spacing:1.6px;color:var(--ink-2);margin-bottom:8px}
+.head-row{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+h1{font-size:38px;font-weight:700;letter-spacing:-.8px;line-height:1.05}
+h1 .script{font-family:'Caveat',cursive;font-weight:700;font-size:46px;background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;color:transparent;padding-right:14px;padding-bottom:4px}
+.head-sub{margin-top:8px;font-size:14.5px;color:var(--ink-2);max-width:560px}
+.head-meta{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;color:var(--ink-2);letter-spacing:.4px;text-align:right;line-height:1.8}
+
+/* STAT RAIL */
+.stat-rail{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:24px;margin-bottom:20px}
+.stat{background:var(--bg-2);border:1.5px solid var(--ink);border-radius:var(--r-md);padding:15px 17px;transition:transform .12s,box-shadow .12s}
+.stat:hover{transform:translate(-2px,-2px);box-shadow:4px 4px 0 var(--ink)}
+.s-label{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10.5px;letter-spacing:1.2px;color:var(--ink-2);margin-bottom:7px}
+.s-value{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:26px;letter-spacing:-.5px}
+.s-delta{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;margin-top:4px}
+.up{color:var(--gain)} .down{color:var(--loss)} .flat{color:var(--ink-3)}
+
+/* RANK CHIPS */
+.rank-bar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:12px}
+.rb-label{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10.5px;letter-spacing:1.2px;color:var(--ink-2);margin-right:2px}
+.chip{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;letter-spacing:.8px;background:var(--bg-2);border:1.5px solid var(--ink);border-radius:var(--r-pill);padding:7px 14px;color:var(--ink-2);cursor:pointer;transition:transform .1s,box-shadow .1s}
+.chip:hover{transform:translate(-1px,-1px);box-shadow:2px 2px 0 var(--ink)}
+.chip.on{background:var(--ink);color:var(--bg);box-shadow:none;transform:none}
+.chip .dir{color:var(--gold);margin-left:5px}
+.chip.on .dir{color:var(--bg-3)}
+
+/* CONTROLS */
+.controls{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:14px}
+.search{flex:0 1 200px;display:flex;align-items:center;gap:8px;background:var(--bg-2);border:1.5px solid var(--ink);border-radius:var(--r-pill);padding:8px 14px}
+.search input{border:none;outline:none;background:none;font-family:'Space Grotesk',sans-serif;font-size:13.5px;color:var(--ink);width:100%}
+.search input::placeholder{color:var(--ink-3)}
+.seg{display:flex;border:1.5px solid var(--ink);border-radius:var(--r-pill);overflow:hidden;background:var(--bg-2)}
+.seg button{border:none;background:none;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;letter-spacing:.8px;padding:8px 14px;color:var(--ink-2);cursor:pointer;display:flex;align-items:center;gap:4px}
+.seg button.on{background:var(--ink);color:var(--bg)}
+.seg button:disabled{color:var(--ink-3);cursor:default}
+.soon{font-size:8.5px;letter-spacing:.5px;color:var(--gold)}
+.ctl-label{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10.5px;letter-spacing:1.2px;color:var(--ink-2)}
+.view-label{margin-left:auto}
+.controls-2{margin-bottom:16px}
+.period-seg{border-color:var(--gold);box-shadow:2px 2px 0 var(--gold)}
+.period-seg button.on{background:var(--gold);color:#fff}
+.view-seg{border-color:var(--coral);box-shadow:2px 2px 0 var(--coral)}
+.view-seg button.on{background:var(--coral);color:#fff}
+
+/* TABLE SHELL */
+.table-card{background:var(--bg-2);border:1.5px solid var(--ink);border-radius:var(--r-lg);overflow:hidden;margin-bottom:16px}
+.scroll{overflow-x:auto}
+table{border-collapse:separate;border-spacing:0;width:100%}
+thead th{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11.5px;letter-spacing:1.1px;color:var(--ink-2);text-transform:uppercase;padding:11px 13px;background:var(--bg-3);border-bottom:1.5px solid var(--ink);white-space:nowrap}
+tbody td{padding:0;border-bottom:1px solid var(--line);font-family:'JetBrains Mono',monospace;font-weight:600;font-size:14.5px;white-space:nowrap}
+tbody tr:last-child td{border-bottom:none}
+
+.m-head,.m-cell{width:var(--w-metric);min-width:var(--w-metric);text-align:left}
+.m-head{background:#F7D9A8;color:var(--ink);border-right:1px solid var(--line)}
+.m-cell{padding:10px 13px !important;background:#FEF3E0;border-right:1px solid var(--line);font-variant-numeric:tabular-nums}
+.m-rank{display:block;font-size:10.5px;color:var(--ink-3);letter-spacing:.8px}
+.m-val{display:block;font-size:16px;margin-top:2px}
+/* ratio-mode metric stack */
+.ms-row{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--ink-2);margin-top:3px}
+.ms-row b{color:var(--ink);font-weight:600}
+.ms-key{font-size:10px;letter-spacing:1px;color:var(--ink-3);align-self:center}
+.ms-mult{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-top:6px;padding-top:6px;border-top:1px solid var(--line)}
+.ms-mult .mv{font-size:19px;letter-spacing:-.4px}
+.ms-mult .md{font-size:12px}
+
+.p-head,.p-cell{width:var(--w-prod);min-width:var(--w-prod);text-align:left}
+.p-cell{padding:10px 13px !important;background:var(--bg-2);border-right:1.5px solid var(--ink)}
+.prod{display:flex;align-items:center;gap:11px}
+.box-thumb{width:30px;height:40px;border:1.5px solid var(--ink);border-radius:5px;background:var(--grad-brand);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:7.5px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.4)}
+.prod-name{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13.5px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:172px}
+.prod-meta{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;color:var(--ink-3);letter-spacing:.6px;margin-top:2px}
+.ath-chip{display:inline-block;font-size:8.5px;letter-spacing:.8px;background:var(--gain);color:#fff;border-radius:var(--r-pill);padding:2px 6px;margin-left:5px;vertical-align:middle}
+
+/* GRID VIEW */
+#gridView table{min-width:1330px}
+#gridView.ratio-mode{--w-metric:198px}
+#gridView.ratio-mode table{min-width:1430px}
+#gridView .m-head,#gridView .m-cell{position:sticky;left:0;z-index:20}
+#gridView .p-head,#gridView .p-cell{position:sticky;left:var(--w-metric);z-index:19}
+#gridView thead th.wk{text-align:right;padding:11px 10px}
+#gridView thead th.wk small{display:block;font-size:10px;letter-spacing:.6px;color:var(--ink-3);font-weight:600;margin-top:2px}
+#gridView thead th.wk.now{color:var(--ink);background:#F7D9A8}
+.cell{display:block;padding:12px 10px;text-align:right;font-variant-numeric:tabular-nums}
+.cell.now{box-shadow:inset 0 0 0 1.5px var(--ink)}
+.cell-d{display:block;font-size:11px;font-weight:600;margin-top:1px;opacity:.85}
+.cell-sub{display:block;font-size:10px;font-weight:600;color:var(--ink-3);letter-spacing:.3px;margin-top:2px}
+.legend{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;letter-spacing:.9px;color:var(--ink-2);padding:0 4px 8px}
+.swatches{display:flex;border:1.5px solid var(--ink);border-radius:var(--r-sm);overflow:hidden}
+.sw{width:26px;height:16px}
+.unit-note{color:var(--ink-3)}
+
+/* TABLE VIEW */
+#tableView table{min-width:1300px}
+#tableView thead th.num{text-align:right}
+#tableView tbody td.num{padding:12px 13px;text-align:right}
+#tableView thead th.sorted{color:var(--ink);background:#F7D9A8}
+#tableView tbody tr:hover td{background:var(--bg-3)}
+#tableView tbody tr:hover td.p-cell,#tableView tbody tr:hover td.m-cell{background:var(--bg-3)}
+.spark{width:92px;height:26px;display:block;margin-left:auto}
+
+/* CARDS VIEW */
+#cardsView{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px}
+.pcard{background:var(--bg-2);border:1.5px solid var(--ink);border-radius:var(--r-lg);overflow:hidden;display:flex;flex-direction:column;transition:transform .13s,box-shadow .13s}
+.pcard:hover{transform:translate(-3px,-3px);box-shadow:6px 6px 0 var(--ink)}
+.pc-top{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg-3);border-bottom:1.5px solid var(--ink)}
+.pc-rank{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12px;letter-spacing:.8px;background:var(--ink);color:var(--bg);border-radius:var(--r-pill);padding:3px 9px}
+.pc-rel{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;letter-spacing:.9px;color:var(--ink-2)}
+.pc-body{padding:16px 16px 12px;display:flex;gap:14px}
+.pc-art{width:60px;height:80px;flex-shrink:0;border:1.5px solid var(--ink);border-radius:var(--r-sm);background:var(--grad-brand);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;letter-spacing:.5px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.4)}
+.pc-name{font-weight:700;font-size:15.5px;line-height:1.2;letter-spacing:-.2px}
+.pc-code{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;letter-spacing:1px;color:var(--ink-3);margin-top:3px}
+.pc-price{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:30px;letter-spacing:-.8px;margin-top:9px;line-height:1}
+.pc-delta{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;margin-top:5px}
+.pc-spark{padding:0 12px 4px}
+.pc-spark svg{width:100%;height:52px;display:block}
+.pc-sparklabel{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:8.5px;letter-spacing:1px;color:var(--ink-3);padding:0 14px 2px}
+.pc-range{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10.5px;letter-spacing:.9px;color:var(--ink-3);display:flex;justify-content:space-between;gap:6px;padding:0 14px 8px}
+.pc-ath{color:var(--ink-2)}
+.pcard.at-ath .pc-ath{color:var(--gain)}
+.pc-foot{margin-top:auto;display:grid;grid-template-columns:1fr 1fr;border-top:1.5px solid var(--ink)}
+.pc-stat{padding:9px 14px}
+.pc-stat + .pc-stat{border-left:1px solid var(--line)}
+.pc-stat.active{background:#FEF3E0}
+.pc-sl{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;letter-spacing:1px;color:var(--ink-2)}
+.pc-sv{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:16px;margin-top:2px;font-variant-numeric:tabular-nums}
+
+.hidden{display:none !important}
+.footnote{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10.5px;color:var(--ink-3);letter-spacing:.4px;padding:0 4px 48px;line-height:1.9}
+
+@media(max-width:1200px){#cardsView{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:1180px){ .nav-search{display:none} }
+@media(max-width:1040px){ .nav-mid .nav-link:not(.terminal){display:none} }
+@media(max-width:900px){
+  .stat-rail{grid-template-columns:repeat(2,1fr)}
+  #cardsView{grid-template-columns:repeat(2,1fr)}
+  h1{font-size:29px} h1 .script{font-size:36px}
+  .head-meta{text-align:left}
+  .view-label{margin-left:0}
+}
+@media(max-width:640px){
+  :root{--w-metric:86px;--w-prod:186px}
+  #gridView.ratio-mode{--w-metric:158px}
+  .container{padding-left:14px;padding-right:14px}
+  .btn-login{display:none} .live-badge{display:none}
+  .nav-row{padding-left:14px;padding-right:14px} .subnav-row{padding-left:14px;padding-right:14px} .ticker-track{padding-left:14px}
+  .prod-name{font-size:12px;max-width:126px} .box-thumb{width:24px;height:32px}
+  .search{flex:1 1 100%}
+  #cardsView{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-row">
+    <a href="#" class="logo">
+      <span class="logo-mark">🌙</span>
+      <span class="logo-name"><span class="wm-moon">Moon</span><span class="wm-market">Market</span></span>
+    </a>
+    <div class="nav-mid">
+      <a href="#" class="nav-link">HOME</a>
+      <a href="#" class="nav-link">MARKETS</a>
+      <a href="#" class="nav-link">RARITIES</a>
+      <a href="#" class="nav-link">PROMOS</a>
+      <a href="#" class="nav-link">SETS</a>
+      <a href="#" class="nav-link">PORTFOLIO</a>
+      <a href="#" class="nav-link">ALERTS</a>
+      <a href="#" class="nav-link terminal active">TERMINAL<span class="tchip">PRO</span></a>
+    </div>
+    <div class="nav-right">
+      <div class="live-badge"><span class="live-dot"></span>LIVE</div>
+      <input class="nav-search" placeholder="Search cards...">
+      <a href="#" class="btn-login">Login</a>
+      <button class="btn-signup">Sign Up</button>
+    </div>
+  </div>
+  <div class="ticker-bar"><div class="ticker-track" id="ticker"></div></div>
+  <div class="subnav">
+    <div class="subnav-row">
+      <span class="sn-label">TERMINAL</span>
+      <a href="#" class="sn-link active">SEALED</a>
+      <a href="#" class="sn-link">CHASE</a>
+      <a href="#" class="sn-link">MOVERS</a>
+      <a href="#" class="sn-link">SET INDEX</a>
+      <a href="#" class="sn-link soon-link">BOX EV</a>
+    </div>
+  </div>
+</nav>
+
+<header class="container head">
+  <div class="eyebrow">MOON TERMINAL / SEALED</div>
+  <div class="head-row">
+    <div>
+      <h1>Sealed <span class="script">Tracker</span></h1>
+      <p class="head-sub" id="headSub"></p>
+    </div>
+    <div class="head-meta mono">
+      DATA: JUSTTCG · WEEKLY SNAPSHOT<br>
+      LAST UPDATE: SAT JUL 25 · 06:00 UTC
+    </div>
+  </div>
+</header>
+
+<section class="container stat-rail">
+  <div class="stat"><div class="s-label">SEALED INDEX</div><div class="s-value" id="idxVal">—</div><div class="s-delta" id="idxDelta">—</div></div>
+  <div class="stat"><div class="s-label" id="brLabel">BREADTH</div><div class="s-value" id="brVal">—</div><div class="s-delta flat" id="brSub">—</div></div>
+  <div class="stat"><div class="s-label" id="gnLabel">TOP GAINER</div><div class="s-value" id="gnVal">—</div><div class="s-delta up" id="gnSub">—</div></div>
+  <div class="stat"><div class="s-label" id="lsLabel">TOP LOSER</div><div class="s-value" id="lsVal">—</div><div class="s-delta down" id="lsSub">—</div></div>
+</section>
+
+<section class="container rank-bar" id="rankBar">
+  <span class="rb-label">RANK BY</span>
+</section>
+
+<section class="container controls">
+  <div class="search"><span class="mono" style="font-size:12px;color:var(--ink-3)">⌕</span><input type="text" placeholder="Search boxes…"></div>
+  <div class="seg">
+    <button class="on">BOXES</button>
+    <button disabled>CASES<span class="soon">SOON</span></button>
+    <button disabled>DECKS<span class="soon">SOON</span></button>
+  </div>
+  <div class="seg">
+    <button class="on">EN</button>
+    <button disabled>JP<span class="soon">SOON</span></button>
+  </div>
+</section>
+
+<section class="container controls controls-2">
+  <span class="ctl-label">PERIOD</span>
+  <div class="seg period-seg">
+    <button id="btnWeekly" class="on">WEEKLY</button>
+    <button id="btnMonthly">MONTHLY</button>
+  </div>
+  <span class="ctl-label view-label">VIEW</span>
+  <div class="seg view-seg">
+    <button id="btnGrid" class="on">GRID</button>
+    <button id="btnTable">TABLE</button>
+    <button id="btnCards">CARDS</button>
+  </div>
+</section>
+
+<section class="container">
+  <div class="legend" id="legend">
+    <span id="legendLabel"></span>
+    <div class="swatches" id="swatches"></div>
+    <span>−8%&nbsp;&nbsp;→&nbsp;&nbsp;FLAT&nbsp;&nbsp;→&nbsp;&nbsp;+8%</span>
+    <span class="unit-note" id="unitNote"></span>
+  </div>
+
+  <div class="table-card" id="gridView">
+    <div class="scroll">
+      <table><thead><tr id="gHead"></tr></thead><tbody id="gBody"></tbody></table>
+    </div>
+  </div>
+
+  <div class="table-card hidden" id="tableView">
+    <div class="scroll">
+      <table><thead><tr id="tHead"></tr></thead><tbody id="tBody"></tbody></table>
+    </div>
+  </div>
+
+  <div class="hidden" id="cardsView"></div>
+
+  <p class="footnote" id="footnote"></p>
+</section>
+
+<script>
+/* ---------- config ---------- */
+const N = 12;
+const WEEK_LABELS  = ["MAY 09","MAY 16","MAY 23","MAY 30","JUN 06","JUN 13","JUN 20","JUN 27","JUL 04","JUL 11","JUL 18","JUL 25"];
+const MONTH_LABELS = ["AUG 25","SEP 25","OCT 25","NOV 25","DEC 25","JAN 26","FEB 26","MAR 26","APR 26","MAY 26","JUN 26","JUL 26"];
+
+const PRODUCTS = [
+ {code:"OP-05", name:"Awakening of the New Era", rel:"2023-12-08", setVal:3100,
+  w:[571,566,579,590,588,602,616,631,655,668,657,685], m9:[512,498,521,540,533,555,548,566,578]},
+ {code:"OP-01", name:"Romance Dawn", rel:"2022-12-02", setVal:2850,
+  w:[349,352,358,366,371,369,375,380,386,390,391,398], m9:[298,305,312,318,325,331,338,347,355]},
+ {code:"PRB-01",name:"Premium Booster", rel:"2024-11-08", setVal:1980,
+  w:[285,291,296,303,301,310,318,322,326,319,321,312], m9:[242,255,268,275,281,288,292,296,299]},
+ {code:"EB-01", name:"Memorial Collection", rel:"2024-05-31", setVal:1560,
+  w:[196,202,209,214,219,224,230,236,241,244,242,258], m9:[148,152,161,168,175,182,190,198,206]},
+ {code:"OP-02", name:"Paramount War", rel:"2023-03-10", setVal:1420,
+  w:[203,205,204,208,209,207,210,211,212,213,213,215], m9:[186,189,191,194,196,199,201,203,205]},
+ {code:"OP-09", name:"The Four Emperors", rel:"2024-11-29", setVal:1080,
+  w:[160,163,167,170,172,171,176,179,182,184,183,189], m9:[128,133,139,144,148,153,157,161,166]},
+ {code:"OP-06", name:"Wings of the Captain", rel:"2024-03-08", setVal:1150,
+  w:[165,168,171,170,169,173,175,178,175,177,174,172], m9:[151,154,158,161,163,166,168,170,167]},
+ {code:"OP-12", name:"Legacy of the Master", rel:"2025-08-29", setVal:810,
+  w:[null,null,null,112,118,121,126,130,135,139,136,148], m9:[168,142,128,119,114,108,105,109,110]},
+ {code:"OP-03", name:"Pillars of Strength", rel:"2023-06-30", setVal:980,
+  w:[137,138,138,139,139,140,140,140,140,141,140,141], m9:[131,132,133,134,135,136,137,138,138]},
+ {code:"OP-08", name:"Two Legends", rel:"2024-09-13", setVal:890,
+  w:[131,133,136,138,136,137,134,133,132,131,132,128], m9:[152,148,145,142,139,137,135,133,132]},
+ {code:"OP-11", name:"A Fist of Divine Speed", rel:"2025-05-30", setVal:720,
+  w:[106,107,109,110,111,112,113,114,116,117,117,119], m9:[92,95,97,99,101,103,104,106,108]},
+ {code:"OP-10", name:"Royal Blood", rel:"2025-02-28", setVal:640,
+  w:[94,95,96,95,95,96,97,97,98,97,97,96], m9:[88,89,90,91,92,93,94,94,95]},
+];
+
+/* ---------- helpers ---------- */
+const money  = v => v==null ? "—" : "$" + Math.round(v).toLocaleString();
+const mult   = v => v==null ? "—" : v.toFixed(1)+"×";
+const pctTxt = v => v==null ? "—" : (v>0?"+":"") + v.toFixed(1) + "%";
+const cls    = v => v==null ? "flat" : v>0 ? "up" : v<0 ? "down" : "flat";
+const pctHTML= v => v==null ? '<span class="flat">—</span>' : `<span class="${cls(v)}">${pctTxt(v)}</span>`;
+const relTxt = d => new Date(d+"T00:00:00Z").toLocaleDateString("en-US",{timeZone:"UTC",month:"short",year:"numeric"}).toUpperCase();
+
+function stepPct(s,i){ if(i===0||s[i]==null||s[i-1]==null) return null; return (s[i]-s[i-1])/s[i-1]*100; }
+function backPct(s,n){ const c=s[N-1],p=s[N-1-n]; if(c==null||p==null) return null; return (c-p)/p*100; }
+
+/* deterministic set-value series (mock): walks backward from today's set value */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function seedOf(s){let h=2166136261;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
+function walkBack(end,n,rnd,vol,drift){
+  const out=new Array(n); out[n-1]=end;
+  for(let i=n-2;i>=0;i--){ out[i]=out[i+1]/(1+(rnd()-drift)*vol); }
+  return out.map(v=>Math.round(v));
+}
+
+PRODUCTS.forEach(p=>{
+  /* box price series */
+  p.m = [...p.m9, p.w[3], p.w[7], p.w[11]];
+
+  /* set value series — drifts semi-independently of box price so the ratio actually moves */
+  const rw=mulberry32(seedOf(p.code+"w")), rm=mulberry32(seedOf(p.code+"m"));
+  p.svw = walkBack(p.setVal, N, rw, 0.055, 0.44).map((v,i)=>p.w[i]==null?null:v);
+  p.svm = walkBack(p.setVal, N, rm, 0.11,  0.42);
+  p.svm[N-1]=p.setVal;
+
+  /* ratio series */
+  p.rw = p.w.map((v,i)=>v==null||p.svw[i]==null?null:p.svw[i]/v);
+  p.rm = p.m.map((v,i)=>v==null||p.svm[i]==null?null:p.svm[i]/v);
+
+  p.cur    = p.w[N-1];
+  p.ath    = Math.max(...[...p.w,...p.m].filter(v=>v!=null));
+  p.atATH  = p.cur === p.ath;
+  p.d7     = backPct(p.w,1);
+  p.d30    = backPct(p.w,4);
+  p.d90    = p.w[0]==null ? null : backPct(p.w,11);
+  p.mom    = backPct(p.m,1);
+  p.m3     = backPct(p.m,3);
+  p.m12    = backPct(p.m,11);
+  p.offATH = p.atATH ? 0 : -((p.ath-p.cur)/p.ath*100);
+  p.ratio  = p.setVal / p.cur;
+  p.relTs  = new Date(p.rel+"T00:00:00Z").getTime();
+});
+
+let period="weekly", mode="trending", relDesc=true, view="grid";
+
+const P = () => period==="weekly"
+  ? {box:p=>p.w, sv:p=>p.svw, ratio:p=>p.rw, labels:WEEK_LABELS, pre:"W", step:"W/W",
+     trend:"12W TREND", trendMetric:p=>p.d7, trendCol:"7D %"}
+  : {box:p=>p.m, sv:p=>p.svm, ratio:p=>p.rm, labels:MONTH_LABELS, pre:"M", step:"M/M",
+     trend:"12M TREND", trendMetric:p=>p.mom, trendCol:"M/M %"};
+
+const ratioStep = p => { const r=P().ratio(p); return stepPct(r,N-1); };
+
+/* ---------- ranking modes ---------- */
+const MODES = {
+  trending:{label:"TRENDING",   col:()=>P().trendCol, key:p=>P().trendMetric(p), fmt:p=>pctHTML(P().trendMetric(p)), colored:true, desc:true},
+  ratio:   {label:"VALUE RATIO",col:()=>"BOX / SET / RATIO", key:p=>P().ratio(p)[N-1], desc:true, stack:true},
+  price:   {label:"PRICE",      col:()=>"PRICE",      key:p=>p.cur,    fmt:p=>money(p.cur),    desc:true},
+  setval:  {label:"SET VALUE",  col:()=>"SET VALUE",  key:p=>P().sv(p)[N-1], fmt:p=>money(P().sv(p)[N-1]), desc:true},
+  offath:  {label:"OFF ATH",    col:()=>"OFF ATH",    key:p=>p.offATH, fmt:p=>p.offATH===0?'<span class="up">0.0%</span>':pctHTML(p.offATH), colored:true, desc:false},
+  release: {label:"RELEASE",    col:()=>"RELEASE",    key:p=>p.relTs,  fmt:p=>relTxt(p.rel),   desc:true, flip:true},
+};
+
+const rankBar=document.getElementById("rankBar");
+Object.entries(MODES).forEach(([id,m])=>{
+  const b=document.createElement("button");
+  b.className="chip"+(id===mode?" on":""); b.dataset.id=id;
+  b.innerHTML=m.label+(m.flip?' <span class="dir">↓</span>':'');
+  b.onclick=()=>{ if(mode===id&&m.flip) relDesc=!relDesc; mode=id; render(); };
+  rankBar.appendChild(b);
+});
+
+/* ---------- cells ---------- */
+function prodCell(p){
+  return `<div class="prod">
+    <div class="box-thumb">${p.code.replace("-","")}</div>
+    <div>
+      <div class="prod-name">${p.name}${p.atATH?'<span class="ath-chip">ATH</span>':''}</div>
+      <div class="prod-meta">${p.code} · ${relTxt(p.rel)}</div>
+    </div></div>`;
+}
+function tint(pc){
+  if(pc==null||Math.abs(pc)<0.15) return "transparent";
+  const a=Math.min(Math.abs(pc)/8,1)*0.30+0.04;
+  return pc>0?`rgba(45,153,97,${a.toFixed(3)})`:`rgba(224,78,78,${a.toFixed(3)})`;
+}
+function sparkSVG(s,w=92,h=26,area=false){
+  const d=s.filter(v=>v!=null),pad=3;
+  const min=Math.min(...d),max=Math.max(...d),rng=(max-min)||1;
+  const xy=d.map((v,i)=>[pad+i*(w-2*pad)/(d.length-1), h-pad-((v-min)/rng)*(h-2*pad)]);
+  const pts=xy.map(([x,y])=>`${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const col=d[d.length-1]>=d[0]?"#2D9961":"#E04E4E";
+  const fill=area?`<polygon points="${pad},${h} ${pts} ${w-pad},${h}" fill="${col}" opacity="0.13"/>`:"";
+  const dot=area?`<circle cx="${xy[xy.length-1][0].toFixed(1)}" cy="${xy[xy.length-1][1].toFixed(1)}" r="3.5" fill="#FFFFFF" stroke="${col}" stroke-width="2"/>`:"";
+  return `<svg class="${area?"":"spark"}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${fill}<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="${area?2.5:2}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>${dot}</svg>`;
+}
+
+/* metric cell — stacked 3-line version in ratio mode */
+function metricCell(p,idx){
+  const m=MODES[mode], cfg=P();
+  if(m.stack){
+    const box=cfg.box(p)[N-1], sv=cfg.sv(p)[N-1], r=cfg.ratio(p)[N-1], d=ratioStep(p);
+    return `<td class="m-cell">
+      <span class="m-rank">#${idx+1}</span>
+      <div class="ms-row"><span class="ms-key">BOX</span><b>${money(box)}</b></div>
+      <div class="ms-row"><span class="ms-key">SET</span><b>${money(sv)}</b></div>
+      <div class="ms-mult"><span class="mv">${mult(r)}</span><span class="md ${cls(d)}">${d==null?'·':pctTxt(d)}</span></div>
+    </td>`;
+  }
+  return `<td class="m-cell"><span class="m-rank">#${idx+1}</span><span class="m-val ${m.colored?cls(m.key(p)):''}">${m.fmt(p)}</span></td>`;
+}
+
+function sortedRows(){
+  const m=MODES[mode], desc=m.flip?relDesc:m.desc;
+  return [...PRODUCTS].sort((a,b)=>{
+    const av=m.key(a),bv=m.key(b);
+    if(av==null) return 1; if(bv==null) return -1;
+    return desc?bv-av:av-bv;
+  });
+}
+
+/* ---------- grid ---------- */
+function renderGrid(rows){
+  const m=MODES[mode], cfg=P(), isRatio=mode==="ratio";
+  document.getElementById("gridView").classList.toggle("ratio-mode",isRatio);
+  document.getElementById("gHead").innerHTML=
+    `<th class="m-head">${m.col()}</th><th class="p-head">PRODUCT</th>`+
+    cfg.labels.map((l,i)=>`<th class="wk${i===N-1?' now':''}">${cfg.pre}${i+1}<small>${l}</small></th>`).join("");
+
+  document.getElementById("gBody").innerHTML=rows.map((p,idx)=>{
+    const series = isRatio ? cfg.ratio(p) : cfg.box(p);
+    const cells = series.map((v,i)=>{
+      const d=stepPct(series,i);
+      if(v==null) return `<td><span class="cell" style="color:var(--ink-3)">—</span></td>`;
+      const main = isRatio ? mult(v) : money(v);
+      const sub  = isRatio ? `<span class="cell-sub">${money(cfg.box(p)[i])} · ${money(cfg.sv(p)[i])}</span>` : "";
+      return `<td style="background:${tint(d)}"><span class="cell${i===N-1?' now':''}">${main}<span class="cell-d ${cls(d)}">${d==null?'·':pctTxt(d)}</span>${sub}</span></td>`;
+    }).join("");
+    return `<tr>${metricCell(p,idx)}<td class="p-cell">${prodCell(p)}</td>${cells}</tr>`;
+  }).join("");
+}
+
+/* ---------- table ---------- */
+function renderTable(rows){
+  const m=MODES[mode], cfg=P(), weekly=period==="weekly";
+  const cols=[
+    {k:"price", h:"PRICE"},
+    {k:"trending", h:weekly?"7D %":"M/M %"},
+    {k:null, h:weekly?"30D %":"3M %"},
+    {k:null, h:weekly?"90D %":"12M %"},
+    {k:null, h:cfg.trend},
+    {k:"setval", h:"SET VALUE"},
+    {k:"ratio",  h:"RATIO"},
+    {k:null, h:"RATIO "+cfg.step},
+    {k:null, h:"ATH"},
+    {k:"offath", h:"OFF ATH"},
+  ];
+  document.getElementById("tHead").innerHTML=
+    `<th class="m-head">${m.stack?"RATIO":m.col()}</th><th class="p-head">PRODUCT</th>`+
+    cols.map(c=>`<th class="num${c.k===mode?' sorted':''}">${c.h}${c.k===mode?' <span style="color:var(--coral)">▼</span>':''}</th>`).join("");
+
+  document.getElementById("tBody").innerHTML=rows.map((p,idx)=>{
+    const a=weekly?p.d7:p.mom, b=weekly?p.d30:p.m3, c=weekly?p.d90:p.m12;
+    const sv=cfg.sv(p)[N-1], r=cfg.ratio(p)[N-1], rd=ratioStep(p);
+    const metric = m.stack
+      ? `<td class="m-cell"><span class="m-rank">#${idx+1}</span><span class="m-val">${mult(r)}</span></td>`
+      : metricCell(p,idx);
+    return `<tr>
+      ${metric}
+      <td class="p-cell">${prodCell(p)}</td>
+      <td class="num">${money(p.cur)}</td>
+      <td class="num">${pctHTML(a)}</td><td class="num">${pctHTML(b)}</td><td class="num">${pctHTML(c)}</td>
+      <td class="num">${sparkSVG(cfg.box(p))}</td>
+      <td class="num" style="color:var(--ink-2)">${money(sv)}</td>
+      <td class="num">${mult(r)}</td>
+      <td class="num">${pctHTML(rd)}</td>
+      <td class="num" style="color:var(--ink-2)">${money(p.ath)}</td>
+      <td class="num">${p.offATH===0?'<span class="up">0.0%</span>':pctHTML(p.offATH)}</td></tr>`;
+  }).join("");
+}
+
+/* ---------- cards ---------- */
+function renderCards(rows){
+  const m=MODES[mode], cfg=P(), isRatio=mode==="ratio";
+  document.getElementById("cardsView").innerHTML=rows.map((p,idx)=>{
+    const box=cfg.box(p), sv=cfg.sv(p), rr=cfg.ratio(p);
+    const series = isRatio ? rr : box;
+    const live = series.filter(v=>v!=null);
+    const d = isRatio ? ratioStep(p) : cfg.trendMetric(p);
+    const fmtV = isRatio ? mult : money;
+    const startIdx = series.findIndex(v=>v!=null);
+
+    const foot = isRatio
+      ? `<div class="pc-stat"><div class="pc-sl">SET VALUE</div><div class="pc-sv">${money(sv[N-1])}</div></div>
+         <div class="pc-stat active"><div class="pc-sl">RATIO ${cfg.step}</div><div class="pc-sv">${mult(rr[N-1])} <span class="${cls(d)}" style="font-size:11px">${d==null?'':pctTxt(d)}</span></div></div>`
+      : `<div class="pc-stat active"><div class="pc-sl">${m.col()}</div><div class="pc-sv ${m.colored?cls(m.key(p)):''}">${m.fmt(p)}</div></div>
+         <div class="pc-stat"><div class="pc-sl">${mode==="setval"?"RATIO":mode==="offath"?"ATH":"OFF ATH"}</div><div class="pc-sv">${
+            mode==="setval" ? mult(rr[N-1])
+          : mode==="offath" ? money(p.ath)
+          : (p.offATH===0?'<span class="up">0.0%</span>':pctHTML(p.offATH))}</div></div>`;
+
+    return `<article class="pcard${p.atATH?" at-ath":""}">
+      <div class="pc-top">
+        <span class="pc-rank">#${idx+1}</span>
+        <span class="pc-rel">${relTxt(p.rel)}${p.atATH?' · <span style="color:var(--gain)">AT ATH</span>':''}</span>
+      </div>
+      <div class="pc-body">
+        <div class="pc-art">${p.code}</div>
+        <div>
+          <div class="pc-name">${p.name}</div>
+          <div class="pc-code">${p.code} · BOOSTER BOX</div>
+          <div class="pc-price">${money(box[N-1])}</div>
+          <div class="pc-delta"><span class="${cls(isRatio?ratioStep(p):cfg.trendMetric(p))}">${d>0?'▲':'▼'} ${pctTxt(d)}</span> <span style="color:var(--ink-3)">${isRatio?"RATIO "+cfg.step:cfg.step}</span></div>
+        </div>
+      </div>
+      <div class="pc-sparklabel">${isRatio?"VALUE RATIO":"BOX PRICE"} · ${cfg.labels[startIdx]} → ${cfg.labels[N-1]}</div>
+      <div class="pc-spark">${sparkSVG(series,260,52,true)}</div>
+      <div class="pc-range"><span>LOW ${fmtV(Math.min(...live))}</span><span>HIGH ${fmtV(Math.max(...live))}</span><span class="pc-ath">ATH ${money(p.ath)}</span></div>
+      <div class="pc-foot">${foot}</div>
+    </article>`;
+  }).join("");
+}
+
+/* ---------- stat rail ---------- */
+function renderRail(){
+  const cfg=P(), weekly=period==="weekly", isRatio=mode==="ratio";
+  const live=PRODUCTS.filter(p=>cfg.box(p)[N-1]!=null);
+
+  if(isRatio){
+    const rNow=live.reduce((a,p)=>a+cfg.ratio(p)[N-1],0)/live.length;
+    const prevSet=PRODUCTS.filter(p=>cfg.ratio(p)[N-2]!=null);
+    const rPrev=prevSet.reduce((a,p)=>a+cfg.ratio(p)[N-2],0)/prevSet.length;
+    const d=(rNow-rPrev)/rPrev*100;
+    document.getElementById("idxVal").textContent=mult(rNow);
+    document.querySelectorAll(".s-label")[0].textContent="AVG VALUE RATIO";
+    const el=document.getElementById("idxDelta");
+    el.textContent=(d>0?"▲ ":"▼ ")+pctTxt(d)+" "+cfg.step; el.className="s-delta "+cls(d);
+  }else{
+    const idxNow=live.reduce((a,p)=>a+cfg.box(p)[N-1],0)/live.length;
+    const prevSet=PRODUCTS.filter(p=>cfg.box(p)[N-2]!=null);
+    const idxPrev=prevSet.reduce((a,p)=>a+cfg.box(p)[N-2],0)/prevSet.length;
+    const d=(idxNow-idxPrev)/idxPrev*100;
+    document.getElementById("idxVal").textContent=money(idxNow);
+    document.querySelectorAll(".s-label")[0].textContent="SEALED INDEX";
+    const el=document.getElementById("idxDelta");
+    el.textContent=(d>0?"▲ ":"▼ ")+pctTxt(d)+" "+cfg.step; el.className="s-delta "+cls(d);
+  }
+
+  const metric = isRatio ? ratioStep : cfg.trendMetric;
+  const unit = isRatio ? "RATIO "+cfg.step : cfg.step;
+  document.getElementById("brLabel").textContent = "BREADTH · "+(weekly?"THIS WEEK":"THIS MONTH");
+  document.getElementById("gnLabel").textContent = "TOP GAINER · "+unit;
+  document.getElementById("lsLabel").textContent = "TOP LOSER · "+unit;
+
+  const ws=live.map(p=>({code:p.code,d:metric(p)})).filter(x=>x.d!=null);
+  const upN=ws.filter(x=>x.d>0).length;
+  document.getElementById("brVal").textContent=`${upN} / ${ws.length} UP`;
+  document.getElementById("brSub").textContent=Math.round(upN/ws.length*100)+"% ADVANCING";
+  const best=[...ws].sort((a,b)=>b.d-a.d)[0],worst=[...ws].sort((a,b)=>a.d-b.d)[0];
+  document.getElementById("gnVal").textContent=best.code;
+  document.getElementById("gnSub").textContent="▲ "+pctTxt(best.d);
+  document.getElementById("lsVal").textContent=worst.code;
+  document.getElementById("lsSub").textContent="▼ "+pctTxt(worst.d);
+}
+
+/* ---------- render ---------- */
+function render(){
+  const cfg=P(), weekly=period==="weekly", isRatio=mode==="ratio";
+  document.querySelectorAll(".chip").forEach(c=>{
+    c.classList.toggle("on",c.dataset.id===mode);
+    if(c.dataset.id==="release") c.querySelector(".dir").textContent=relDesc?"↓":"↑";
+  });
+  document.getElementById("headSub").textContent = isRatio
+    ? "How much card value each box dollar buys, tracked "+(weekly?"week by week":"month by month")+". A falling ratio means sealed is outrunning singles."
+    : weekly
+      ? "Twelve weeks of booster box prices, week by week. Read across a row for the arc, down a column for the market."
+      : "Twelve months of booster box closes. The long arc — post-launch decay, floors, and multi-year runs.";
+  document.getElementById("legendLabel").textContent = (isRatio?"RATIO ":"")+cfg.step+" CHANGE";
+  document.getElementById("unitNote").textContent = isRatio ? "· CELLS = SET VALUE ÷ BOX PRICE" : "";
+  document.getElementById("footnote").innerHTML =
+    `PRICES = ${weekly?"WEEKLY":"MONTH-END"} VOLUME-WEIGHTED MARKET SNAPSHOTS (JUSTTCG), WHOLE DOLLARS. CELL TINT = ${isRatio?"RATIO ":""}${cfg.step} CHANGE.<br>`+
+    `VALUE RATIO = TOTAL SET SINGLES VALUE ÷ BOX PRICE, RECOMPUTED EVERY ${weekly?"WEEK":"MONTH"}. ATH TRACKED SINCE FIRST SNAPSHOT. SAMPLE DATA FOR MOCKUP REVIEW.`;
+  document.getElementById("swatches").innerHTML=
+    [-8,-4,-1.5,0,1.5,4,8].map(v=>`<div class="sw" style="background:${tint(v)}"></div>`).join("");
+
+  const rows=sortedRows();
+  renderGrid(rows); renderTable(rows); renderCards(rows); renderRail();
+}
+
+/* ---------- toggles ---------- */
+const views={grid:"gridView",table:"tableView",cards:"cardsView"};
+const btns={grid:"btnGrid",table:"btnTable",cards:"btnCards"};
+function setView(v){
+  view=v;
+  Object.entries(views).forEach(([k,id])=>document.getElementById(id).classList.toggle("hidden",k!==v));
+  Object.entries(btns).forEach(([k,id])=>document.getElementById(id).classList.toggle("on",k===v));
+  document.getElementById("legend").classList.toggle("hidden",v!=="grid");
+}
+document.getElementById("btnGrid").onclick=()=>setView("grid");
+document.getElementById("btnTable").onclick=()=>setView("table");
+document.getElementById("btnCards").onclick=()=>setView("cards");
+
+function setPeriod(p){
+  period=p;
+  document.getElementById("btnWeekly").classList.toggle("on",p==="weekly");
+  document.getElementById("btnMonthly").classList.toggle("on",p==="monthly");
+  render();
+}
+document.getElementById("btnWeekly").onclick=()=>setPeriod("weekly");
+document.getElementById("btnMonthly").onclick=()=>setPeriod("monthly");
+
+/* ---------- ticker ---------- */
+const TICKER=[
+ {n:"OP-05 BOX",p:"$685",c:"+4.2%",u:true},{n:"OP-01 BOX",p:"$398",c:"+1.9%",u:true},
+ {n:"PRB-01 BOX",p:"$312",c:"-2.4%",u:false},{n:"EB-01 BOX",p:"$258",c:"+6.8%",u:true},
+ {n:"OP-12 BOX",p:"$148",c:"+8.9%",u:true},{n:"OP-08 BOX",p:"$128",c:"-3.1%",u:false},
+ {n:"SEALED IDX",p:"$238",c:"+2.1%",u:true},{n:"OP-09 BOX",p:"$189",c:"+3.5%",u:true},
+];
+document.getElementById("ticker").innerHTML =
+  [...TICKER,...TICKER].map(t=>`<span class="tk">${t.n} <b>${t.p}</b> <span class="${t.u?"up":"down"}">${t.c}</span></span>`).join("");
+
+render();
+</script>
+</body>
+</html>

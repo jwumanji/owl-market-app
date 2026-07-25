@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Moon Terminal — OP-05 Awakening of the New Era</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Caveat:wght@700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FFF5E4; --bg-2:#FFFFFF; --bg-3:#FCE6BE;
+  --ink:#1A0F08; --ink-2:#5C4534; --ink-3:#9A8475;
+  --pink:#FF6BB8; --coral:#FF4936; --gold:#E89512;
+  --gain:#2D9961; --loss:#E04E4E; --select:#1F47A1;
+  --grad-brand:linear-gradient(135deg,#FF6BB8 0%,#FF4936 50%,#E89512 100%);
+  --grad-terminal:linear-gradient(100deg,#1E7FA8 0%,#1C9C9C 40%,#1FAE86 72%,#3EC08A 100%);
+  --line:#EEDFC8;
+  --r-sm:8px; --r-md:14px; --r-lg:22px; --r-pill:999px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:'Space Grotesk',sans-serif;-webkit-font-smoothing:antialiased}
+.mono{font-family:'JetBrains Mono',monospace}
+.container{max-width:1460px;margin:0 auto;padding-left:28px;padding-right:28px}
+.up{color:var(--gain)} .down{color:var(--loss)} .flat{color:var(--ink-3)}
+
+/* ---------- NAV (matches main site) ---------- */
+nav{position:sticky;top:0;z-index:60;background:rgba(255,245,228,.96);backdrop-filter:blur(8px);border-bottom:1.5px solid var(--ink)}
+.nav-row{max-width:1460px;margin:0 auto;padding:0 28px;display:flex;align-items:center;gap:18px;height:60px}
+.logo{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--ink);flex-shrink:0}
+.logo-mark{width:26px;height:26px;border:1.5px solid var(--ink);border-radius:50%;background:var(--grad-brand);display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1}
+.logo-name{display:flex;align-items:baseline;gap:2px}
+.wm-moon{font-weight:700;font-size:20px;letter-spacing:-.3px}
+.wm-market{font-family:'Caveat',cursive;font-weight:700;font-size:25px;background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;color:transparent;padding-right:8px;padding-bottom:2px}
+.nav-mid{display:flex;align-items:center;gap:15px;margin-left:6px}
+.nav-link{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11.5px;letter-spacing:1px;color:var(--ink-2);text-decoration:none;padding:4px 0;border-bottom:2px solid transparent;white-space:nowrap}
+.nav-link:hover{color:var(--ink)}
+.nav-link.active{color:var(--ink);border-bottom-color:var(--coral)}
+.nav-link.terminal{display:flex;align-items:center;gap:5px;color:var(--ink)}
+.nav-link.terminal .tchip{font-size:9px;letter-spacing:1.1px;background:var(--grad-terminal);color:#FFFFFF;border-radius:var(--r-pill);padding:3px 8px 2px}
+.nav-right{display:flex;align-items:center;gap:10px;margin-left:auto}
+.live-badge{display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:9.5px;letter-spacing:1.1px;color:var(--gain);border:1.5px solid var(--gain);border-radius:var(--r-pill);padding:3px 9px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--gain);animation:pulse 1.8s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.nav-search{font-family:'Space Grotesk',sans-serif;font-size:12.5px;color:var(--ink);background:var(--bg-2);border:1.5px solid var(--ink);border-radius:var(--r-pill);padding:7px 14px;width:145px;outline:none}
+.nav-search::placeholder{color:var(--ink-3)}
+.btn-login{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;letter-spacing:.8px;color:var(--ink-2);text-decoration:none}
+.btn-signup{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;letter-spacing:.8px;color:#fff;background:var(--grad-brand);border:1.5px solid var(--ink);border-radius:var(--r-pill);padding:7px 15px;cursor:pointer}
+.ticker-bar{border-top:1.5px solid var(--ink);background:var(--bg-3);overflow:hidden;height:30px;display:flex;align-items:center}
+.ticker-track{display:flex;gap:26px;white-space:nowrap;animation:slide 42s linear infinite;padding-left:28px}
+@keyframes slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.tk{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10.5px;letter-spacing:.5px;color:var(--ink-2)}
+.tk b{color:var(--ink);font-weight:600}
+.subnav{border-top:1.5px solid var(--ink);background:var(--grad-terminal);box-shadow:inset 0 1px 0 rgba(255,255,255,.28)}
+.subnav-row{max-width:1460px;margin:0 auto;padding-left:28px;padding-right:28px;display:flex;align-items:center;gap:20px;height:44px;overflow-x:auto}
+.sn-label{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:9.5px;letter-spacing:1.4px;color:rgba(255,255,255,.68);flex-shrink:0}
+.sn-link{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;letter-spacing:1px;color:rgba(255,255,255,.86);text-decoration:none;padding:3px 0;border-bottom:2px solid transparent;white-space:nowrap;transition:color .12s}
+.sn-link:hover{color:#FFFFFF}
+.sn-link.active{color:#FFFFFF;border-bottom-color:#FFD166}
+.sn-link.soon-link{color:rgba(255,255,255,.52)}
+
+/* ---------- BREADCRUMB ---------- */
+.crumbs{padding-top:20px;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10.5px;letter-spacing:1.2px;color:var(--ink-3)}
+.crumbs a{color:var(--ink-2);text-decoration:none}
+.crumbs a:hover{color:var(--coral)}
+
+/* ---------- HERO ---------- */
+.hero{display:grid;grid-template-columns:200px 1fr 300px;gap:28px;padding-top:20px;padding-bottom:26px;align-items:start}
+.hero-art{width:100%;aspect-ratio:5/6;border:1.5px solid var(--ink);border-radius:var(--r-lg);background:var(--grad-brand);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.35);box-shadow:6px 6px 0 var(--ink)}
+.hero-art .ha-code{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:26px;letter-spacing:1px}
+.hero-art .ha-kind{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:9.5px;letter-spacing:1.6px;opacity:.9}
+.hero-main .h-eyebrow{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;letter-spacing:1.6px;color:var(--ink-2);margin-bottom:7px}
+.hero-main h1{font-size:36px;font-weight:700;letter-spacing:-.9px;line-height:1.06}
+.hero-main h1 .script{font-family:'Caveat',cursive;font-weight:700;font-size:43px;background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;color:transparent;padding-right:13px;padding-bottom:4px}
+.price-row{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-top:16px}
+.big-price{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:48px;letter-spacing:-1.8px;line-height:1}
+.delta-stack{display:flex;gap:8px;flex-wrap:wrap;padding-bottom:5px}
+.dchip{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11.5px;border:1.5px solid var(--ink);border-radius:var(--r-pill);padding:4px 11px;background:var(--bg-2)}
+.dchip small{color:var(--ink-3);font-size:9px;letter-spacing:.9px;margin-right:5px}
+/* range bar */
+.range{margin-top:22px;max-width:520px}
+.range-head{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:9.5px;letter-spacing:1.1px;color:var(--ink-3);margin-bottom:6px}
+.range-track{position:relative;height:12px;border:1.5px solid var(--ink);border-radius:var(--r-pill);background:linear-gradient(90deg,#FBE3E3 0%,var(--bg-3) 55%,#DCF1E6 100%);overflow:visible}
+.range-marker{position:absolute;top:-5px;width:4px;height:20px;background:var(--ink);border-radius:2px}
+.range-marker::after{content:attr(data-v);position:absolute;top:-19px;left:50%;transform:translateX(-50%);font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;white-space:nowrap;color:var(--ink)}
+.range-foot{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;color:var(--ink-2);margin-top:7px}
+.range-foot em{font-style:normal;color:var(--ink-3);font-size:9.5px;letter-spacing:.8px;display:block}
+/* facts panel */
+.facts{border:1.5px solid var(--ink);border-radius:var(--r-lg);background:var(--bg-2);overflow:hidden}
+.facts-head{background:var(--bg-3);border-bottom:1.5px solid var(--ink);padding:9px 14px;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;letter-spacing:1.3px;color:var(--ink-2)}
+.fact{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:9px 14px;border-bottom:1px solid var(--line)}
+.fact:last-child{border-bottom:none}
+.fact .fk{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;letter-spacing:1px;color:var(--ink-3)}
+.fact .fv{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:14px;font-variant-numeric:tabular-nums}
+.btn-row{display:flex;gap:8px;margin-top:12px}
+.btn{flex:1;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;letter-spacing:.9px;border:1.5px solid var(--ink);border-radius:var(--r-pill);padding:9px 12px;background:var(--bg-2);color:var(--ink);cursor:pointer;transition:transform .1s,box-shadow .1s}
+.btn:hover{transform:translate(-1px,-1px);box-shadow:2px 2px 0 var(--ink)}
+.btn.primary{background:var(--ink);color:var(--bg)}
+
+/* ---------- SECTIONS ---------- */
+section.blk{margin-bottom:30px}
+.blk-head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.blk-title{font-size:22px;font-weight:700;letter-spacing:-.4px}
+.blk-title .script{font-family:'Caveat',cursive;font-weight:700;font-size:28px;background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;color:transparent;padding-right:11px;padding-bottom:3px}
+.blk-sub{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10.5px;letter-spacing:1px;color:var(--ink-3);margin-top:4px}
+.card{background:var(--bg-2);border:1.5px solid var(--ink);border-radius:var(--r-lg);overflow:hidden}
+
+/* controls */
+.seg{display:flex;border:1.5px solid var(--ink);border-radius:var(--r-pill);overflow:hidden;background:var(--bg-2)}
+.seg button{border:none;background:none;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;letter-spacing:.8px;padding:8px 14px;color:var(--ink-2);cursor:pointer}
+.seg button.on{background:var(--ink);color:var(--bg)}
+.tf-seg{border-color:var(--coral)} .tf-seg button.on{background:var(--coral);color:#fff}
+.pv-seg{border-color:var(--select)} .pv-seg button.on{background:var(--select);color:#fff}
+.ph-table{max-height:452px;overflow:auto}
+.ph-table thead th{position:sticky;top:0;z-index:2}
+.ph-table tbody td:first-child{color:var(--ink-2);font-size:12.5px;letter-spacing:.6px}
+.ov-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ov-label{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;letter-spacing:1.2px;color:var(--ink-3)}
+.ov{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10.5px;letter-spacing:.8px;border:1.5px solid var(--ink);border-radius:var(--r-pill);padding:6px 12px;background:var(--bg-2);color:var(--ink-2);cursor:pointer;display:flex;align-items:center;gap:6px}
+.ov .dash{width:14px;height:0;border-top:2.5px dashed currentColor;opacity:.55}
+.ov.on{color:var(--ink)}
+.ov.on.sv{background:#FBF0DA;border-color:var(--gold);color:#8A5A06}
+.ov.on.rt{background:#EAF0FB;border-color:var(--select);color:var(--select)}
+
+/* chart */
+.chart-wrap{position:relative;padding:16px 8px 8px}
+#chart{width:100%;height:320px;display:block;cursor:crosshair}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);border-radius:var(--r-sm);padding:8px 11px;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;line-height:1.6;white-space:nowrap;opacity:0;transition:opacity .1s;z-index:5}
+.tip .tp-d{color:var(--bg-3);font-size:9.5px;letter-spacing:.9px;display:block;margin-bottom:2px}
+.tip .sw{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:5px}
+.chart-foot{display:flex;gap:18px;flex-wrap:wrap;border-top:1.5px solid var(--ink);background:var(--bg-3);padding:8px 16px;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;letter-spacing:.9px;color:var(--ink-2)}
+
+/* stat grid */
+.stat-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:13px}
+.stat{background:var(--bg-2);border:1.5px solid var(--ink);border-radius:var(--r-md);padding:14px 15px;transition:transform .12s,box-shadow .12s}
+.stat:hover{transform:translate(-2px,-2px);box-shadow:4px 4px 0 var(--ink)}
+.stat .sl{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:9.5px;letter-spacing:1.1px;color:var(--ink-2);margin-bottom:7px}
+.stat .sv{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:20px;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.stat .sn{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;color:var(--ink-3);margin-top:3px}
+
+/* box EV */
+.ev-grid{display:grid;grid-template-columns:1fr 330px;gap:16px}
+.ev-summary{border:1.5px solid var(--ink);border-radius:var(--r-lg);overflow:hidden;background:var(--bg-2);display:flex;flex-direction:column}
+.ev-hero{padding:18px;border-bottom:1.5px solid var(--ink);background:var(--bg-3)}
+.ev-hero .el{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;letter-spacing:1.2px;color:var(--ink-2)}
+.ev-hero .ev{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:34px;letter-spacing:-1px;margin-top:5px}
+.ev-bars{padding:16px 18px}
+.ev-bar-row{margin-bottom:13px}
+.ev-bar-row:last-child{margin-bottom:0}
+.ev-bar-lab{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10.5px;color:var(--ink-2);margin-bottom:4px}
+.ev-bar{height:16px;border:1.5px solid var(--ink);border-radius:var(--r-sm);overflow:hidden;background:var(--bg-3)}
+.ev-bar i{display:block;height:100%}
+.prem{padding:14px 18px;border-top:1.5px solid var(--ink);margin-top:auto}
+.prem .pl{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;letter-spacing:1.2px;color:var(--ink-2)}
+.prem .pv{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:26px;letter-spacing:-.7px;margin-top:3px}
+.prem .pn{font-size:12px;color:var(--ink-2);margin-top:5px;line-height:1.5}
+
+/* tables */
+table{border-collapse:separate;border-spacing:0;width:100%}
+thead th{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10.5px;letter-spacing:1.1px;color:var(--ink-2);text-transform:uppercase;padding:11px 13px;background:var(--bg-3);border-bottom:1.5px solid var(--ink);white-space:nowrap;text-align:right}
+thead th:first-child{text-align:left}
+tbody td{padding:11px 13px;border-bottom:1px solid var(--line);font-family:'JetBrains Mono',monospace;font-weight:600;font-size:14px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+tbody td:first-child{text-align:left}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:var(--bg-3)}
+tbody td.tot{background:#FEF3E0;border-top:1.5px solid var(--ink);border-bottom:none}
+.scroll{overflow-x:auto}
+.rchip{display:inline-block;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:9.5px;letter-spacing:.9px;border-radius:var(--r-pill);padding:3px 9px;border:1.5px solid transparent}
+.r-gmr{background:#1A0F08;color:#F5BE50;border-color:#E89512}
+.r-mr{background:#1A0F08;color:#F5BE50;border-color:#E89512}
+.r-sec{background:#3A1620;color:#FFD3DA}
+.r-sp{background:#241A3A;color:#D9CCFF}
+.r-tr{background:#FBF0DA;color:#8A5A06;border-color:#E89512}
+.r-aa{background:#EAF0FB;color:#1F47A1;border-color:#1F47A1}
+.r-sr{background:#DCF1E6;color:#1F6B45;border-color:#2D9961}
+.r-l{background:#E0F2F1;color:#12655E;border-color:#12655E}
+.r-bulk{background:var(--bg-3);color:var(--ink-2);border-color:var(--ink-3)}
+
+/* inside cards */
+.inside{display:grid;grid-template-columns:repeat(5,1fr);gap:11px}
+.ic-art{position:relative}
+.ic-rar{position:absolute;top:6px;right:6px}
+.ic-rank{position:absolute;top:6px;left:6px;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:9.5px;letter-spacing:.6px;background:var(--ink);color:var(--bg);border-radius:var(--r-pill);padding:2px 6px}
+.ic-share{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:9px;color:var(--ink-3);letter-spacing:.5px}
+.top10{display:flex;gap:20px;flex-wrap:wrap;align-items:baseline;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;letter-spacing:1px;color:var(--ink-2);background:var(--bg-3);border:1.5px solid var(--ink);border-radius:var(--r-md);padding:11px 16px;margin-bottom:14px}
+.top10 b{font-size:17px;color:var(--ink);letter-spacing:-.3px}
+.wbar{height:7px;border:1.5px solid var(--ink);border-radius:var(--r-pill);overflow:hidden;background:var(--bg-3);margin-top:5px;min-width:64px}
+.wbar i{display:block;height:100%;background:var(--gain)}
+.r-r{background:#F2EAE0;color:var(--ink-2);border-color:var(--ink-3)}
+.icard{background:var(--bg-2);border:1.5px solid var(--ink);border-radius:var(--r-md);overflow:hidden;transition:transform .13s,box-shadow .13s;cursor:pointer}
+.icard:hover{transform:translate(-3px,-3px);box-shadow:6px 6px 0 var(--ink)}
+.ic-art{aspect-ratio:4/3;background:var(--bg-3);border-bottom:1.5px solid var(--ink);display:flex;align-items:center;justify-content:center;font-size:26px}
+.ic-body{padding:9px 11px}
+.ic-name{font-weight:700;font-size:13px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ic-meta{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:9px;letter-spacing:.7px;color:var(--ink-3);margin-top:2px}
+.ic-price{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:17px;margin-top:6px;letter-spacing:-.4px}
+.ic-d{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10.5px;margin-top:1px}
+
+.footnote{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10.5px;color:var(--ink-3);letter-spacing:.4px;padding-bottom:56px;line-height:1.9}
+
+/* ---------- RESPONSIVE ---------- */
+@media(max-width:1180px){ .nav-search{display:none} .stat-grid{grid-template-columns:repeat(3,1fr)} .inside{grid-template-columns:repeat(4,1fr)} }
+@media(max-width:940px){ .inside{grid-template-columns:repeat(3,1fr)} }
+@media(max-width:640px){ .inside{grid-template-columns:repeat(2,1fr);gap:9px} }
+@media(max-width:1080px){
+  .nav-mid .nav-link:not(.terminal){display:none}
+  .hero{grid-template-columns:170px 1fr;gap:22px}
+  .facts{grid-column:1/-1}
+  .ev-grid{grid-template-columns:1fr}
+}
+@media(max-width:720px){
+  .container{padding-left:14px;padding-right:14px}
+  .nav-row{padding-left:14px;padding-right:14px} .subnav-row{padding-left:14px;padding-right:14px} .ticker-track{padding-left:14px}
+  .btn-login,.live-badge{display:none}
+  .hero{grid-template-columns:1fr}
+  .hero-art{max-width:150px}
+  .hero-main h1{font-size:27px} .hero-main h1 .script{font-size:33px}
+  .big-price{font-size:38px}
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+  .inside{grid-template-columns:repeat(2,1fr)}
+  #chart{height:250px}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-row">
+    <a href="#" class="logo">
+      <span class="logo-mark">🌙</span>
+      <span class="logo-name"><span class="wm-moon">Moon</span><span class="wm-market">Market</span></span>
+    </a>
+    <div class="nav-mid">
+      <a href="#" class="nav-link">HOME</a>
+      <a href="#" class="nav-link">MARKETS</a>
+      <a href="#" class="nav-link">RARITIES</a>
+      <a href="#" class="nav-link">PROMOS</a>
+      <a href="#" class="nav-link">SETS</a>
+      <a href="#" class="nav-link">CHARACTERS</a>
+      <a href="#" class="nav-link">PORTFOLIO</a>
+      <a href="#" class="nav-link">ALERTS</a>
+      <a href="#" class="nav-link terminal active">TERMINAL<span class="tchip">PRO</span></a>
+    </div>
+    <div class="nav-right">
+      <div class="live-badge"><span class="live-dot"></span>LIVE</div>
+      <input class="nav-search" placeholder="Search cards...">
+      <a href="#" class="btn-login">Login</a>
+      <button class="btn-signup">Sign Up</button>
+    </div>
+  </div>
+  <div class="ticker-bar"><div class="ticker-track" id="ticker"></div></div>
+  <div class="subnav">
+    <div class="subnav-row">
+      <span class="sn-label">TERMINAL</span>
+      <a href="#" class="sn-link active">SEALED</a>
+      <a href="#" class="sn-link">CHASE</a>
+      <a href="#" class="sn-link">MOVERS</a>
+      <a href="#" class="sn-link">SET INDEX</a>
+      <a href="#" class="sn-link soon-link">BOX EV</a>
+    </div>
+  </div>
+</nav>
+
+<div class="container crumbs">
+  <a href="#">TERMINAL</a> / <a href="#">SEALED</a> / OP-05 BOOSTER BOX
+</div>
+
+<!-- ============ 1 · HERO ============ -->
+<header class="container hero">
+  <div class="hero-art">
+    <div class="ha-code">OP-05</div>
+    <div class="ha-kind">BOOSTER BOX · 24 PACKS</div>
+  </div>
+
+  <div class="hero-main">
+    <div class="h-eyebrow">SEALED PRODUCT · ENGLISH</div>
+    <h1>Awakening of the <span class="script">New Era</span></h1>
+    <div class="price-row">
+      <div class="big-price">$685</div>
+      <div class="delta-stack">
+        <span class="dchip"><small>7D</small><span class="up">+4.2%</span></span>
+        <span class="dchip"><small>30D</small><span class="up">+11.8%</span></span>
+        <span class="dchip"><small>90D</small><span class="up">+26.4%</span></span>
+        <span class="dchip"><small>1Y</small><span class="up">+41.0%</span></span>
+      </div>
+    </div>
+
+    <div class="range">
+      <div class="range-head"><span>52-WEEK RANGE</span><span>4.9% OFF ATH</span></div>
+      <div class="range-track"><div class="range-marker" style="left:85%" data-v="$685"></div></div>
+      <div class="range-foot">
+        <span>$486<em>ATL · SEP 06 2025</em></span>
+        <span style="text-align:right">$720<em>ATH · APR 18 2026</em></span>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="facts">
+      <div class="facts-head">KEY FACTS</div>
+      <div class="fact"><span class="fk">MSRP</span><span class="fv">$104</span></div>
+      <div class="fact"><span class="fk">VS MSRP</span><span class="fv up">+559%</span></div>
+      <div class="fact"><span class="fk">RELEASED</span><span class="fv">DEC 08 2023</span></div>
+      <div class="fact"><span class="fk">SET VALUE</span><span class="fv">$3,100</span></div>
+      <div class="fact"><span class="fk">VALUE RATIO</span><span class="fv">4.5×</span></div>
+      <div class="fact"><span class="fk">SELLERS</span><span class="fv">34 <span class="down" style="font-size:11px">−6</span></span></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn primary">+ WATCHLIST</button>
+      <button class="btn">CSV</button>
+    </div>
+  </div>
+</header>
+
+<!-- ============ 2 · CHART ============ -->
+<section class="container blk">
+  <div class="blk-head">
+    <div>
+      <div class="blk-title">Price <span class="script">history</span></div>
+      <div class="blk-sub">MARKET PRICE · OVERLAY SET VALUE OR RATIO TO COMPARE · SWITCH TO TABLE FOR THE RAW SNAPSHOTS</div>
+    </div>
+    <div class="ov-row">
+      <span class="ov-label">OVERLAY</span>
+      <button class="ov sv" id="ovSV"><span class="dash"></span>SET VALUE</button>
+      <button class="ov rt" id="ovRT"><span class="dash"></span>VALUE RATIO</button>
+      <div class="seg tf-seg" id="tfSeg">
+        <button data-tf="30D">30D</button>
+        <button data-tf="90D" class="on">90D</button>
+        <button data-tf="1Y">1Y</button>
+        <button data-tf="ALL">ALL</button>
+      </div>
+      <div class="seg pv-seg" id="pvSeg">
+        <button data-pv="chart" class="on">CHART</button>
+        <button data-pv="table">TABLE</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="chartCard">
+    <div class="chart-wrap">
+      <svg id="chart" preserveAspectRatio="none"></svg>
+      <div class="tip" id="tip"></div>
+    </div>
+    <div class="chart-foot" id="chartFoot"></div>
+  </div>
+
+  <div class="card" id="phTableCard" style="display:none">
+    <div class="ph-table">
+      <table>
+        <thead><tr>
+          <th>DATE</th><th>BOX PRICE</th><th>CHANGE</th><th>SET VALUE</th><th>RATIO</th><th>SELLERS</th>
+        </tr></thead>
+        <tbody id="phBody"></tbody>
+      </table>
+    </div>
+    <div class="chart-foot" id="phFoot"></div>
+  </div>
+</section>
+
+<!-- ============ 3 · STAT GRID ============ -->
+<section class="container blk">
+  <div class="blk-head"><div><div class="blk-title">Market <span class="script">stats</span></div></div></div>
+  <div class="stat-grid">
+    <div class="stat"><div class="sl">OFF ATH</div><div class="sv down">−4.9%</div><div class="sn">ATH $720</div></div>
+    <div class="stat"><div class="sl">12W VOLATILITY</div><div class="sv">2.1%</div><div class="sn">AVG WEEKLY SWING</div></div>
+    <div class="stat"><div class="sl">SELLERS</div><div class="sv">34</div><div class="sn down">−6 W/W · TIGHTENING</div></div>
+    <div class="stat"><div class="sl">CARDS / BOX</div><div class="sv">288</div><div class="sn">24 PACKS × 12</div></div>
+    <div class="stat"><div class="sl">$ / PACK</div><div class="sv">$28.54</div><div class="sn">MSRP $4.32</div></div>
+    <div class="stat"><div class="sl">SEALED RANK</div><div class="sv">#1</div><div class="sn">OF 12 TRACKED</div></div>
+  </div>
+</section>
+
+<!-- ============ 4 · WHAT'S INSIDE ============ -->
+<section class="container blk">
+  <div class="blk-head">
+    <div>
+      <div class="blk-title">What's <span class="script">inside</span></div>
+      <div class="blk-sub">TOP 10 CARDS BY MARKET VALUE · WHAT ACTUALLY MOVES THIS SET</div>
+    </div>
+    <button class="btn" style="flex:0 0 auto">ALL 119 CARDS →</button>
+  </div>
+  <div class="top10" id="top10"></div>
+  <div class="inside" id="inside"></div>
+</section>
+
+<!-- ============ 5 · BOX EV ============ -->
+<section class="container blk">
+  <div class="blk-head">
+    <div>
+      <div class="blk-title">Box <span class="script">EV</span></div>
+      <div class="blk-sub">ESTIMATED VALUE OF OPENING ONE BOX AT TODAY'S SINGLES PRICES</div>
+    </div>
+  </div>
+  <div class="ev-grid">
+    <div class="card scroll">
+      <table>
+        <thead><tr>
+          <th>RARITY SLOT</th><th>PER BOX</th><th>AVG PRICE</th><th>VALUE / BOX</th><th>WEIGHT</th>
+        </tr></thead>
+        <tbody id="evBody"></tbody>
+      </table>
+    </div>
+
+    <div class="ev-summary">
+      <div class="ev-hero">
+        <div class="el">OPENING EV · PER BOX</div>
+        <div class="ev">$412</div>
+      </div>
+      <div class="ev-bars">
+        <div class="ev-bar-row">
+          <div class="ev-bar-lab"><span>BOX PRICE</span><span>$685</span></div>
+          <div class="ev-bar"><i style="width:100%;background:var(--ink)"></i></div>
+        </div>
+        <div class="ev-bar-row">
+          <div class="ev-bar-lab"><span>OPENING EV</span><span>$412</span></div>
+          <div class="ev-bar"><i style="width:60.1%;background:var(--gain)"></i></div>
+        </div>
+      </div>
+      <div class="prem">
+        <div class="pl">SEALED PREMIUM</div>
+        <div class="pv down">+66.3%</div>
+        <div class="pn">The box trades 66% above what its cards are worth. Sealed is priced for scarcity, not contents.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<p class="container footnote">
+  PRICES = WEEKLY VOLUME-WEIGHTED MARKET SNAPSHOTS (JUSTTCG). SET VALUE = SUM OF ONE COPY OF EVERY CARD IN THE SET AT MARKET.<br>
+  BOX EV IS AN ESTIMATE BUILT FROM COMMUNITY-SOURCED PULL RATES × CURRENT SINGLES PRICES. NOT A GUARANTEE OF ANY BOX'S CONTENTS. SAMPLE DATA FOR MOCKUP REVIEW.
+</p>
+
+<script>
+/* ============ helpers ============ */
+const money = v => v==null?"—":"$"+Math.round(v).toLocaleString();
+const money2= v => "$"+v.toFixed(2);
+const pctTxt= v => v==null?"—":(v>0?"+":"")+v.toFixed(1)+"%";
+const cls   = v => v==null?"flat":v>0?"up":v<0?"down":"flat";
+const pctH  = v => v==null?'<span class="flat">—</span>':`<span class="${cls(v)}">${pctTxt(v)}</span>`;
+
+/* ============ ticker ============ */
+const TICKER=[
+ {n:"OP-05 BOX",p:"$685",c:"+4.2%",u:true},{n:"OP-01 BOX",p:"$398",c:"+1.9%",u:true},
+ {n:"PRB-01 BOX",p:"$312",c:"-2.4%",u:false},{n:"EB-01 BOX",p:"$258",c:"+6.8%",u:true},
+ {n:"OP-12 BOX",p:"$148",c:"+8.9%",u:true},{n:"OP-08 BOX",p:"$128",c:"-3.1%",u:false},
+ {n:"SEALED IDX",p:"$238",c:"+2.1%",u:true},{n:"OP-09 BOX",p:"$189",c:"+3.5%",u:true},
+];
+document.getElementById("ticker").innerHTML =
+ [...TICKER,...TICKER].map(t=>`<span class="tk">${t.n} <b>${t.p}</b> <span class="${t.u?'up':'down'}">${t.c}</span></span>`).join("");
+
+/* ============ series generation (deterministic mock) ============ */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const CUR_BOX=685, CUR_SET=3100, RELEASE=new Date("2023-12-08T00:00:00Z"), TODAY=new Date("2026-07-25T00:00:00Z");
+
+function walk(end,n,seed,vol,drift){
+  const r=mulberry32(seed), out=new Array(n); out[n-1]=end;
+  for(let i=n-2;i>=0;i--) out[i]=out[i+1]/(1+(r()-drift)*vol);
+  return out;
+}
+function datesBack(n,stepDays){
+  const out=[];
+  for(let i=n-1;i>=0;i--) out.push(new Date(TODAY.getTime()-i*stepDays*86400000));
+  return out;
+}
+const dLab = d => d.toLocaleDateString("en-US",{timeZone:"UTC",month:"short",day:"numeric"}).toUpperCase();
+const dLabY= d => d.toLocaleDateString("en-US",{timeZone:"UTC",month:"short",year:"2-digit"}).toUpperCase();
+
+const TF = {
+  "30D":{n:31, step:1,  seedB:11, seedS:21, vol:0.016, xf:dLab,  every:5},
+  "90D":{n:91, step:1,  seedB:12, seedS:22, vol:0.014, xf:dLab,  every:15},
+  "1Y" :{n:53, step:7,  seedB:13, seedS:23, vol:0.030, xf:dLabY, every:8},
+  "ALL":{n:32, step:30, seedB:14, seedS:24, vol:0.055, xf:dLabY, every:5},
+};
+Object.entries(TF).forEach(([k,c])=>{
+  c.dates = datesBack(c.n,c.step);
+  c.box   = walk(CUR_BOX,c.n,c.seedB,c.vol,0.455);
+  c.set   = walk(CUR_SET,c.n,c.seedS,c.vol*1.15,0.45);
+  c.ratio = c.box.map((b,i)=>c.set[i]/b);
+  c.sellers = c.dates.map((d,i)=>{
+    const r=mulberry32(c.seedB*97+i*13)();
+    const base = 34 + (c.n-1-i)*(24/(c.n-1));
+    return Math.max(11, Math.round(base + (r-0.5)*4));
+  });
+  c.sellers[c.n-1] = 34;
+});
+
+/* ============ chart ============ */
+let tf="90D", showSV=false, showRT=false;
+const svg=document.getElementById("chart"), tip=document.getElementById("tip");
+const W=1000,H=320,PADL=54,PADR=showRT?54:22,PADT=16,PADB=34;
+
+function norm(arr){ const a=arr[0]; return arr.map(v=>v/a*100); }
+
+function drawChart(){
+  const c=TF[tf];
+  const anyOverlay = showSV||showRT;
+  const padR = 22;
+  const x = i => PADL + i*(W-PADL-padR)/(c.n-1);
+
+  /* pick scale: raw dollars when no overlay, index=100 when comparing */
+  let seriesList, yLabelFmt, title;
+  if(!anyOverlay){
+    seriesList=[{k:"box",d:c.box,col:"#2D9961",dash:false}];
+    yLabelFmt = v=>"$"+Math.round(v);
+    title="BOX PRICE (USD)";
+  }else{
+    seriesList=[{k:"box",d:norm(c.box),col:"#2D9961",dash:false}];
+    if(showSV) seriesList.push({k:"set",d:norm(c.set),col:"#E89512",dash:true});
+    if(showRT) seriesList.push({k:"ratio",d:norm(c.ratio),col:"#1F47A1",dash:true});
+    yLabelFmt = v=>Math.round(v);
+    title="INDEXED · 100 = "+c.xf(c.dates[0]);
+  }
+  const all=seriesList.flatMap(s=>s.d);
+  let lo=Math.min(...all), hi=Math.max(...all);
+  const pad=(hi-lo)*0.12||1; lo-=pad; hi+=pad;
+  const y = v => PADT + (hi-v)/(hi-lo)*(H-PADT-PADB);
+
+  /* gridlines + y labels */
+  let g="";
+  const TICKS=5;
+  for(let i=0;i<=TICKS;i++){
+    const v=lo+(hi-lo)*i/TICKS, yy=y(v);
+    g+=`<line x1="${PADL}" y1="${yy.toFixed(1)}" x2="${W-padR}" y2="${yy.toFixed(1)}" stroke="#EEDFC8" stroke-width="1"/>`;
+    g+=`<text x="${PADL-9}" y="${(yy+4).toFixed(1)}" text-anchor="end" font-family="JetBrains Mono,monospace" font-size="11" font-weight="600" fill="#9A8475">${yLabelFmt(v)}</text>`;
+  }
+  /* x labels */
+  for(let i=0;i<c.n;i+=c.every){
+    g+=`<text x="${x(i).toFixed(1)}" y="${H-12}" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="11" font-weight="600" fill="#9A8475">${c.xf(c.dates[i])}</text>`;
+  }
+  /* series */
+  let paths="";
+  seriesList.forEach(s=>{
+    const pts=s.d.map((v,i)=>`${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+    if(s.k==="box" && !anyOverlay){
+      paths+=`<polygon points="${PADL},${H-PADB} ${pts} ${W-padR},${H-PADB}" fill="${s.col}" opacity="0.12"/>`;
+    }
+    paths+=`<polyline points="${pts}" fill="none" stroke="${s.col}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" ${s.dash?'stroke-dasharray="7 5"':''}/>`;
+    const last=s.d.length-1;
+    paths+=`<circle cx="${x(last).toFixed(1)}" cy="${y(s.d[last]).toFixed(1)}" r="4" fill="#FFF" stroke="${s.col}" stroke-width="2.5"/>`;
+  });
+
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  svg.innerHTML=`<text x="${PADL}" y="12" font-family="JetBrains Mono,monospace" font-size="10.5" font-weight="600" fill="#9A8475" letter-spacing="1">${title}</text>
+    ${g}${paths}
+    <line id="cross" x1="0" y1="${PADT}" x2="0" y2="${H-PADB}" stroke="#1A0F08" stroke-width="1" stroke-dasharray="4 4" opacity="0"/>
+    <rect x="${PADL}" y="${PADT}" width="${W-PADL-padR}" height="${H-PADT-PADB}" fill="transparent" id="hit"/>`;
+
+  /* footer legend */
+  const f=[`<span><span style="color:#2D9961">━━</span> BOX PRICE</span>`];
+  if(showSV) f.push(`<span><span style="color:#E89512">╌╌</span> SET VALUE</span>`);
+  if(showRT) f.push(`<span><span style="color:#1F47A1">╌╌</span> VALUE RATIO</span>`);
+  f.push(`<span style="margin-left:auto;color:var(--ink-3)">${c.n} POINTS · ${c.xf(c.dates[0])} → ${c.xf(c.dates[c.n-1])}</span>`);
+  document.getElementById("chartFoot").innerHTML=f.join("");
+
+  /* hover */
+  const hit=svg.querySelector("#hit"), cross=svg.querySelector("#cross");
+  const wrap=svg.parentElement;
+  function move(ev){
+    const r=svg.getBoundingClientRect();
+    const px=(ev.clientX-r.left)/r.width*W;
+    let i=Math.round((px-PADL)/((W-PADL-padR)/(c.n-1)));
+    i=Math.max(0,Math.min(c.n-1,i));
+    cross.setAttribute("x1",x(i)); cross.setAttribute("x2",x(i)); cross.setAttribute("opacity","0.4");
+    const rows=[`<span class="tp-d">${c.dates[i].toLocaleDateString("en-US",{timeZone:"UTC",month:"short",day:"numeric",year:"numeric"}).toUpperCase()}</span>`,
+      `<span class="sw" style="background:#2D9961"></span>BOX ${money(c.box[i])}`];
+    if(showSV) rows.push(`<br><span class="sw" style="background:#E89512"></span>SET ${money(c.set[i])}`);
+    if(showRT) rows.push(`<br><span class="sw" style="background:#1F47A1"></span>RATIO ${c.ratio[i].toFixed(2)}×`);
+    tip.innerHTML=rows.join("");
+    tip.style.opacity="1";
+    const lx=(x(i)/W)*r.width;
+    tip.style.left=Math.min(Math.max(lx-tip.offsetWidth/2,4),wrap.clientWidth-tip.offsetWidth-4)+"px";
+    tip.style.top="26px";
+  }
+  hit.addEventListener("mousemove",move);
+  hit.addEventListener("mouseleave",()=>{tip.style.opacity="0";cross.setAttribute("opacity","0")});
+  hit.addEventListener("touchmove",e=>{if(e.touches[0])move(e.touches[0])},{passive:true});
+}
+
+/* ============ price history table ============ */
+let pv="chart";
+const dFull = d => d.toLocaleDateString("en-US",{timeZone:"UTC",month:"short",day:"numeric",year:"numeric"}).toUpperCase();
+
+function drawPriceTable(){
+  const c=TF[tf];
+  const rows=[];
+  for(let i=c.n-1;i>=0;i--){
+    const ch = i===0 ? null : (c.box[i]-c.box[i-1])/c.box[i-1]*100;
+    const sd = i===0 ? 0 : c.sellers[i]-c.sellers[i-1];
+    rows.push(`<tr>
+      <td>${dFull(c.dates[i])}</td>
+      <td>${money(c.box[i])}</td>
+      <td>${pctH(ch)}</td>
+      <td style="color:var(--ink-2)">${money(c.set[i])}</td>
+      <td>${c.ratio[i].toFixed(2)}×</td>
+      <td>${c.sellers[i]} <span class="${sd>0?'up':sd<0?'down':'flat'}" style="font-size:10.5px">${sd===0?'':(sd>0?'+':'')+sd}</span></td>
+    </tr>`);
+  }
+  document.getElementById("phBody").innerHTML=rows.join("");
+  document.getElementById("phFoot").innerHTML =
+    `<span>${c.n} SNAPSHOTS · NEWEST FIRST</span><span>${c.xf(c.dates[0])} → ${c.xf(c.dates[c.n-1])}</span>`+
+    `<span style="margin-left:auto;color:var(--ink-3)">${tf==="30D"||tf==="90D"?"DAILY":tf==="1Y"?"WEEKLY":"MONTHLY"} RESOLUTION</span>`;
+}
+
+function setPV(v){
+  pv=v;
+  document.getElementById("chartCard").style.display   = v==="chart" ? "" : "none";
+  document.getElementById("phTableCard").style.display = v==="table" ? "" : "none";
+  /* overlays only affect the chart — hide them in table mode */
+  document.getElementById("ovSV").style.display = v==="chart" ? "" : "none";
+  document.getElementById("ovRT").style.display = v==="chart" ? "" : "none";
+  document.querySelector(".ov-label").style.display = v==="chart" ? "" : "none";
+  document.querySelectorAll("#pvSeg button").forEach(b=>b.classList.toggle("on",b.dataset.pv===v));
+  if(v==="table") drawPriceTable(); else drawChart();
+}
+document.querySelectorAll("#pvSeg button").forEach(b=>b.onclick=()=>setPV(b.dataset.pv));
+
+document.querySelectorAll("#tfSeg button").forEach(b=>b.onclick=()=>{
+  tf=b.dataset.tf;
+  document.querySelectorAll("#tfSeg button").forEach(x=>x.classList.toggle("on",x===b));
+  if(pv==="table") drawPriceTable(); else drawChart();
+});
+document.getElementById("ovSV").onclick=e=>{showSV=!showSV;e.currentTarget.classList.toggle("on",showSV);drawChart()};
+document.getElementById("ovRT").onclick=e=>{showRT=!showRT;e.currentTarget.classList.toggle("on",showRT);drawChart()};
+
+/* ============ box EV ============ */
+const EV=[
+ {r:"GMR", cl:"r-gmr", name:"Golden Manga Rare", per:0.10, avg:680, note:"~1 per 10 boxes"},
+ {r:"MR",  cl:"r-mr",  name:"Manga Rare",        per:0.35, avg:380, note:"~1 per 3 boxes"},
+ {r:"SEC", cl:"r-sec", name:"Secret Rare",       per:0.17, avg:70,  note:"~1 per case"},
+ {r:"SP",  cl:"r-sp",  name:"Special Rare",      per:0.25, avg:72,  note:"~1 per 4 boxes"},
+ {r:"TR",  cl:"r-tr",  name:"Treasure Rare",     per:0.40, avg:44,  note:"~1 per 2-3 boxes"},
+ {r:"AA",  cl:"r-aa",  name:"Alternate Art",     per:1.20, avg:48,  note:"~1 per box"},
+ {r:"SR",  cl:"r-sr",  name:"Super Rare",        per:4.00, avg:17,  note:"~4 per box"},
+ {r:"L",   cl:"r-l",   name:"Leader",            per:4.00, avg:6,   note:"~4 per box"},
+ {r:"—",   cl:"r-bulk",name:"R / UC / C bulk",   per:1.00, avg:14,  note:"aggregate"},
+];
+EV.forEach(e=>e.ev=e.per*e.avg);
+const EV_TOTAL=EV.reduce((a,e)=>a+e.ev,0);
+document.getElementById("evBody").innerHTML =
+ EV.map(e=>`<tr>
+   <td><span class="rchip ${e.cl}">${e.r}</span> ${e.name}<div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--ink-3);letter-spacing:.6px;margin-top:3px">${e.note.toUpperCase()}</div></td>
+   <td>${e.per.toFixed(2)}</td>
+   <td style="color:var(--ink-2)">${money(e.avg)}</td>
+   <td>${money2(e.ev)}</td>
+   <td><span style="color:var(--ink-2)">${(e.ev/EV_TOTAL*100).toFixed(1)}%</span><div class="wbar"><i style="width:${(e.ev/EV_TOTAL*100).toFixed(1)}%"></i></div></td>
+ </tr>`).join("")
+ + `<tr>
+   <td class="tot" style="font-family:'JetBrains Mono',monospace;letter-spacing:1px;font-size:11px;color:var(--ink-2)">TOTAL OPENING EV</td>
+   <td class="tot"></td><td class="tot"></td>
+   <td class="tot" style="font-size:16px">${money(EV_TOTAL)}</td>
+   <td class="tot" style="color:var(--ink-2)">100%</td>
+ </tr>`;
+
+/* ============ what's inside — top 10 by value ============ */
+const SET_VALUE = 3100;
+const INSIDE=[
+ {e:"🌊", n:"Katakuri",        r:"MR",  cl:"r-mr",  no:"OP05-119", p:380, d:6.1},
+ {e:"⚡", n:"Yamato",          r:"SP",  cl:"r-sp",  no:"OP05-114", p:72,  d:14.1},
+ {e:"⚡", n:"Yamato",          r:"SEC", cl:"r-sec", no:"OP05-118", p:68,  d:9.1},
+ {e:"👑", n:"Monkey D. Luffy", r:"AA",  cl:"r-aa",  no:"OP05-060", p:58,  d:4.4},
+ {e:"🍰", n:"Charlotte Linlin",r:"AA",  cl:"r-aa",  no:"OP05-081", p:44,  d:-2.1},
+ {e:"🐉", n:"Kaido",           r:"SR",  cl:"r-sr",  no:"OP05-069", p:18,  d:2.4},
+ {e:"🌸", n:"Boa Hancock",     r:"SR",  cl:"r-sr",  no:"OP05-042", p:16,  d:1.8},
+ {e:"🔥", n:"Portgas D. Ace",  r:"L",   cl:"r-l",   no:"OP05-001", p:14,  d:0.9},
+ {e:"🚬", n:"Sanji",           r:"SR",  cl:"r-sr",  no:"OP05-093", p:11,  d:-0.8},
+ {e:"🍊", n:"Nami",            r:"R",   cl:"r-r",   no:"OP05-055", p:8,   d:3.2},
+];
+const TOP10 = INSIDE.reduce((a,c)=>a+c.p,0);
+
+document.getElementById("top10").innerHTML =
+ `<span>TOP 10 COMBINED <b>${money(TOP10)}</b></span>
+  <span>SET VALUE <b>${money(SET_VALUE)}</b></span>
+  <span>SHARE OF SET <b>${(TOP10/SET_VALUE*100).toFixed(1)}%</b></span>
+  <span style="margin-left:auto;color:var(--ink-3)">TOP CARD ALONE = ${(INSIDE[0].p/SET_VALUE*100).toFixed(1)}% OF SET VALUE</span>`;
+
+document.getElementById("inside").innerHTML = INSIDE.map((c,i)=>`
+ <article class="icard">
+   <div class="ic-art">
+     <span class="ic-rank">#${i+1}</span>
+     <span class="ic-rar"><span class="rchip ${c.cl}">${c.r}</span></span>
+     ${c.e}
+   </div>
+   <div class="ic-body">
+     <div class="ic-name">${c.n}</div>
+     <div class="ic-meta">${c.no}</div>
+     <div class="ic-price">${money(c.p)}</div>
+     <div class="ic-d"><span class="${cls(c.d)}">${c.d>0?"▲":"▼"} ${pctTxt(c.d)}</span> <span class="ic-share">· ${(c.p/SET_VALUE*100).toFixed(1)}% OF SET</span></div>
+   </div>
+ </article>`).join("");
+
+drawChart();
+</script>
+</body>
+</html>
