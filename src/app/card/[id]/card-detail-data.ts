@@ -103,12 +103,17 @@ async function loadCardCoreUncached(options: {
         market_avg,
         tcg_market,
         ebay_avg,
+        ebay_low,
+        ebay_high,
         tcg_low,
         tcg_mid,
         tcg_high,
         chg_1d,
         chg_7d,
         chg_30d,
+        volume_7d,
+        volume_30d,
+        tcg_listings_count,
         ath,
         ath_date,
         atl,
@@ -206,6 +211,8 @@ const EBAY_STATS_WINDOW_DAYS = 90;
 async function loadCardMarketExtrasUncached(options: {
   gameId: string;
   cardId: string;
+  cardNumber: string | null;
+  variantLabel: string | null;
 }): Promise<CardMarketExtrasPayload> {
   const supabase = createCachedServiceClient(CATALOG_DATA_TTL_SECONDS);
   const statsSinceIso = new Date(
@@ -217,7 +224,7 @@ async function loadCardMarketExtrasUncached(options: {
   const [jpRes, recentRes, windowRes] = await Promise.all([
     supabase
       .from("jp_prices")
-      .select("price_jpy, snapshot_date, source_url")
+      .select("price_jpy, snapshot_date, source_url, card_name, card_image_id, variant, rarity, in_stock, match_method")
       .eq("game_id", options.gameId)
       .eq("card_id", options.cardId)
       .not("price_jpy", "is", null)
@@ -243,8 +250,36 @@ async function loadCardMarketExtrasUncached(options: {
       .gte("sold_at", statsSinceIso),
   ]);
 
+  let jpPrice = ((jpRes.data ?? [])[0] ?? null) as Omit<JpPriceData, "comparison_match"> | null;
+  let comparisonMatch: JpPriceData["comparison_match"] = "linked";
+
+  // Japanese rows are sometimes attached to a region-specific JP printing
+  // rather than the English printing. When the direct relation is empty, use
+  // a conservative number + treatment matcher so the market page can surface
+  // an exact counterpart without collapsing distinct OP13-118 variants.
+  if (!jpPrice && options.cardNumber) {
+    const { data: candidates } = await supabase
+      .from("jp_prices")
+      .select("price_jpy, snapshot_date, source_url, card_name, card_image_id, variant, rarity, in_stock, match_method")
+      .eq("game_id", options.gameId)
+      .eq("card_number", options.cardNumber)
+      .not("price_jpy", "is", null)
+      .order("snapshot_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    const counterpart = findJpCounterpart(
+      (candidates ?? []) as Array<Omit<JpPriceData, "comparison_match">>,
+      options.variantLabel
+    );
+    if (counterpart) {
+      jpPrice = counterpart;
+      comparisonMatch = "counterpart";
+    }
+  }
+
   return {
-    jpPrice: ((jpRes.data ?? [])[0] ?? null) as JpPriceData | null,
+    jpPrice: jpPrice ? { ...jpPrice, comparison_match: comparisonMatch } : null,
     ebayRecent: (recentRes.data ?? []) as EbaySaleData[],
     ebayStats: computeEbayAvgStats((windowRes.data ?? []) as EbaySaleForStats[]),
   };
@@ -253,15 +288,55 @@ async function loadCardMarketExtrasUncached(options: {
 export function loadCardMarketExtras(options: {
   gameId: string;
   cardId: string;
+  cardNumber: string | null;
+  variantLabel: string | null;
 }): Promise<CardMarketExtrasPayload> {
   // v3: plain-10 tier split by grader (PSA_10/BGS_10/OTHER_10) — bump the
   // version on every payload shape change or unstable_cache serves the old
   // shape stale.
   return cachedPublicData(
-    publicDataCacheKey("card-extras-v3", options.gameId, options.cardId),
+    publicDataCacheKey("card-extras-v4", options.gameId, options.cardId),
     () => loadCardMarketExtrasUncached(options),
     CATALOG_DATA_TTL_SECONDS
   );
+}
+
+function findJpCounterpart(
+  candidates: Array<Omit<JpPriceData, "comparison_match">>,
+  variantLabel: string | null
+): Omit<JpPriceData, "comparison_match"> | null {
+  const label = (variantLabel ?? "").toLowerCase();
+  const uniqueLatest = new Map<string, Omit<JpPriceData, "comparison_match">>();
+  for (const candidate of candidates) {
+    const key = candidate.card_image_id ?? candidate.source_url ?? candidate.card_name ?? "";
+    if (key && !uniqueLatest.has(key)) uniqueLatest.set(key, candidate);
+  }
+
+  const latest = [...uniqueLatest.values()];
+  const name = (candidate: Omit<JpPriceData, "comparison_match">) =>
+    (candidate.card_name ?? "").toLowerCase();
+
+  if (label.includes("red super")) {
+    return latest.find((candidate) => name(candidate).includes("レッドスーパーパラレル")) ?? null;
+  }
+  if (label.includes("super alternate") || label.includes("super parallel")) {
+    return latest.find((candidate) =>
+      name(candidate).includes("スーパーパラレル") &&
+      !name(candidate).includes("レッドスーパーパラレル")
+    ) ?? null;
+  }
+  if (label.includes("wanted")) {
+    return latest.find((candidate) => /wanted|手配書/.test(name(candidate))) ?? null;
+  }
+  if (label.includes("parallel") || label.includes("alternate")) {
+    return latest.find((candidate) =>
+      candidate.variant === "altart" && candidate.rarity?.toUpperCase() !== "SP"
+    ) ?? null;
+  }
+  if (!label) {
+    return latest.find((candidate) => !candidate.variant) ?? null;
+  }
+  return null;
 }
 
 export type CardCoreLoadResult =

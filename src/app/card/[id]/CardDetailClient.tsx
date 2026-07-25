@@ -3,7 +3,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { formatPrice, formatPct, pctColor, spreadPct, timeAgo } from "@/lib/utils";
+import { formatPct, pctColor, spreadPct, timeAgo } from "@/lib/utils";
 import RarityBadge from "@/components/ui/RarityBadge";
 import { gamePath, gameQueryValue } from "@/lib/game-routes";
 import type {
@@ -20,47 +20,164 @@ type Period = (typeof PERIODS)[number];
 
 const PriceChart = lazy(() => import("./PriceChartClient"));
 
-// TODO(fx): hardcoded JPY→USD rate — swap for a live FX API once one is wired.
+// TODO(fx): replace with a timestamped FX feed. The UI labels this as an
+// estimate so a fixed conversion is never presented as a tradeable quote.
 const JPY_PER_USD = 155;
+const DAY_MS = 86_400_000;
 
-// Past this the EN and JP rows are almost certainly different printings (the
-// JP matcher can pair a promo EN card with the base JP version), so the
-// spread is noise — flag it instead of presenting it as signal.
-const SPREAD_MISMATCH_THRESHOLD_PCT = 300;
+type WindowMetric = {
+  value: number | null;
+  source: "provider" | "history" | "unavailable";
+  baselineAt: string | null;
+};
+
+type HistoryOverview = {
+  current: number | null;
+  currentAt: string | null;
+  high: number | null;
+  highAt: string | null;
+  low: number | null;
+  lowAt: string | null;
+  growthFromLow: number | null;
+  rangePosition: number | null;
+  sampleCount: number;
+  firstAt: string | null;
+};
+
+function pointPrice(point: PricePoint): number | null {
+  if (Number.isFinite(point.tcg_market) && point.tcg_market > 0) return point.tcg_market;
+  if (Number.isFinite(point.market_avg) && point.market_avg > 0) return point.market_avg;
+  return null;
+}
+
+function deriveHistoryOverview(history: PricePoint[]): HistoryOverview {
+  const priced = history
+    .map((point) => ({ point, price: pointPrice(point) }))
+    .filter((entry): entry is { point: PricePoint; price: number } => entry.price != null)
+    .sort(
+      (a, b) =>
+        new Date(a.point.recorded_at).getTime() - new Date(b.point.recorded_at).getTime()
+    );
+
+  if (priced.length === 0) {
+    return {
+      current: null,
+      currentAt: null,
+      high: null,
+      highAt: null,
+      low: null,
+      lowAt: null,
+      growthFromLow: null,
+      rangePosition: null,
+      sampleCount: 0,
+      firstAt: null,
+    };
+  }
+
+  const latest = priced[priced.length - 1];
+  const high = priced.reduce((best, entry) => (entry.price > best.price ? entry : best));
+  const low = priced.reduce((best, entry) => (entry.price < best.price ? entry : best));
+  const range = high.price - low.price;
+
+  return {
+    current: latest.price,
+    currentAt: latest.point.recorded_at,
+    high: high.price,
+    highAt: high.point.recorded_at,
+    low: low.price,
+    lowAt: low.point.recorded_at,
+    growthFromLow: low.price > 0 ? ((latest.price - low.price) / low.price) * 100 : null,
+    rangePosition: range > 0 ? ((latest.price - low.price) / range) * 100 : null,
+    sampleCount: priced.length,
+    firstAt: priced[0].point.recorded_at,
+  };
+}
+
+function deriveWindowChange(history: PricePoint[], days: 1 | 7 | 30): WindowMetric {
+  const priced = history
+    .map((point) => ({ point, price: pointPrice(point) }))
+    .filter((entry): entry is { point: PricePoint; price: number } => entry.price != null)
+    .sort(
+      (a, b) =>
+        new Date(a.point.recorded_at).getTime() - new Date(b.point.recorded_at).getTime()
+    );
+
+  if (priced.length < 2) return { value: null, source: "unavailable", baselineAt: null };
+  const latest = priced[priced.length - 1];
+  const latestMs = new Date(latest.point.recorded_at).getTime();
+  const cutoff = latestMs - days * DAY_MS;
+  const baseline = [...priced]
+    .reverse()
+    .find((entry) => new Date(entry.point.recorded_at).getTime() <= cutoff);
+  if (!baseline || baseline.price <= 0) {
+    return { value: null, source: "unavailable", baselineAt: null };
+  }
+
+  // Reject a distant sample for short windows. A stale four-day-old quote is
+  // not a defensible 24-hour return, even if its numeric value is unchanged.
+  const tolerance = days === 1 ? 1.5 * DAY_MS : days === 7 ? 4 * DAY_MS : 10 * DAY_MS;
+  if (cutoff - new Date(baseline.point.recorded_at).getTime() > tolerance) {
+    return { value: null, source: "unavailable", baselineAt: baseline.point.recorded_at };
+  }
+
+  return {
+    value: ((latest.price - baseline.price) / baseline.price) * 100,
+    source: "history",
+    baselineAt: baseline.point.recorded_at,
+  };
+}
+
+function providerOrHistory(
+  providerValue: number | null | undefined,
+  fallback: WindowMetric
+): WindowMetric {
+  if (providerValue != null) {
+    return { value: providerValue, source: "provider", baselineAt: null };
+  }
+  return fallback;
+}
 
 function filterByPeriod(history: PricePoint[], period: Period): PricePoint[] {
   if (period === "max") return history;
-  const now = Date.now();
-  const msMap: Record<string, number> = {
-    "7d": 7 * 86400000,
-    "1m": 30 * 86400000,
-    "3m": 90 * 86400000,
-    "1y": 365 * 86400000,
+  const msMap: Record<Exclude<Period, "max">, number> = {
+    "7d": 7 * DAY_MS,
+    "1m": 30 * DAY_MS,
+    "3m": 90 * DAY_MS,
+    "1y": 365 * DAY_MS,
   };
-  const cutoff = now - msMap[period];
-  return history.filter((p) => new Date(p.recorded_at).getTime() >= cutoff);
+  const cutoff = Date.now() - msMap[period];
+  return history.filter((point) => new Date(point.recorded_at).getTime() >= cutoff);
 }
 
-function formatAthDate(dateStr: string | null): string {
+function formatMarketPrice(value: number | null | undefined): string {
+  if (value == null) return "—";
+  return `$${value.toLocaleString("en-US", {
+    minimumFractionDigits: value >= 100 ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function formatJpy(value: number): string {
+  return `¥${Math.round(value).toLocaleString("en-US")}`;
+}
+
+function formatDate(dateStr: string | null): string {
   if (!dateStr) return "—";
-  const d = new Date(dateStr);
-  // timeZone pinned: the page prerenders in UTC, and a viewer in another
-  // timezone hydrating a boundary date would otherwise produce a text
-  // mismatch — React 19 responds by client-rendering the whole root, which
-  // repaints the hero and re-fires LCP seconds late.
-  return d.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }
 
-/* "3h ago" can never match between prerender time and hydration time, and an
-   unsuppressed text mismatch makes React 19 discard the server DOM (error
-   #418) — confirmed live as the card page's 2.2s LCP render delay.
-   suppressHydrationWarning keeps the server text through hydration; the
-   effect then swaps in the viewer-accurate label. */
+function formatGrade(grade: number): string {
+  return grade % 1 === 0 ? String(grade) : grade.toFixed(1);
+}
+
 function TimeAgoLabel({ date }: { date: string }) {
   const [clientLabel, setClientLabel] = useState<string | null>(null);
-  useEffect(() => {
-    setClientLabel(timeAgo(date));
-  }, [date]);
+  useEffect(() => setClientLabel(timeAgo(date)), [date]);
   return <span suppressHydrationWarning>{clientLabel ?? timeAgo(date)}</span>;
 }
 
@@ -74,16 +191,57 @@ export default function CardDetailClient({
   gameRouteSlug: string;
 }) {
   const [chartPeriod, setChartPeriod] = useState<Period>("3m");
-  // Fetched client-side near the viewport (never during static generation —
-  // the per-page history reads were the bulk of the build's DB load). State
-  // lives here so the header notice and the chart share one fetch.
   const [history, setHistory] = useState<CardHistoryPayload | null>(null);
+  const [extras, setExtras] = useState<CardMarketExtrasPayload | null>(null);
+  const [extrasLoaded, setExtrasLoaded] = useState(false);
+
+  const cardImageId = data?.card.card_image_id ?? null;
+
+  useEffect(() => {
+    if (!cardImageId) return;
+    const controller = new AbortController();
+    const game = encodeURIComponent(gameQueryValue(gameRouteSlug));
+    fetch(`/api/card/${encodeURIComponent(cardImageId)}/history?game=${game}`, {
+      signal: controller.signal,
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: CardHistoryPayload | null) => {
+        setHistory(payload ?? { priceHistory: [], priceHistorySynthetic: false });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setHistory({ priceHistory: [], priceHistorySynthetic: false });
+        }
+      });
+    return () => controller.abort();
+  }, [cardImageId, gameRouteSlug]);
+
+  useEffect(() => {
+    if (!cardImageId) return;
+    const controller = new AbortController();
+    const game = encodeURIComponent(gameQueryValue(gameRouteSlug));
+    fetch(`/api/card/${encodeURIComponent(cardImageId)}/extras?game=${game}`, {
+      signal: controller.signal,
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: CardMarketExtrasPayload | null) => {
+        setExtras(payload);
+        setExtrasLoaded(true);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setExtrasLoaded(true);
+      });
+    return () => controller.abort();
+  }, [cardImageId, gameRouteSlug]);
 
   if (error || !data) {
     return (
-      <section className="card-page max-w-[1180px] mx-auto px-8 py-8">
-        <p className="text-loss-2 text-sm font-mono-2">{error ?? "Card not found"}</p>
-        <Link href={gamePath(gameRouteSlug, "/sets")} className="text-coral text-sm mt-4 inline-block hover:underline">
+      <section className="mx-auto max-w-[1180px] px-6 py-10">
+        <p className="font-mono-2 text-sm text-loss-2">{error ?? "Card not found"}</p>
+        <Link
+          href={gamePath(gameRouteSlug, "/sets")}
+          className="mt-4 inline-block text-sm text-coral hover:underline"
+        >
           &larr; Back to Sets
         </Link>
       </section>
@@ -91,282 +249,413 @@ export default function CardDetailClient({
   }
 
   const { card, set, priceStats } = data;
-  // Always route the hero through the optimizer, mirrored or not: the mirrored
-  // srcSet topped out at the 420px preview (soft on retina, cross-origin, no
-  // AVIF), while the optimizer serves display-sized AVIF from the same origin.
-  // Feed it the largest source available — it never upscales.
   const cardImageSrc = card.image_url ?? card.image_url_preview ?? card.image_url_small;
-  const growth =
-    priceStats?.market_avg != null && priceStats?.atl != null && priceStats.atl > 0
-      ? ((priceStats.market_avg - priceStats.atl) / priceStats.atl) * 100
-      : null;
-
-  const chg1d = priceStats?.chg_1d;
-  const heroPrice = priceStats?.market_avg ?? null;
+  const priceHistory = history?.priceHistory ?? [];
+  const overview = deriveHistoryOverview(priceHistory);
+  const currentPrice = priceStats?.tcg_market ?? priceStats?.market_avg ?? overview.current;
+  const observedAt = overview.currentAt ?? priceStats?.updated_at ?? null;
+  const change1d = providerOrHistory(
+    priceStats?.chg_1d,
+    deriveWindowChange(priceHistory, 1)
+  );
+  const change7d = providerOrHistory(
+    priceStats?.chg_7d,
+    deriveWindowChange(priceHistory, 7)
+  );
+  const change30d = providerOrHistory(
+    priceStats?.chg_30d,
+    deriveWindowChange(priceHistory, 30)
+  );
+  const recordedHigh = priceStats?.ath ?? overview.high;
+  const recordedHighAt = priceStats?.ath_date ?? overview.highAt;
+  const recordedLow = priceStats?.atl ?? overview.low;
+  const recordedLowAt = priceStats?.atl_date ?? overview.lowAt;
+  const growthFromLow =
+    currentPrice != null && recordedLow != null && recordedLow > 0
+      ? ((currentPrice - recordedLow) / recordedLow) * 100
+      : overview.growthFromLow;
+  const verifiedSales = extras?.ebayRecent.length ?? 0;
+  const marketConfidence = getMarketConfidence({
+    observedAt,
+    sampleCount: overview.sampleCount,
+    verifiedSales,
+    listingsCount: priceStats?.tcg_listings_count ?? 0,
+    synthetic: history?.priceHistorySynthetic ?? false,
+  });
 
   return (
-    <section className="card-page max-w-[1180px] mx-auto px-8 pt-8 pb-24 text-ink">
-      {/* Breadcrumb */}
-      <div className="mb-8 font-mono-2 font-semibold text-[12px] tracking-[0.04em] flex items-center flex-wrap text-[var(--breadcrumb-accent)]">
-        <Link href={gamePath(gameRouteSlug, "/sets")} className="text-[var(--breadcrumb-accent)] hover:text-ink transition-colors">
+    <section className="mx-auto max-w-[1220px] px-5 pb-24 pt-7 text-ink sm:px-8">
+      <div className="mb-5 flex flex-wrap items-center gap-2 font-mono-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-3">
+        <Link href={gamePath(gameRouteSlug, "/sets")} className="transition-colors hover:text-ink">
           Sets
         </Link>
+        <span>/</span>
         {set && (
           <>
-            <span className="mx-2 text-[var(--breadcrumb-accent)]">/</span>
             <Link
               href={gamePath(gameRouteSlug, `/sets/${set.slug}`)}
-              className="text-[var(--breadcrumb-accent)] hover:text-ink transition-colors"
+              className="transition-colors hover:text-ink"
             >
-              {set.code} {set.name}
+              {set.code}
             </Link>
+            <span>/</span>
           </>
         )}
-        <span className="mx-2 text-[var(--breadcrumb-accent)]">/</span>
-        <span className="text-ink truncate max-w-[300px]">{card.name}</span>
+        <span className="text-ink">Market dossier</span>
       </div>
 
-      {/* Two-column layout */}
-      <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-14 items-start">
-        {/* Left col — title block + art */}
-        <div>
-          <div className="mb-5">
-            <h1 className="font-grotesk font-bold text-[32px] leading-[1.15] tracking-[-0.02em] text-ink">
+      {/* 01 — investor snapshot */}
+      <section className="relative overflow-hidden rounded-[28px] border-[1.5px] border-ink/15 bg-[linear-gradient(135deg,#FFFDF8_0%,#FFEBDD_52%,#FFF4D7_100%)] text-ink shadow-[0_24px_60px_rgba(91,52,25,0.12)]">
+        <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-coral/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-gold/15 blur-3xl" />
+        <div className="relative grid gap-8 p-5 sm:p-7 lg:grid-cols-[230px_minmax(0,1fr)] lg:gap-10 lg:p-9">
+          <div className="mx-auto w-full max-w-[230px] lg:mx-0">
+            {cardImageSrc ? (
+              <Image
+                src={cardImageSrc}
+                sizes="(max-width: 1023px) 230px, 230px"
+                alt={card.name}
+                width={300}
+                height={420}
+                quality={68}
+                priority
+                fetchPriority="high"
+                className="aspect-[5/7] w-full rounded-[18px] object-cover shadow-[0_20px_38px_rgba(74,39,17,0.24)]"
+              />
+            ) : (
+              <div className="aspect-[5/7] w-full rounded-[18px] bg-ink/5" />
+            )}
+            <div className="mt-3 flex items-center justify-between gap-3 font-mono-2 text-[10px] uppercase tracking-[0.1em] text-ink-3">
+              <span>{card.card_number ?? "Catalog card"}</span>
+              <span>{set?.code ?? "—"}</span>
+            </div>
+          </div>
+
+          <div className="flex min-w-0 flex-col">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-ink/15 bg-white/65 px-3 py-1 font-mono-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-2">
+                01 / Market snapshot
+              </span>
+              <ConfidenceBadge confidence={marketConfidence.level} />
+            </div>
+
+            <h1 className="mt-5 max-w-[760px] font-grotesk text-[30px] font-bold leading-[1.06] tracking-[-0.03em] text-ink sm:text-[38px] lg:text-[44px]">
               {card.name}
             </h1>
-            <div className="mt-3 flex items-center gap-2.5 flex-wrap">
-              <span className="font-mono-2 font-semibold text-[12.5px] text-ink-2">
-                {set ? (
-                  <Link
-                    href={gamePath(gameRouteSlug, `/sets/${set.slug}`)}
-                    className="hover:text-ink transition-colors"
-                  >
-                    {set.code} {set.name}
-                  </Link>
-                ) : null}
-                {card.card_number ? ` · #${card.card_number}` : ""}
-              </span>
+            <div className="mt-4 flex flex-wrap items-center gap-2.5">
               <RarityBadge rarity={card.rarity} />
+              {card.variant_label && (
+                <DarkChip>{card.variant_label}</DarkChip>
+              )}
+              {set && <DarkChip>{set.code} {set.name}</DarkChip>}
             </div>
-            {(card.card_type ||
-              (card.variant_label && card.variant_label !== card.rarity) ||
-              (card.color && card.color.length > 0)) && (
-              <div className="mt-3 flex gap-2 flex-wrap">
-                {card.card_type && <Chip>{card.card_type}</Chip>}
-                {card.variant_label && card.variant_label !== card.rarity && (
-                  <Chip>{card.variant_label}</Chip>
-                )}
-                {card.color?.map((c) => (
-                  <Chip key={c}>{c}</Chip>
-                ))}
-              </div>
-            )}
-          </div>
 
-          {cardImageSrc ? (
-            <Image
-              src={cardImageSrc}
-              sizes="(max-width: 364px) calc(100vw - 4rem), 300px"
-              alt={card.name}
-              width={300}
-              height={420}
-              quality={60}
-              priority
-              // Next 15's `priority` no longer implies fetchPriority (14 did):
-              // without this, BOTH the img and its preload ship at default
-              // priority — PSI flagged the preload losing the bandwidth race.
-              // This prop flows to the img and into ReactDOM.preload alike.
-              fetchPriority="high"
-              className="w-full max-w-[300px] aspect-[5/7] object-cover rounded-c-md border-[1.5px] border-ink shadow-[0_10px_24px_rgba(26,15,8,0.10)]"
-            />
-          ) : (
-            <div className="w-full max-w-[300px] aspect-[5/7] rounded-c-md border-[1.5px] border-ink bg-bg-3" />
-          )}
+            <div className="mt-9 flex flex-wrap items-end justify-between gap-5 border-b border-ink/15 pb-7">
+              <div>
+                <div className="font-mono-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-3">
+                  {priceStats?.tcg_market != null ? "TCG market quote" : "Market reference"}
+                </div>
+                <div className="mt-2 font-mono-2 text-[48px] font-semibold leading-none tracking-[-0.045em] text-ink sm:text-[66px]">
+                  {formatMarketPrice(currentPrice)}
+                </div>
+              </div>
+              <div className="max-w-[330px] text-right">
+                <div className="font-mono-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-3">
+                  Market read
+                </div>
+                <p className="mt-2 font-grotesk text-[15px] font-medium leading-relaxed text-ink-2">
+                  {marketConfidence.summary}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-px overflow-hidden rounded-[16px] bg-ink/10 sm:grid-cols-3">
+              <HeroFact
+                label="Last observed"
+                value={observedAt ? <TimeAgoLabel date={observedAt} /> : "Unavailable"}
+                foot={formatDate(observedAt)}
+              />
+              <HeroFact
+                label="Price evidence"
+                value={`${overview.sampleCount} snapshots`}
+                foot={overview.firstAt ? `Since ${formatDate(overview.firstAt)}` : "No history yet"}
+              />
+              <HeroFact
+                label="Verified sales"
+                value={extrasLoaded ? String(verifiedSales) : "Checking…"}
+                foot={verifiedSales > 0 ? "Exact-printing eBay comps" : "Exact printing only"}
+              />
+            </div>
+          </div>
         </div>
+      </section>
 
-        {/* Right col — price hero + chart + stats */}
-        <div className="min-w-0">
-          {/* Price hero */}
-          <div className="mb-9">
-            <div className="font-mono-2 font-semibold text-[12px] tracking-[0.14em] uppercase text-ink-2 mb-3">
-              Market average
-            </div>
-            <div className="flex items-baseline gap-4 flex-wrap">
-              <span className="font-mono-2 font-semibold text-[56px] leading-none tracking-[-0.01em] text-ink">
-                {formatPrice(heroPrice)}
-              </span>
-              {chg1d != null && <DeltaPill value={chg1d} />}
-            </div>
-            {priceStats?.updated_at && (
-              <div className="mt-2.5 font-mono-2 font-semibold text-[13px] text-ink-2">
-                Last updated <TimeAgoLabel date={priceStats.updated_at} />
-              </div>
-            )}
-          </div>
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <ReturnCard label="24H return" metric={change1d} />
+        <ReturnCard label="7D return" metric={change7d} />
+        <ReturnCard label="30D return" metric={change30d} />
+        <MetricCard
+          label="From recorded low"
+          value={formatPct(growthFromLow)}
+          valueClass={pctColor(growthFromLow)}
+          foot={recordedLowAt ? `Low set ${formatDate(recordedLowAt)}` : "Waiting for history"}
+        />
+      </div>
 
-          {/* Chart block */}
-          <div className="bg-bg-2 border-[1.5px] border-ink rounded-c-md p-5 mb-8">
-            <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-              <div className="flex items-baseline gap-2">
-                <h2 className="font-grotesk font-bold text-[18px] tracking-[-0.01em] text-ink">
-                  Price History
-                </h2>
-                {history?.priceHistorySynthetic &&
-                  filterByPeriod(history.priceHistory, chartPeriod).length > 0 && (
-                    <span className="font-mono-2 font-semibold text-[10px] text-ink-3 uppercase tracking-[0.1em]">
-                      Estimated from 30-day stats
-                    </span>
-                  )}
+      {/* 02 — performance canvas */}
+      <section className="mt-14">
+        <SectionHeading
+          index="02"
+          eyebrow="Performance canvas"
+          title="Price behavior, without the false precision."
+          description="Quote history and rolling market average are separated. Sparse windows stay unavailable instead of becoming artificial zeroes."
+        />
+
+        <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_310px]">
+          <div className="rounded-[22px] border-[1.5px] border-ink bg-bg-2 p-4 shadow-[0_10px_30px_rgba(55,31,14,0.06)] sm:p-6">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="font-grotesk text-[20px] font-bold tracking-[-0.02em]">Market record</h2>
+                <div className="mt-1 font-mono-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-3">
+                  TCG quote · rolling average when available
+                </div>
               </div>
-              <div className="flex gap-1.5">
-                {PERIODS.map((p) => (
+              <div className="flex gap-1 rounded-full bg-bg-3 p-1">
+                {PERIODS.map((period) => (
                   <button
-                    key={p}
-                    onClick={() => setChartPeriod(p)}
-                    className={`font-mono-2 font-semibold text-[12px] tracking-[0.04em] px-3 py-1.5 rounded-c-pill transition-colors ${
-                      chartPeriod === p
+                    key={period}
+                    type="button"
+                    aria-pressed={chartPeriod === period}
+                    onClick={() => setChartPeriod(period)}
+                    className={`rounded-full px-3 py-1.5 font-mono-2 text-[11px] font-semibold uppercase tracking-[0.04em] transition-colors ${
+                      chartPeriod === period
                         ? "bg-ink text-bg"
-                        : "text-ink-2 hover:bg-bg-3"
+                        : "text-ink-2 hover:bg-white/70 hover:text-ink"
                     }`}
                   >
-                    {p.toUpperCase()}
+                    {period}
                   </button>
                 ))}
               </div>
             </div>
 
+            {history?.priceHistorySynthetic && (
+              <div className="mb-3 rounded-c-sm bg-gold/10 px-3 py-2 font-mono-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-gold">
+                Estimated series built from summary statistics
+              </div>
+            )}
+
             <MountNearViewport placeholder={<ChartLoading />}>
-              <HistorySection
-                cardImageId={card.card_image_id}
-                gameRouteSlug={gameRouteSlug}
-                period={chartPeriod}
-                history={history}
-                onLoaded={setHistory}
-              />
+              <ChartPanel history={priceHistory} period={chartPeriod} loaded={history != null} />
             </MountNearViewport>
           </div>
 
-          {/* Stats grid */}
-          <div className="grid grid-cols-3 gap-3.5">
-            <StatTile
-              label="24h change"
-              value={formatPct(priceStats?.chg_1d)}
-              valueClass={pctColor(priceStats?.chg_1d)}
-            />
-            <StatTile
-              label="7d change"
-              value={formatPct(priceStats?.chg_7d)}
-              valueClass={pctColor(priceStats?.chg_7d)}
-            />
-            <StatTile
-              label="30d change"
-              value={formatPct(priceStats?.chg_30d)}
-              valueClass={pctColor(priceStats?.chg_30d)}
-            />
-            <StatTile
-              label="All-time high"
-              value={formatPrice(priceStats?.ath)}
-              foot={formatAthDate(priceStats?.ath_date ?? null)}
-            />
-            <StatTile
-              label="All-time low"
-              value={formatPrice(priceStats?.atl)}
-              foot={formatAthDate(priceStats?.atl_date ?? null)}
-            />
-            <StatTile
-              label="Growth from ATL"
-              value={formatPct(growth)}
-              valueClass={pctColor(growth)}
-            />
-          </div>
-
-          {/* TCG Range */}
-          {(priceStats?.tcg_low != null ||
-            priceStats?.tcg_mid != null ||
-            priceStats?.tcg_high != null) && (
-            <div className="mt-3.5 bg-bg-2 border-[1.5px] border-ink rounded-c-md px-5 py-4">
-              <div className="font-mono-2 font-semibold text-[11px] tracking-[0.12em] uppercase text-ink-2 mb-2">
-                TCG Price Range (30d)
+          <aside className="rounded-[22px] bg-[#FCE6BE] p-5 sm:p-6">
+            <div className="font-mono-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-2">
+              Recorded range
+            </div>
+            <div className="mt-4 flex items-end justify-between gap-4">
+              <div>
+                <div className="font-mono-2 text-[10px] uppercase tracking-[0.1em] text-ink-3">Low</div>
+                <div className="mt-1 font-mono-2 text-[18px] font-semibold">{formatMarketPrice(recordedLow)}</div>
               </div>
-              <div className="flex items-center gap-5 font-mono-2 font-semibold text-[14px] text-ink flex-wrap">
-                <div>
-                  <span className="text-ink-3 text-[11px] mr-1.5 uppercase tracking-[0.06em]">
-                    Low
-                  </span>
-                  {formatPrice(priceStats.tcg_low)}
-                </div>
-                <span className="text-ink-3">·</span>
-                <div>
-                  <span className="text-ink-3 text-[11px] mr-1.5 uppercase tracking-[0.06em]">
-                    Mid
-                  </span>
-                  {formatPrice(priceStats.tcg_mid)}
-                </div>
-                <span className="text-ink-3">·</span>
-                <div>
-                  <span className="text-ink-3 text-[11px] mr-1.5 uppercase tracking-[0.06em]">
-                    High
-                  </span>
-                  {formatPrice(priceStats.tcg_high)}
-                </div>
+              <div className="text-right">
+                <div className="font-mono-2 text-[10px] uppercase tracking-[0.1em] text-ink-3">High</div>
+                <div className="mt-1 font-mono-2 text-[18px] font-semibold">{formatMarketPrice(recordedHigh)}</div>
               </div>
             </div>
-          )}
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/70">
+              <div
+                className="h-full rounded-full bg-[linear-gradient(90deg,#FF6BB8,#FF4936,#E89512)]"
+                style={{ width: `${Math.max(0, Math.min(100, overview.rangePosition ?? 0))}%` }}
+              />
+            </div>
+            <div className="mt-2 flex justify-between font-mono-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-3">
+              <span>{formatDate(recordedLowAt)}</span>
+              <span>{formatDate(recordedHighAt)}</span>
+            </div>
 
-          {/* JP price + eBay solds — fetched client-side near the viewport
-              (never during static generation: 4.4k prerendered pages × 3
-              queries each timed out the Vercel build). Blocks hide when
-              empty. */}
-          <MountNearViewport placeholder={null}>
-            <MarketExtrasSection
-              cardImageId={card.card_image_id}
-              gameRouteSlug={gameRouteSlug}
-              enMarketPrice={priceStats?.market_avg ?? null}
-            />
-          </MountNearViewport>
+            <div className="mt-7 space-y-3 border-t border-ink/20 pt-5">
+              <EvidenceRow label="TCG low" value={formatMarketPrice(priceStats?.tcg_low)} />
+              <EvidenceRow label="TCG midpoint" value={formatMarketPrice(priceStats?.tcg_mid)} />
+              <EvidenceRow label="TCG high" value={formatMarketPrice(priceStats?.tcg_high)} />
+              <EvidenceRow
+                label="Listings"
+                value={priceStats?.tcg_listings_count != null ? String(priceStats.tcg_listings_count) : "Not reported"}
+              />
+              <EvidenceRow
+                label="30D volume"
+                value={priceStats?.volume_30d != null ? String(priceStats.volume_30d) : "Not reported"}
+              />
+            </div>
+            <p className="mt-5 rounded-[12px] bg-white/50 p-3 font-grotesk text-[12px] leading-relaxed text-ink-2">
+              High and low refer to this recorded dataset. They are not presented as lifetime records unless the provider supplies verified all-time statistics.
+            </p>
+          </aside>
         </div>
-      </div>
+      </section>
+
+      {/* 03 — cross-market evidence */}
+      <section className="mt-14">
+        <SectionHeading
+          index="03"
+          eyebrow="Markets & evidence"
+          title="What buyers are actually paying elsewhere."
+          description="Regional pricing and exact-printing sales are kept separate so a cheaper variant never contaminates the investment case."
+        />
+        <MarketEvidence
+          extras={extras}
+          loaded={extrasLoaded}
+          enMarketPrice={currentPrice}
+        />
+      </section>
     </section>
   );
 }
 
-/* ── Sub-components ── */
-
-function Chip({ children }: { children: React.ReactNode }) {
+function DarkChip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="font-mono-2 font-semibold text-[11px] tracking-[0.06em] px-2.5 py-1 rounded-c-pill border-[1.5px] border-ink-2 text-ink-2 bg-bg-2">
+    <span className="rounded-full border border-ink/15 bg-white/55 px-3 py-1 font-mono-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-2">
       {children}
     </span>
   );
 }
 
-function DeltaPill({ value }: { value: number }) {
-  const bg = value > 0 ? "bg-gain-2" : value < 0 ? "bg-loss-2" : "bg-ink-3";
-  const arrow = value > 0 ? "↑ " : value < 0 ? "↓ " : "";
-  const magnitude = value === 0 ? formatPct(value) : formatPct(Math.abs(value));
+function ConfidenceBadge({ confidence }: { confidence: "high" | "medium" | "low" }) {
+  const styles = {
+    high: "border-[#1F6F47]/25 bg-[#DDF3E7] text-[#1F6F47]",
+    medium: "border-[#B46B00]/25 bg-[#FFF0C9] text-[#8C5300]",
+    low: "border-[#C93426]/25 bg-[#FFE2DE] text-[#C93426]",
+  };
   return (
-    <span
-      className={`inline-flex items-center font-mono-2 font-semibold text-[13px] text-bg px-3 py-1.5 rounded-c-pill ${bg}`}
-    >
-      {arrow}
-      {magnitude} · 24h
+    <span className={`rounded-full border px-3 py-1 font-mono-2 text-[10px] font-semibold uppercase tracking-[0.12em] ${styles[confidence]}`}>
+      {confidence} confidence
     </span>
+  );
+}
+
+function HeroFact({
+  label,
+  value,
+  foot,
+}: {
+  label: string;
+  value: React.ReactNode;
+  foot: string;
+}) {
+  return (
+    <div className="bg-white/60 p-4">
+      <div className="font-mono-2 text-[9px] font-semibold uppercase tracking-[0.13em] text-ink-3">{label}</div>
+      <div className="mt-2 font-mono-2 text-[15px] font-semibold text-ink">{value}</div>
+      <div className="mt-1 font-grotesk text-[11px] text-ink-3">{foot}</div>
+    </div>
+  );
+}
+
+function ReturnCard({ label, metric }: { label: string; metric: WindowMetric }) {
+  const available = metric.value != null;
+  const sourceLabel =
+    metric.source === "provider"
+      ? "Provider statistic"
+      : metric.source === "history"
+        ? `History · ${formatDate(metric.baselineAt)}`
+        : "Insufficient cadence";
+  return (
+    <MetricCard
+      label={label}
+      value={available ? formatPct(metric.value) : "Not reliable"}
+      valueClass={available ? pctColor(metric.value) : "text-ink-3"}
+      foot={sourceLabel}
+      compact={!available}
+    />
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  foot,
+  valueClass = "text-ink",
+  compact = false,
+}: {
+  label: string;
+  value: string;
+  foot: string;
+  valueClass?: string;
+  compact?: boolean;
+}) {
+  return (
+    <div className="rounded-[18px] border-[1.5px] border-ink bg-bg-2 p-4">
+      <div className="font-mono-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-2">{label}</div>
+      <div className={`mt-3 font-mono-2 font-semibold leading-none ${compact ? "text-[16px]" : "text-[25px]"} ${valueClass}`}>
+        {value}
+      </div>
+      <div className="mt-2 font-grotesk text-[11px] text-ink-3">{foot}</div>
+    </div>
+  );
+}
+
+function SectionHeading({
+  index,
+  eyebrow,
+  title,
+  description,
+}: {
+  index: string;
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_430px] md:items-end">
+      <div>
+        <div className="font-mono-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-coral-text">
+          {index} / {eyebrow}
+        </div>
+        <h2 className="mt-2 max-w-[680px] font-grotesk text-[30px] font-bold leading-[1.05] tracking-[-0.035em] sm:text-[38px]">
+          {title}
+        </h2>
+      </div>
+      <p className="font-grotesk text-[14px] leading-relaxed text-ink-2">{description}</p>
+    </div>
   );
 }
 
 function ChartLoading() {
   return (
-    <div className="flex h-[280px] items-center justify-center text-sm font-mono-2 text-ink-3">
-      Loading price history...
+    <div className="flex h-[330px] items-center justify-center font-mono-2 text-xs uppercase tracking-[0.1em] text-ink-3">
+      Loading market record…
     </div>
   );
 }
 
-/* Defers mounting its children until the block scrolls near the viewport.
-   chart.js parsing/rendering was the biggest TBT contributor after react-dom
-   hydration; on mobile the chart is below the fold, so this moves that work
-   out of the load window entirely. Desktop (chart above the fold) mounts on
-   the first observer callback. */
+function ChartPanel({
+  history,
+  period,
+  loaded,
+}: {
+  history: PricePoint[];
+  period: Period;
+  loaded: boolean;
+}) {
+  if (!loaded) return <ChartLoading />;
+  const filtered = filterByPeriod(history, period);
+  if (filtered.length === 0) {
+    return (
+      <div className="flex h-[330px] items-center justify-center rounded-[14px] bg-bg font-mono-2 text-xs uppercase tracking-[0.08em] text-ink-3">
+        No observations in this window
+      </div>
+    );
+  }
+  return (
+    <div className="h-[330px]">
+      <Suspense fallback={<ChartLoading />}>
+        <PriceChart data={filtered} period={period} />
+      </Suspense>
+    </div>
+  );
+}
+
 function MountNearViewport({
   children,
   placeholder,
@@ -378,8 +667,8 @@ function MountNearViewport({
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const el = ref.current;
-    if (!el || mounted) return;
+    const element = ref.current;
+    if (!element || mounted) return;
     if (typeof IntersectionObserver === "undefined") {
       setMounted(true);
       return;
@@ -391,215 +680,130 @@ function MountNearViewport({
           observer.disconnect();
         }
       },
-      { rootMargin: "200px" }
+      { rootMargin: "240px" }
     );
-    observer.observe(el);
+    observer.observe(element);
     return () => observer.disconnect();
   }, [mounted]);
 
   return <div ref={ref}>{mounted ? children : placeholder}</div>;
 }
 
-function HistoryEmpty() {
+function EvidenceRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-center h-[280px] text-ink-3 text-sm font-mono-2">
-      No price history available
+    <div className="flex items-center justify-between gap-4 border-b border-ink/10 pb-3 font-mono-2 text-[11px] font-semibold">
+      <span className="uppercase tracking-[0.08em] text-ink-2">{label}</span>
+      <span className="text-right text-ink">{value}</span>
     </div>
   );
 }
 
-/* Mounted by MountNearViewport, so the fetch fires when the chart nears the
-   viewport — immediately on desktop, on scroll on mobile. State is lifted to
-   CardDetailClient so the header notice reads the same payload. (The old
-   streamed-promise HistoryNotice needed mount-gating against a Date.now()
-   hydration mismatch — moot now: history is always null at prerender, so the
-   notice only ever renders client-side, after the fetch.) */
-
-function HistorySection({
-  cardImageId,
-  gameRouteSlug,
-  period,
-  history,
-  onLoaded,
-}: {
-  cardImageId: string;
-  gameRouteSlug: string;
-  period: Period;
-  history: CardHistoryPayload | null;
-  onLoaded: (history: CardHistoryPayload) => void;
-}) {
-  const loaded = history != null;
-
-  useEffect(() => {
-    if (loaded) return;
-    const controller = new AbortController();
-    const game = encodeURIComponent(gameQueryValue(gameRouteSlug));
-    fetch(`/api/card/${encodeURIComponent(cardImageId)}/history?game=${game}`, {
-      signal: controller.signal,
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((payload: CardHistoryPayload | null) => {
-        // Failed fetch → empty history → the chart shows its empty state.
-        onLoaded(payload ?? { priceHistory: [], priceHistorySynthetic: false });
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          onLoaded({ priceHistory: [], priceHistorySynthetic: false });
-        }
-      });
-    return () => controller.abort();
-  }, [loaded, cardImageId, gameRouteSlug, onLoaded]);
-
-  if (!history) return <ChartLoading />;
-
-  const filteredHistory = filterByPeriod(history.priceHistory, period);
-  if (filteredHistory.length === 0) return <HistoryEmpty />;
-
-  return (
-    <div style={{ height: 280 }}>
-      <Suspense fallback={<ChartLoading />}>
-        <PriceChart data={filteredHistory} period={period} />
-      </Suspense>
-    </div>
-  );
-}
-
-/* ── JP price + eBay solds (streamed like the history promise) ── */
-
-function formatJpy(value: number): string {
-  return `¥${Math.round(value).toLocaleString("en-US")}`;
-}
-
-// snapshot_date is a bare date ("2026-07-04") — pin to UTC so the label
-// doesn't slip a day in negative-offset timezones.
-function formatDateOnly(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-}
-
-function formatSaleDate(iso: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-}
-
-function formatGrade(grade: number): string {
-  return grade % 1 === 0 ? String(grade) : grade.toFixed(1);
-}
-
-function MarketExtrasSection({
-  cardImageId,
-  gameRouteSlug,
+function MarketEvidence({
+  extras,
+  loaded,
   enMarketPrice,
 }: {
-  cardImageId: string;
-  gameRouteSlug: string;
+  extras: CardMarketExtrasPayload | null;
+  loaded: boolean;
   enMarketPrice: number | null;
 }) {
-  const [extras, setExtras] = useState<CardMarketExtrasPayload | null>(null);
+  if (!loaded) {
+    return (
+      <div className="mt-6 grid gap-5 lg:grid-cols-2">
+        <EvidenceSkeleton />
+        <EvidenceSkeleton />
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const game = encodeURIComponent(gameQueryValue(gameRouteSlug));
-    fetch(`/api/card/${encodeURIComponent(cardImageId)}/extras?game=${game}`, {
-      signal: controller.signal,
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((payload: CardMarketExtrasPayload | null) => {
-        if (payload) setExtras(payload);
-      })
-      .catch(() => {
-        // Failed fetch → the blocks just stay hidden.
-      });
-    return () => controller.abort();
-  }, [cardImageId, gameRouteSlug]);
+  const jpPrice = extras?.jpPrice ?? null;
+  const ebayRecent = extras?.ebayRecent ?? [];
+  const ebayStats = extras?.ebayStats ?? null;
 
-  if (!extras) return null;
-  const { jpPrice, ebayRecent, ebayStats } = extras;
-  if (!jpPrice && ebayRecent.length === 0) return null;
   return (
-    <>
-      {jpPrice && <JpPriceBlock jp={jpPrice} enMarketPrice={enMarketPrice} />}
+    <div className="mt-6 grid gap-5 lg:grid-cols-2">
+      <JapanMarketCard jp={jpPrice} enMarketPrice={enMarketPrice} />
+      <EbayMarketCard recent={ebayRecent} stats={ebayStats} />
       {ebayRecent.length > 0 && (
-        <EbaySalesBlock recent={ebayRecent} stats={ebayStats} />
+        <div className="lg:col-span-2">
+          <EbaySalesTape recent={ebayRecent} />
+        </div>
       )}
-    </>
+    </div>
   );
 }
 
-function JpPriceBlock({
+function EvidenceSkeleton() {
+  return (
+    <div className="h-[270px] animate-pulse rounded-[22px] border-[1.5px] border-ink bg-bg-2 p-6">
+      <div className="h-3 w-28 rounded bg-bg-3" />
+      <div className="mt-8 h-10 w-44 rounded bg-bg-3" />
+      <div className="mt-5 h-20 rounded bg-bg-3" />
+    </div>
+  );
+}
+
+function JapanMarketCard({
   jp,
   enMarketPrice,
 }: {
-  jp: JpPriceData;
+  jp: JpPriceData | null;
   enMarketPrice: number | null;
 }) {
+  if (!jp) {
+    return (
+      <EmptyEvidenceCard
+        eyebrow="Japan / Yuyu-tei"
+        title="No verified counterpart"
+        body="A Japanese price will appear only after the collector number and treatment both match this printing."
+      />
+    );
+  }
+
   const jpUsd = jp.price_jpy / JPY_PER_USD;
-  // Positive spread = EN trades above JP (an EN premium).
   const spread = spreadPct(enMarketPrice, jpUsd);
-  const spreadSuspect =
-    spread != null && Math.abs(spread) > SPREAD_MISMATCH_THRESHOLD_PCT;
   return (
-    <div className="mt-3.5 bg-bg-2 border-[1.5px] border-ink rounded-c-md px-5 py-4">
-      <div className="font-mono-2 font-semibold text-[11px] tracking-[0.12em] uppercase text-ink-2 mb-2">
-        {jp.source_url ? (
+    <div className="relative overflow-hidden rounded-[22px] bg-[#1F47A1] p-6 text-white shadow-[0_12px_34px_rgba(31,71,161,0.18)]">
+      <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
+      <div className="relative">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="font-mono-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/60">
+            Japan / Yuyu-tei
+          </div>
+          <span className={`rounded-full px-2.5 py-1 font-mono-2 text-[9px] font-semibold uppercase tracking-[0.1em] ${jp.in_stock ? "bg-[#9DE8BF]/20 text-[#B9F4D0]" : "bg-white/10 text-white/60"}`}>
+            {jp.in_stock ? "In stock" : "Out of stock"}
+          </span>
+        </div>
+        <div className="mt-6 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <div className="font-mono-2 text-[35px] font-semibold leading-none tracking-[-0.04em]">{formatJpy(jp.price_jpy)}</div>
+            <div className="mt-2 font-mono-2 text-[13px] text-white/60">≈ {formatMarketPrice(jpUsd)} USD</div>
+          </div>
+          <div className="text-right">
+            <div className="font-mono-2 text-[9px] uppercase tracking-[0.12em] text-white/50">EN premium</div>
+            <div className="mt-1 font-mono-2 text-[22px] font-semibold">{formatPct(spread)}</div>
+          </div>
+        </div>
+        <div className="mt-6 rounded-[14px] bg-black/20 p-4">
+          <div className="font-grotesk text-[13px] font-medium text-white/80">
+            {jp.card_name ?? "Japanese market counterpart"}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono-2 text-[9px] font-semibold uppercase tracking-[0.08em] text-white/50">
+            <span>Snapshot {formatDate(jp.snapshot_date)}</span>
+            <span>{jp.comparison_match === "counterpart" ? "Treatment-matched counterpart" : "Directly linked printing"}</span>
+            <span>FX estimate ¥{JPY_PER_USD}/USD</span>
+          </div>
+        </div>
+        {jp.source_url && (
           <a
             href={jp.source_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="hover:text-ink transition-colors"
+            className="mt-5 inline-flex font-mono-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/75 underline decoration-white/30 underline-offset-4 hover:text-white"
           >
-            Japan Market — Yuyu-tei ↗
+            Inspect source ↗
           </a>
-        ) : (
-          "Japan Market — Yuyu-tei"
         )}
-      </div>
-      <div className="flex items-center gap-5 font-mono-2 font-semibold text-[14px] text-ink flex-wrap">
-        <div>
-          <span className="text-ink-3 text-[11px] mr-1.5 uppercase tracking-[0.06em]">
-            JP
-          </span>
-          {formatJpy(jp.price_jpy)}
-        </div>
-        <span className="text-ink-3">·</span>
-        <div>
-          <span className="text-ink-3 text-[11px] mr-1.5 uppercase tracking-[0.06em]">
-            USD
-          </span>
-          {formatPrice(jpUsd)}
-        </div>
-        {spread != null && (
-          <>
-            <span className="text-ink-3">·</span>
-            <div>
-              <span className="text-ink-3 text-[11px] mr-1.5 uppercase tracking-[0.06em]">
-                EN vs JP
-              </span>
-              {spreadSuspect ? (
-                <span
-                  className="text-gold text-[12px]"
-                  title={`Spread ${formatPct(spread)} exceeds ±${SPREAD_MISMATCH_THRESHOLD_PCT}% — the JP row may be a different printing`}
-                >
-                  possible variant mismatch
-                </span>
-              ) : (
-                <span className={pctColor(spread)}>{formatPct(spread)}</span>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-      <div className="mt-2 font-mono-2 font-semibold text-[11px] text-ink-3">
-        Snapshot {formatDateOnly(jp.snapshot_date)} · fixed ¥{JPY_PER_USD}/USD
       </div>
     </div>
   );
@@ -614,141 +818,133 @@ const TIER_ROWS: Array<[keyof CardMarketExtrasPayload["ebayStats"]["tiers"], str
   ["GRADE_9", "Grade 9–9.5"],
 ];
 
-function AvgRow({
-  label,
-  avg,
-  count,
-}: {
-  label: string;
-  avg: number | null;
-  count: number;
-}) {
-  return (
-    <div className="flex items-baseline justify-between gap-4 py-1 font-mono-2 font-semibold text-[14px] text-ink">
-      <span className="text-ink-2 text-[12px] uppercase tracking-[0.06em]">{label}</span>
-      <span className="flex items-baseline gap-3">
-        <span className="text-ink-3 text-[11px]">n={count}</span>
-        {formatPrice(avg)}
-      </span>
-    </div>
-  );
-}
-
-function EbaySalesBlock({
+function EbayMarketCard({
   recent,
   stats,
 }: {
   recent: EbaySaleData[];
-  stats: CardMarketExtrasPayload["ebayStats"];
+  stats: CardMarketExtrasPayload["ebayStats"] | null;
 }) {
-  // Optional-chain the tiers: a CDN can serve pre-tier JSON (old payload
-  // shape) for a few minutes after a deploy.
-  const tierRows = TIER_ROWS.filter(([tier]) => (stats.tiers?.[tier]?.count ?? 0) > 0);
-  const hasStats = stats.rawCount > 0 || tierRows.length > 0;
+  const tierRows = TIER_ROWS.filter(([tier]) => (stats?.tiers?.[tier]?.count ?? 0) > 0);
+  const totalComps = (stats?.rawCount ?? 0) + tierRows.reduce((sum, [tier]) => sum + (stats?.tiers[tier].count ?? 0), 0);
+
+  if (recent.length === 0) {
+    return (
+      <EmptyEvidenceCard
+        eyebrow="eBay / verified solds"
+        title="No exact-printing comps"
+        body="Sales for cards sharing this collector number are excluded when the treatment differs. That absence is a liquidity signal, not an empty-state bug."
+        accent="coral"
+      />
+    );
+  }
+
   return (
-    <div className="mt-10">
-      <h2 className="font-grotesk font-bold text-[22px] tracking-[-0.01em] text-ink mb-3.5">
-        Recent eBay sales
-      </h2>
-      {hasStats && (
-        <div className="bg-bg-2 border-[1.5px] border-ink rounded-c-md px-5 py-4 mb-3.5">
-          <div className="font-mono-2 font-semibold text-[11px] tracking-[0.12em] uppercase text-ink-2 mb-2">
-            Average sale price (90d)
-          </div>
-          {tierRows.map(([tier, label]) => (
-            <AvgRow
-              key={tier}
-              label={label}
-              avg={stats.tiers[tier].avg}
-              count={stats.tiers[tier].count}
-            />
-          ))}
-          {stats.rawCount > 0 && (
-            <AvgRow label="Raw" avg={stats.rawAvg} count={stats.rawCount} />
-          )}
-        </div>
-      )}
-      <div className="bg-bg-2 border-[1.5px] border-ink rounded-c-md overflow-hidden">
-        <div className="grid grid-cols-[110px_90px_1fr_100px] items-center gap-4 px-[18px] py-3 bg-bg-3 border-b-[1.5px] border-ink font-mono-2 font-semibold text-[11px] tracking-[0.1em] uppercase text-ink-2">
-          <span>Date</span>
-          <span>Grade</span>
-          <span>Source</span>
-          <span className="text-right">Price</span>
-        </div>
-        {recent.map((sale, i) => (
-          <EbaySaleRow key={`${sale.sold_at ?? "unknown"}-${i}`} sale={sale} />
+    <div className="rounded-[22px] border-[1.5px] border-ink bg-bg-2 p-6">
+      <div className="flex items-center justify-between gap-3">
+        <div className="font-mono-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-2">eBay / verified solds</div>
+        <span className="rounded-full bg-gain-2 px-2.5 py-1 font-mono-2 text-[9px] font-semibold uppercase tracking-[0.1em] text-white">Exact printing</span>
+      </div>
+      <div className="mt-5 font-mono-2 text-[40px] font-semibold leading-none tracking-[-0.04em]">{totalComps}</div>
+      <div className="mt-2 font-grotesk text-[12px] text-ink-3">Verified 90-day comparables</div>
+      <div className="mt-5 space-y-3 border-t border-ink/20 pt-4">
+        {(stats?.rawCount ?? 0) > 0 && (
+          <EvidenceRow label={`Raw · n=${stats?.rawCount ?? 0}`} value={formatMarketPrice(stats?.rawAvg)} />
+        )}
+        {tierRows.slice(0, 3).map(([tier, label]) => (
+          <EvidenceRow
+            key={tier}
+            label={`${label} · n=${stats?.tiers[tier].count ?? 0}`}
+            value={formatMarketPrice(stats?.tiers[tier].avg)}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function EbaySaleRow({ sale }: { sale: EbaySaleData }) {
-  const isGraded = sale.grader != null && sale.grade != null;
-  const isPsa10 = sale.grader === "PSA" && sale.grade === 10;
+function EmptyEvidenceCard({
+  eyebrow,
+  title,
+  body,
+  accent = "gold",
+}: {
+  eyebrow: string;
+  title: string;
+  body: string;
+  accent?: "gold" | "coral";
+}) {
   return (
-    <div className="grid grid-cols-[110px_90px_1fr_100px] items-center gap-4 px-[18px] py-3 border-t border-bg-3 hover:bg-bg-3 transition-colors">
-      <span className="font-mono-2 font-semibold text-[13px] text-ink-2">
-        {formatSaleDate(sale.sold_at)}
-      </span>
-      <span>
-        <span
-          className={`inline-block font-mono-2 font-semibold text-[11px] tracking-[0.06em] px-2.5 py-[3px] rounded-c-pill border-[1.5px] w-fit ${
-            isPsa10
-              ? "[background:var(--grad-brand)] text-bg border-transparent"
-              : "border-ink text-ink bg-bg-2"
-          }`}
-        >
-          {isGraded ? `${sale.grader} ${formatGrade(sale.grade!)}` : "Raw"}
-        </span>
-      </span>
-      <span className="font-grotesk font-medium text-[13px] text-ink-2">
-        {sale.ebay_url ? (
-          <a
-            href={sale.ebay_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-ink hover:underline transition-colors"
-          >
-            eBay ↗
-          </a>
-        ) : (
-          "eBay"
-        )}
-      </span>
-      <span className="font-mono-2 font-semibold text-[15px] text-ink text-right">
-        {formatPrice(sale.sale_price)}
-      </span>
+    <div className="rounded-[22px] border-[1.5px] border-ink bg-bg-2 p-6">
+      <div className="font-mono-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-2">{eyebrow}</div>
+      <div className={`mt-6 inline-flex h-11 w-11 items-center justify-center rounded-full font-mono-2 text-[17px] font-semibold ${accent === "coral" ? "bg-coral/10 text-coral-text" : "bg-gold/20 text-gold"}`}>
+        —
+      </div>
+      <h3 className="mt-5 font-grotesk text-[24px] font-bold tracking-[-0.025em]">{title}</h3>
+      <p className="mt-3 max-w-[470px] font-grotesk text-[13px] leading-relaxed text-ink-2">{body}</p>
     </div>
   );
 }
 
-function StatTile({
-  label,
-  value,
-  foot,
-  valueClass = "text-ink",
-}: {
-  label: string;
-  value: string;
-  foot?: string;
-  valueClass?: string;
-}) {
+function EbaySalesTape({ recent }: { recent: EbaySaleData[] }) {
   return (
-    <div className="bg-bg-2 border-[1.5px] border-ink rounded-c-md px-[18px] py-4">
-      <div className="font-mono-2 font-semibold text-[11px] tracking-[0.12em] uppercase text-ink-2">
-        {label}
+    <div className="overflow-hidden rounded-[22px] border-[1.5px] border-ink bg-bg-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-bg-3 px-5 py-4">
+        <h3 className="font-grotesk text-[18px] font-bold">Recent verified sales</h3>
+        <span className="font-mono-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-ink-3">Exact printing · newest first</span>
       </div>
-      <div
-        className={`mt-2 font-mono-2 font-semibold text-[22px] leading-none tracking-[-0.01em] ${valueClass}`}
-      >
-        {value}
-      </div>
-      {foot && (
-        <div className="mt-1.5 font-mono-2 font-semibold text-[11px] text-ink-2">
-          {foot}
+      {recent.map((sale, index) => (
+        <div
+          key={`${sale.sold_at ?? "unknown"}-${index}`}
+          className="grid gap-2 border-t border-ink/10 px-5 py-4 sm:grid-cols-[120px_110px_1fr_120px] sm:items-center sm:gap-4"
+        >
+          <span className="font-mono-2 text-[11px] font-semibold text-ink-2">{formatDate(sale.sold_at)}</span>
+          <span className="w-fit rounded-full border border-ink/20 px-2.5 py-1 font-mono-2 text-[9px] font-semibold uppercase tracking-[0.08em]">
+            {sale.grader && sale.grade != null ? `${sale.grader} ${formatGrade(sale.grade)}` : "Raw"}
+          </span>
+          <span className="font-grotesk text-[12px] text-ink-3">{sale.sale_type ?? "Sold listing"}</span>
+          <span className="font-mono-2 text-[17px] font-semibold sm:text-right">
+            {sale.ebay_url ? (
+              <a href={sale.ebay_url} target="_blank" rel="noopener noreferrer" className="hover:text-coral-text">
+                {formatMarketPrice(sale.sale_price)} ↗
+              </a>
+            ) : (
+              formatMarketPrice(sale.sale_price)
+            )}
+          </span>
         </div>
-      )}
+      ))}
     </div>
   );
+}
+
+function getMarketConfidence({
+  observedAt,
+  sampleCount,
+  verifiedSales,
+  listingsCount,
+  synthetic,
+}: {
+  observedAt: string | null;
+  sampleCount: number;
+  verifiedSales: number;
+  listingsCount: number;
+  synthetic: boolean;
+}): { level: "high" | "medium" | "low"; summary: string } {
+  if (synthetic) {
+    return { level: "low", summary: "Estimated history with no direct transaction evidence." };
+  }
+  const ageDays = observedAt
+    ? Math.max(0, (Date.now() - new Date(observedAt).getTime()) / DAY_MS)
+    : Number.POSITIVE_INFINITY;
+  if (ageDays <= 2 && sampleCount >= 12 && verifiedSales >= 3) {
+    return { level: "high", summary: "Fresh quote supported by repeat observations and verified sales." };
+  }
+  if (ageDays <= 7 && sampleCount >= 6 && (verifiedSales > 0 || listingsCount > 0)) {
+    return { level: "medium", summary: "Usable quote, but transaction depth remains limited." };
+  }
+  if (verifiedSales === 0) {
+    return { level: "low", summary: "Thin market: no verified sales for this exact printing." };
+  }
+  return { level: "low", summary: "Sparse or stale observations limit price confidence." };
 }
