@@ -32,8 +32,19 @@ Drop this folder at the repo root as `/mockups` (or wherever the build prompts r
 | *(no file)* | `/admin/orders` | redirects to `/admin/inventory?status=ship` |
 | *(no file)* | `/admin/inventory/[id]/centering` | **DEFERRED — not designed.** Same `CenteringWorkspace` as `16-admin-lens-pregrade` + card-identity header + "Save to inventory item" action. |
 
+## Terminal surfaces (4 routes, 2 files)
+
+Game-scoped like every other public surface, each mirrored at the bare path for the default game.
+
+| File | Route(s) |
+|---|---|
+| `17-moon-terminal-sealed.html` | `/games/[game]/terminal/sealed` · `/terminal/sealed` (sealed tracker dashboard — grid/table/card views) |
+| `18-moon-terminal-sealed-detail.html` | `/games/[game]/terminal/sealed/[productSlug]` · `/terminal/sealed/[productSlug]` |
+
+Spec: `docs/moon-terminal-sealed-spec.md` (v2.0) — data model, per-section specs, ingestion cadence, acceptance criteria. **Where the spec and these mockups disagree, the spec wins:** the mockups were built standalone and carry tokens and a 1460px canvas the repo doesn't have.
+
 ## Conventions captured in these mockups
-Color roles: ink = primary/neutral/active · coral = destructive/attention/required · gain(green) = success · gold = graded-conditional · gradient = brand only · `--select` cobalt #1F47A1 = list-selection + PSA tier chip + centering inner-frame. PSA grade bands (5-band): 10 green / 9 lime / 8 gold / 7 orange / ≤6 red. Admin nav = wordmark + coral INTERNAL pill + Inventory·Bundles·Orders·Lens·PSA + View site↗/Sign out. Full convention system in the session-2 handoff (`C1.5 Migration — Handoff 2 (Admin).md`).
+Color roles: ink = primary/neutral/active · coral = destructive/attention/required · gain(green) = success · gold = graded-conditional · gradient = brand only, **except `--grad-terminal`** (blue→green), a second gradient scoped to the Terminal product surface (sub-nav band + nav `PRO` chip) — the sunset brand gradient stays brand-only · `--select` cobalt #1F47A1 = list-selection + PSA tier chip + centering inner-frame. PSA grade bands (5-band): 10 green / 9 lime / 8 gold / 7 orange / ≤6 red. Admin nav = wordmark + coral INTERNAL pill + Inventory·Bundles·Orders·Lens·PSA + View site↗/Sign out. Full convention system in the session-2 handoff (`C1.5 Migration — Handoff 2 (Admin).md`).
 
 ## New data fields these mockups assume (need schema work)
 - `psa_tier` on `psa_submissions` (PSA Tier dropdown — 8 tiers, see `14-admin-psa-import`).

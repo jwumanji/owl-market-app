@@ -1,59 +1,98 @@
-# Moon Terminal — Sealed Product Detail · Spec v1.1
+# Moon Terminal — Sealed Module · Spec v2.0
 
-> Route: `/terminal/sealed/[productSlug]`
-> Visual reference: `mockups/moon-terminal-sealed-detail.html`
-> Dashboard reference: `mockups/moon-terminal-sealed.html`
-> Parent: `/terminal/sealed` (the grid/table dashboard)
-> Design system: C1.5 Playful Modern (unprefixed tokens)
+> **Routes:** `/games/[game]/terminal/sealed` and `/games/[game]/terminal/sealed/[productSlug]`, each mirrored at `/terminal/sealed…` for the default game
+> **Mockups:** `mockups/17-moon-terminal-sealed.html`, `mockups/18-moon-terminal-sealed-detail.html`
+> **Design system:** C1.5 Playful Modern
+> **Supersedes v1.1**
 
 ---
 
-## 0 — Scope
+## 0 — What changed from v1.1, and why
 
-One page, six stacked sections. Entered by clicking any product row in the Sealed Tracker grid, table, or card view.
+v1.1 was written from the mockups without verifying the repo. Recon found twelve conflicts. All are resolved below; this section is the summary so you don't have to diff.
 
-| # | Section | Blocks on |
+| # | v1.1 claimed | Reality | Resolution |
+|---|---|---|---|
+| 1 | files in `docs/specs/` | doesn't exist; mockups are numbered at repo root | `docs/` + `mockups/17|18-*` |
+| 2 | `--gain` / `--loss` | repo has `--gain-2` / `--loss-2` | use repo names, **no aliases** |
+| 3 | `--line` exists | it doesn't | add it as a real token |
+| 4 | `--grad-terminal` is a token add | it's a brand-bible change | add it, and log it as a system change |
+| 5 | `.container`, 1460px | no `.container`; canvas is 1280px | per-page shell class, **stay at 1280** |
+| 6 | add to `body:has()` bg list | no such rule; body is already cream | drop the instruction entirely |
+| 7 | nav has PROMOS/PORTFOLIO/ALERTS | those don't exist; Catalog does | use the real nav |
+| 8 | tables have no `game_id` | every public query is game-scoped, v40 enforces it | **`game_id` on all four tables** |
+| 9 | `language` column | repo models this as `region` (v45) | use `region` |
+| 10 | reuse `RarityBadge` | repo chips are solid-fill, mockup chips are outline | **use `RarityBadge`**; mockup palette does not ship |
+| 11 | sub-nav in the nav component | `Nav` variant is `public\|admin` only | separate `TerminalSubNav` via a route-group layout |
+| 12 | hand-rolled SVG chart | `chart.js` + `react-chartjs-2` already ship | **use chart.js** for the main chart |
+
+**Three of these change the build, not just the wording:** #8 (game scoping), #10 (the pages will not look like the mockups in the rarity chips), and #12 (chart library).
+
+**Standing correction:** where this spec and a mockup disagree, **the spec wins**. The mockups were built standalone and carry tokens and a canvas width the repo doesn't have.
+
+---
+
+## 1 — Scope and order
+
+Five sections on the detail page, one dashboard.
+
+| Phase | Deliverable | Blocked on |
 |---|---|---|
-| 1 | Hero rail | nothing — ships first |
-| 2 | Price history (chart + table) | `sealed_weekly_prices`, `set_weekly_values` |
-| 3 | Market stats | `sellers` from JustTCG |
-| 4 | Top 10 cards | existing card data |
-| 5 | Box EV | `pull_rates` table (new, admin-seeded) |
+| A | Tokens + Terminal shell + sub-nav | nothing |
+| B | Migration v46 (four tables) | hand-application, no DDL via client |
+| C | Catalog seed + ingestion + backfill | JustTCG sealed coverage confirmed |
+| D | Dashboard | B, C |
+| E | Detail §3.1 hero + §3.2 price history | D |
+| F | Detail §3.3 stats + §3.4 top 10 | E |
+| G | Detail §3.5 Box EV | F + `pull_rates` seeded |
 
-Ship 1→2→3→4, then 5. Box EV last because it's the only section needing new hand-curated data.
-
-**Note:** an earlier draft had a separate sixth "Weekly snapshots" section. It's been folded into §2.2's table view — selecting `1Y + TABLE` *is* the weekly history, and 30D/90D give daily resolution the standalone section couldn't. Sellers moved into that table.
+Box EV is last because it's the only section needing hand-curated data that doesn't exist yet.
 
 ---
 
-## 1 — Data model
+## 2 — Data model
 
-### 1.1 New tables
+### 2.1 Game scoping — read this first
+
+Every public table in this repo carries `game_id`, every public query filters on it, migration **v40** enforces the boundary, and `npm run audit:game-boundaries` will fail a build that violates it.
+
+All four new tables therefore carry `game_id`. Match the column type used by `cards.game_id` — do not assume uuid.
+
+`region` follows the v45 convention (`'en'`, `'jp'`), lowercase. There is no `language` column anywhere in this codebase and we are not introducing a second vocabulary.
+
+### 2.2 Migration v46
+
+Head is currently v45. Numbering has collided historically (two each of v14, v22, v24, v25, v34, v41, v44), so **verify no v46 exists before writing it**.
+
+There is no DDL access through the Supabase client. This migration is hand-applied via the SQL editor, same as v44 `jp_prices`.
 
 ```sql
--- sealed products catalog
-create table sealed_products (
-  id                uuid primary key default gen_random_uuid(),
-  slug              text unique not null,       -- 'op-05-booster-box-en'
-  set_code          text not null,              -- 'OP-05'  (FK-ish to sets)
-  product_type      text not null,              -- 'booster_box' | 'case' | 'starter_deck' | 'premium'
-  language          text not null default 'EN', -- 'EN' | 'JP'
-  display_name      text not null,              -- 'Awakening of the New Era'
-  packs_per_unit    int,                        -- 24
-  cards_per_pack    int,                        -- 12
-  msrp_usd          numeric(10,2),              -- 103.68
-  release_date      date,
-  justtcg_variant_id text,                      -- pricing join key
-  image_url         text,
-  is_tracked        boolean not null default true,
-  created_at        timestamptz default now()
-);
-create index on sealed_products (set_code, language);
+-- schema-migration-v46-terminal-sealed.sql
 
--- weekly price snapshots (one row per product per week)
+create table sealed_products (
+  id                 uuid primary key default gen_random_uuid(),
+  game_id            <match cards.game_id> not null references games(id),
+  slug               text not null,
+  set_code           text not null,
+  product_type       text not null,          -- 'booster_box' | 'case' | 'starter_deck' | 'premium'
+  region             text not null default 'en',
+  display_name       text not null,
+  packs_per_unit     int,
+  cards_per_pack     int,
+  msrp_usd           numeric(10,2),
+  release_date       date,
+  justtcg_variant_id text,
+  image_url          text,
+  is_tracked         boolean not null default true,
+  created_at         timestamptz default now(),
+  unique (game_id, slug)
+);
+create index on sealed_products (game_id, region, set_code);
+
 create table sealed_weekly_prices (
   product_id   uuid not null references sealed_products(id) on delete cascade,
-  week_ending  date not null,                   -- always a Saturday, UTC
+  game_id      <match> not null references games(id),
+  week_ending  date not null,               -- Saturday, UTC, always
   market_price numeric(10,2) not null,
   low_price    numeric(10,2),
   sellers      int,
@@ -61,217 +100,314 @@ create table sealed_weekly_prices (
   captured_at  timestamptz not null default now(),
   primary key (product_id, week_ending)
 );
+create index on sealed_weekly_prices (game_id, week_ending);
 
--- set singles rollup, snapshotted weekly (powers Value Ratio)
 create table set_weekly_values (
+  game_id     <match> not null references games(id),
   set_code    text not null,
+  region      text not null default 'en',
   week_ending date not null,
-  total_value numeric(12,2) not null,           -- sum of one copy of every card
+  total_value numeric(12,2) not null,
   card_count  int not null,
-  primary key (set_code, week_ending)
+  primary key (game_id, set_code, region, week_ending)
 );
 
--- pull rates, hand-curated per set (powers Box EV)
 create table pull_rates (
-  set_code       text not null,
-  rarity         text not null,                 -- 'MR' | 'GMR' | 'SEC' | 'SP' | 'TR' | 'AA' | 'SR' | 'L' | 'BULK'
-  per_box        numeric(6,3) not null,         -- expected count per box (0.35 = 1 per ~3 boxes)
-  source_note    text,                          -- 'community box breaks, n=412'
-  confidence     text not null default 'medium',-- 'high' | 'medium' | 'low'
-  updated_at     timestamptz default now(),
-  primary key (set_code, rarity)
+  game_id     <match> not null references games(id),
+  set_code    text not null,
+  rarity      text not null,                -- 'GMR'|'MR'|'SEC'|'SP'|'TR'|'AA'|'SR'|'L'|'BULK'
+  per_box     numeric(6,3) not null,
+  source_note text,
+  confidence  text not null default 'medium', -- 'high'|'medium'|'low'
+  updated_at  timestamptz default now(),
+  primary key (game_id, set_code, rarity)
 );
 ```
 
-**`card_image_id` reminder:** when averaging singles prices per rarity slot, group on `card_image_id`, never `card_number` — parallels and alt-arts share numbers. Use explicit `includes()` checks for `_p1` / `_p2` suffixes, no regex catch-alls.
+RLS: public read, no public write, matching how existing public tables are configured.
 
-### 1.2 Derived values (compute, don't store)
+**`card_image_id` is the canonical key.** Anywhere singles are aggregated — set value rollup, rarity averages for Box EV, top 10 — group on `card_image_id`, never `card_number`. Parallels and alt-arts share numbers but have unique `_p1` / `_p2` suffixed image ids. Variant detection uses explicit `includes()` checks; **no regex catch-alls**.
+
+### 2.3 Derived values — compute, never store
 
 | Value | Formula |
 |---|---|
-| `off_ath` | `(current − ath) / ath × 100`, ath = max over all snapshots |
+| `off_ath` | `(current − ath) / ath × 100`, ath = max across all snapshots |
 | `vs_msrp` | `(current − msrp) / msrp × 100` |
-| `value_ratio` | `set_weekly_values.total_value / market_price` for the same `week_ending` |
+| `value_ratio` | `set_weekly_values.total_value / market_price`, same `week_ending` |
 | `volatility_12w` | mean of `abs(w/w %)` over trailing 12 weeks |
 | `price_per_pack` | `market_price / packs_per_unit` |
 | `box_ev` | `Σ (pull_rates.per_box × avg_price_of_rarity)` |
 | `sealed_premium` | `(market_price − box_ev) / box_ev × 100` |
-| `sealed_rank` | rank by `market_price` among `is_tracked = true`, same type + language |
+| `sealed_rank` | rank by `market_price` among `is_tracked`, same `game_id` + `product_type` + `region` |
 
 ---
 
-## 2 — Section specs
+## 3 — Detail page sections
 
-### 2.1 Hero rail
+### 3.0 Layout shell
 
-3-column grid: `200px | 1fr | 300px`. Collapses to `170px | 1fr` at 1080px (facts panel spans full width), single column at 720px.
-
-**Left** — box art, 5:6 aspect, 1.5px ink border, `--r-lg`, `6px 6px 0` hard shadow. Fallback: gradient panel with set code + product type.
-
-**Center** — mono eyebrow (`SEALED PRODUCT · ENGLISH`), H1 with the last two words in Caveat gradient (**needs `padding-right: 13px`** — Caveat clips its tail under `background-clip:text`), then:
-- Price at 48px JetBrains Mono, `-1.8px` letter-spacing
-- Four delta chips: 7D / 30D / 90D / 1Y. Ink border, white fill, mono label in `--ink-3`
-- 52-week range bar: gradient track (loss-tint → peach → gain-tint), 4px ink marker positioned at `(current − atl) / (ath − atl) × 100%`, value label above. ATL and ATH below with dates.
-
-**Right** — key facts panel (MSRP, vs MSRP, released, set value, value ratio, sellers with W/W delta), then `+ WATCHLIST` (ink fill) and `CSV` buttons.
-
-**Edge cases:** `msrp_usd` null → hide both MSRP rows. Fewer than 52 weeks of history → label the bar with the actual span (`"38-WEEK RANGE"`). `ath === current` → marker at 100%, show `AT ATH` in `--gain` instead of the off-ATH figure.
-
-### 2.2 Price chart
-
-Inline SVG, `viewBox="0 0 1000 320"`, no chart library needed. Chart.js is already in the repo if preferred — either is fine, but the overlay-normalization logic below is the part that matters.
-
-**View toggle:** cobalt `CHART | TABLE` segment, chart default. The table renders the active timeframe's raw snapshots — date, box price, change, set value, ratio, sellers — newest first, sticky header, `max-height: 452px` with internal scroll. Footer strip states the resolution (`DAILY` / `WEEKLY` / `MONTHLY`) so a row's meaning is unambiguous.
-
-Overlay buttons **hide** in table mode. They only affect the chart, and leaving them visible implies they filter columns.
-
-**Timeframes:** 30D (daily) · 90D (daily) · 1Y (weekly) · **ALL** (monthly, since release). Default 90D. Timeframe drives both views.
-
-**Overlays:** two independent toggles — `SET VALUE` (gold, dashed) and `VALUE RATIO` (cobalt `--select`, dashed).
-
-**The scale rule — important.** With no overlay active, the y-axis is raw USD and the box price line gets a 12%-opacity area fill. The moment *any* overlay is on, all series switch to **indexed at 100 = first point in window**, the area fill is dropped, and the axis label becomes `INDEXED · 100 = <start date>`. Mixing dollars and a multiplier on one axis is meaningless; indexing makes them comparable. This is the CoinGecko "compare against BTC" behavior.
-
-**Hover:** transparent `<rect>` over the plot area, `mousemove` → nearest index → dashed vertical crosshair + ink tooltip listing every active series with color swatches. Bind `touchmove` too (passive) for mobile. Clamp the tooltip inside the wrapper.
-
-**Footer strip:** peach, 1.5px ink top border, legend for active series, right-aligned point count and date span.
-
-**Charts are always green** per the established convention (`#2D9961` line and fill). Gold and cobalt are overlay-only.
-
-### 2.3 Market stats
-
-6-up grid of stat cards, 3-up at 1180px, 2-up at 720px. Hover: `translate(-2px,-2px)` + `4px 4px 0` ink shadow.
-
-Off ATH · 12W volatility · sellers (with direction and a `TIGHTENING` / `LOOSENING` note) · cards per box · $ per pack (with MSRP per pack beneath) · sealed rank.
-
-Sellers falling while price rises is the supply-drying signal — the sub-label should say so.
-
-### 2.4 Top 10 cards
-
-Sits **above** Box EV — it's the section that explains why the box moved, and it reads faster than the EV table.
-
-**Summary strip** above the grid, peach with 1.5px ink border: top 10 combined value · set value · share of set · and the top card's own share. That last figure is the story on most sets (Katakuri alone is 12.3% of OP-05).
-
-**Grid:** 5-up × 2 rows. 4-up at 1180px, 3-up at 940px, 2-up at 640px — more columns as it narrows so total height stays roughly flat.
-
-**Tile:** art panel at **4:3** (not 5:7 — portrait made the two-row block dominate the page), rank badge top-left, rarity chip top-right inside the art panel, then name (single line, ellipsis), card number, price, and one combined line of `7D delta · % OF SET`.
-
-Sorted by price descending. Whole tile links to `/card/[card_image_id]`. `ALL <n> CARDS →` in the section header goes to set detail.
-
-### 2.5 Box EV
-
-Two columns: `1fr | 330px`, stacks below 1080px.
-
-**Left — slot table.** Columns: rarity slot (chip + name + source note) · `PER BOX` · `AVG PRICE` · `VALUE / BOX` · `WEIGHT`. Weight shows the percentage plus a proportional bar (`--gain` fill, ink border) so concentration is scannable rather than read — MR and GMR together are ~49% of a box's value off 0.45 expected cards, and the bars make that obvious at a glance. Column is named `VALUE / BOX`, not `EV CONTRIB`. Totals row on `#FEF3E0` with a 1.5px ink top border.
-
-Rarity chips use the **Option A palette** — MR/GMR are apex (ink fill, gold border, gold text). Reuse the canonical `RarityBadge` component; no inline chips.
-
-**Right — summary.** Peach hero showing opening EV, then two comparison bars (box price at 100% ink, opening EV proportional in green), then sealed premium.
-
-**Copy matters here.** The premium figure needs a plain-language read beneath it, because the number is counterintuitive on its own: *"The box trades 66% above what its cards are worth. Sealed is priced for scarcity, not contents."* Sign convention: premium positive = box costs more than contents = sealed is expensive.
-
-**Confidence surfacing.** Any set where `pull_rates.confidence = 'low'` on any slot gets a peach caution strip above the table naming the estimate as rough. Sets with no `pull_rates` rows hide section 4 entirely rather than showing zeros.
-
-The footnote disclaimer is mandatory and non-negotiable: estimates from community-sourced pull rates, not a guarantee of any individual box.
-
-## 3 — Chrome
-
-Nav matches the main site exactly: `HOME · MARKETS · RARITIES · PROMOS · SETS · CHARACTERS · PORTFOLIO · ALERTS · TERMINAL`, with LIVE badge, search, Login / Sign Up, and the ticker bar beneath. TERMINAL carries a gradient `PRO` chip.
-
-Third row is the Terminal sub-nav: `SEALED · CHASE · MOVERS · SET INDEX · BOX EV`, gold underline on active.
-
-Breadcrumb above the hero: `TERMINAL / SEALED / OP-05 BOOSTER BOX`.
-
-Responsive nav collapse: search hides at 1180px, main links hide at 1080px (TERMINAL stays), Login and LIVE hide at 720px.
-
-Add `.terminal-page` to the `body:has()` cream-background rule list in `globals.css`.
-
-**Terminal gradient (new token).** The sub-nav band uses a blue→green gradient distinct from the sunset brand gradient:
+No `.container` class exists. Follow the per-page pattern:
 
 ```css
+.terminal-page { padding: 24px; max-width: 1280px; margin: 0 auto; }
+```
+
+**Canvas stays at 1280.** The mockups were built at 1460 and both pages were tuned for it. Do not widen the site for one module. Consequences to absorb:
+
+- Hero grid `200px | 1fr | 300px` gets tight — reflow the facts panel to full-width one breakpoint earlier than the mockup does
+- Stat rail goes 6-up → **3-up at 1180px**, not the mockup's later breakpoint
+- The dashboard grid already has `min-width` plus sticky metric and product columns. Horizontal scroll there is **designed behavior**, not a failure — do not remove it to fit
+
+### 3.1 Hero rail
+
+Breadcrumb, then a three-column grid: box art (5:6, 1.5px ink border, `6px 6px 0` hard shadow) · main · key facts panel.
+
+Main column: mono eyebrow, H1 with the last two words in Caveat gradient (**`padding-right: 13px` required** — Caveat clips its tail under `background-clip:text`), price at 48px mono, four delta chips (7D/30D/90D/1Y), then the 52-week range bar.
+
+Range bar: gradient track, 4px ink marker at `(current − atl) / (ath − atl) × 100%`, value label above, ATL and ATH with dates below.
+
+Facts panel: MSRP · vs MSRP · released · set value · value ratio · sellers with W/W delta. Then `+ WATCHLIST` and `CSV`.
+
+**Edge cases.** Null `msrp_usd` → hide both MSRP rows. Fewer than 52 weeks of history → relabel to the real span (`"38-WEEK RANGE"`). `ath === current` → marker at 100%, show `AT ATH` in `--gain-2` instead of an off-ATH figure.
+
+### 3.2 Price history
+
+**Use `chart.js` + `react-chartjs-2`.** Both already ship. Follow the existing pattern in `SetChartClient.tsx` / `CardDetailClient.tsx`: a `"use client"` component calling `ChartJS.register(...)` at module scope with only the elements it needs.
+
+Do not port the mockup's hand-rolled SVG chart. It exists because the mockup was standalone.
+
+**View toggle:** cobalt `CHART | TABLE`, chart default. **Timeframes:** 30D (daily) · 90D (daily) · 1Y (weekly) · ALL (monthly, since release). Default 90D. Timeframe drives both views and survives toggling between them.
+
+**Overlays:** `SET VALUE` (gold, dashed) and `VALUE RATIO` (`--select` cobalt, dashed), independent toggles.
+
+**The scale rule — this is the part that's easy to get wrong.** With no overlay, the y-axis is raw USD and the price line carries a 12%-opacity area fill. The moment *any* overlay activates, all series switch to **indexed at 100 = first point in window**, the area fill drops, and the axis label becomes `INDEXED · 100 = <start date>`. Plotting dollars against a multiplier on one axis is meaningless. This is the CoinGecko "compare against BTC" behaviour.
+
+**Table view:** active timeframe's raw snapshots — date, box price, change, set value, ratio, sellers — newest first, sticky header, `max-height: 452px` with internal scroll. Footer states the resolution (`DAILY` / `WEEKLY` / `MONTHLY`).
+
+Overlay buttons **hide** in table mode. They only affect the chart; leaving them visible implies they filter columns.
+
+Chart hover works on mouse and touch; tooltip stays inside its container at both edges.
+
+### 3.3 Market stats
+
+6-up stat cards, **3-up at 1180px**, 2-up at 720px. Hover: `translate(-2px,-2px)` + `4px 4px 0` ink shadow.
+
+Off ATH · 12W volatility · sellers · cards per box · $ per pack · sealed rank.
+
+Sellers falling while price rises is the supply-drying signal. The sub-label says so (`TIGHTENING` / `LOOSENING`) rather than just printing a number.
+
+### 3.4 Top 10 cards
+
+Sits **above** Box EV — it explains why the box moved and reads faster than the EV table.
+
+Summary strip above the grid: top 10 combined · set value · share of set · top card's own share. That last figure is usually the story (Katakuri alone is ~12% of OP-05).
+
+Grid 5-up × 2 rows → 4-up at 1180 → 3-up at 940 → 2-up at 640. Column count rises as width drops so total height stays roughly flat.
+
+Tile: **4:3** art panel (not 5:7 — portrait made the block dominate the page), rank badge top-left, `RarityBadge` top-right inside the art panel, name on one line with ellipsis, card number, price, then one combined line of `7D delta · % OF SET`.
+
+Sorted by price descending. Whole tile links to `/card/[card_image_id]` — game-scoped variant where applicable.
+
+### 3.5 Box EV
+
+Two columns `1fr | 330px`, stacking below 1080px.
+
+**Left — slot table.** Columns: rarity slot · `PER BOX` · `AVG PRICE` · `VALUE / BOX` · `WEIGHT`. Weight is the percentage plus a proportional bar (`--gain-2` fill, ink border) so concentration is scannable rather than read. MR and GMR together are ~49% of a box's value off 0.45 expected cards — the bars make that obvious at a glance.
+
+Column is named `VALUE / BOX`, not `EV CONTRIB`.
+
+**The BULK row has no rarity code.** `RarityBadge` returns null for null and falls back to `c-rar-c` for anything unrecognised — both wrong here. Render a plain text label (`R / UC / C bulk`) with no badge. Do not pass `'BULK'` to `RarityBadge`.
+
+**Right — summary.** Peach hero with opening EV, two comparison bars (box price at 100% ink, opening EV proportional in `--gain-2`), then sealed premium.
+
+Sign convention: **positive premium = box costs more than its contents.**
+
+The premium figure needs its plain-language read beneath it — the number is counterintuitive alone: *"The box trades 66% above what its cards are worth. Sealed is priced for scarcity, not contents."*
+
+**Behaviour:** sets with no `pull_rates` rows **hide the section entirely** — never render zeros. Any set with a `confidence = 'low'` slot gets a caution strip above the table.
+
+Footnote disclaimer is mandatory: estimates from community-sourced pull rates, not a guarantee of any individual box's contents.
+
+---
+
+## 4 — Dashboard
+
+Route `/games/[game]/terminal/sealed`, mirrored at `/terminal/sealed`.
+
+**Stat rail** — sealed index, breadth, top gainer, top loser. All recomputed from the active period.
+
+**Six ranking chips** — `TRENDING · VALUE RATIO · PRICE · SET VALUE · OFF ATH · RELEASE`. `RELEASE` reverses direction on second click, arrow updates.
+
+**Sticky metric column** showing `#rank` plus the active metric's value; header label follows the mode. Without it the sort order isn't legible in a week grid.
+
+**PERIOD toggle** `WEEKLY | MONTHLY` — changes the grid's time axis (W1–W12 vs M1–M12), cell deltas (W/W vs M/M), the table's delta columns (7D/30D/90D vs M/M / 3M / 12M), stat rail labels, and the legend.
+
+**VIEW toggle** `GRID | TABLE | CARDS` — **grid is default and stays default.** Persist the user's choice to `localStorage` so a returning user gets their last view; do not reorder the buttons.
+
+**Grid** — rows are products, columns are 12 periods, each cell is price plus step delta, background tinted by the delta capped at ±8%.
+
+**`VALUE RATIO` mode switches the grid's unit** — cells become the multiplier with box/set prices on a sub-line, and the metric column widens to a stacked `BOX / SET / RATIO` block.
+
+`CASES`, `DECKS`, and `JP` render disabled with `SOON` labels.
+
+Missing weeks render as em-dashes, **never zeros**. Exactly-zero deltas render `--ink-3`, **never green**.
+
+Sparklines in table view stay hand-rolled inline SVG — one chart.js instance per row is not worth it. chart.js is for the detail page's main chart only.
+
+---
+
+## 5 — Chrome
+
+### 5.1 Main nav — the real one
+
+`Nav.tsx` builds links per-game via `publicLinks(gameRouteSlug)`. The actual set:
+
+**Home · Markets · Catalog · Rarities · Sets · Characters**, plus a single **Sign in**.
+
+There is no PROMOS, no PORTFOLIO, no ALERTS, no search input, and no Login/Sign-Up pair. v1.1 invented those from the mockup. **Add one entry — `Terminal`, with the gradient `PRO` chip — and change nothing else.**
+
+Active state uses the existing `isActivePath(pathname, href, exact)`. `PublicNav` deliberately avoids `useSearchParams()` (it bails static prerender and causes CLS) — **do not introduce it**.
+
+### 5.2 Terminal sub-nav
+
+`Nav`'s variant union is `'public' | 'admin'` and it renders once in the root layout. Do not add a third variant.
+
+Build a separate **`TerminalSubNav`** component rendered by a layout at the terminal route segment, so it appears on `/terminal/*` only.
+
+Band: `SEALED · CHASE · MOVERS · SET INDEX · BOX EV`. Only `SEALED` routes anywhere for now; the rest render disabled.
+
+### 5.3 Tokens
+
+Two additions to `globals.css`:
+
+```css
+--line: #EEDFC8;
 --grad-terminal: linear-gradient(100deg,#1E7FA8 0%,#1C9C9C 40%,#1FAE86 72%,#3EC08A 100%);
 ```
 
-Links white at 86% (full white on hover), active underline `#FFD166`, `inset 0 1px 0 rgba(255,255,255,.28)` top highlight, 44px tall. The `PRO` chip in the main nav uses the same gradient so the chip and band read as one product. This is a **second** gradient in a system that reserved gradients for brand use — justified because Terminal is a separate paid surface, but it needs writing into the brand bible rather than living as a one-off.
+Use the repo's existing **`--gain-2` / `--loss-2`**. Do not add `--gain` / `--loss` aliases — one name per concept. The mockups use the short names throughout; every one needs rewriting during the port.
 
-**Container padding rule — this bit us on this page.** Any element wearing `.container` must use `padding-left` / `padding-right` and `margin-top` / `margin-bottom` **longhand only**. The shorthand silently resets the side padding to 0 and, worse, `margin: Xpx 0 Ypx` overwrites `.container`'s `margin: 0 auto`, so the section stops centering and hugs the viewport edge. Four rules on this page had it (`.crumbs`, `.hero`, `.footnote`, and `.stat-rail` on the dashboard) and it presented as a mysterious left-alignment bug.
+Sub-nav band: white links at 86%, full white on hover, active underline `#FFD166`, `inset 0 1px 0 rgba(255,255,255,.28)`, 44px tall. `PRO` chip uses the same gradient so chip and band read as one product.
+
+**`--grad-terminal` is a brand-system change**, not just a token add. The convention has been *gradient = brand only*. This introduces a second, scoped to the Terminal product surface. It's justified — Terminal is a separate paid surface and the blue-green marks it as a different space — but it belongs in the brand bible, not in a component file as a one-off. `mockups/README.md`'s conventions block needs the amendment.
+
+**Do not** add `.terminal-page` to any `body:has()` background rule. `globals.css:115`'s `body:has()` is a nav-offset rule, and `body` is already unconditionally cream at line 107. The v1.1 instruction was a no-op.
+
+The legacy dark shim (`<html className="dark">`, `--void`, `--surface`, `--owl…`) is pre-existing debt for `src/components/lens/*`. **Out of scope. Leave it alone.**
+
+### 5.4 Rarity chips — accept the divergence
+
+Use the repo's `RarityBadge` and its `.c-rar-*` classes.
+
+The mockups use an outline/tinted palette; the repo uses solid fill. Only MR matches. **The pages will not look like the mockups here, and that's the correct trade** — site-wide consistency beats matching a standalone mockup. If the outline palette is genuinely better, that's a separate site-wide change, not something Terminal does unilaterally.
+
+`RarityBadge` takes `{ rarity: string | null }` only — no `size`, `variant`, or `className`. Any sizing happens in the parent.
 
 ---
 
-## 4 — Ingestion
+## 6 — Page structure and data access
+
+Follow the existing three-file split exactly, as `/sets` does:
+
+```
+src/app/terminal/sealed/page.tsx                    → <SealedTrackerContent />
+src/app/games/[game]/terminal/sealed/page.tsx       → <SealedTrackerContent gameRouteSlug={params.game} />
+src/app/terminal/sealed/SealedTrackerContent.tsx    → server, calls loader, fallback/error
+src/app/terminal/sealed/SealedTrackerClient.tsx     → "use client", all interactivity
+src/app/terminal/sealed/load-sealed.ts              → all Supabase access
+src/app/terminal/sealed/terminal.css                → page-scoped, imported by the client
+```
+
+Same shape for `[productSlug]`.
+
+`page.tsx` carries `export const revalidate = 3600` and `generateStaticParams()` on the `[game]` variant, matching `/sets`.
+
+**Data access rules:**
+
+- `createCachedServiceClient()` from `@/lib/supabase-server` — **server-only, service role**. It must never be reachable from a client component. Service role bypasses RLS entirely.
+- Wrap every loader in `cachedPublicData(publicDataCacheKey(...), fn, CATALOG_DATA_TTL_SECONDS)`
+- Resolve game scope with `resolveGameScope(supabase, options.game, { defaultToOnePiece: true })`, throw on `gameResult.error`
+- Every query carries `.eq("game_id", game.id)` and `.eq("region", "en")`
+- Paginate with the manual `while(true)` + `.range()` loop at `pageSize = 1000`
+- Unwrap joins with `firstRelation()`
+
+---
+
+## 7 — Ingestion
 
 | Job | Cadence | Writes |
 |---|---|---|
 | `sealed-weekly-snapshot` | Sat 06:00 UTC | `sealed_weekly_prices` |
 | `set-value-rollup` | Sat 06:15 UTC | `set_weekly_values` |
 
-Run the rollup *after* the price snapshot so the ratio has both sides for the same `week_ending`. Both idempotent — re-running a week overwrites rather than duplicating.
+Rollup runs **after** the snapshot so value ratio has both sides for the same `week_ending`. Both idempotent — re-running a week overwrites rather than duplicating. `week_ending` is always the Saturday, UTC.
 
-JustTCG notes: auth header is `x-api-key`. Sealed products come back through the same `/cards` endpoint using `condition=Sealed` (or `S`); `/sets` exposes `sealed_count` for reconciliation. **Verify One Piece sealed coverage per plan before building the job** — confirm boxes and cases both return, and confirm sealed variants carry price history (`{p, t}` objects, Unix seconds). If history is missing, snapshots start accumulating from day one and the ALL timeframe stays short until enough weeks land.
+**Capture `sellers` from the first run.** JustTCG returns a current count and nothing stores it over time. Section 3.2's sellers column and 3.3's supply signal both depend on history that doesn't exist yet.
+
+JustTCG notes: auth header is `x-api-key`; `OP01-001` format returned natively; price history as `{p, t}` objects with Unix seconds; set slugs are full descriptive slugs.
+
+**Verify sealed coverage before building the jobs** — confirm boxes *and* cases return, and confirm sealed variants carry price history. If history is missing, snapshots accumulate from day one and the ALL timeframe stays short until enough weeks land.
 
 ---
 
-## 5 — Acceptance criteria
+## 8 — Acceptance criteria
 
-- `npm run lint` and `npm run build` clean
-- Chart renders correctly at all four timeframes with all four overlay combinations (none / SV / RT / both)
-- Overlay activation switches the axis to indexed mode; deactivating all overlays restores USD and the area fill
-- Hover tooltip works with mouse and touch, stays inside its container at both edges
-- Range bar marker lands correctly for a product at ATH (100%) and at ATL (0%)
-- Section 4 hides cleanly for a set with no `pull_rates` rows; low-confidence sets show the caution strip
-- Box EV total equals the sum of its slot contributions — no rounding drift in the totals row
-- `CHART | TABLE` toggle preserves the selected timeframe in both directions
-- Overlay buttons hidden in table mode, restored on return to chart
-- Box EV weight bars sum to 100% with no rounding drift
-- Top 10 tile names truncate rather than wrapping to a second line at every breakpoint
+- `npm run lint` passes
+- `npm run build` passes — note it runs `owl-lens:check-types` first, so unrelated lens type errors will gate this
+- `npm run audit:game-boundaries` passes
+- No `--gain` / `--loss` / `--line` references resolve to nothing — grep both pages for undefined custom properties
+- No service-role client reachable from any client component
+- Every new query carries `game_id` and `region` filters
+- Dashboard: 3 views × 2 periods × 6 ranking modes render without error
+- View preference persists across reload
+- Detail: 4 timeframes × 4 overlay combinations render; overlay activation switches the axis to indexed mode and deactivating all restores USD + area fill
+- `CHART | TABLE` preserves timeframe in both directions
+- Range bar marker correct at ATH (100%) and ATL (0%)
+- Box EV total equals the sum of slot contributions, no rounding drift; weights sum to 100%
+- Box EV hides cleanly for a set with no `pull_rates`; low-confidence sets show the caution strip
+- Top 10 names truncate rather than wrapping, at every breakpoint
 - Deltas: green above zero, red below, `--ink-3` at exactly zero
-- Mobile 380px: no horizontal page scroll; tables scroll within their own containers only
-- Cold-page LCP measured after deploy, per the standing PSI-retest rule. The hero art is the likely LCP element — make sure it isn't webfont-blocked.
+- Mobile 380px: no horizontal page scroll — tables scroll within their own containers only
+- Cold-page PSI after deploy, per the standing retest rule. Hero art is the likely LCP element on detail — confirm it isn't webfont-blocked
 
 ---
 
-## 6 — Open questions
+## 9 — Open questions
 
-1. **MSRP source.** No API provides it. Hardcode per product in `sealed_products`, admin-editable. Confirm the OP booster box figure — spec assumes $103.68 ($4.32 × 24).
-2. **`sellers` history.** JustTCG returns a current count; nothing stores it over time. Section 2.6's sellers column needs the snapshot job to persist it from week one.
-3. **Case products.** `product_type = 'case'` is in the schema but the dashboard has CASES disabled. Detail page should handle a case with `packs_per_unit = null` — hide the per-pack stat.
-4. **JP counterpart.** Once JP coverage is confirmed, the hero gains a `JP / EN` switch and the chart gains a JP overlay. Schema already supports it via `language`.
+1. **MSRP source.** No API provides it. Hand-maintained in `sealed_products`, admin-editable. Spec assumes $103.68 ($4.32 × 24) for standard boxes — confirm.
+2. **Case products.** `product_type = 'case'` is in the schema but CASES is disabled in the UI. Detail page must handle `packs_per_unit = null` by hiding the per-pack stat.
+3. **JP.** `region` already supports it. Once JP sealed coverage is confirmed, hero gains an EN/JP switch and the chart gains a JP overlay. No schema change needed.
+4. **Sub-nav placement.** `TerminalSubNav` needs a layout at the terminal segment — confirm this works cleanly with the `/games/[game]/…` mirror without duplicating the component.
 
 ---
 
-## 7 — Backlog: PSA graded data (not in v1)
+## 10 — Backlog: PSA graded data (not in v1)
 
-Deferred, but recorded so the schema isn't designed into a corner.
+Recorded so the schema isn't designed into a corner.
 
-**Two surfaces**
+**Two surfaces:** a set-level graded panel here (total pop, grade distribution, pop growth W/W — rising pop means singles supply is inflating, a real bear signal sealed price doesn't show), and per-card gem rate as a `GEM %` column in the top 10 with full breakdown on `/card/[id]`.
 
-1. **Set-level graded panel** on this page — total pop across the set, grade distribution, pop growth W/W. Rising pop means singles supply is inflating, which is a genuine bear signal the sealed price doesn't show.
-2. **Per-card gem rate** — a `GEM %` column in the Top 10 grid, full grade breakdown on `/card/[id]`.
-
-**Blocking decision: source.** PSA's public API covers cert verification and order status, not pop reports. Candidates, in order of preference:
+**Blocking decision — source.** PSA's public API covers cert verification and order status, not pop reports.
 
 | Option | Trade-off |
 |---|---|
-| Third-party aggregator (GemRate-style) | Paid, but structured and stable |
+| Third-party aggregator (GemRate-style) | Paid, structured, stable |
 | Scrape PSA pop report pages | Free, fragile, ToS exposure |
-| Cert-lookup crawl | Slow, incomplete coverage |
+| Cert-lookup crawl | Slow, incomplete |
 
-Pick before writing schema — the row shape differs materially between them.
+Pick before writing schema — row shape differs materially.
 
-**Design constraints**
-
-- **Pop is monotonic.** It only grows, so momentum requires snapshots. Start capturing from the first day the source lands, exactly as with `sellers`.
-- **Gem rate is submitter-biased.** People grade copies that already look clean, so a 45% gem rate is not a 45% population estimate. Label it as *submitted* gem rate, never implied population quality. This bias is the argument for Owl Pregrade — measured centering is the unbiased signal gem rate can't be.
-- Join on `card_image_id`, not `card_number` — parallels and alt-arts grade as distinct specs.
-
-**Sketch**
+**Design constraints.** Pop is monotonic, so momentum requires snapshots from the first day the source lands, same as `sellers`. Gem rate is **submitter-biased** — people grade copies that already look clean, so 45% gem rate is not a 45% population estimate. Label it *submitted* gem rate, never implied population quality. That bias is precisely the argument for Owl Pregrade: measured centering is the unbiased signal gem rate can't be.
 
 ```sql
 create table psa_pop_snapshots (
   card_image_id text not null,
+  game_id       <match> not null references games(id),
   psa_spec_id   text,
   week_ending   date not null,
   total_graded  int not null,
-  pop_10        int, pop_9 int, pop_8 int, pop_7 int, pop_6_and_below int,
+  pop_10 int, pop_9 int, pop_8 int, pop_7 int, pop_6_and_below int,
   source        text not null,
   primary key (card_image_id, week_ending)
 );
