@@ -27,6 +27,8 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
   const extras = await loadCardMarketExtras({
     gameId: core.data.game.id,
     cardId: core.data.card.id,
+    cardNumber: core.data.card.card_number,
+    variantLabel: core.data.card.variant_label,
   });
 
   return NextResponse.json(extras, { headers: PUBLIC_DATA_CACHE_HEADERS });

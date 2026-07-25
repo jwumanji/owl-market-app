@@ -29,12 +29,17 @@ export interface PriceStatsData {
   market_avg: number | null;
   tcg_market: number | null;
   ebay_avg: number | null;
+  ebay_low: number | null;
+  ebay_high: number | null;
   tcg_low: number | null;
   tcg_mid: number | null;
   tcg_high: number | null;
   chg_1d: number | null;
   chg_7d: number | null;
   chg_30d: number | null;
+  volume_7d: number | null;
+  volume_30d: number | null;
+  tcg_listings_count: number | null;
   ath: number | null;
   ath_date: string | null;
   atl: number | null;
@@ -52,6 +57,13 @@ export interface JpPriceData {
   price_jpy: number;
   snapshot_date: string;
   source_url: string | null;
+  card_name: string | null;
+  card_image_id: string | null;
+  variant: string | null;
+  rarity: string | null;
+  in_stock: boolean | null;
+  match_method: string | null;
+  comparison_match: "linked" | "counterpart";
 }
 
 export interface EbaySaleData {
