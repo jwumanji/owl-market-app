@@ -183,11 +183,11 @@ export const GAME_DEFINITIONS = {
     status: "active",
     capabilities: {
       catalog: "live",
-      markets: "preview",
-      pricing: "planned",
+      markets: "live",
+      pricing: "live",
       sets: "live",
       rarities: "live",
-      characters: "preview",
+      characters: "live",
       champions: "unsupported",
       franchises: "live",
       promos: "live",
@@ -206,9 +206,9 @@ export const GAME_DEFINITIONS = {
       justtcg: {
         provider: JUSTTCG_PROVIDER,
         sourceGameSlug: LORCANA_JUSTTCG_GAME_SLUG,
-        status: "seeded",
+        status: "active",
         notes:
-          "Read-only audit and exact TCGplayer product-ID reconciliation; price publication remains disabled.",
+          "Live preferred-finish pricing from unique exact TCGplayer product-ID matches; unmatched records remain quarantined.",
       },
     },
   },

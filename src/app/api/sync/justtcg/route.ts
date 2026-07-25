@@ -29,6 +29,7 @@ import {
   type JustTcgShadowPriceMatch,
 } from "@/lib/multitcg/justtcg-shadow-write";
 import { syncRiftboundJustTcg } from "./riftbound-sync";
+import { syncLorcanaJustTcg } from "./lorcana-sync";
 
 // Leave enough headroom for one provider set plus the catalog match preload.
 // Cursor mode is intentionally capped at one set per invocation below.
@@ -1567,6 +1568,7 @@ function addToBatch(
 async function syncPrices(request: Request) {
   const game = new URL(request.url).searchParams.get("game");
   if (game === "riftbound") return syncRiftboundJustTcg(request);
+  if (game === "lorcana") return syncLorcanaJustTcg(request);
   return syncOnePiecePrices(request);
 }
 

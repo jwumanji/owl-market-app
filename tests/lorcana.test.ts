@@ -16,6 +16,7 @@ import {
   matchLorcanaJustTcgSet,
   normalizeLorcanaColors,
   normalizeLorcanaJsonCard,
+  selectLorcanaPreferredMarketVariant,
   type LorcanaJsonCard,
 } from "../src/lib/games/lorcana.ts";
 import type { JustTCGCard, JustTCGSet } from "../src/lib/justtcg.ts";
@@ -222,6 +223,34 @@ test("Near Mint English finish variants remain separate", () => {
   );
 });
 
+test("Lorcana card-level markets prefer Normal and fall back for foil-only products", () => {
+  const normal = {
+    id: "normal",
+    condition: "Near Mint",
+    printing: "Normal",
+    language: "English",
+    price: 10,
+    lastUpdated: 100,
+  } as JustTCGCard["variants"][number];
+  const coldFoil = {
+    id: "cold-foil",
+    condition: "Near Mint",
+    printing: "Cold Foil",
+    language: "English",
+    price: 50,
+    lastUpdated: 200,
+  } as JustTCGCard["variants"][number];
+
+  assert.equal(
+    selectLorcanaPreferredMarketVariant(justTcgCard({ variants: [coldFoil, normal] }))?.id,
+    "normal"
+  );
+  assert.equal(
+    selectLorcanaPreferredMarketVariant(justTcgCard({ variants: [coldFoil] }))?.id,
+    "cold-foil"
+  );
+});
+
 test("JustTCG source identity prefers UUID and uses the latest variant timestamp", () => {
   const card = justTcgCard({
     variants: [
@@ -264,8 +293,9 @@ test("Lorcana public navigation follows the approved investor hierarchy", () => 
 
   assert.ok(lorcanaDefinition);
   assert.match(lorcanaDefinition, /isPublic: true/);
-  assert.match(lorcanaDefinition, /markets: "preview"/);
-  assert.match(lorcanaDefinition, /characters: "preview"/);
+  assert.match(lorcanaDefinition, /markets: "live"/);
+  assert.match(lorcanaDefinition, /pricing: "live"/);
+  assert.match(lorcanaDefinition, /characters: "live"/);
   assert.match(lorcanaDefinition, /sets: "live"/);
   assert.match(lorcanaDefinition, /franchises: "live"/);
   assert.match(lorcanaDefinition, /rarities: "live"/);

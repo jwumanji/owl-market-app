@@ -25,6 +25,10 @@
       "schedule": "35 4 * * *"
     },
     {
+      "path": "/api/sync/justtcg?game=lorcana",
+      "schedule": "45 * * * *"
+    },
+    {
       "path": "/api/sync/justtcg-history?game=one_piece&maxSets=1&historyDuration=1y",
       "schedule": "30 7 * * *"
     },

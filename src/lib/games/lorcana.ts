@@ -419,6 +419,31 @@ export function eligibleLorcanaMarketVariants(card: JustTCGCard): JustTCGVariant
   );
 }
 
+/**
+ * Select the single compatibility price used by today's card-level market
+ * surfaces while every eligible finish remains preserved in raw ingestion.
+ * Normal is the baseline when it exists; foil-only products fall back to the
+ * provider's collectible finish in a deterministic order.
+ */
+export function selectLorcanaPreferredMarketVariant(
+  card: JustTCGCard
+): JustTCGVariant | null {
+  const eligible = eligibleLorcanaMarketVariants(card);
+  const printingOrder = ["normal", "cold foil", "holofoil"];
+
+  for (const printing of printingOrder) {
+    const candidates = eligible
+      .filter((variant) => variant.printing.trim().toLowerCase() === printing)
+      .sort((left, right) => (right.lastUpdated ?? 0) - (left.lastUpdated ?? 0));
+    if (candidates[0]) return candidates[0];
+  }
+
+  return [...eligible].sort((left, right) => {
+    const printing = left.printing.localeCompare(right.printing);
+    return printing || (right.lastUpdated ?? 0) - (left.lastUpdated ?? 0);
+  })[0] ?? null;
+}
+
 export function justTcgLorcanaCardExternalId(card: JustTCGCard): string | null {
   return card.uuid?.trim() || card.id?.trim() || null;
 }
