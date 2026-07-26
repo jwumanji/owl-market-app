@@ -1,20 +1,17 @@
--- OWL Market — v49 follow-up: remove redundant sealed price-history indexes
+-- OWL Market — follow-up to 20260726143000: remove redundant sealed
+-- price-history indexes
 --
 -- ############################################################################
--- ## DO NOT APPLY YET. FILENAME IS PROVISIONAL.                             ##
--- ##                                                                        ##
--- ## The root schema-migration-v*.sql convention is frozen at v48; every     ##
--- ## migration since 2026-07-14 lives in supabase/migrations/ with a         ##
--- ## timestamped name. This file uses the OLD convention only so it sits     ##
--- ## beside v49 until the naming question is settled. Rename to something    ##
--- ## like 20260726HHMMSS_terminal_sealed_index_cleanup.sql once the          ##
--- ## supabase_migrations tracking question is answered.                      ##
+-- ## NEVER APPLIED. This file has NO tracking row and must not get one --    ##
+-- ## `supabase db push` should pick it up and record it normally. Inserting  ##
+-- ## a row for it by hand would permanently skip it.                         ##
 -- ############################################################################
 --
 -- WHY
 --
--- v49 was written from live-database introspection without knowing which
--- migration created sealed_product_price_history. That table comes from
+-- 20260726143000_terminal_sealed.sql (originally schema-migration-v49) was
+-- written from live-database introspection without knowing which migration
+-- created sealed_product_price_history. That table comes from
 -- supabase/migrations/20260714153000_sealed_product_tracking.sql, which is not
 -- on main -- so two of v49's additions duplicate work already there.
 --

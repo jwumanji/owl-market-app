@@ -39,7 +39,7 @@ Five sections on the detail page, one dashboard.
 | Phase | Deliverable | Blocked on |
 |---|---|---|
 | A | Tokens + Terminal shell + sub-nav | nothing |
-| B | Migration v49 (3 ALTERs + 1 new table) | hand-application, no DDL via client |
+| B | Migration `20260726143000` (3 ALTERs + 1 new table) | hand-application, no DDL via client |
 | C | Sealed price job + cron + catalog reconcile | nothing — coverage confirmed, set-value job already exists |
 | D | Dashboard | B, C |
 | E | Detail §3.1 hero + §3.2 price history | D |
@@ -60,9 +60,11 @@ All four new tables therefore carry `game_id`. Match the column type used by `ca
 
 `region` follows the v45 convention (`'en'`, `'jp'`), lowercase. There is no `language` column anywhere in this codebase and we are not introducing a second vocabulary.
 
-### 2.2 Migration v49
+### 2.2 Migration `20260726143000_terminal_sealed`
 
-**This is v49, not v46.** v46 (`character-price-index`), v47 (`character-links`) and v48 (`nullable-price-changes`) were all written on 2026-07-12 and are all applied to the live database. Head is v48. There is no backlog of unapplied migrations — v44 `jp_prices` and v45 `region-aware-cards` are live too (7,740 and 373 rows respectively).
+**Filenames.** This shipped as `supabase/migrations/20260726143000_terminal_sealed.sql`, with a follow-up at `20260726150000_terminal_sealed_index_cleanup.sql`. Both were originally written under the root convention as v49 and v50, and **"v49" / "v50" below are shorthand for those two files.** The root `schema-migration-v*.sql` convention is frozen at v48; the live convention is timestamped files in `supabase/migrations/`. See `CLAUDE.md` §2.
+
+**It was never "v46".** v46 (`character-price-index`), v47 (`character-links`) and v48 (`nullable-price-changes`) were all written on 2026-07-12 and are all applied. Root head is v48, and there is no backlog — v44 `jp_prices` and v45 `region-aware-cards` are live too (7,740 and 373 rows respectively). The spec's original "v46" claim came from reading root migrations on `main` and never checking `supabase/migrations/` on the deployed branch, which is also what caused the duplicate index this migration had to walk back.
 
 There is no DDL access through the Supabase client. This migration is hand-applied via the SQL editor.
 
@@ -82,7 +84,7 @@ There is no DDL access through the Supabase client. This migration is hand-appli
 **`game_id` is `uuid`**, `references public.games(id) on delete restrict` — confirmed against `cards.game_id`, not assumed.
 
 ```sql
--- schema-migration-v49-terminal-sealed.sql  (abridged; see the file for the
+-- supabase/migrations/20260726143000_terminal_sealed.sql  (abridged; see the file for the
 -- idempotency guards, comments, constraints and verification block)
 
 -- 1. sealed_products — extend the live table
