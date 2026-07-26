@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import ArticleCard from "@/components/articles/ArticleCard";
+import type { ArticleSummary } from "@/lib/articles";
 import { gamePath } from "@/lib/game-routes";
 import {
   rankBoosterBoxesByPrice,
@@ -24,37 +26,6 @@ import "./market-dashboard.css";
 
 const WINDOWS: MarketWindow[] = ["1D", "7D", "90D"];
 type SetRankingMode = "booster_box" | "tsv";
-
-const NEWS = [
-  {
-    slug: "op16-round-one-reveals",
-    title: "Round 1 cards revealed — OP16 first look",
-    category: "reveal",
-    hero_image_url: null,
-    published_at: "2026-07-14",
-  },
-  {
-    slug: "regional-market-movers",
-    title: "Top regional cards: what won and what it did to prices",
-    category: "market",
-    hero_image_url: null,
-    published_at: "2026-07-11",
-  },
-  {
-    slug: "one-piece-day-2026",
-    title: "One Piece Day 2026 — full reveal schedule",
-    category: "event",
-    hero_image_url: null,
-    published_at: "2026-07-08",
-  },
-  {
-    slug: "op16-secret-rare",
-    title: "Round 2 cards revealed — secret rare chase confirmed",
-    category: "release",
-    hero_image_url: null,
-    published_at: "2026-07-05",
-  },
-] as const;
 
 function WindowSelector<T>({
   data,
@@ -170,7 +141,15 @@ function SeeAll({ href, children }: { href: string; children: React.ReactNode })
   );
 }
 
-function NewsSection() {
+export function MarketNewsSection({
+  articles,
+  gameRouteSlug,
+}: {
+  articles: ArticleSummary[];
+  gameRouteSlug?: string | null;
+}) {
+  const archiveHref = gamePath(gameRouteSlug, "/news");
+
   return (
     <section className="qd-section" aria-labelledby="quickdash-news">
       <div className="qd-section-head">
@@ -180,37 +159,27 @@ function NewsSection() {
             Events &amp; <em>news</em>
           </h2>
         </div>
-        <Link href="/news" className="qd-see-all qd-see-all-top" prefetch={false}>
+        <Link href={archiveHref} className="qd-see-all qd-see-all-top" prefetch={false}>
           See more stories <span aria-hidden="true">→</span>
         </Link>
       </div>
 
-      <div className="qd-news-grid">
-        {NEWS.map((article, index) => (
-          <Link
-            key={article.slug}
-            href={`/news/${article.slug}`}
-            className="qd-news-card"
-            prefetch={false}
-          >
-            <div className={`qd-news-image qd-art-${index + 1}`}>
-              <span>Article hero</span>
-            </div>
-            <div className="qd-news-body">
-              <span className={`qd-news-tag ${article.category}`}>{article.category}</span>
-              <span className="qd-news-title">{article.title}</span>
-              <time className="qd-news-date" dateTime={article.published_at}>
-                {new Intl.DateTimeFormat("en-US", {
-                  month: "short",
-                  day: "2-digit",
-                  year: "numeric",
-                  timeZone: "UTC",
-                }).format(new Date(`${article.published_at}T00:00:00Z`))}
-              </time>
-            </div>
-          </Link>
-        ))}
-      </div>
+      {articles.length > 0 ? (
+        <div className="qd-news-grid">
+          {articles.map((article, index) => (
+            <ArticleCard
+              key={article.id}
+              article={article}
+              accentIndex={index}
+              href={gamePath(gameRouteSlug, `/news/${article.slug}`)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="qd-news-empty">
+          The first story for this game is being prepared.
+        </div>
+      )}
     </section>
   );
 }
@@ -684,14 +653,16 @@ function RaritySection({ data, gameRouteSlug }: { data: DashboardData; gameRoute
 
 export default function MarketDashboard({
   data,
+  articles,
   gameRouteSlug,
 }: {
   data: DashboardData;
+  articles: ArticleSummary[];
   gameRouteSlug?: string | null;
 }) {
   return (
     <div className="qd-dashboard">
-      <NewsSection />
+      <MarketNewsSection articles={articles} gameRouteSlug={gameRouteSlug} />
       <TrendingSection data={data} gameRouteSlug={gameRouteSlug} />
       <TopCardsSection data={data} gameRouteSlug={gameRouteSlug} />
       <SetsSection data={data} gameRouteSlug={gameRouteSlug} />
