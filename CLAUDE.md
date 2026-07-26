@@ -184,9 +184,9 @@ Populated by DB function `capture_market_index_snapshots(p_game_id, p_snapshot_d
 
 Returns `OP01-001` format natively. Price history as `{p, t}` objects, Unix seconds. Set slugs are full descriptive slugs. `/sets` exposes `sealed_count`.
 
-Sealed coverage (probed 2026-07-26): 364 products via `condition=Sealed`, of which 86 booster boxes, 29 cases, 168 packs, 52 starter decks. **354/364 carry `{p,t}` daily history, median 90 points.** Full catalog + history costs **4 requests**.
+Sealed coverage (probed 2026-07-26; corrected 2026-07-27): 364 products via `condition=Sealed`. The earlier "86 booster boxes vs our 23" gap was a name-classification artifact in the probe — the live catalog is complete, **0 boxes missing** (`docs/investigations/sealed-catalog-reconcile.md`). **354/364 carry `{p,t}` daily history, median 90 points — but only with `priceHistoryDuration=90d`.** The param is **`priceHistoryDuration`**; the previously probed `historyDuration` is not recognized and silently falls back to a ~7-day window. Full catalog + history costs **4 requests**.
 
-Three constraints: the **`1y` duration param is broken** (returns ~7 points only days old — ~90 days is the hard ceiling); **no `sellers` / `listings` / `quantity` field exists** on sealed variants; per-product `lastUpdated` ranges from today back nearly a year, so **gate writes on it** or you manufacture flat history that reads as real market data.
+Three constraints: **history beyond 90 days is unavailable** — `priceHistoryDuration=1y` degrades to ~7 recent points (re-verified 2026-07-27 with the correct param name), so ~90 days remains the hard ceiling; **no `sellers` / `listings` / `quantity` field exists** on sealed variants; per-product `lastUpdated` ranges from today back nearly a year, so **gate writes on it** or you manufacture flat history that reads as real market data.
 
 **eBay** — there is no usable official API for sold comps:
 
