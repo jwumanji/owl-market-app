@@ -4,6 +4,33 @@
 **Probe scripts:** `C:\tmp` (run in a separate session; not committed to this repo)
 **Status:** answers the open questions in `moon-terminal-sealed-spec.md` §7
 
+> **CORRECTIONS — 2026-07-27, from Phase C execution.** Four claims below are
+> superseded; the sections are left as written for the record.
+>
+> 1. **§2 — the param name was wrong, but the conclusion survives.** The history
+>    param is **`priceHistoryDuration`**; `historyDuration` is not recognized, so
+>    §2's "1y" probe was actually measuring the silent ~7-day default. Re-probed
+>    2026-07-27 with the correct name: `=90d` returns the full 90 daily points;
+>    `=1y` still degrades to ~7 recent points. **~90 days remains the hard
+>    ceiling**; 30D/90D launch scope is unchanged. "4 requests, median 90 points"
+>    holds **only** with `priceHistoryDuration=90d` explicitly set.
+> 2. **§4 — the 86-vs-23 box gap was a probe artifact, not a real gap.** "86" was
+>    a name-match (`box|display` minus `case`) that swept in starter-deck, tin and
+>    deck-set displays. Matching the full 364-product feed on `justtcg_id`:
+>    358/364 already had live rows, every real API booster box is present, and the
+>    6 genuinely-new products all postdate the 07-14 catalog sync. The catalog was
+>    neither stale nor filtered. Full diff: `sealed-catalog-reconcile.md`.
+> 3. **§8 — the reconstruction method is blocked; the cutoff-skew explanation is
+>    falsified.** Matching the capture run's exact cutoff does NOT remove the
+>    residual. Root cause: `price_history` and `price_stats` record different
+>    variants' prices for a class of promo/prize cards (5–700× disagreement), and
+>    the capture function sums `price_stats` while the reconstruction sums
+>    `price_history`. Worst set delta +33%. Zero rows were backfilled; three
+>    candidate corrections await a decision. Full evidence:
+>    `investigations/set-value-backfill.md`.
+> 4. **§5 — the sealed table now has a scheduled writer**: `/api/sync/sealed-prices`,
+>    daily 06:10 UTC via `config/game-sync-jobs.json` (Phase C), pending deploy.
+
 This file exists because these results were derived once, in another session's
 scrollback, and would otherwise have to be re-derived. Items 1–3 are from the JustTCG
 API probe. Items 4–6 are from live-database recon done while writing migration v49.
