@@ -207,6 +207,7 @@ async function loadCardHistoryUncached(options: {
 // Raw averages blend Buy-It-Now and auctions; graded copies are a different
 // market entirely, so the split (never a blend) is computed in ebay-stats.
 const EBAY_STATS_WINDOW_DAYS = 90;
+const EBAY_WEEK_WINDOW_DAYS = 7;
 
 async function loadCardMarketExtrasUncached(options: {
   gameId: string;
@@ -217,6 +218,9 @@ async function loadCardMarketExtrasUncached(options: {
   const supabase = createCachedServiceClient(CATALOG_DATA_TTL_SECONDS);
   const statsSinceIso = new Date(
     Date.now() - EBAY_STATS_WINDOW_DAYS * 86400000
+  ).toISOString();
+  const weekSinceIso = new Date(
+    Date.now() - EBAY_WEEK_WINDOW_DAYS * 86400000
   ).toISOString();
 
   // Errors degrade to empty (data ?? []) — the page hides the blocks rather
@@ -243,7 +247,7 @@ async function loadCardMarketExtrasUncached(options: {
       .from("ebay_sales")
       // grade + title feed the tier split (Black Label / Pristine live only
       // in the title text).
-      .select("sale_price, sale_type, grader, grade, title")
+      .select("sale_price, sale_type, grader, grade, title, sold_at")
       .eq("game_id", options.gameId)
       .eq("card_id", options.cardId)
       .not("sale_price", "is", null)
@@ -278,10 +282,18 @@ async function loadCardMarketExtrasUncached(options: {
     }
   }
 
+  const ebayWindowRows = (windowRes.data ?? []) as Array<
+    EbaySaleForStats & { sold_at: string | null }
+  >;
+  const ebayWeekRows = ebayWindowRows.filter(
+    (sale) => sale.sold_at != null && sale.sold_at >= weekSinceIso
+  );
+
   return {
     jpPrice: jpPrice ? { ...jpPrice, comparison_match: comparisonMatch } : null,
     ebayRecent: (recentRes.data ?? []) as EbaySaleData[],
-    ebayStats: computeEbayAvgStats((windowRes.data ?? []) as EbaySaleForStats[]),
+    ebayWeekStats: computeEbayAvgStats(ebayWeekRows),
+    ebayStats: computeEbayAvgStats(ebayWindowRows),
   };
 }
 
@@ -291,11 +303,11 @@ export function loadCardMarketExtras(options: {
   cardNumber: string | null;
   variantLabel: string | null;
 }): Promise<CardMarketExtrasPayload> {
-  // v3: plain-10 tier split by grader (PSA_10/BGS_10/OTHER_10) — bump the
+  // v5: adds a distinct seven-day exact-printing sold summary. Bump the
   // version on every payload shape change or unstable_cache serves the old
   // shape stale.
   return cachedPublicData(
-    publicDataCacheKey("card-extras-v4", options.gameId, options.cardId),
+    publicDataCacheKey("card-extras-v5", options.gameId, options.cardId),
     () => loadCardMarketExtrasUncached(options),
     CATALOG_DATA_TTL_SECONDS
   );

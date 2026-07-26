@@ -80,6 +80,7 @@ export interface EbaySaleData {
 export interface CardMarketExtrasPayload {
   jpPrice: JpPriceData | null;
   ebayRecent: EbaySaleData[];
+  ebayWeekStats: EbayAvgStats;
   ebayStats: EbayAvgStats;
 }
 
