@@ -677,11 +677,12 @@
   align-items: center;
   justify-content: center;
   height: 168px;
-  background: #fff;
+  background: var(--bg-3);
 }
 
 .qd-rarity-image .qd-image {
-  object-fit: contain;
+  object-fit: cover;
+  object-position: center 20%;
 }
 
 .qd-rarity-top-card {
