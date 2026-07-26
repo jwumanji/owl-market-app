@@ -32,6 +32,7 @@ type PublicNavLink = {
 function publicLinks(gameRouteSlug: string): PublicNavLink[] {
   return [
     { label: "Markets", href: gamePath(gameRouteSlug, "/markets") },
+    { label: "News", href: gamePath(gameRouteSlug, "/news") },
     { label: "Characters", href: gamePath(gameRouteSlug, "/characters") },
     { label: "Sets", href: gamePath(gameRouteSlug, "/sets") },
     { label: "Rarities", href: gamePath(gameRouteSlug, "/rarities") },
@@ -46,6 +47,7 @@ function adminLinks(gameSlug: string): NavLink[] {
 
   return [
     { label: "Inventory", href: `/admin/inventory?game=${game}` },
+    { label: "Stories", href: `/admin/articles?game=${game}` },
     { label: "Bundles", href: `/admin/bundles?game=${game}` },
     { label: "Orders", href: `/admin/orders?game=${game}` },
     { label: "Lens", href: "/admin/lens" },

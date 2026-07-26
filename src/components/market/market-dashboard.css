@@ -221,6 +221,17 @@
   gap: 16px;
 }
 
+.qd-news-empty {
+  padding: 34px 20px;
+  border: 1.5px dashed var(--ink-3);
+  border-radius: var(--r-md);
+  color: var(--ink-2);
+  background: var(--bg-2);
+  font-family: var(--font-space-grotesk-stack);
+  font-size: 14px;
+  text-align: center;
+}
+
 .qd-news-card,
 .qd-market-card,
 .qd-rarity-card {

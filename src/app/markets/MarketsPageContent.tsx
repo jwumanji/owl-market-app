@@ -4,7 +4,8 @@ import { loadCachedCharacterIndex } from "@/app/characters/characters-index-data
 import { loadRarities } from "@/app/rarities/load-rarities";
 import { RARITY_INDEX_SLUGS } from "@/app/rarities/rarities-data";
 import { getSetImageUrl } from "@/app/sets/set-images";
-import MarketDashboard from "@/components/market/MarketDashboard";
+import MarketDashboard, { MarketNewsSection } from "@/components/market/MarketDashboard";
+import { loadPublishedArticles } from "@/lib/articles";
 import { gamePath } from "@/lib/game-routes";
 import { characterIndexMarketRanking } from "@/lib/market-characters";
 import { marketRarityRanking } from "@/lib/market-rarities";
@@ -173,6 +174,7 @@ async function renderMarketsPageContent({
     sealedRes,
     topEbaySalesRes,
     catalogCountRes,
+    newsRes,
   ] = await Promise.all([
     cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "top-value-cards"), async () =>
       await supabase
@@ -269,6 +271,7 @@ async function renderMarketsPageContent({
         .eq("game_id", game.id)
         .eq("region", "en")
     ),
+    loadPublishedArticles(supabase, game.id, 4),
   ]);
 
   const topValueCards = mapDashboardCards(topValueCardsRes.data)
@@ -286,8 +289,9 @@ async function renderMarketsPageContent({
   if (topValueCards.length === 0 && (catalogCountRes.count ?? 0) > 0) {
     return (
       <div className="qd-page-shell">
-        <section className="qd-page-container">
-          <div className="rounded-c-md border-[1.5px] border-ink bg-bg-2 p-8">
+        <div className="qd-page-container">
+          <MarketNewsSection articles={newsRes.data} gameRouteSlug={game.routeSlug} />
+          <section className="rounded-c-md border-[1.5px] border-ink bg-bg-2 p-8">
             <div className="mb-3 font-mono-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-2">
               Catalog preview · Pricing pending
             </div>
@@ -303,8 +307,8 @@ async function renderMarketsPageContent({
             >
               Open catalog
             </Link>
-          </div>
-        </section>
+          </section>
+        </div>
       </div>
     );
   }
@@ -414,7 +418,11 @@ async function renderMarketsPageContent({
   return (
     <div className="qd-page-shell">
       <div className="qd-page-container">
-        <MarketDashboard data={dashboardData} gameRouteSlug={game.routeSlug} />
+        <MarketDashboard
+          data={dashboardData}
+          articles={newsRes.data}
+          gameRouteSlug={game.routeSlug}
+        />
       </div>
     </div>
   );
