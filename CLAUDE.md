@@ -66,7 +66,14 @@ List `supabase/migrations/` **on the deployed branch** and grep it for the table
 
 ## 3 · What PostgREST cannot see
 
-The service client reads tables and nine predefined RPCs. It **cannot** see indexes, constraints, RLS policies, function bodies, triggers, or `cron.job`. Any claim about those needs SQL run by the user in the editor.
+The service client reads tables and a small set of predefined RPCs — **enumerate them, never assume a count; Codex adds functions.** List them from the OpenAPI document rather than from memory or from this file:
+
+```bash
+curl -s "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+  | jq -r '.paths | keys[] | select(startswith("/rpc/"))'
+```
+
+It **cannot** see indexes, constraints, RLS policies, function bodies, triggers, or `cron.job`. Any claim about those needs SQL run by the user in the editor.
 
 Error-code tell for "did my migration apply":
 
