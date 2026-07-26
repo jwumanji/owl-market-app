@@ -323,15 +323,25 @@ Sparklines in table view stay hand-rolled inline SVG — one chart.js instance p
 
 ## 5 — Chrome
 
-### 5.1 Main nav — the real one
+### 5.1 Main nav — three different navs, pending the trunk call
 
-`Nav.tsx` builds links per-game via `publicLinks(gameRouteSlug)`. The actual set:
+**The nav is not settled and this section cannot be finalised until the trunk is.** Three live branches ship three different `publicLinks`:
 
-**Home · Markets · Catalog · Rarities · Sets · Characters**, plus a single **Sign in**.
+| Branch | Public links |
+|---|---|
+| `main` (`b0c10f1`) | Home · Markets · Catalog · Rarities · Sets · Characters |
+| `codex/market-index-snapshots` — **currently deployed** | Markets · Characters · Sets · Rarities · Japan Market *(soon)* · eBay Sales *(soon)* · All Cards *(divider)* |
+| `codex/lorcana-data-live` | capability-driven off `src/lib/games/registry.ts`: Markets · Champions · Characters · Sets · Franchises · Rarities · Promos |
 
-There is no PROMOS, no PORTFOLIO, no ALERTS, no search input, and no Login/Sign-Up pair. v1.1 invented those from the mockup. **Add one entry — `Terminal`, with the gradient `PRO` chip — and change nothing else.**
+Earlier drafts asserted main's list as "the real one" and that "there is no PROMOS". That was recon against `main`, which is not what production runs. Do not trust it.
 
-Active state uses the existing `isActivePath(pathname, href, exact)`. `PublicNav` deliberately avoids `useSearchParams()` (it bails static prerender and causes CLS) — **do not introduce it**.
+**What holds across all three:**
+
+- Both non-`main` variants replace `NavLink` with a **`PublicNavLink`** type carrying `status?: "coming-soon"` and `divider?: boolean`. Phase A's `chip?: string` was added to `NavLink` and must be re-added to `PublicNavLink` on whichever branch wins.
+- `codex/lorcana-data-live` already declares a **`sealedProducts` capability** in the registry. On that branch the Terminal link should be a `capabilityLink(game, "Terminal", "/terminal/sealed", game.capabilities.sealedProducts)` rather than a literal — which correctly hides it for games without sealed data, instead of the hardcoded entry Phase A added.
+- Active state uses the existing `isActivePath(pathname, href, exact)`. `PublicNav` deliberately avoids `useSearchParams()` (it bails static prerender and causes CLS) — **do not introduce it**.
+
+Phase A's Nav change is therefore **provisional**. It conflicts with both non-`main` branches (see the Phase A commit and the trunk report) and must be re-authored, not merged, once the trunk exists.
 
 ### 5.2 Terminal sub-nav
 
@@ -390,6 +400,8 @@ Same shape for `[productSlug]`.
 **Data access rules:**
 
 - `createCachedServiceClient()` from `@/lib/supabase-server` — **server-only, service role**. It must never be reachable from a client component. Service role bypasses RLS entirely.
+
+- **`market_index_snapshots` is service-role-only and this is load-bearing, not incidental.** Its migration runs `revoke all on table public.market_index_snapshots from anon, authenticated` — unlike `pull_rates` (v49), which is public-read. Set value and Value Ratio therefore **cannot** be fetched from a client component or any anon-key path; they must be resolved server-side in `load-sealed.ts` and passed down as props. Our loaders already use `createCachedServiceClient`, so today's code is correct — this is written down so a later "just fetch it on the client" refactor fails review rather than silently returning empty for every visitor. The same applies to any future `/api/` route serving this data: it must not proxy the raw table to an unauthenticated caller.
 - Wrap every loader in `cachedPublicData(publicDataCacheKey(...), fn, CATALOG_DATA_TTL_SECONDS)`
 - Resolve game scope with `resolveGameScope(supabase, options.game, { defaultToOnePiece: true })`, throw on `gameResult.error`
 - Every query carries `.eq("game_id", game.id)` and `.eq("region", "en")`
