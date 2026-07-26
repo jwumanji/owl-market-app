@@ -10,6 +10,14 @@
       "schedules": ["0 0 * * *", "0 6 * * *", "0 12 * * *", "0 18 * * *"]
     },
     {
+      "id": "one_piece.justtcg.sealed_prices",
+      "game": "one_piece",
+      "provider": "justtcg",
+      "kind": "pricing",
+      "path": "/api/sync/sealed-prices?game=one_piece",
+      "schedules": ["10 6 * * *"]
+    },
+    {
       "id": "riftbound.justtcg.incremental",
       "game": "riftbound",
       "provider": "justtcg",
