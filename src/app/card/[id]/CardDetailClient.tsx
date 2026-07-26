@@ -13,6 +13,7 @@ import type {
   EbaySaleData,
   JpPriceData,
   PricePoint,
+  PriceStatsData,
 } from "./card-detail-types";
 
 const PERIODS = ["7d", "1m", "3m", "1y", "max"] as const;
@@ -275,6 +276,15 @@ export default function CardDetailClient({
       ? ((currentPrice - recordedLow) / recordedLow) * 100
       : overview.growthFromLow;
   const verifiedSales = extras?.ebayRecent.length ?? 0;
+  const hasWeeklyEbayRaw = (extras?.ebayWeekStats.rawCount ?? 0) > 0;
+  const ebayRawAverage = hasWeeklyEbayRaw
+    ? extras?.ebayWeekStats.rawAvg ?? null
+    : extras?.ebayStats.rawAvg ?? null;
+  const ebayRawCount = hasWeeklyEbayRaw
+    ? extras?.ebayWeekStats.rawCount ?? 0
+    : extras?.ebayStats.rawCount ?? 0;
+  const jpMarketPrice = extras?.jpPrice ?? null;
+  const jpUsd = jpMarketPrice ? jpMarketPrice.price_jpy / JPY_PER_USD : null;
   const marketConfidence = getMarketConfidence({
     observedAt,
     sampleCount: overview.sampleCount,
@@ -350,23 +360,49 @@ export default function CardDetailClient({
               {set && <DarkChip>{set.code} {set.name}</DarkChip>}
             </div>
 
-            <div className="mt-9 flex flex-wrap items-end justify-between gap-5 border-b border-ink/15 pb-7">
-              <div>
-                <div className="font-mono-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-3">
-                  {priceStats?.tcg_market != null ? "TCG market quote" : "Market reference"}
-                </div>
-                <div className="mt-2 font-mono-2 text-[48px] font-semibold leading-none tracking-[-0.045em] text-ink sm:text-[66px]">
-                  {formatMarketPrice(currentPrice)}
-                </div>
+            <div className="mt-8 grid gap-px overflow-hidden rounded-[18px] bg-ink/10 sm:grid-cols-3">
+              <MarketQuoteCard
+                eyebrow="TCGplayer"
+                label="Market price"
+                value={formatMarketPrice(currentPrice)}
+                detail={observedAt ? `Observed ${formatDate(observedAt)}` : "No quote timestamp"}
+                accent="coral"
+              />
+              <MarketQuoteCard
+                eyebrow="eBay"
+                label={hasWeeklyEbayRaw ? "7D sold average" : "Recent sold average"}
+                value={extrasLoaded ? formatMarketPrice(ebayRawAverage) : "Checking…"}
+                detail={
+                  extrasLoaded
+                    ? ebayRawCount > 0
+                      ? `${ebayRawCount} exact-printing raw sold${ebayRawCount === 1 ? "" : "s"}`
+                      : "No exact-printing raw solds"
+                    : "Loading verified solds"
+                }
+                accent="gold"
+              />
+              <MarketQuoteCard
+                eyebrow="Japan"
+                label="Yuyu-tei price"
+                value={extrasLoaded && jpMarketPrice ? formatJpy(jpMarketPrice.price_jpy) : extrasLoaded ? "—" : "Checking…"}
+                detail={
+                  extrasLoaded && jpMarketPrice
+                    ? `≈ ${formatMarketPrice(jpUsd)} USD · ${formatDate(jpMarketPrice.snapshot_date)}`
+                    : extrasLoaded
+                      ? "No verified counterpart"
+                      : "Loading Japanese market"
+                }
+                accent="blue"
+              />
+            </div>
+
+            <div className="mt-5 flex flex-wrap items-start justify-between gap-4 border-b border-ink/15 pb-5">
+              <div className="font-mono-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-3">
+                Market read
               </div>
-              <div className="max-w-[330px] text-right">
-                <div className="font-mono-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-3">
-                  Market read
-                </div>
-                <p className="mt-2 font-grotesk text-[15px] font-medium leading-relaxed text-ink-2">
-                  {marketConfidence.summary}
-                </p>
-              </div>
+              <p className="max-w-[600px] font-grotesk text-[13px] font-medium leading-relaxed text-ink-2 sm:text-right">
+                {marketConfidence.summary}
+              </p>
             </div>
 
             <div className="grid gap-px overflow-hidden rounded-[16px] bg-ink/10 sm:grid-cols-3">
@@ -501,12 +537,16 @@ export default function CardDetailClient({
           index="03"
           eyebrow="Markets & evidence"
           title="What buyers are actually paying elsewhere."
-          description="Regional pricing and exact-printing sales are kept separate so a cheaper variant never contaminates the investment case."
+          description="TCGplayer quotes, exact-printing eBay solds, and Japanese pricing stay separate so every number keeps its market context."
         />
         <MarketEvidence
           extras={extras}
           loaded={extrasLoaded}
           enMarketPrice={currentPrice}
+          priceStats={priceStats}
+          priceHistory={priceHistory}
+          observedAt={observedAt}
+          syntheticHistory={history?.priceHistorySynthetic ?? false}
         />
       </section>
     </section>
@@ -548,6 +588,44 @@ function HeroFact({
       <div className="font-mono-2 text-[9px] font-semibold uppercase tracking-[0.13em] text-ink-3">{label}</div>
       <div className="mt-2 font-mono-2 text-[15px] font-semibold text-ink">{value}</div>
       <div className="mt-1 font-grotesk text-[11px] text-ink-3">{foot}</div>
+    </div>
+  );
+}
+
+function MarketQuoteCard({
+  eyebrow,
+  label,
+  value,
+  detail,
+  accent,
+}: {
+  eyebrow: string;
+  label: string;
+  value: string;
+  detail: string;
+  accent: "coral" | "gold" | "blue";
+}) {
+  const accentClass = {
+    coral: "bg-coral",
+    gold: "bg-gold",
+    blue: "bg-[#1F47A1]",
+  }[accent];
+
+  return (
+    <div className="relative bg-white/65 p-4 sm:p-5">
+      <span className={`absolute inset-x-0 top-0 h-1 ${accentClass}`} />
+      <div className="font-mono-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-ink-3">
+        {eyebrow}
+      </div>
+      <div className="mt-3 font-mono-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-2">
+        {label}
+      </div>
+      <div className="mt-2 font-mono-2 text-[25px] font-semibold leading-none tracking-[-0.035em] text-ink sm:text-[28px]">
+        {value}
+      </div>
+      <div className="mt-3 min-h-[30px] font-grotesk text-[11px] leading-snug text-ink-3">
+        {detail}
+      </div>
     </div>
   );
 }
@@ -702,30 +780,46 @@ function MarketEvidence({
   extras,
   loaded,
   enMarketPrice,
+  priceStats,
+  priceHistory,
+  observedAt,
+  syntheticHistory,
 }: {
   extras: CardMarketExtrasPayload | null;
   loaded: boolean;
   enMarketPrice: number | null;
+  priceStats: PriceStatsData | null;
+  priceHistory: PricePoint[];
+  observedAt: string | null;
+  syntheticHistory: boolean;
 }) {
-  if (!loaded) {
-    return (
-      <div className="mt-6 grid gap-5 lg:grid-cols-2">
-        <EvidenceSkeleton />
-        <EvidenceSkeleton />
-      </div>
-    );
-  }
-
   const jpPrice = extras?.jpPrice ?? null;
   const ebayRecent = extras?.ebayRecent ?? [];
+  const ebayWeekStats = extras?.ebayWeekStats ?? null;
   const ebayStats = extras?.ebayStats ?? null;
 
   return (
-    <div className="mt-6 grid gap-5 lg:grid-cols-2">
-      <JapanMarketCard jp={jpPrice} enMarketPrice={enMarketPrice} />
-      <EbayMarketCard recent={ebayRecent} stats={ebayStats} />
-      {ebayRecent.length > 0 && (
-        <div className="lg:col-span-2">
+    <div className="mt-6 grid gap-5 lg:grid-cols-3">
+      <TcgMarketCard
+        marketPrice={enMarketPrice}
+        priceStats={priceStats}
+        history={priceHistory}
+        observedAt={observedAt}
+        syntheticHistory={syntheticHistory}
+      />
+      {loaded ? (
+        <>
+          <EbayMarketCard recent={ebayRecent} weekStats={ebayWeekStats} stats={ebayStats} />
+          <JapanMarketCard jp={jpPrice} enMarketPrice={enMarketPrice} />
+        </>
+      ) : (
+        <>
+          <EvidenceSkeleton />
+          <EvidenceSkeleton />
+        </>
+      )}
+      {loaded && ebayRecent.length > 0 && (
+        <div className="lg:col-span-3">
           <EbaySalesTape recent={ebayRecent} />
         </div>
       )}
@@ -739,6 +833,80 @@ function EvidenceSkeleton() {
       <div className="h-3 w-28 rounded bg-bg-3" />
       <div className="mt-8 h-10 w-44 rounded bg-bg-3" />
       <div className="mt-5 h-20 rounded bg-bg-3" />
+    </div>
+  );
+}
+
+function TcgMarketCard({
+  marketPrice,
+  priceStats,
+  history,
+  observedAt,
+  syntheticHistory,
+}: {
+  marketPrice: number | null;
+  priceStats: PriceStatsData | null;
+  history: PricePoint[];
+  observedAt: string | null;
+  syntheticHistory: boolean;
+}) {
+  const recentRecords = history
+    .map((point) => ({ point, price: pointPrice(point) }))
+    .filter((entry): entry is { point: PricePoint; price: number } => entry.price != null)
+    .sort(
+      (a, b) =>
+        new Date(b.point.recorded_at).getTime() - new Date(a.point.recorded_at).getTime()
+    )
+    .slice(0, 3);
+
+  return (
+    <div className="rounded-[22px] border-[1.5px] border-ink bg-bg-2 p-6">
+      <div className="flex items-center justify-between gap-3">
+        <div className="font-mono-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-2">
+          TCGplayer / market
+        </div>
+        <span className="rounded-full bg-coral/10 px-2.5 py-1 font-mono-2 text-[9px] font-semibold uppercase tracking-[0.1em] text-coral-text">
+          Quote feed
+        </span>
+      </div>
+      <div className="mt-5 font-mono-2 text-[38px] font-semibold leading-none tracking-[-0.04em]">
+        {formatMarketPrice(marketPrice)}
+      </div>
+      <div className="mt-2 font-grotesk text-[12px] text-ink-3">
+        Current market price {observedAt ? `· ${formatDate(observedAt)}` : ""}
+      </div>
+
+      <div className="mt-5 space-y-3 border-t border-ink/20 pt-4">
+        <EvidenceRow label="Low" value={formatMarketPrice(priceStats?.tcg_low)} />
+        <EvidenceRow label="Mid" value={formatMarketPrice(priceStats?.tcg_mid)} />
+        <EvidenceRow
+          label="Listings"
+          value={priceStats?.tcg_listings_count != null ? String(priceStats.tcg_listings_count) : "Not reported"}
+        />
+      </div>
+
+      <div className="mt-5 rounded-[14px] bg-bg-3 p-4">
+        <div className="font-mono-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-ink-3">
+          Recent price records
+        </div>
+        <div className="mt-3 space-y-2">
+          {recentRecords.length > 0 ? (
+            recentRecords.map(({ point, price }) => (
+              <div key={point.recorded_at} className="flex items-center justify-between gap-3 font-mono-2 text-[10px] font-semibold">
+                <span className="text-ink-3">{formatDate(point.recorded_at)}</span>
+                <span>{formatMarketPrice(price)}</span>
+              </div>
+            ))
+          ) : (
+            <div className="font-grotesk text-[11px] text-ink-3">No quote history yet.</div>
+          )}
+        </div>
+      </div>
+      <p className="mt-4 font-grotesk text-[10px] leading-relaxed text-ink-3">
+        {syntheticHistory
+          ? "Estimated quote history; not transaction-level sold listings."
+          : "TCGplayer supplies market quotes here, not transaction-level last-sold records."}
+      </p>
     </div>
   );
 }
@@ -820,15 +988,21 @@ const TIER_ROWS: Array<[keyof CardMarketExtrasPayload["ebayStats"]["tiers"], str
 
 function EbayMarketCard({
   recent,
+  weekStats,
   stats,
 }: {
   recent: EbaySaleData[];
+  weekStats: CardMarketExtrasPayload["ebayWeekStats"] | null;
   stats: CardMarketExtrasPayload["ebayStats"] | null;
 }) {
   const tierRows = TIER_ROWS.filter(([tier]) => (stats?.tiers?.[tier]?.count ?? 0) > 0);
   const totalComps = (stats?.rawCount ?? 0) + tierRows.reduce((sum, [tier]) => sum + (stats?.tiers[tier].count ?? 0), 0);
+  const hasWeeklyRaw = (weekStats?.rawCount ?? 0) > 0;
+  const rawAverage = hasWeeklyRaw ? weekStats?.rawAvg ?? null : stats?.rawAvg ?? null;
+  const rawCount = hasWeeklyRaw ? weekStats?.rawCount ?? 0 : stats?.rawCount ?? 0;
+  const averageWindow = hasWeeklyRaw ? "7-day" : "90-day";
 
-  if (recent.length === 0) {
+  if (recent.length === 0 && totalComps === 0) {
     return (
       <EmptyEvidenceCard
         eyebrow="eBay / verified solds"
@@ -845,11 +1019,13 @@ function EbayMarketCard({
         <div className="font-mono-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-2">eBay / verified solds</div>
         <span className="rounded-full bg-gain-2 px-2.5 py-1 font-mono-2 text-[9px] font-semibold uppercase tracking-[0.1em] text-white">Exact printing</span>
       </div>
-      <div className="mt-5 font-mono-2 text-[40px] font-semibold leading-none tracking-[-0.04em]">{totalComps}</div>
-      <div className="mt-2 font-grotesk text-[12px] text-ink-3">Verified 90-day comparables</div>
+      <div className="mt-5 font-mono-2 text-[38px] font-semibold leading-none tracking-[-0.04em]">{formatMarketPrice(rawAverage)}</div>
+      <div className="mt-2 font-grotesk text-[12px] text-ink-3">
+        {rawCount > 0 ? `${averageWindow} raw sold average · n=${rawCount}` : "No raw sold average"}
+      </div>
       <div className="mt-5 space-y-3 border-t border-ink/20 pt-4">
-        {(stats?.rawCount ?? 0) > 0 && (
-          <EvidenceRow label={`Raw · n=${stats?.rawCount ?? 0}`} value={formatMarketPrice(stats?.rawAvg)} />
+        {hasWeeklyRaw && (stats?.rawCount ?? 0) > 0 && (
+          <EvidenceRow label={`90D raw · n=${stats?.rawCount ?? 0}`} value={formatMarketPrice(stats?.rawAvg)} />
         )}
         {tierRows.slice(0, 3).map(([tier, label]) => (
           <EvidenceRow
@@ -858,6 +1034,7 @@ function EbayMarketCard({
             value={formatMarketPrice(stats?.tiers[tier].avg)}
           />
         ))}
+        <EvidenceRow label="90D verified comps" value={String(totalComps)} />
       </div>
     </div>
   );
