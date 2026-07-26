@@ -366,7 +366,7 @@ export default function CardDetailClient({
                 label="Market price"
                 value={formatMarketPrice(currentPrice)}
                 detail={observedAt ? `Observed ${formatDate(observedAt)}` : "No quote timestamp"}
-                accent="coral"
+                accent="yellow"
               />
               <MarketQuoteCard
                 eyebrow="eBay"
@@ -379,7 +379,7 @@ export default function CardDetailClient({
                       : "No exact-printing raw solds"
                     : "Loading verified solds"
                 }
-                accent="gold"
+                accent="blue"
               />
               <MarketQuoteCard
                 eyebrow="Japan"
@@ -392,7 +392,7 @@ export default function CardDetailClient({
                       ? "No verified counterpart"
                       : "Loading Japanese market"
                 }
-                accent="blue"
+                accent="red"
               />
             </div>
 
@@ -603,28 +603,29 @@ function MarketQuoteCard({
   label: string;
   value: string;
   detail: string;
-  accent: "coral" | "gold" | "blue";
+  accent: "yellow" | "blue" | "red";
 }) {
-  const accentClass = {
-    coral: "bg-coral",
-    gold: "bg-gold",
-    blue: "bg-[#1F47A1]",
+  const headerClass = {
+    yellow: "bg-[#F2C94C] text-[#352509]",
+    blue: "bg-[#2F66B0] text-white",
+    red: "bg-[#D85045] text-white",
   }[accent];
 
   return (
-    <div className="relative bg-white/65 p-4 sm:p-5">
-      <span className={`absolute inset-x-0 top-0 h-1 ${accentClass}`} />
-      <div className="font-mono-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-ink-3">
+    <div className="bg-white/65">
+      <div className={`px-4 py-3 font-mono-2 text-[9px] font-bold uppercase tracking-[0.16em] sm:px-5 ${headerClass}`}>
         {eyebrow}
       </div>
-      <div className="mt-3 font-mono-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-2">
-        {label}
-      </div>
-      <div className="mt-2 font-mono-2 text-[25px] font-semibold leading-none tracking-[-0.035em] text-ink sm:text-[28px]">
-        {value}
-      </div>
-      <div className="mt-3 min-h-[30px] font-grotesk text-[11px] leading-snug text-ink-3">
-        {detail}
+      <div className="p-4 sm:p-5">
+        <div className="font-mono-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-2">
+          {label}
+        </div>
+        <div className="mt-2 font-mono-2 text-[25px] font-semibold leading-none tracking-[-0.035em] text-ink sm:text-[28px]">
+          {value}
+        </div>
+        <div className="mt-3 min-h-[30px] font-grotesk text-[11px] leading-snug text-ink-3">
+          {detail}
+        </div>
       </div>
     </div>
   );
