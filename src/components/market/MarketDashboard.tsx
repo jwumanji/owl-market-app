@@ -6,6 +6,7 @@ import { useState } from "react";
 import ArticleCard from "@/components/articles/ArticleCard";
 import type { ArticleSummary } from "@/lib/articles";
 import { gamePath } from "@/lib/game-routes";
+import { ONE_PIECE_ROUTE_SLUG } from "@/lib/games/one-piece";
 import { RIFTBOUND_ROUTE_SLUG } from "@/lib/games/registry";
 import {
   rankBoosterBoxesByPrice,
@@ -62,6 +63,37 @@ const RIFTBOUND_GUIDES = [
     meta: "Edition coverage",
   },
 ] as const;
+
+const UPCOMING_ONE_PIECE_EVENTS = [
+  {
+    month: "Aug",
+    day: "22–23",
+    label: "One Piece Day ’26 · Japan",
+    kind: "event",
+    dateTime: "2026-08-22",
+    dateLabel: "August 22 to 23, 2026",
+  },
+  {
+    month: "Sep",
+    day: "TBD",
+    label: "OP-17 · Japan release",
+    kind: "release",
+  },
+  {
+    month: "Oct",
+    day: "TBD",
+    label: "OP-17 · English pre-release",
+    kind: "release",
+  },
+  {
+    month: "Nov",
+    day: "TBD",
+    label: "Championship finals",
+    kind: "tournament",
+  },
+] as const;
+
+type UpcomingEventKind = (typeof UPCOMING_ONE_PIECE_EVENTS)[number]["kind"];
 
 function WindowSelector<T>({
   data,
@@ -188,7 +220,7 @@ export function MarketNewsSection({
   const archiveHref = gamePath(gameRouteSlug, "/news");
 
   return (
-    <section className="qd-section" aria-labelledby="quickdash-news">
+    <section className="qd-section qd-news-section" aria-labelledby="quickdash-news">
       <div className="qd-section-head">
         <div>
           <div className="qd-section-kicker">{isRiftbound ? "Build your market view" : "What's happening"}</div>
@@ -237,6 +269,76 @@ export function MarketNewsSection({
           The first story for this game is being prepared.
         </div>
       )}
+    </section>
+  );
+}
+
+function UpcomingEventIcon({ kind }: { kind: UpcomingEventKind }) {
+  if (kind === "release") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="6" y="3.5" width="12" height="17" rx="2.2" />
+        <path d="M9 7h6M9 11h6M10 15h4" />
+      </svg>
+    );
+  }
+
+  if (kind === "tournament") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M8 4h8v4a4 4 0 0 1-8 0V4Z" />
+        <path d="M8 6H5v1a4 4 0 0 0 4 4M16 6h3v1a4 4 0 0 1-4 4M12 12v5M8 20h8M10 17h4" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m12 3 2.6 5.3 5.9.9-4.3 4.2 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.2 5.9-.9L12 3Z" />
+    </svg>
+  );
+}
+
+function UpcomingEventsSection() {
+  return (
+    <section className="qd-upcoming" aria-labelledby="quickdash-upcoming">
+      <div className="qd-upcoming-copy">
+        <div>
+          <div className="qd-section-kicker">Coming up</div>
+          <h2 id="quickdash-upcoming" className="qd-upcoming-title">
+            Dates to <em>watch</em>
+          </h2>
+        </div>
+        <p className="qd-upcoming-note">Dates subject to change</p>
+      </div>
+
+      <div className="qd-upcoming-track-wrap">
+        <div className="qd-upcoming-track">
+          {UPCOMING_ONE_PIECE_EVENTS.map((event) => (
+            <div key={`${event.month}-${event.label}`} className="qd-upcoming-event">
+              {"dateTime" in event ? (
+                <time
+                  className="qd-upcoming-date"
+                  dateTime={event.dateTime}
+                  aria-label={event.dateLabel}
+                >
+                  <span>{event.month}</span>
+                  <strong>{event.day}</strong>
+                </time>
+              ) : (
+                <span className="qd-upcoming-date" aria-label={`${event.month}, date to be announced`}>
+                  <span>{event.month}</span>
+                  <strong>{event.day}</strong>
+                </span>
+              )}
+              <span className={`qd-upcoming-marker qd-upcoming-marker-${event.kind}`} aria-hidden="true">
+                <UpcomingEventIcon kind={event.kind} />
+              </span>
+              <span className="qd-upcoming-event-name">{event.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }
@@ -729,9 +831,12 @@ export default function MarketDashboard({
   articles: ArticleSummary[];
   gameRouteSlug?: string | null;
 }) {
+  const showUpcomingEvents = !gameRouteSlug || gameRouteSlug === ONE_PIECE_ROUTE_SLUG;
+
   return (
     <div className="qd-dashboard">
       <MarketNewsSection articles={articles} gameRouteSlug={gameRouteSlug} />
+      {showUpcomingEvents && <UpcomingEventsSection />}
       <TrendingSection data={data} gameRouteSlug={gameRouteSlug} />
       <TopCardsSection data={data} gameRouteSlug={gameRouteSlug} />
       <SetsSection data={data} gameRouteSlug={gameRouteSlug} />
