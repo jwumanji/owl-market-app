@@ -200,6 +200,48 @@ export const SET_SLUG_MAP: Record<string, string> = {
  * Returns the corrected rarity code: "MR", "SP", "AA", "SAR", or the
  * original baseRarity if no variant keyword is found.
  */
+export function canonicalOnePieceRarity(value: string | null | undefined): string {
+  const normalized = String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[._-]+/g, " ")
+    .replace(/\s+/g, " ");
+
+  const aliases: Record<string, string> = {
+    "TREASURE RARE": "TR",
+    "SPECIAL RARE": "SP",
+    "MANGA RARE": "MR",
+    "GOLDEN MANGA RARE": "GMR",
+    "SUPER ALTERNATE ART": "SAR",
+    "SUPER ALT ART": "SAR",
+    "ALTERNATE ART": "AA",
+    "ALT ART": "AA",
+    "SECRET RARE": "SEC",
+    "SUPER RARE": "SR",
+    LEADER: "L",
+    RARE: "R",
+    UNCOMMON: "UC",
+    COMMON: "C",
+    PROMOTION: "PROMO",
+    PROMO: "PROMO",
+  };
+
+  return aliases[normalized] ?? normalized.replace(/\s+/g, "_");
+}
+
+export function hasExplicitTreasureRareSignal(
+  name: string | null | undefined,
+  variantLabel: string | null | undefined,
+  providerRarity: string | null | undefined
+): boolean {
+  return (
+    /\(\s*TR\s*\)/i.test(name ?? "") ||
+    /\btreasure rare\b/i.test(name ?? "") ||
+    canonicalOnePieceRarity(variantLabel) === "TR" ||
+    canonicalOnePieceRarity(providerRarity) === "TR"
+  );
+}
+
 export function classifyRarity(
   name: string,
   variantLabel: string | null,
@@ -214,8 +256,9 @@ export function classifyRarity(
   // 1. Manga Rare — highest priority chase cards
   if (/\bmanga\b/i.test(hay))
     return "MR";
-  // 2. Treasure Rare — (TR) tag
-  if (/\(TR\)/i.test(hay))
+  // 2. Treasure Rare — explicit name/variant/provider rarity signal. Do not
+  // match phrases such as "Treasure Cup", which are promo products.
+  if (hasExplicitTreasureRareSignal(name, variantLabel, baseRarity))
     return "TR";
   // 3. Super Alternate Art — (Super Alternate Art) / (Red Super Alternate Art)
   if (/\(red super alternate art\)/i.test(hay) || /\(super alternate art\)/i.test(hay))
@@ -229,7 +272,7 @@ export function classifyRarity(
   if (/\(alternate art\)/i.test(hay))
     return "AA";
   // Parallel-only variants and Box Toppers stay as base rarity
-  return baseRarity;
+  return canonicalOnePieceRarity(baseRarity);
 }
 
 // ---------------------------------------------------------------------------

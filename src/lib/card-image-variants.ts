@@ -21,3 +21,12 @@ export function cardImageSources(
     .filter((src): src is string => Boolean(src))
     .filter((src, index, sources) => sources.indexOf(src) === index);
 }
+
+export function cardImageSourcesAcrossCards(
+  cards: CardImageVariantUrls[],
+  sourceSize: CardImageSourceSize,
+) {
+  return cards
+    .flatMap((card) => cardImageSources(card, sourceSize))
+    .filter((src, index, sources) => sources.indexOf(src) === index);
+}

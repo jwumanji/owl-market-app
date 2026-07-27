@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, type ComponentProps, type ReactNode } from "react";
 import Link from "next/link";
 import FastCardImage from "@/components/ui/FastCardImage";
 import { TIER_LABELS } from "./characters-data";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
 import { characterMatchesSearch } from "@/lib/character-search";
-import { cardImageSources } from "@/lib/card-image-variants";
+import { cardImageSources, cardImageSourcesAcrossCards } from "@/lib/card-image-variants";
 import "./characters-page.css";
 
 /* ── Types ── */
@@ -25,6 +25,7 @@ export interface CharacterCard {
   imageUrlSmall?: string | null;
   imageUrlPreview?: string | null;
   cardImageId?: string | null;
+  href?: string | null;
 }
 
 export interface CharacterData {
@@ -44,6 +45,21 @@ export interface CharacterData {
   colorD?: string;
   colorBd?: string;
   spark?: number[];
+}
+
+type IndexMode = "characters" | "champions";
+
+function indexCopy(mode: IndexMode) {
+  const champions = mode === "champions";
+  return {
+    singular: champions ? "champion" : "character",
+    singularTitle: champions ? "Champion" : "Character",
+    plural: champions ? "champions" : "characters",
+    pluralTitle: champions ? "Champions" : "Characters",
+    indexLabel: champions ? "Champion Index" : "Character Index",
+    valueLabel: "Total Set Value",
+    queryParam: champions ? "champion" : "character",
+  };
 }
 
 function gameDisplayName(gameRouteSlug: string) {
@@ -78,15 +94,9 @@ function rarityClass(rarity: string): string {
   return "rb-r";
 }
 
-/** Get character avatar from their top card image */
-function getCharAvatar(c: CharacterData): string | null {
-  const firstCard = c.topCards?.[0];
-  if (!firstCard) return null;
-
-  // Rank cards render this artwork across the full card width, so the tiny
-  // thumbnail variant looks visibly pixelated. Prefer the preview-sized asset
-  // and retain the thumbnail as a last-resort fallback.
-  return cardImageSources(firstCard, "preview")[0] ?? null;
+/** Get representative artwork candidates in market-rank order. */
+function getCharAvatarSources(c: CharacterData) {
+  return cardImageSourcesAcrossCards(c.topCards ?? [], "preview");
 }
 
 /* ── SVG Sparkline ── */
@@ -117,25 +127,38 @@ function SparkSvg({ data, up, w, h, pad }: { data: number[]; up: boolean; w: num
   );
 }
 
-/* ── Character Avatar ── */
-function CharAvatar({ src, name, size = 28 }: { src: string | null; name: string; size?: number }) {
-  const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-  if (src) {
-    return (
-      <FastCardImage
-        src={src}
-        alt={name}
-        width={size}
-        height={Math.round(size * 1.4)}
-        loading="lazy"
-        fetchPriority="low"
-        sizes={`${size}px`}
-        className="ch-avatar-img"
-        style={{ width: size, height: Math.round(size * 1.4) }}
-      />
-    );
-  }
+type ResilientCardImageProps = Omit<ComponentProps<typeof FastCardImage>, "onError" | "src"> & {
+  fallback: ReactNode;
+  sources: string[];
+};
+
+function ResilientCardImage({ fallback, sources, ...props }: ResilientCardImageProps) {
+  const sourceKey = sources.join("\n");
+  const [sourceState, setSourceState] = useState({ key: sourceKey, index: 0 });
+  const sourceIndex = sourceState.key === sourceKey ? sourceState.index : 0;
+  const src = sources[sourceIndex] ?? null;
+
+  if (!src) return fallback;
+
   return (
+    <FastCardImage
+      {...props}
+      key={src}
+      src={src}
+      onError={() => {
+        setSourceState((current) => ({
+          key: sourceKey,
+          index: (current.key === sourceKey ? current.index : 0) + 1,
+        }));
+      }}
+    />
+  );
+}
+
+/* ── Character Avatar ── */
+function CharAvatar({ sources, name, size = 28 }: { sources: string[]; name: string; size?: number }) {
+  const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+  const fallback = (
     <div
       className="ch-avatar-placeholder"
       style={{ width: size, height: Math.round(size * 1.4), fontSize: Math.round(size * 0.35) }}
@@ -143,18 +166,46 @@ function CharAvatar({ src, name, size = 28 }: { src: string | null; name: string
       {initials}
     </div>
   );
+
+  return (
+    <ResilientCardImage
+      sources={sources}
+      fallback={fallback}
+      alt={name}
+      width={size}
+      height={Math.round(size * 1.4)}
+      loading="lazy"
+      fetchPriority="low"
+      sizes={`${size}px`}
+      className="ch-avatar-img"
+      style={{ width: size, height: Math.round(size * 1.4) }}
+    />
+  );
 }
 
 /* ── Character Ranking Card (top row) ── */
-function RankCard({ c, rank, active, onClick }: { c: CharacterData; rank: number; active: boolean; onClick: () => void }) {
+function RankCard({
+  c,
+  rank,
+  active,
+  onClick,
+  mode,
+}: {
+  c: CharacterData;
+  rank: number;
+  active: boolean;
+  onClick: () => void;
+  mode: IndexMode;
+}) {
   const tier = TIER_LABELS[c.tier] || TIER_LABELS[3];
   const color = c.color || "#E89512";
-  const avatar = getCharAvatar(c);
+  const avatarSources = getCharAvatarSources(c);
+  const copy = indexCopy(mode);
   return (
     <button
       type="button"
       className="ch-rank-card"
-      aria-label={`Open ${c.name} character details`}
+      aria-label={`Open ${c.name} ${copy.singular} details`}
       style={{
         ["--ch-color" as string]: color,
         ...(active ? { borderColor: color, boxShadow: `0 0 0 1px ${color}, 0 6px 20px rgba(0,0,0,0.35)` } : {}),
@@ -163,7 +214,7 @@ function RankCard({ c, rank, active, onClick }: { c: CharacterData; rank: number
     >
       <div className="ch-rank-top">
         <span className="ch-rank-num">#{rank}</span>
-        <span className="ch-tier-badge" style={{ background: tier.bg, color: tier.color }}>{tier.label}</span>
+        {mode === "characters" && <span className="ch-tier-badge" style={{ background: tier.bg, color: tier.color }}>{tier.label}</span>}
       </div>
       <div className="ch-rank-title">
         <div className="ch-rank-name">{c.name}</div>
@@ -171,13 +222,13 @@ function RankCard({ c, rank, active, onClick }: { c: CharacterData; rank: number
       </div>
       <div className="ch-rank-body">
         <div className="ch-rank-image">
-          <CharAvatar src={avatar} name={c.name} size={200} />
+          <CharAvatar sources={avatarSources} name={c.name} size={200} />
         </div>
         <div className="ch-rank-market">
           <div className="ch-rank-market-line">
             <div className="ch-rank-value">
               <div className="ch-rank-price">${c.indexValue.toLocaleString()}</div>
-              <div className="ch-rank-value-label">Total Set Value</div>
+              <div className="ch-rank-value-label">{copy.valueLabel}</div>
             </div>
             <div
               className="ch-rank-chg"
@@ -201,31 +252,34 @@ function CompactCharacterCard({
   rank,
   active,
   onClick,
+  mode,
 }: {
   c: CharacterData;
   rank: number;
   active: boolean;
   onClick: () => void;
+  mode: IndexMode;
 }) {
   const tier = TIER_LABELS[c.tier] || TIER_LABELS[3];
-  const avatar = getCharAvatar(c);
+  const avatarSources = getCharAvatarSources(c);
+  const copy = indexCopy(mode);
 
   return (
     <button
       type="button"
       className={`ch-compact-card${active ? " active" : ""}`}
-      aria-label={`Open ${c.name} character details`}
+      aria-label={`Open ${c.name} ${copy.singular} details`}
       onClick={onClick}
     >
       <div className="ch-compact-image">
-        <CharAvatar src={avatar} name={c.name} size={150} />
+        <CharAvatar sources={avatarSources} name={c.name} size={150} />
         <span className="ch-compact-rank">#{rank}</span>
-        <span className="ch-compact-tier" style={{ background: tier.bg, color: tier.color }}>{tier.label}</span>
+        {mode === "characters" && <span className="ch-compact-tier" style={{ background: tier.bg, color: tier.color }}>{tier.label}</span>}
       </div>
       <div className="ch-compact-copy">
         <span className="ch-compact-name" title={c.name}>{c.name}</span>
         <strong className="ch-compact-value">${c.indexValue.toLocaleString()}</strong>
-        <span className="ch-compact-label">Total Set Value</span>
+        <span className="ch-compact-label">{copy.valueLabel}</span>
       </div>
     </button>
   );
@@ -240,6 +294,7 @@ function CharToolbar({
   onSelect,
   onViewAll,
   viewAllLabel,
+  mode,
 }: {
   search: string;
   onSearchChange: (v: string) => void;
@@ -248,9 +303,11 @@ function CharToolbar({
   onSelect: (slug: string) => void;
   onViewAll: () => void;
   viewAllLabel: string;
+  mode: IndexMode;
 }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const copy = indexCopy(mode);
 
   const sorted = [...characters].sort((a, b) => a.name.localeCompare(b.name));
 
@@ -280,7 +337,7 @@ function CharToolbar({
         <input
           type="text"
           className="ch-search-input"
-          placeholder="Search characters..."
+          placeholder={`Search ${copy.plural}...`}
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
         />
@@ -295,7 +352,7 @@ function CharToolbar({
           className={`ch-dropdown-btn${dropdownOpen ? " open" : ""}`}
           onClick={() => setDropdownOpen((o) => !o)}
         >
-          All Characters
+          All {copy.pluralTitle}
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points={dropdownOpen ? "18 15 12 9 6 15" : "6 9 12 15 18 9"} />
           </svg>
@@ -303,7 +360,7 @@ function CharToolbar({
         {dropdownOpen && (
           <div className="ch-dropdown-menu">
             {filtered.length === 0 && (
-              <div className="ch-dropdown-empty">No characters found</div>
+              <div className="ch-dropdown-empty">No {copy.plural} found</div>
             )}
             {filtered.map((ch) => (
               <div
@@ -341,15 +398,16 @@ function CharacterTopCard({
   rank: number;
   gameRouteSlug: string;
 }) {
-  const imageSrc = card.imageUrlPreview ?? card.imageUrlSmall ?? card.imageUrl;
+  const imageSources = cardImageSources(card, "preview");
   const content = (
     <>
       <div className="ch-showcase-image">
         <span className="ch-showcase-rank">#{rank}</span>
         <span className={`rb ${rarityClass(card.rarity)} ch-showcase-rarity`}>{card.rarity}</span>
-        {imageSrc ? (
-          <FastCardImage
-            src={imageSrc}
+        {imageSources.length ? (
+          <ResilientCardImage
+            sources={imageSources}
+            fallback={<div className="ch-showcase-placeholder" aria-hidden="true" />}
             alt={card.name}
             width={256}
             height={358}
@@ -378,8 +436,10 @@ function CharacterTopCard({
     </>
   );
 
-  return card.cardImageId ? (
-    <Link href={gamePath(gameRouteSlug, `/card/${card.cardImageId}`)} className="ch-showcase-card">
+  const href = card.href ?? (card.cardImageId ? gamePath(gameRouteSlug, `/card/${card.cardImageId}`) : null);
+
+  return href ? (
+    <Link href={href} className="ch-showcase-card">
       {content}
     </Link>
   ) : (
@@ -387,9 +447,18 @@ function CharacterTopCard({
   );
 }
 
-function CharacterCards({ c, gameRouteSlug }: { c: CharacterData; gameRouteSlug: string }) {
+function CharacterCards({
+  c,
+  gameRouteSlug,
+  mode,
+}: {
+  c: CharacterData;
+  gameRouteSlug: string;
+  mode: IndexMode;
+}) {
   const tier = TIER_LABELS[c.tier] || TIER_LABELS[3];
-  const avatar = getCharAvatar(c);
+  const avatarSources = getCharAvatarSources(c);
+  const copy = indexCopy(mode);
   const indexValue = c.indexValue.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -399,18 +468,18 @@ function CharacterCards({ c, gameRouteSlug }: { c: CharacterData; gameRouteSlug:
     <div className="ch-cards-section">
       <div className="ch-character-strip">
         <div className="ch-cards-identity">
-          <CharAvatar src={avatar} name={c.name} size={48} />
+          <CharAvatar sources={avatarSources} name={c.name} size={48} />
           <div className="ch-cards-identity-copy">
             <span className="ch-cards-character-name" style={{ color: c.color }}>{c.name}</span>
             <span className="ch-cards-subtitle">{c.subtitle}</span>
             <div className="ch-cards-badges">
-              <span className="ch-tier-badge" style={{ background: tier.bg, color: tier.color }}>Tier {tier.label}</span>
+              {mode === "characters" && <span className="ch-tier-badge" style={{ background: tier.bg, color: tier.color }}>Tier {tier.label}</span>}
               <span className="ch-faction-badge">{c.faction}</span>
             </div>
           </div>
         </div>
         <div className="ch-index-stat">
-          <span className="ch-cards-stat-label">Character Index</span>
+          <span className="ch-cards-stat-label">{copy.indexLabel}</span>
           <strong className="ch-index-value">${indexValue}</strong>
         </div>
         <div className="ch-cards-stats">
@@ -431,7 +500,7 @@ function CharacterCards({ c, gameRouteSlug }: { c: CharacterData; gameRouteSlug:
       <div className="ch-showcase-header">
         <div>
           <div className="section-title">Top {Math.min(10, c.topCards.length)} Cards <span>— {c.name}</span></div>
-          <div className="section-sub">Highest-value cards across all sets</div>
+          <div className="section-sub">Highest-value cards linked to this {copy.singular}</div>
         </div>
         <Link href={gamePath(gameRouteSlug, "/markets")} className="section-action">View all in markets &rarr;</Link>
       </div>
@@ -458,10 +527,14 @@ const ALL_CHARACTER_BATCH_SIZE = 60;
 export default function CharactersClient({
   characters,
   gameRouteSlug,
+  mode = "characters",
 }: {
   characters: CharacterData[];
   gameRouteSlug: string;
+  mode?: IndexMode;
 }) {
+  const copy = indexCopy(mode);
+  const remoteDataEnabled = mode === "characters";
   const [availableCharacters, setAvailableCharacters] = useState(characters);
   const [searchResults, setSearchResults] = useState<CharacterData[]>([]);
   const [activeChar, setActiveChar] = useState(characters[0]?.slug ?? "");
@@ -485,6 +558,7 @@ export default function CharactersClient({
   const hasCharacters = availableCharacters.length > 0;
 
   useEffect(() => {
+    if (!remoteDataEnabled) return;
     if (!modalOpen || !baseCharacter || detailsBySlug[baseCharacter.slug]) return;
     const expectedTopCards = Math.min(10, baseCharacter.cardCount);
     if (baseCharacter.topCards.length >= expectedTopCards) return;
@@ -508,9 +582,10 @@ export default function CharactersClient({
     return () => {
       cancelled = true;
     };
-  }, [baseCharacter, detailsBySlug, gameRouteSlug, modalOpen]);
+  }, [baseCharacter, detailsBySlug, gameRouteSlug, modalOpen, remoteDataEnabled]);
 
   const ensureFullOverview = useCallback(() => {
+    if (!remoteDataEnabled) return;
     if (overviewRequested.current) return;
     overviewRequested.current = true;
     fetch(`/api/characters?game=${encodeURIComponent(gameRouteSlug)}&view=overview`)
@@ -532,7 +607,7 @@ export default function CharactersClient({
       .catch(() => {
         overviewRequested.current = false;
       });
-  }, [gameRouteSlug]);
+  }, [gameRouteSlug, remoteDataEnabled]);
 
   useEffect(() => {
     const query = search.trim();
@@ -540,6 +615,13 @@ export default function CharactersClient({
 
     if (!query) {
       setSearchResults([]);
+      return;
+    }
+
+    if (!remoteDataEnabled) {
+      const matches = availableCharacters.filter((entry) => characterMatchesSearch(entry, query));
+      setSearchResults(matches);
+      if (matches[0]) setActiveChar(matches[0].slug);
       return;
     }
 
@@ -564,7 +646,7 @@ export default function CharactersClient({
     }, 125);
 
     return () => window.clearTimeout(timer);
-  }, [gameRouteSlug, search]);
+  }, [availableCharacters, gameRouteSlug, remoteDataEnabled, search]);
 
   const handleSearchChange = useCallback((value: string) => {
     setSearch(value);
@@ -572,12 +654,12 @@ export default function CharactersClient({
 
   const updateCharacterUrl = useCallback((slug: string | null, mode: "push" | "replace") => {
     const url = new URL(window.location.href);
-    if (slug) url.searchParams.set("character", slug);
-    else url.searchParams.delete("character");
-    const state = slug ? { characterModal: slug } : null;
+    if (slug) url.searchParams.set(copy.queryParam, slug);
+    else url.searchParams.delete(copy.queryParam);
+    const state = slug ? { indexModal: slug } : null;
     if (mode === "push") window.history.pushState(state, "", url);
     else window.history.replaceState(state, "", url);
-  }, []);
+  }, [copy.queryParam]);
 
   const openCharacter = useCallback((slug: string) => {
     setActiveChar(slug);
@@ -592,7 +674,7 @@ export default function CharactersClient({
 
   const closeCharacter = useCallback(() => {
     setModalOpen(false);
-    if (window.history.state?.characterModal) window.history.back();
+    if (window.history.state?.indexModal) window.history.back();
     else updateCharacterUrl(null, "replace");
   }, [updateCharacterUrl]);
 
@@ -609,7 +691,7 @@ export default function CharactersClient({
 
   useEffect(() => {
     const syncModalWithUrl = () => {
-      const slug = new URLSearchParams(window.location.search).get("character");
+      const slug = new URLSearchParams(window.location.search).get(copy.queryParam);
       if (!slug) {
         setModalOpen(false);
         return;
@@ -625,7 +707,7 @@ export default function CharactersClient({
     syncModalWithUrl();
     window.addEventListener("popstate", syncModalWithUrl);
     return () => window.removeEventListener("popstate", syncModalWithUrl);
-  }, [availableCharacters, searchResults]);
+  }, [availableCharacters, copy.queryParam, searchResults]);
 
   useEffect(() => {
     if (!modalOpen) return;
@@ -662,9 +744,9 @@ export default function CharactersClient({
     <>
       {!hasCharacters ? (
         <div className="ch-detail" style={{ padding: 28, textAlign: "center" }}>
-          <div className="ch-detail-name">No character index yet</div>
+          <div className="ch-detail-name">No {copy.singular} index yet</div>
           <div className="ch-detail-sub" style={{ marginTop: 8 }}>
-            {gameDisplayName(gameRouteSlug)} has catalog data loaded, but no character taxonomy or pricing index is enabled yet.
+            {gameDisplayName(gameRouteSlug)} has catalog data loaded, but no {copy.singular} taxonomy or pricing index is enabled yet.
           </div>
           <div style={{ marginTop: 18 }}>
             <Link href={gamePath(gameRouteSlug, "/catalog")} className="section-action">
@@ -682,13 +764,14 @@ export default function CharactersClient({
             activeSlug={activeChar}
             onSelect={openCharacter}
             onViewAll={toggleAllCharacters}
-            viewAllLabel={showAll ? "Show Top 20" : "View All Characters"}
+            viewAllLabel={showAll ? "Show Top 20" : `View All ${copy.pluralTitle}`}
+            mode={mode}
           />
 
           {/* Character ranking cards */}
           <div className="ch-rank-row">
             {displayedCharacters.map((ch, i) => (
-              <RankCard key={ch.slug} c={ch} rank={i + 1} active={modalOpen && activeChar === ch.slug} onClick={() => openCharacter(ch.slug)} />
+              <RankCard key={ch.slug} c={ch} rank={i + 1} active={modalOpen && activeChar === ch.slug} onClick={() => openCharacter(ch.slug)} mode={mode} />
             ))}
           </div>
 
@@ -697,11 +780,11 @@ export default function CharactersClient({
               <div className="ch-discovery-head">
                 <div>
                   <div className="ch-discovery-kicker">Beyond the Top 20</div>
-                  <h2 id="more-characters-title" className="ch-discovery-title">More <em>characters</em></h2>
-                  <p>Fan favorites and more of the ranked character index.</p>
+                  <h2 id="more-characters-title" className="ch-discovery-title">More <em>{copy.plural}</em></h2>
+                  <p>More of the ranked {copy.singular} index.</p>
                 </div>
                 <button type="button" className="ch-discovery-all" onClick={toggleAllCharacters}>
-                  Browse all characters <span aria-hidden="true">→</span>
+                  Browse all {copy.plural} <span aria-hidden="true">→</span>
                 </button>
               </div>
               <div className="ch-discovery-grid">
@@ -712,6 +795,7 @@ export default function CharactersClient({
                     rank={INITIAL_CHARACTER_COUNT + index + 1}
                     active={modalOpen && activeChar === character.slug}
                     onClick={() => openCharacter(character.slug)}
+                    mode={mode}
                   />
                 ))}
               </div>
@@ -719,7 +803,7 @@ export default function CharactersClient({
           )}
 
           {displayedCharacters.length === 0 && (
-            <div className="ch-empty-results">No characters found.</div>
+            <div className="ch-empty-results">No {copy.plural} found.</div>
           )}
 
           {showAll && visibleAllCount < rankedCharacters.length && (
@@ -728,7 +812,7 @@ export default function CharactersClient({
                 className="ch-see-all-btn"
                 onClick={() => setVisibleAllCount((count) => count + ALL_CHARACTER_BATCH_SIZE)}
               >
-                Load More Characters
+                Load More {copy.pluralTitle}
               </button>
             </div>
           )}
@@ -745,12 +829,12 @@ export default function CharactersClient({
                 className="ch-character-modal"
                 role="dialog"
                 aria-modal="true"
-                aria-labelledby="character-modal-title"
+                aria-labelledby="index-modal-title"
               >
                 <div className="ch-character-modal-toolbar">
                   <div>
-                    <span className="ch-character-modal-kicker">Character details</span>
-                    <h2 id="character-modal-title">{c.name}</h2>
+                    <span className="ch-character-modal-kicker">{copy.singularTitle} details</span>
+                    <h2 id="index-modal-title">{c.name}</h2>
                   </div>
                   <div className="ch-character-modal-actions">
                     <button
@@ -769,11 +853,11 @@ export default function CharactersClient({
                     >
                       Next <span aria-hidden="true">→</span>
                     </button>
-                    <button type="button" className="ch-modal-close" onClick={closeCharacter} aria-label="Close character details" autoFocus>×</button>
+                    <button type="button" className="ch-modal-close" onClick={closeCharacter} aria-label={`Close ${copy.singular} details`} autoFocus>×</button>
                   </div>
                 </div>
                 <div className="ch-character-modal-body">
-                  <CharacterCards c={c} gameRouteSlug={gameRouteSlug} />
+                  <CharacterCards c={c} gameRouteSlug={gameRouteSlug} mode={mode} />
                 </div>
               </section>
             </div>

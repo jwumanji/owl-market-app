@@ -1,20 +1,32 @@
 {
   "crons": [
     {
-      "path": "/api/sync/justtcg?game=one_piece&cursor=1&maxSets=4",
+      "path": "/api/sync/justtcg?game=one_piece&cursor=1&maxSets=1",
       "schedule": "0 0 * * *"
     },
     {
-      "path": "/api/sync/justtcg?game=one_piece&cursor=1&maxSets=4",
+      "path": "/api/sync/justtcg?game=one_piece&cursor=1&maxSets=1",
       "schedule": "0 6 * * *"
     },
     {
-      "path": "/api/sync/justtcg?game=one_piece&cursor=1&maxSets=4",
+      "path": "/api/sync/justtcg?game=one_piece&cursor=1&maxSets=1",
       "schedule": "0 12 * * *"
     },
     {
-      "path": "/api/sync/justtcg?game=one_piece&cursor=1&maxSets=4",
+      "path": "/api/sync/justtcg?game=one_piece&cursor=1&maxSets=1",
       "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/sync/justtcg?game=riftbound&mode=incremental&maxSets=50",
+      "schedule": "15 * * * *"
+    },
+    {
+      "path": "/api/sync/justtcg?game=riftbound&mode=full&cursor=1&maxSets=50",
+      "schedule": "35 4 * * *"
+    },
+    {
+      "path": "/api/sync/justtcg?game=lorcana",
+      "schedule": "45 * * * *"
     },
     {
       "path": "/api/sync/justtcg-history?game=one_piece&maxSets=1&historyDuration=1y",
@@ -25,12 +37,20 @@
       "schedule": "0 */6 * * *"
     },
     {
-      "path": "/api/warm?pages=150&imageCards=50",
-      "schedule": "30 0,6,12,18 * * *"
-    },
-    {
       "path": "/api/sync/jp-prices?game=one_piece&cursor=1",
       "schedule": "30 */6 * * *"
+    },
+    {
+      "path": "/api/sync/characters?game=one_piece",
+      "schedule": "45 23 * * *"
+    },
+    {
+      "path": "/api/sync/summaries?game=one_piece",
+      "schedule": "20 0,6,12,18 * * *"
+    },
+    {
+      "path": "/api/warm?pages=150&imageCards=50",
+      "schedule": "30 0,6,12,18 * * *"
     },
     {
       "path": "/api/warm?pages=0&imageCards=550&offset=0&widths=828",
@@ -73,12 +93,8 @@
       "schedule": "40 3 * * *"
     },
     {
-      "path": "/api/sync/characters?game=one_piece",
-      "schedule": "45 23 * * *"
-    },
-    {
-      "path": "/api/sync/summaries?game=one_piece",
-      "schedule": "20 0,6,12,18 * * *"
+      "path": "/api/audit/card-images",
+      "schedule": "15 8 * * *"
     }
   ]
 }

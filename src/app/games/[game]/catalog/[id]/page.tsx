@@ -16,6 +16,7 @@ import {
 } from "@/lib/catalog-card-fields";
 import { catalogCardDescription } from "@/lib/game-catalog-copy";
 import FastCardImage from "@/components/ui/FastCardImage";
+import { tcgPlayerProductImageUrl } from "@/lib/market-sealed";
 import "../catalog.css";
 
 // Keep in sync with CATALOG_DATA_TTL_SECONDS (Next 15 requires a literal).
@@ -202,6 +203,13 @@ export default async function GameCatalogCardPage(
 
   const { game, card } = data;
   const set = joinedSet(card);
+  const tcgplayerProductId = data.externalIds.find(
+    (externalId) => externalId.provider?.toLowerCase() === "tcgplayer"
+      && externalId.external_type?.toLowerCase() === "product_id"
+  )?.external_id;
+  const imageSrc = card.image_url_small
+    ?? card.image_url
+    ?? (game.slug === "riftbound" ? tcgPlayerProductImageUrl(tcgplayerProductId) : null);
   const cardInfo = catalogCardPayload(card);
   const sourceInfo = catalogSourcePayload(card);
   const details = payloadRows(cardInfo);
@@ -219,9 +227,9 @@ export default async function GameCatalogCardPage(
 
       <div className="catalog-card-detail-hero">
         <div className="catalog-card-art" aria-hidden="true">
-          {card.image_url_small || card.image_url ? (
+          {imageSrc ? (
             <FastCardImage
-              src={card.image_url_small ?? card.image_url ?? ""}
+              src={imageSrc}
               alt=""
               width={190}
               height={266}

@@ -6,6 +6,7 @@ import {
   ONE_PIECE_JUSTTCG_GAME_SLUG,
   buildJustTcgCodeToSlugs,
   classifyRarity,
+  hasExplicitTreasureRareSignal,
   onePieceGame,
 } from "@/lib/games/one-piece";
 import { resolveOnePieceSyncGame } from "@/lib/games/one-piece/sync-scope";
@@ -41,6 +42,7 @@ interface DbCard {
 interface JTCard {
   name: string;
   number: string | null;
+  rarity: string | null;
 }
 
 export async function GET(request: Request) {
@@ -96,6 +98,7 @@ export async function GET(request: Request) {
         .select("id, game_id, card_number, name, variant_label, rarity, set_id")
         .eq("game_id", game.id)
         .eq("set_id", dbSet.id)
+        .eq("region", "en")
         .not("rarity", "is", null)
         .range(from, from + pageSize - 1);
 
@@ -130,7 +133,11 @@ export async function GET(request: Request) {
           });
           const cards = response.data ?? [];
           for (const c of cards) {
-            const card = { name: c.name, number: c.number ?? null };
+            const card: JTCard = {
+              name: c.name,
+              number: c.number ?? null,
+              rarity: c.rarity ?? null,
+            };
             jtCardsByKey.set(`${card.number ?? ""}|${card.name}`, card);
           }
           if (!response.pagination?.hasMore) break;
@@ -160,6 +167,12 @@ export async function GET(request: Request) {
 
       // Score by tag overlap (same logic as sync)
       const jtTags = extractTags(jtCard.name);
+      const providerTreasureRare = hasExplicitTreasureRareSignal(
+        jtCard.name,
+        null,
+        jtCard.rarity
+      );
+      if (providerTreasureRare && !jtTags.includes("tr")) jtTags.push("tr");
 
       const scored = unmatched.map((c) => {
         const dbTags = extractTags(`${c.name ?? ""} ${c.variant_label ?? ""}`);
@@ -179,6 +192,14 @@ export async function GET(request: Request) {
       scored.sort((a, b) => a.score - b.score);
       const best = scored[0];
       if (!best) continue;
+      if (
+        providerTreasureRare &&
+        !hasExplicitTreasureRareSignal(
+          best.card.name,
+          best.card.variant_label,
+          best.card.rarity
+        )
+      ) continue;
 
       matched.add(best.card.id);
 
@@ -191,7 +212,7 @@ export async function GET(request: Request) {
       const fromJt = classifyRarity(
         jtCard.name,
         best.card.variant_label ?? null,
-        best.card.rarity
+        jtCard.rarity ?? best.card.rarity
       );
       const newRarity = fromDb !== best.card.rarity ? fromDb : fromJt;
 

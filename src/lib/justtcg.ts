@@ -1,7 +1,7 @@
 import { ONE_PIECE_JUSTTCG_GAME_SLUG, parseVariant } from "@/lib/games/one-piece";
+import { JUSTTCG_NORMALIZED_API_BASE } from "@/lib/games/provider-contract";
 
-const BASE = "https://api.justtcg.com/v1";
-const GAME = ONE_PIECE_JUSTTCG_GAME_SLUG;
+const BASE = JUSTTCG_NORMALIZED_API_BASE;
 
 function headers(): HeadersInit {
   const key = process.env.JUSTTCG_API_KEY;
@@ -10,10 +10,12 @@ function headers(): HeadersInit {
 }
 
 export interface JustTCGVariant {
+  uuid?: string;
   id: string;
   condition: string;
   printing: string;
   language: string;
+  tcgplayerSkuId?: string | null;
   price: number | null;
   priceChange24hr: number | null;
   priceChange7d: number | null;
@@ -29,9 +31,11 @@ export interface JustTCGVariant {
   trendSlope30d: number | null;
   minPriceAllTime: number | null;
   maxPriceAllTime: number | null;
+  lastUpdated?: number | null;
 }
 
 export interface JustTCGCard {
+  uuid?: string;
   id: string;
   name: string;
   game: string;
@@ -79,14 +83,16 @@ async function fetchJSON<T>(url: string): Promise<T> {
   return res.json();
 }
 
-/** Fetch all One Piece TCG sets, handling future pagination growth. */
-export async function fetchSets(): Promise<JustTCGSet[]> {
+/** Fetch every set for one provider game, handling future pagination growth. */
+export async function fetchSets(
+  gameSlug = ONE_PIECE_JUSTTCG_GAME_SLUG
+): Promise<JustTCGSet[]> {
   const all: JustTCGSet[] = [];
   let offset = 0;
 
   while (true) {
     const res = await fetchJSON<PaginatedResponse<JustTCGSet>>(
-      `${BASE}/sets?game=${GAME}&limit=100&offset=${offset}`
+      `${BASE}/sets?game=${encodeURIComponent(gameSlug)}&limit=100&offset=${offset}`
     );
     all.push(...res.data);
     if (!hasMore(res)) break;
@@ -96,14 +102,42 @@ export async function fetchSets(): Promise<JustTCGSet[]> {
   return all;
 }
 
-/** Fetch all cards in a set, handling pagination (100 per page) */
-export async function fetchCardsBySet(setSlug: string): Promise<JustTCGCard[]> {
+export interface FetchCardsBySetOptions {
+  updatedAfter?: number | null;
+  includePriceHistory?: boolean;
+}
+
+export function buildJustTcgCardsUrl(
+  setSlug: string,
+  gameSlug: string,
+  offset: number,
+  options: FetchCardsBySetOptions = {}
+): string {
+  const params = new URLSearchParams({
+    game: gameSlug,
+    set: setSlug,
+    include_price_history: String(options.includePriceHistory ?? false),
+    limit: "100",
+    offset: String(offset),
+  });
+  if (typeof options.updatedAfter === "number" && Number.isFinite(options.updatedAfter)) {
+    params.set("updated_after", String(Math.max(0, Math.floor(options.updatedAfter))));
+  }
+  return BASE + "/cards?" + params.toString();
+}
+
+/** Fetch every card in one provider set, handling pagination (100 per page). */
+export async function fetchCardsBySet(
+  setSlug: string,
+  gameSlug = ONE_PIECE_JUSTTCG_GAME_SLUG,
+  options: FetchCardsBySetOptions = {}
+): Promise<JustTCGCard[]> {
   const all: JustTCGCard[] = [];
   let offset = 0;
 
   while (true) {
     const res = await fetchJSON<PaginatedResponse<JustTCGCard>>(
-      `${BASE}/cards?game=${GAME}&set=${encodeURIComponent(setSlug)}&include_price_history=false&limit=100&offset=${offset}`
+      buildJustTcgCardsUrl(setSlug, gameSlug, offset, options)
     );
     all.push(...res.data);
     if (!hasMore(res)) break;

@@ -5,13 +5,23 @@ import {
   ONE_PIECE_JUSTTCG_GAME_SLUG,
   buildJustTcgCodeToSlugs,
   extractVariantLabel,
+  hasExplicitTreasureRareSignal,
   onePieceGame,
 } from "@/lib/games/one-piece";
 import { resolveOnePieceSyncGame } from "@/lib/games/one-piece/sync-scope";
+import {
+  JUSTTCG_NORMALIZED_API_BASE,
+  JUSTTCG_NORMALIZED_API_VERSION,
+} from "@/lib/games/provider-contract";
+import {
+  acquireProviderSyncState,
+  releaseProviderSyncState,
+  type ProviderSyncScope,
+} from "@/lib/provider-sync-state";
 
 export const maxDuration = 60;
 
-const JUSTTCG_BASE = "https://api.justtcg.com/v1";
+const JUSTTCG_BASE = JUSTTCG_NORMALIZED_API_BASE;
 const GAME = ONE_PIECE_JUSTTCG_GAME_SLUG;
 const LOCK_TTL_MS = 55 * 60 * 1000;
 const DEFAULT_MAX_SETS = 1;
@@ -45,6 +55,7 @@ interface JTCard {
   id: string;
   name: string;
   number: string | null;
+  rarity: string | null;
   variants: JTVariant[];
 }
 
@@ -167,7 +178,14 @@ async function syncHistory(request: Request) {
       return NextResponse.json({ error: `No mapped sets matched: ${manualCodes.join(",")}` }, { status: 400 });
     }
   } else {
-    cursor = await acquireCursor(supabase, stateKey(historyDuration), syncableSets.length, reset);
+    cursor = await acquireCursor(
+      supabase,
+      game.id,
+      stateKey(historyDuration),
+      historyDuration,
+      syncableSets.length,
+      reset
+    );
     if (cursor.error) {
       return NextResponse.json(cursor.error, { status: cursor.status ?? 500 });
     }
@@ -209,7 +227,9 @@ async function syncHistory(request: Request) {
   if (cursor && cursor.lockOwner) {
     await releaseCursor(
       supabase,
+      game.id,
       stateKey(historyDuration),
+      historyDuration,
       cursor.lockOwner,
       advanceState(cursor.state, syncableSets.length, startIndex, processedForCursor, results, fatalError)
     );
@@ -274,7 +294,8 @@ async function syncOneSetHistory(
   const { data: dbCards, error: cardsError } = await supabase
     .from("cards")
     .select("id,game_id,card_image_id,card_number,name,name_base,variant_label,rarity,set_id,tcg_product_id")
-    .eq("game_id", gameId);
+    .eq("game_id", gameId)
+    .eq("region", "en");
 
   if (cardsError) {
     result.errors.push(cardsError.message);
@@ -297,7 +318,7 @@ async function syncOneSetHistory(
           continue;
         }
 
-        const jtVariantKey = variantKey(expectedVariantLabel(jtCard.name));
+        const jtVariantKey = variantKey(expectedVariantLabel(jtCard.name, jtCard.rarity));
         const variant = chooseVariant(jtCard, Boolean(jtVariantKey || cardVariantKey(match.card)));
         if (!variant || numeric(variant.price) === null || numeric(variant.price) === 0) {
           result.skipped.no_price++;
@@ -431,7 +452,7 @@ function findExistingMatch(
 ): { card: DbCard | null; reason: string; score?: number } {
   const jtNumber = nullIfEmpty(jtCard.number);
   if (!jtNumber) return { card: null, reason: "no_number" };
-  const jtVariantKey = variantKey(expectedVariantLabel(jtCard.name));
+  const jtVariantKey = variantKey(expectedVariantLabel(jtCard.name, jtCard.rarity));
   const crossSetWithoutVariant = !allowsCardNumberInSet(setCode, jtNumber) && !jtVariantKey;
 
   const direct = jtCard.id
@@ -603,7 +624,9 @@ async function insertHistoryRows(
 async function acquireCursor(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
+  gameId: string,
   key: string,
+  duration: Duration,
   totalSets: number,
   reset: boolean
 ): Promise<{
@@ -614,83 +637,49 @@ async function acquireCursor(
   error?: Record<string, unknown>;
   status?: number;
 }> {
-  const { data, error } = await supabase
-    .from("sync_state")
-    .select("key,state,locked_at,lock_owner")
-    .eq("key", key)
-    .maybeSingle();
-
-  if (error) return syncStateError(error);
-
-  const now = new Date().toISOString();
-  const existingState = (data?.state ?? {}) as CursorState;
-  const lockedAt = data?.locked_at ? new Date(data.locked_at).getTime() : 0;
-  if (!reset && lockedAt && Date.now() - lockedAt < LOCK_TTL_MS) {
-    return { state: existingState, lockOwner: null, locked: true, row: data };
-  }
-
-  const state: CursorState = reset
-    ? { nextIndex: 0, completedCycles: 0, totalSets }
-    : { ...existingState, nextIndex: normalizeIndex(existingState.nextIndex ?? 0, totalSets), totalSets };
-  const lockOwner = randomId();
-
-  const { error: upsertError } = await supabase
-    .from("sync_state")
-    .upsert(
-      {
-        key,
-        state,
-        locked_at: now,
-        lock_owner: lockOwner,
-        updated_at: now,
-      },
-      { onConflict: "key" }
-    );
-
-  if (upsertError) return syncStateError(upsertError);
-  return { state, lockOwner, locked: false };
+  return acquireProviderSyncState<CursorState>({
+    supabase,
+    scope: justTcgHistoryScope(gameId, duration, key),
+    lockTtlMs: LOCK_TTL_MS,
+    reset,
+    resetState: () => ({ nextIndex: 0, completedCycles: 0, totalSets }),
+    normalizeState: (existingState) => ({
+      ...existingState,
+      nextIndex: normalizeIndex(existingState.nextIndex ?? 0, totalSets),
+      totalSets,
+    }),
+  });
 }
 
 async function releaseCursor(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
+  gameId: string,
   key: string,
+  duration: Duration,
   lockOwner: string,
   state: CursorState
 ) {
-  await supabase
-    .from("sync_state")
-    .update({
-      state,
-      locked_at: null,
-      lock_owner: null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("key", key)
-    .eq("lock_owner", lockOwner);
+  await releaseProviderSyncState({
+    supabase,
+    scope: justTcgHistoryScope(gameId, duration, key),
+    lockOwner,
+    state,
+  });
 }
 
-function syncStateError(error: { code?: string; message?: string }) {
-  const message = error.message ?? "sync_state error";
-  if (error.code === "42P01" || message.includes("sync_state")) {
-    return {
-      state: {},
-      lockOwner: null,
-      locked: false,
-      status: 500,
-      error: {
-        error: "Missing sync_state table.",
-        migration: "Run schema-migration-v15-price-history-backfill.sql in Supabase.",
-        details: message,
-      },
-    };
-  }
+function justTcgHistoryScope(
+  gameId: string,
+  duration: Duration,
+  legacyKey: string
+): ProviderSyncScope {
   return {
-    state: {},
-    lockOwner: null,
-    locked: false,
-    status: 500,
-    error: { error: message },
+    gameId,
+    provider: "justtcg",
+    providerApiVersion: JUSTTCG_NORMALIZED_API_VERSION,
+    jobKey: "price_history",
+    scopeKey: duration,
+    legacyKey,
   };
 }
 
@@ -716,10 +705,14 @@ function advanceState(
   };
 }
 
-function expectedVariantLabel(name: string | null | undefined): string | null {
+function expectedVariantLabel(
+  name: string | null | undefined,
+  providerRarity?: string | null
+): string | null {
   const text = nullIfEmpty(name) ?? "";
   const extracted = extractVariantLabel(text);
   if (extracted) return extracted;
+  if (hasExplicitTreasureRareSignal(text, null, providerRarity)) return "TR";
 
   const tags: string[] = [];
   const re = /\(([^)]+)\)/g;
@@ -892,10 +885,6 @@ function pickSets(sets: DbSet[], startIndex: number, count: number): DbSet[] {
 
 function stateKey(duration: Duration) {
   return `justtcg_price_history_backfill_${duration}`;
-}
-
-function randomId() {
-  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
 }
 
 function setSortKey(code: string) {

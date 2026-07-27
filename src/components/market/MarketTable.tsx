@@ -18,6 +18,8 @@ interface MarketTableProps {
 
 export default function MarketTable({ cards: initialCards, sets, gameRouteSlug }: MarketTableProps) {
   const router = useRouter();
+  const commercialPriceLabel =
+    gameQueryValue(gameRouteSlug) === "riftbound" ? "JustTCG" : "TCG";
   const [search, setSearch] = useState("");
   const [selectedSet, setSelectedSet] = useState("all");
   const [selectedRarities, setSelectedRarities] = useState<string[]>([]);
@@ -88,7 +90,7 @@ export default function MarketTable({ cards: initialCards, sets, gameRouteSlug }
               <th className="w-[80px] py-3 px-3 text-right">24h</th>
               <th className="w-[80px] py-3 px-3 text-right">7d</th>
               <th className="w-[80px] py-3 px-3 text-right">30d</th>
-              <th className="w-[100px] py-3 px-3 text-right">TCG</th>
+              <th className="w-[100px] py-3 px-3 text-right">{commercialPriceLabel}</th>
               <th className="w-[100px] py-3 px-3 text-right">eBay</th>
             </tr>
           </thead>
@@ -147,7 +149,7 @@ export default function MarketTable({ cards: initialCards, sets, gameRouteSlug }
                 <ChangeCell value={card.price_stats?.chg_7d} />
                 <ChangeCell value={card.price_stats?.chg_30d} />
 
-                {/* TCG */}
+                {/* Commercial provider */}
                 <td className="py-3 px-3 text-right font-mono-2 text-[12.5px] text-ink-2 tabular-nums">
                   {formatPrice(card.price_stats?.tcg_market)}
                 </td>

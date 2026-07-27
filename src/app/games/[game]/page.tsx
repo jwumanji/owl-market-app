@@ -324,7 +324,9 @@ export default async function GameOverviewPage(
         <Link href={gamePath(game.routeSlug, "/sets")}>Open set index</Link>
         <Link href={gamePath(game.routeSlug, "/rarities")}>Open rarities</Link>
         <Link href={gamePath(game.routeSlug, "/markets")}>Open market status</Link>
-        <Link href={gamePath(game.routeSlug, "/characters")}>Open characters</Link>
+        <Link href={gamePath(game.routeSlug, game.slug === "riftbound" ? "/champions" : "/characters")}>
+          Open {game.slug === "riftbound" ? "champions" : "characters"}
+        </Link>
       </div>
 
       <div className="game-stat-grid">
