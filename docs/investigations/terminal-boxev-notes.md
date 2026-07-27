@@ -198,3 +198,88 @@ detail page's ratio overlay + facts row (audit: per-product trends honest).
   romance-dawn/awakening/carrying-on/anime-25th/OP16/EB03/PRB pages, no §3.5 on any case page.
 - Dashboard: VALUE RATIO chip absent; SET VALUE chip present; table view still shows the three
   ratio columns.
+
+## Classifier hardening
+
+**Date:** 2026-07-27 · **Files:** `src/lib/games/one-piece/booster-baseline.ts` (restructured),
+`scripts/audit-booster-baseline.mjs` (new tripwire), `package.json` (`audit:booster-baseline`).
+Prompted by the final-acceptance §C13b finding: `EVENT_ID_MARKERS` only ever caught what someone
+had already noticed (four hit-class leaks needed a fourth round of marker additions).
+
+### The id grammar (full-catalog sweep, 2026-07-27, 5,053 one_piece ids, all regions)
+
+Every `card_image_id` decomposes as `<PRINTEDCODE>-<number>[_<variant>]` for booster paper, while
+product/venue-origin cards append **extra hyphen segments after the number**
+(`OP09-001-magazine-promo`, `EB01-003-regional-prize`). Variant axes (`_p1` parallels ×1,007,
+`_r1` reprints ×328, `_sp_*`, `_jp_*`, `_tr_*`) are always underscore-spelled; zero ids carry
+both a hyphen suffix and an underscore suffix. Shape census: 4,063 plain · 656 `P-` promo ids ·
+327 hyphen-suffixed · 7 malformed. The 327 hyphen-suffixed ids span **33 distinct suffix tokens,
+every one a product/event/venue distribution** — the entire 20-entry `EVENT_ID_MARKERS` list was
+one structural rule wearing twenty disguises.
+
+**False-exclusion hunt (why the rule has two guards, not an allowlist):**
+
+- `OP07-OP07-037` "More Pizza!!" (UC $0.09) and `OP16-OP16-011-TR` "Vista (TR)" ($23.26) —
+  malformed doubled-code ids for real booster cards. Guard: the segment after the set code must
+  be all digits or the grammar does not apply.
+- `OP09-078-r1` "Gum-Gum Giant (Reprint)" (R $0.36) — a hyphen-spelled twin of the `_r1` reprint
+  ids; reprints stay included by design. Guard: a lone trailing `r<digits>` segment is a variant,
+  not a product origin.
+
+With both guards: **zero false exclusions across the catalog.** `EVENT_ID_MARKERS` is deleted;
+rule 2 is now `hasProductOriginIdSuffix()` — explicit `indexOf`/`split`/`charCodeAt` parsing of a
+measured grammar, not a regex catch-all (CLAUDE.md §8 honored in letter and intent: the sweep is
+the evidence that the shape means what we claim). `P-` rule, PR-rarity rule, base-rarity
+parallel/name rules, and the curated list are unchanged; the `"event-id"` reason literal is kept
+so no consumer changes.
+
+### Exclusion diff (structural rule vs the 20-marker list, whole catalog)
+
+**Newly excluded — 18 leaks the marker list missed** (17 structural + 1 name-marker, below):
+7× `-gift-collection` (ST01-006 at **$309.95**, ST01-013 $76.15, ST01-008 $70.63, ST03-008
+$31.52, OP01-021 $25.74, ST01-005 $14.31, ST09-012 —), 2× `-sound-loader` (EB02-010 $46.54,
+OP05-098 —), 3× `-tournament-prize` (ST13, unpriced), 2× `-crossover-promo` (EB02-010 Dodgers,
+ST13-003 BVB, unpriced), 1× `-treasure-booster` (ST10-006 $11.58), 1× `-sealed-battle-kit`
+(OP04-083, unpriced), 1× `-special-event` (ST01-007, unpriced). **Lost exclusions: zero.**
+9 already-excluded PR promo ids flip reason `pr-rarity`→`event-id` (rule order), inclusion
+unchanged.
+
+**EV impact: none.** No newly excluded card lands in a seeded set's priced slot (they sit in
+ST/OP01/OP05/OP13/EB02 populations or carry no price). All 13 Box EVs recomputed old-vs-new with
+the real module: identical to the cent — OP09 **$293.32** (post-§C13b figure, slots AA 79.16 ·
+TR 16.52 · SR 22.32 · L 130.96 · BULK 44.36), OP02 **$159.27** (AA 66.35 · SEC 5.04 · SR 46.55 ·
+L 1.48 · BULK 39.85) — matching the final-acceptance recompute.
+
+**One new plain-id leak found by the calibration sweep:** `OP13-084` "St. Shepherd Ju Peter
+**(Parallel)**" — R rarity, plain id, $18.12 vs OP13 R-base median $0.21 (86×). Its Gorosei
+siblings `OP13-080_p2`…`OP13-091_p2` are R parallels at $399–494; this is parallel data landed on
+the base id (jp row `OP13-084_jp_10106` prices the true base at $0.21). It is the only plain-id
+row in the catalog named "(Parallel)" — every other one sits on a `_p*` id — so `"(Parallel)"`
+joins `BULK_NAME_MARKERS` (same precedent as `"(SP)"`/OP06-047). OP13 is unseeded: no EV change.
+
+### The tripwire — `npm run audit:booster-baseline`
+
+Sweeps the live catalog (en, priced, deduped — loader parity) with the **real classifier module**
+(Node type-stripping import, never a re-implementation) and flags included cards via three
+detectors; nonzero exit + named rows on any flag:
+
+- **A · grammar invariant** — an included card with a `P-` id, a product-origin suffix, or PR
+  rarity. Zero by construction; fires on classifier regressions.
+- **B · peer-median multiple** — within `(printed_set_code, rarity, variant-bucket)` peers
+  (base/parallel/reprint/other buckets stop chase parallels being compared to bulk), flag
+  price > **250×** group median, groups of **8+**. Calibration: largest legit multiple today is
+  211× (ST21-009 "Nami" $31.62 vs $0.15 median — real chase paper, must not flag); smallest
+  known-leak multiple is 382× (OP06-047 were its name rule to regress); the OP09 L leaks sit at
+  909–965×, OP04-015 at ~1,000×.
+- **C · base-bucket absolute ceiling** — any plain-id card above **$400**. The most expensive
+  legit plain-id card in the catalog is ST10-010 (TR) $141.80; ~2.8× headroom. Covers sparse
+  groups B must skip (the $1,582 anniversary-set MR had no peers to median).
+
+**Acceptance, both proven 2026-07-27:** normal run → 4,390 priced cards, 3,369 included, **0
+flags, exit 0**. `--selftest` (re-includes the four §C13b leaks) → `OP09-001-magazine-promo`
+caught via A+B, `OP09-061-special-edition` A+B, `OP09-051-anniversary-set` A+C,
+`OP07-051-alt-art-promo` A. Documented blind spot: a plain-id product card priced *inside* the
+legit envelope with no same-class peers (the OP07-051 $141.90 pattern) is invisible to price
+detectors — only its id gives it away, which is exactly what the structural rule now reads.
+
+`npm run lint` clean after the restructure.
