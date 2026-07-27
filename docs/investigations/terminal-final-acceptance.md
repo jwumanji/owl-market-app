@@ -138,3 +138,11 @@ these four to `EVENT_ID_MARKERS` as a D8 call (deliberately **not** fixed by thi
 5. **The classifier leaks in §C13b** — the one substantive data-quality finding; D8 candidate.
 6. Lint/build/audit were run against the working tree with Phase G uncommitted, per the task; the
    riftbound audit failure needs a DB flag flip (or a launch-approval decision), not a Phase G edit.
+
+## Addendum 2026-07-28 — the red gate cleared
+
+`audit:game-boundaries` re-run after the `riftbound.is_public` revert: **PASS**
+(exit 0, cross-game 0, missing game_id 0; riftbound `is_public=false` probed
+live first). The Phase G sweep's sole FAIL was the out-of-band visibility flip,
+since reverted — see `codex-coordination.md` §"Game visibility is flipped from
+outside this repo". All acceptance gates for phases C–G are now green.
