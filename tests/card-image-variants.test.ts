@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 // @ts-ignore -- Node's native TypeScript test runner requires the explicit extension.
-import { cardImageSources } from "../src/lib/card-image-variants.ts";
+import {
+  cardImageSources,
+  cardImageSourcesAcrossCards,
+} from "../src/lib/card-image-variants.ts";
 
 const variants = {
   imageUrl: "large.webp",
@@ -45,5 +48,29 @@ test("missing and duplicate variants fall back without repeated requests", () =>
       "display",
     ),
     ["fallback.webp"],
+  );
+});
+
+test("representative artwork falls through to lower-ranked cards", () => {
+  assert.deepEqual(
+    cardImageSourcesAcrossCards(
+      [
+        {
+          imageUrl: "missing-expensive-card.jpg",
+          imageUrlPreview: "missing-expensive-card.jpg",
+        },
+        {
+          imageUrl: "available-runner-up.jpg",
+          imageUrlPreview: "available-runner-up.jpg",
+          imageUrlSmall: "available-runner-up-thumb.jpg",
+        },
+      ],
+      "preview",
+    ),
+    [
+      "missing-expensive-card.jpg",
+      "available-runner-up.jpg",
+      "available-runner-up-thumb.jpg",
+    ],
   );
 });

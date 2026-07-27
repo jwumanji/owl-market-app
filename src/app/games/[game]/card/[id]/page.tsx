@@ -8,12 +8,11 @@ import { ONE_PIECE_DB_SLUG } from "@/lib/games/one-piece";
 // Keep in sync with CATALOG_DATA_TTL_SECONDS (Next 15 requires a literal).
 export const revalidate = 3600;
 
-// Pre-render every priced card at build time (~20ms marginal per page, so
-// the whole priced catalog costs ~2min of build): a static CDN file means no
-// lambda cold start or cold queries for any card users can reach, and ISR
-// expiry serves stale-while-revalidate instead of blocking. Only unpriced /
-// catalog-only cards stay dynamic (dynamicParams defaults to true).
-const STATIC_CARD_COUNT = Number(process.env.CARD_STATIC_PARAMS_COUNT ?? 6000);
+// Card detail pages stay available through on-demand rendering (dynamicParams
+// defaults to true) and are cached by ISR after the first request. Operators
+// can opt a small hot set into build-time rendering, but the safe default is
+// zero so deployments do not depend on catalog size or database headroom.
+const STATIC_CARD_COUNT = Number(process.env.CARD_STATIC_PARAMS_COUNT ?? 0);
 
 export async function generateStaticParams() {
   try {

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 
 const REPORT_PATH = readArg("--report") ?? "game-boundary-audit.md";
-const REQUIRED_GAMES = ["one_piece", "riftbound"];
+const REQUIRED_GAMES = ["one_piece", "riftbound", "lorcana"];
 
 function readArg(name) {
   const prefix = `${name}=`;
@@ -123,6 +123,7 @@ async function main() {
   const gameBySlug = new Map(games.map((game) => [game.slug, game]));
   const onePiece = gameBySlug.get("one_piece");
   const riftbound = gameBySlug.get("riftbound");
+  const lorcana = gameBySlug.get("lorcana");
 
   const [
     sets,
@@ -143,6 +144,9 @@ async function main() {
     setExternalIds,
     sourceRecords,
     priceMappings,
+    sealedProducts,
+    sealedPriceHistory,
+    cardMarketSyncStatus,
   ] = await Promise.all([
     sbFetchAll("sets?select=id,game_id,slug,code,name"),
     sbFetchAll("cards?select=id,game_id,set_id,card_image_id,card_number,name"),
@@ -162,6 +166,9 @@ async function main() {
     sbFetchAll("set_external_ids?select=id,game_id,provider,external_id,set_id"),
     sbFetchAll("tcg_source_records?select=id,game_id,provider,record_type,external_id"),
     sbFetchAll("price_provider_mappings?select=id,game_id,provider,source_game_slug,is_active"),
+    sbFetchAll("sealed_products?select=id,game_id,set_id"),
+    sbFetchAll("sealed_product_price_history?select=id,game_id,sealed_product_id"),
+    sbFetchAll("card_market_sync_status?select=game_id,card_id,provider"),
   ]);
 
   const tables = [
@@ -183,6 +190,9 @@ async function main() {
     ["set_external_ids", setExternalIds],
     ["tcg_source_records", sourceRecords],
     ["price_provider_mappings", priceMappings],
+    ["sealed_products", sealedProducts],
+    ["sealed_product_price_history", sealedPriceHistory],
+    ["card_market_sync_status", cardMarketSyncStatus],
   ];
 
   const setsById = indexById(sets);
@@ -192,6 +202,7 @@ async function main() {
   const bundlesById = indexById(bundles);
   const ordersById = indexById(orders);
   const psaSubmissionsById = indexById(psaSubmissions);
+  const sealedProductsById = indexById(sealedProducts);
 
   const crossGameIssues = [
     ...findCrossGameRows(cards, setsById, "set_id", "cards.set_id"),
@@ -209,6 +220,19 @@ async function main() {
     ...findCrossGameRows(centeringMeasurements, inventoryItemsById, "inventory_item_id", "centering_measurements.inventory_item_id"),
     ...findCrossGameRows(cardExternalIds, cardsById, "card_id", "card_external_ids.card_id"),
     ...findCrossGameRows(setExternalIds, setsById, "set_id", "set_external_ids.set_id"),
+    ...findCrossGameRows(sealedProducts, setsById, "set_id", "sealed_products.set_id"),
+    ...findCrossGameRows(
+      sealedPriceHistory,
+      sealedProductsById,
+      "sealed_product_id",
+      "sealed_product_price_history.sealed_product_id"
+    ),
+    ...findCrossGameRows(
+      cardMarketSyncStatus,
+      cardsById,
+      "card_id",
+      "card_market_sync_status.card_id"
+    ),
   ];
 
   const globalCardDuplicates = duplicateKeys(cards, (card) => card.card_image_id);
@@ -232,13 +256,40 @@ async function main() {
     rows.filter((row) => !row.game_id).map((row) => ({ table, id: row.id }))
   );
 
-  const privateGateIssues = [];
-  if (!onePiece) privateGateIssues.push("Missing one_piece game row");
-  if (!riftbound) privateGateIssues.push("Missing riftbound game row");
-  if (onePiece && onePiece.is_active === false) privateGateIssues.push("one_piece is not active");
-  if (onePiece && onePiece.is_public === false) privateGateIssues.push("one_piece is not public");
-  if (riftbound && riftbound.is_active === false) privateGateIssues.push("riftbound is not active");
-  if (riftbound && riftbound.is_public !== false) privateGateIssues.push("riftbound should remain private until launch approval");
+  const launchGateIssues = [];
+  const riftboundPricingGateApproved =
+    riftbound?.metadata?.pricing_status === "deferred" ||
+    (
+      riftbound?.metadata?.pricing_status === "live" &&
+      riftbound?.metadata?.pricing_provider === "justtcg" &&
+      riftbound?.metadata?.justtcg_ingestion_status === "live_exact_matches"
+    );
+  const riftboundCatalogPreviewApproved =
+    riftbound?.is_public !== false &&
+    riftbound?.metadata?.launch_status === "public_catalog_preview" &&
+    riftbound?.metadata?.public_launch_scope === "catalog_and_tcgplayer_images" &&
+    riftbound?.metadata?.public_launch_gate === "tcgplayer_images_only" &&
+    riftboundPricingGateApproved;
+  const lorcanaPublicationApproved =
+    lorcana?.is_public !== false &&
+    lorcana?.metadata?.catalog_status === "live" &&
+    lorcana?.metadata?.publication_status === "live" &&
+    lorcana?.metadata?.pricing_status === "live_exact_matches" &&
+    lorcana?.metadata?.pricing_provider === "justtcg";
+  if (!onePiece) launchGateIssues.push("Missing one_piece game row");
+  if (!riftbound) launchGateIssues.push("Missing riftbound game row");
+  if (!lorcana) launchGateIssues.push("Missing lorcana game row");
+  if (onePiece && onePiece.is_active === false) launchGateIssues.push("one_piece is not active");
+  if (onePiece && onePiece.is_public === false) launchGateIssues.push("one_piece is not public");
+  if (riftbound && riftbound.is_active === false) launchGateIssues.push("riftbound is not active");
+  if (riftbound && riftbound.is_public === false) launchGateIssues.push("riftbound is not public");
+  if (riftbound && riftbound.is_public !== false && !riftboundCatalogPreviewApproved) {
+    launchGateIssues.push("riftbound is public without an approved catalog-preview and pricing gate");
+  }
+  if (lorcana && lorcana.is_active === false) launchGateIssues.push("lorcana is not active");
+  if (lorcana && lorcana.is_public !== false && !lorcanaPublicationApproved) {
+    launchGateIssues.push("lorcana is public without approved catalog and exact-price publication metadata");
+  }
 
   const gameCounts = [];
   for (const game of games) {
@@ -248,7 +299,7 @@ async function main() {
   }
 
   const hardFailures = [
-    ...privateGateIssues,
+    ...launchGateIssues,
     ...missingGameRows.map((row) => `${row.table}.${row.id} missing game_id`),
     ...crossGameIssues.map((row) => `${row.table}.${row.id} ${row.reason}`),
     ...scopedCardDuplicates.map((row) => `duplicate scoped card key ${row.key}`),
@@ -267,13 +318,31 @@ async function main() {
   report.push("## Game Rows");
   report.push("");
   report.push(mdTable(
-    ["Slug", "Name", "Active", "Public", "Route Slug"],
+    [
+      "Slug",
+      "Name",
+      "Active",
+      "Public",
+      "Route Slug",
+      "Launch",
+      "Catalog",
+      "Pricing",
+      "Pricing Provider",
+      "Ingestion",
+      "Publication",
+    ],
     games.map((game) => [
       game.slug,
       game.name,
       game.is_active !== false ? "yes" : "no",
       game.is_public !== false ? "yes" : "no",
       game.metadata?.route_slug ?? "",
+      game.metadata?.launch_status ?? "",
+      game.metadata?.catalog_status ?? "",
+      game.metadata?.pricing_status ?? "",
+      game.metadata?.pricing_provider ?? "",
+      game.metadata?.justtcg_ingestion_status ?? "",
+      game.metadata?.publication_status ?? "",
     ])
   ));
   report.push("");

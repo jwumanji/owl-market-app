@@ -18,23 +18,24 @@ export const revalidate = 900;
 export const metadata = {
   title: "Moon Market — See what others miss",
   description:
-    "TCG Market Intelligence. Real-time price tracking, market trends, and portfolio tools — built for serious TCG players and collectors. Currently powering One Piece TCG.",
+    "TCG market intelligence for One Piece TCG, Riftbound, and Disney Lorcana, with live prices, market trends, and collector tools.",
 };
 
 const GAMES = [
-  { name: "One Piece TCG", href: gamePath(DEFAULT_PUBLIC_GAME_ROUTE_SLUG, "/markets"), enabled: true, status: "Live", emoji: "🏴‍☠️" },
-  { name: "Pokémon TCG", href: null, enabled: false, status: "Soon", emoji: "⚡" },
-  { name: "Magic: The Gathering", href: null, enabled: false, status: "Soon", emoji: "🧙" },
-  { name: "Riftbound", href: gamePath("riftbound"), enabled: false, status: "Preview", emoji: "🌀" },
-  { name: "Dragon Ball Z", href: null, enabled: false, status: "Soon", emoji: "🐉" },
+  { routeSlug: DEFAULT_PUBLIC_GAME_ROUTE_SLUG, name: "One Piece TCG", href: gamePath(DEFAULT_PUBLIC_GAME_ROUTE_SLUG, "/markets"), enabled: true, status: "Live", emoji: "🏴‍☠️" },
+  { routeSlug: "riftbound", name: "Riftbound", href: gamePath("riftbound"), enabled: false, status: "Preview", emoji: "🌀" },
+  { routeSlug: "lorcana", name: "Disney Lorcana", href: gamePath("lorcana"), enabled: false, status: "Preview", emoji: "✨" },
+  { routeSlug: null, name: "Pokémon TCG", href: null, enabled: false, status: "Soon", emoji: "⚡" },
+  { routeSlug: null, name: "Magic: The Gathering", href: null, enabled: false, status: "Soon", emoji: "🧙" },
+  { routeSlug: null, name: "Dragon Ball Z", href: null, enabled: false, status: "Soon", emoji: "🐉" },
 ] as const;
 
-async function fetchRiftboundTileState() {
+async function fetchGameTileState(gameRouteSlug: string) {
   const privatePreview = allowsPrivateGamePreview();
-  return cachedPublicData(publicDataCacheKey("home-riftbound-tile", privatePreview), async () => {
+  return cachedPublicData(publicDataCacheKey("home-game-tile", gameRouteSlug, privatePreview), async () => {
     try {
       const supabase = createCachedServiceClient(PRICE_DATA_TTL_SECONDS);
-      const gameResult = await resolveGameScope(supabase, "riftbound", {
+      const gameResult = await resolveGameScope(supabase, gameRouteSlug, {
         defaultToOnePiece: false,
         publicOnly: false,
       });
@@ -113,16 +114,22 @@ async function fetchTopCards(): Promise<TeaserCard[]> {
 }
 
 export default async function Home() {
-  const [topCards, riftboundTile] = await Promise.all([
+  const [topCards, riftboundTile, lorcanaTile] = await Promise.all([
     fetchTopCards(),
-    fetchRiftboundTileState(),
+    fetchGameTileState("riftbound"),
+    fetchGameTileState("lorcana"),
   ]);
   const marketHref = gamePath(DEFAULT_PUBLIC_GAME_ROUTE_SLUG, "/markets");
-  const games = GAMES.map((game) =>
-    game.name === "Riftbound"
-      ? { ...game, enabled: riftboundTile.enabled, status: riftboundTile.status }
-      : game,
-  );
+  const tileStateByRouteSlug = new Map([
+    ["riftbound", riftboundTile],
+    ["lorcana", lorcanaTile],
+  ]);
+  const games = GAMES.map((game) => {
+    const tileState = game.routeSlug ? tileStateByRouteSlug.get(game.routeSlug) : null;
+    return tileState
+      ? { ...game, enabled: tileState.enabled, status: tileState.status }
+      : game;
+  });
 
   return (
     <main className="c-home-main">
@@ -140,7 +147,7 @@ export default async function Home() {
           </h1>
           <p className="c-hero-sub">
             Real-time price tracking, market trends, and portfolio tools — built for serious TCG
-            players and collectors. Currently powering One Piece TCG, with more games coming.
+            players and collectors. Live across One Piece TCG, Riftbound, and Disney Lorcana.
           </p>
         </section>
 

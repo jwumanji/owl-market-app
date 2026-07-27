@@ -308,7 +308,6 @@
 
 .catalog-card-art {
   min-height: 260px;
-  border: 1.5px solid var(--ink);
   border-radius: 8px;
   background: linear-gradient(135deg, var(--bg-3), var(--bg));
   display: flex;
