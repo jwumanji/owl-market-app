@@ -13,6 +13,7 @@
     "golden:cards": "node scripts/card-api-golden.mjs",
     "golden:gate4-expected-diffs": "node scripts/capture-gate4-expected-diffs.mjs",
     "audit:game-boundaries": "node scripts/audit-game-boundaries.mjs",
+    "audit:booster-baseline": "node scripts/audit-booster-baseline.mjs",
     "audit:sync-schedule": "node scripts/sync-schedule-manifest.mjs",
     "sync-schedule:generate": "node scripts/sync-schedule-manifest.mjs --write",
     "audit:public-performance": "node scripts/audit-public-performance.mjs",
