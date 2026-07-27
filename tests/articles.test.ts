@@ -5,7 +5,6 @@ import {
   articleReadMinutes,
   formatArticleDate,
   slugifyArticleTitle,
-// @ts-expect-error Node's direct TypeScript test runner requires the file extension.
 } from "../src/lib/articles.ts";
 
 test("article slugs are URL-safe and stable", () => {
