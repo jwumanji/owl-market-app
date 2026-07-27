@@ -11,14 +11,17 @@ import "./sets.css";
 type SortKey = "rank" | "code" | "name" | "price" | "chg1d" | "chg7d" | "chg30d" | "cards";
 type SortDir = "asc" | "desc";
 type SetType = NonNullable<SetData["type"]>;
-type TypeFilter = "all" | SetType;
+type TypeFilter = "all" | "promo_products" | SetType;
+type ListedTypeFilter = Exclude<TypeFilter, "all">;
+
+const PROMO_PRODUCT_TYPES: SetType[] = ["anniversary", "collection", "special"];
 
 const TYPE_LABELS: Record<SetType, string> = {
   op: "Booster",
   eb: "Extra Booster",
   prb: "Premium",
   st: "Starter Deck",
-  promo: "Promo",
+  promo: "Promo Cards",
   anniversary: "Anniversary",
   collection: "Card Collection",
   special: "Special Set",
@@ -27,7 +30,13 @@ const TYPE_LABELS: Record<SetType, string> = {
   judge: "Judge",
 };
 
-const TYPE_ORDER: SetType[] = ["op", "eb", "prb", "main", "st", "anniversary", "collection", "special", "promo", "organized", "judge"];
+const TYPE_ORDER: ListedTypeFilter[] = ["op", "eb", "prb", "main", "st", "promo_products", "anniversary", "collection", "special", "promo", "organized", "judge"];
+
+function typeFilterLabel(type: TypeFilter) {
+  if (type === "all") return "All";
+  if (type === "promo_products") return "Promo";
+  return TYPE_LABELS[type];
+}
 
 function classify(code: string): SetType {
   if (["OGN", "SFD", "UNL"].includes(code)) return "main";
@@ -192,7 +201,10 @@ export default function SetsClient({
     for (const s of sets) present.add(s.type ?? classify(s.code));
     const tabs: Array<{ key: TypeFilter; label: string }> = [{ key: "all", label: "All" }];
     for (const type of TYPE_ORDER) {
-      if (present.has(type)) tabs.push({ key: type, label: TYPE_LABELS[type] });
+      const isPresent = type === "promo_products"
+        ? PROMO_PRODUCT_TYPES.some((promoType) => present.has(promoType))
+        : present.has(type);
+      if (isPresent) tabs.push({ key: type, label: typeFilterLabel(type) });
     }
     return tabs;
   }, [sets]);
@@ -206,7 +218,11 @@ export default function SetsClient({
   const filtered = useMemo(() => {
     return sets.filter((s) => {
       const t = s.type ?? classify(s.code);
-      if (typeFilter !== "all" && t !== typeFilter) return false;
+      if (typeFilter === "promo_products") {
+        if (!PROMO_PRODUCT_TYPES.includes(t)) return false;
+      } else if (typeFilter !== "all" && t !== typeFilter) {
+        return false;
+      }
       if (yearFilter !== "all" && String(s.year) !== yearFilter) return false;
       if (search) {
         const q = search.toLowerCase();
