@@ -18,7 +18,7 @@ export const revalidate = 900;
 export const metadata = {
   title: "Moon Market — See what others miss",
   description:
-    "TCG Market Intelligence. Real-time price tracking, market trends, and portfolio tools — built for serious TCG players and collectors. Currently powering One Piece TCG.",
+    "TCG market intelligence for One Piece TCG, Riftbound, and Disney Lorcana, with live prices, market trends, and collector tools.",
 };
 
 const GAMES = [

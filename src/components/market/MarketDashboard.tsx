@@ -527,7 +527,7 @@ function SetsSection({ data, gameRouteSlug }: { data: DashboardData; gameRouteSl
         {sets.length === 0 ? (
           <div className="qd-section-empty">
             <strong>Sealed pricing is coming online.</strong>
-            <span>Explore the Riftbound set library while booster box coverage fills in.</span>
+            <span>Explore the set library while booster box coverage fills in.</span>
           </div>
         ) : sets.map((item, index) => {
           const valueMultiple = sealedValueMultiple(item.total_set_value, item.market_avg);

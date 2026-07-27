@@ -343,6 +343,18 @@ test("Lorcana stays wired into the homepage and canonical production schedule", 
   );
 });
 
+test("Lorcana is required by the cross-game production boundary audit", () => {
+  const audit = fs.readFileSync(
+    path.join(process.cwd(), "scripts/audit-game-boundaries.mjs"),
+    "utf8"
+  );
+
+  assert.match(audit, /REQUIRED_GAMES = \["one_piece", "riftbound", "lorcana"\]/);
+  assert.match(audit, /lorcana\?\.metadata\?\.catalog_status === "live"/);
+  assert.match(audit, /lorcana\?\.metadata\?\.pricing_status === "live_exact_matches"/);
+  assert.match(audit, /lorcana\?\.metadata\?\.pricing_provider === "justtcg"/);
+});
+
 test("Lorcana franchises and promos resolve to filtered catalog views", () => {
   const franchisePage = fs.readFileSync(
     path.join(process.cwd(), "src/app/games/[game]/franchises/page.tsx"),
@@ -360,4 +372,25 @@ test("Lorcana franchises and promos resolve to filtered catalog views", () => {
   assert.match(franchisePage, /\?franchise=/);
   assert.match(promoPage, /\?variant=PROMO/);
   assert.match(catalogPage, /\.eq\("attribute", selectedFranchise\)/);
+});
+
+test("shared market empty states do not leak another game's name", () => {
+  const dashboard = fs.readFileSync(
+    path.join(process.cwd(), "src/components/market/MarketDashboard.tsx"),
+    "utf8"
+  );
+
+  assert.doesNotMatch(dashboard, /Explore the Riftbound set library/);
+  assert.match(dashboard, /Explore the set library while booster box coverage fills in/);
+});
+
+test("games without an explicit ticker never inherit One Piece prices", () => {
+  const ticker = fs.readFileSync(
+    path.join(process.cwd(), "src/components/layout/Ticker.tsx"),
+    "utf8"
+  );
+
+  assert.match(ticker, /gameRouteSlug === ONE_PIECE_ROUTE_SLUG/);
+  assert.match(ticker, /if \(!tickerData\) return null/);
+  assert.doesNotMatch(ticker, /\? RIFTBOUND_TICKER : ONE_PIECE_TICKER/);
 });

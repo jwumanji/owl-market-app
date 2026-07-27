@@ -11,6 +11,10 @@ const routePath = path.join(
   process.cwd(),
   "src/app/api/sync/market-index-snapshots/route.ts"
 );
+const publicScheduleMigrationPath = path.join(
+  process.cwd(),
+  "supabase/migrations/20260727120000_public_game_market_index_snapshot_schedule.sql"
+);
 
 test("market index snapshots persist private idempotent 7D and 30D history", () => {
   const sql = fs.readFileSync(migrationPath, "utf8");
@@ -49,4 +53,15 @@ test("snapshot sync endpoint authenticates before invoking the capture RPC", () 
   assert.ok(rpcIndex > authIndex);
   assert.match(route, /const ISO_DATE = \/\^\\d\{4\}-\\d\{2\}-\\d\{2\}\$\//);
   assert.match(route, /p_snapshot_date: snapshotDate/);
+});
+
+test("weekly market snapshots include every active public game", () => {
+  const sql = fs.readFileSync(publicScheduleMigrationPath, "utf8");
+
+  assert.match(sql, /where jobname in \(/);
+  assert.match(sql, /'one-piece-market-index-snapshots'/);
+  assert.match(sql, /'public-game-market-index-snapshots'/);
+  assert.match(sql, /where games\.is_active = true/);
+  assert.match(sql, /and games\.is_public = true/);
+  assert.doesNotMatch(sql, /where games\.slug = 'one_piece'/);
 });

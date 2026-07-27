@@ -138,6 +138,7 @@ test("game boundary audit gates Riftbound live pricing on exact JustTCG ingestio
   assert.match(audit, /pricing_status === "live"/);
   assert.match(audit, /pricing_provider === "justtcg"/);
   assert.match(audit, /justtcg_ingestion_status === "live_exact_matches"/);
+  assert.match(audit, /riftbound\.is_public === false/);
 });
 
 test("provider sync helper uses the atomic lock RPC when available", async () => {

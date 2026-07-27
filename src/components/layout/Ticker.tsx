@@ -1,4 +1,5 @@
 import { RIFTBOUND_ROUTE_SLUG } from "@/lib/games/registry";
+import { ONE_PIECE_ROUTE_SLUG } from "@/lib/games/one-piece";
 
 type TickerDatum = { n: string; p: string; c: string; up: boolean };
 
@@ -41,7 +42,13 @@ function TickerItem({ n, p, c, up }: TickerDatum) {
 }
 
 export default function Ticker({ gameRouteSlug }: { gameRouteSlug?: string | null }) {
-  const tickerData = gameRouteSlug === RIFTBOUND_ROUTE_SLUG ? RIFTBOUND_TICKER : ONE_PIECE_TICKER;
+  const tickerData = gameRouteSlug === RIFTBOUND_ROUTE_SLUG
+    ? RIFTBOUND_TICKER
+    : gameRouteSlug === ONE_PIECE_ROUTE_SLUG
+      ? ONE_PIECE_TICKER
+      : null;
+  if (!tickerData) return null;
+
   const items = [...tickerData, ...tickerData];
 
   return (

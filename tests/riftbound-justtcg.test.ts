@@ -192,3 +192,21 @@ test("Riftbound reconciliation migration keeps catalog and pricing authority sep
   assert.match(sql, /on conflict \(game_id, card_id\)/);
   assert.match(sql, /'policy', 'riftbound_near_mint_normal_v1'/);
 });
+
+test("Riftbound publication recovery is gated by live catalog and exact pricing", () => {
+  const sql = fs.readFileSync(
+    path.join(
+      process.cwd(),
+      "supabase/migrations/20260727110000_restore_riftbound_publication.sql"
+    ),
+    "utf8"
+  );
+
+  assert.match(sql, /riftbound_set_count < 7/);
+  assert.match(sql, /riftbound_card_count < 1000/);
+  assert.match(sql, /riftbound_priced_card_count < 1000/);
+  assert.match(sql, /launch_status' <> 'public_catalog_preview'/);
+  assert.match(sql, /pricing_status' <> 'live'/);
+  assert.match(sql, /justtcg_ingestion_status' <> 'live_exact_matches'/);
+  assert.match(sql, /is_public = true/);
+});
