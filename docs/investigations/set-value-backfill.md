@@ -1,5 +1,11 @@
 # Set-value snapshot backfill (Phase C5 / D3) — STOPPED at the regression gate
 
+> **UPDATE 2026-07-27 — executed.** Option 2 (per-set anchoring) was approved and run;
+> the out-of-sample gate against the new pg_cron 2026-07-26 snapshot passed (median |Δ|
+> 0.00%, worst 0.50%) and **254 rows were written**. §§1–7 below record the original
+> stopped run unchanged; see **“Executed 2026-07-27 — anchored method (option 2)”** at
+> the bottom for what is now in the database.
+
 **Date:** 2026-07-26 · **Branch:** `feat/moon-terminal` · **Script:** `scripts/backfill-set-value-snapshots.mjs`
 **Outcome: NO ROWS WRITTEN.** The mandatory regression gate failed (max |Δ| **+32.70%** vs the findings'
 +0.04–4.17% range), the script refused `--write` by design, and the root cause turns out to invalidate
@@ -221,3 +227,209 @@ Zero writes. Weeks written: none. Skips executed: none (the run never reached th
 4. Minor: brief said ~88k One Piece `price_history` rows / 53 codes with 07-23 coverage; live today:
    89,013 rows (one more sync day), 51 current printed codes (OP16 and two others churned), 4,678 en
    cards with a printed code. `chg_*` policy is stricter than the brief anticipated (§5, first bullet).
+
+---
+
+## Executed 2026-07-27 — anchored method (option 2)
+
+**Approved by Justin; run 2026-07-27 (dry run 09:26:06Z, write 09:34:56Z — backfilled
+rows carry `captured_at 2026-07-27T09:34:56.959Z`).
+Script: `scripts/backfill-set-value-snapshots.mjs` (extended in place —
+dry-run default, `--write` flag, gates refuse writes). Outcome: out-of-sample gate PASSED,
+254 rows written across the five Sundays. Stored 2026-07-23 and 2026-07-26 batches
+byte-untouched (verified: 53 rows each, original `captured_at` values, index sums
+363,628.97 / 364,229.77 unchanged).**
+
+### The new fact that made this validatable
+
+pg_cron job 1 fired on schedule Sunday **2026-07-26 23:40 UTC** and wrote a second stored
+batch (53 rows, `captured_at 2026-07-26T23:40:00.225203Z`) — it did not exist when the
+method was designed, making it a genuine out-of-sample target: anchor factors computed
+solely from 07-23 were required to predict the stored 07-26 values.
+
+### Method
+
+- Per set: `anchor_factor = stored_index_value(07-23) / reconstructed(07-23)` at the
+  stored capture's exact cutoff `2026-07-23T09:45:14.932882Z`. Reconstruction semantics
+  identical to §1 (printed_set_code population, `region='en'`, `card_image_id` dedupe,
+  as-of carry-forward from `price_history`; 89,657 history rows ≤ 07-26 23:40 fetched).
+- Backfilled `index_value` = `anchor_factor × reconstructed(week)` for Sundays 06-21 →
+  07-19, cutoff 23:40 UTC each (the cron time).
+- Gate: write only if median |Δ| ≤ 2% **and** worst |Δ| ≤ 10% on the 07-26 prediction.
+
+### Out-of-sample gate — PASSED, no exclusions needed
+
+**Median |Δ| 0.00% (gate 2%) · worst |Δ| +0.50% (EB02, gate 10%) · 50 comparable sets.**
+Full table (prediction = 07-23 anchor factor × reconstruction at the 07-26 stored cutoff):
+
+| set | stored 07-26 | anchored prediction | Δ | population churn |
+| --- | ---: | ---: | ---: | --- |
+| EB01 | 12380.93 | 12380.90 | -0.00% | no |
+| EB02 | 9173.21 | 9218.98 | +0.50% | no |
+| EB03 | 7244.31 | 7244.31 | -0.00% | no |
+| EB04 | 1467.32 | 1467.32 | +0.00% | no |
+| OP01 | 24678.43 | 24676.32 | -0.01% | no |
+| OP02 | 12049.27 | 12049.27 | -0.00% | no |
+| OP03 | 7892.63 | 7894.11 | +0.02% | no |
+| OP04 | 3362.86 | 3362.85 | -0.00% | no |
+| OP05 | 44892.51 | 44886.07 | -0.01% | no |
+| OP06 | 20548.72 | 20545.38 | -0.02% | no |
+| OP07 | 28413.19 | 28412.96 | -0.00% | no |
+| OP08 | 11408.27 | 11409.06 | +0.01% | no |
+| OP09 | 48632.90 | 48630.84 | -0.00% | no |
+| OP10 | 6983.47 | 6981.90 | -0.02% | no |
+| OP11 | 6276.00 | 6275.85 | -0.00% | no |
+| OP12 | 6996.49 | 6993.43 | -0.04% | no |
+| OP13 | 38394.04 | 38394.23 | +0.00% | no |
+| OP14 | 6016.02 | 6016.02 | +0.00% | no |
+| OP15 | 2587.24 | 2587.22 | -0.00% | **YES (147→146)** |
+| OP16 | 25.60 | — | — | excluded: anchor uncomputable (catalog-deleted) |
+| P | 18142.13 | 18142.13 | +0.00% | **YES (297→291)** |
+| PRB01 | 111.67 | 111.67 | +0.00% | no |
+| PRB02 | 10622.07 | 10622.07 | +0.00% | no |
+| ST01 | 15637.64 | 15637.61 | -0.00% | no |
+| ST02 | 502.73 | 502.73 | +0.00% | no |
+| ST03 | 2246.94 | 2246.80 | -0.01% | no |
+| ST04 | 1580.35 | 1580.35 | +0.00% | no |
+| ST05 | 36.35 | 36.35 | +0.00% | no |
+| ST06 | 911.24 | 911.24 | -0.00% | no |
+| ST07 | 1122.09 | 1122.09 | +0.00% | no |
+| ST08 | 25.33 | 25.33 | +0.00% | no |
+| ST09 | 51.36 | 51.36 | +0.00% | no |
+| ST10 | 3718.68 | 3718.68 | +0.00% | no |
+| ST11 | 21.07 | 21.07 | +0.00% | no |
+| ST12 | 559.59 | 559.60 | +0.00% | no |
+| ST13 | 1877.31 | 1877.31 | +0.00% | no |
+| ST14 | 171.59 | 171.59 | -0.00% | no |
+| ST15 | 1170.21 | 1170.21 | -0.00% | no |
+| ST16 | 432.43 | 432.44 | +0.00% | no |
+| ST17 | 1528.86 | 1528.86 | +0.00% | no |
+| ST18 | 1493.62 | 1493.68 | +0.00% | no |
+| ST19 | 6.73 | 6.73 | +0.00% | no |
+| ST20 | 3.43 | 3.43 | +0.00% | no |
+| ST21 | 2151.43 | 2151.43 | +0.00% | no |
+| ST22 | 68.01 | 68.01 | +0.00% | no |
+| ST23 | 14.69 | 14.69 | +0.00% | no |
+| ST24 | 9.81 | 9.81 | +0.00% | no |
+| ST25 | 2.91 | 2.91 | +0.00% | no |
+| ST26 | 581.67 | 581.67 | +0.00% | no |
+| ST27 | 2.26 | 2.26 | +0.00% | no |
+| ST28 | 2.16 | 2.16 | +0.00% | no |
+| ST29 | 0.00 | 0.00 | matched (empty) | — |
+| ST30 | 0.00 | 0.00 | matched (empty) | — |
+
+The churn-flagged sets (OP15, P) predicted to within rounding — both stored batches share
+the pre-churn population basis, both reconstructions share today's basis, so the anchor
+absorbs the population deficit along with the pipeline offset. **No churn exclusions were
+required; the gate passed on all 50 comparable sets.** This also validates §4's premise:
+the §3 pipeline divergence is a stable per-set offset over the 3-day window, exactly what
+chain-linking assumes.
+
+### Anchor factors (from the 07-23 stored batch)
+
+| set | stored 07-23 | recon 07-23 | raw Δ | anchor factor |
+| --- | ---: | ---: | ---: | ---: |
+| EB01 | 12379.97 | 12773.70 | +3.18% | 0.969177 |
+| EB02 | 9175.60 | 9182.74 | +0.08% | 0.999222 |
+| EB03 | 7205.81 | 7205.81 | +0.00% | 1.000000 |
+| EB04 | 1467.36 | 1478.04 | +0.73% | 0.992774 |
+| OP01 | 24617.93 | 25645.59 | +4.17% | 0.959928 |
+| OP02 | 12135.18 | 12135.18 | +0.00% | 1.000000 |
+| OP03 | 7918.62 | 7917.19 | -0.02% | 1.000181 |
+| OP04 | 3348.06 | 3350.80 | +0.08% | 0.999182 |
+| OP05 | 44675.28 | 46042.42 | +3.06% | 0.970307 |
+| OP06 | 20250.40 | 20479.65 | +1.13% | 0.988806 |
+| OP07 | 28397.27 | 28805.31 | +1.44% | 0.985835 |
+| OP08 | 11421.17 | 11528.65 | +0.94% | 0.990677 |
+| OP09 | 48573.99 | 48578.70 | +0.01% | 0.999903 |
+| OP10 | 6973.42 | 7138.70 | +2.37% | 0.976847 |
+| OP11 | 6285.16 | 6285.31 | +0.00% | 0.999976 |
+| OP12 | 7011.71 | 7014.49 | +0.04% | 0.999604 |
+| OP13 | 38460.90 | 38458.98 | -0.00% | 1.000050 |
+| OP14 | 6016.02 | 6011.82 | -0.07% | 1.000699 |
+| OP15 | 2587.32 | 2303.52 | -10.97% | 1.123203 |
+| OP16 | 25.60 | — | — | SKIP — catalog-deleted, anchor uncomputable |
+| P | 18142.13 | 24075.14 | +32.70% | 0.753563 |
+| PRB01 | 111.67 | 111.67 | -0.00% | 1.000000 |
+| PRB02 | 10622.07 | 10618.65 | -0.03% | 1.000322 |
+| ST01 | 15631.11 | 15692.61 | +0.39% | 0.996081 |
+| ST02 | 503.43 | 503.44 | +0.00% | 0.999980 |
+| ST03 | 2244.91 | 2416.28 | +7.63% | 0.929077 |
+| ST04 | 1580.18 | 1579.37 | -0.05% | 1.000513 |
+| ST05 | 36.35 | 36.31 | -0.11% | 1.001102 |
+| ST06 | 911.96 | 911.09 | -0.10% | 1.000955 |
+| ST07 | 1122.09 | 1146.40 | +2.17% | 0.978794 |
+| ST08 | 25.33 | 25.33 | +0.00% | 1.000000 |
+| ST09 | 51.36 | 51.36 | +0.00% | 1.000000 |
+| ST10 | 3723.14 | 3723.14 | +0.00% | 1.000000 |
+| ST11 | 21.07 | 20.37 | -3.32% | 1.034364 |
+| ST12 | 559.10 | 551.80 | -1.31% | 1.013229 |
+| ST13 | 1876.38 | 1875.69 | -0.04% | 1.000368 |
+| ST14 | 152.47 | 152.48 | +0.01% | 0.999934 |
+| ST15 | 1169.79 | 1169.79 | +0.00% | 1.000000 |
+| ST16 | 429.33 | 429.60 | +0.06% | 0.999372 |
+| ST17 | 1528.86 | 1515.31 | -0.89% | 1.008942 |
+| ST18 | 1487.99 | 1487.98 | -0.00% | 1.000007 |
+| ST19 | 6.73 | 6.73 | +0.00% | 1.000000 |
+| ST20 | 3.43 | 3.43 | +0.00% | 1.000000 |
+| ST21 | 2080.43 | 2080.43 | +0.00% | 1.000000 |
+| ST22 | 68.01 | 68.01 | +0.00% | 1.000000 |
+| ST23 | 14.22 | 14.22 | +0.00% | 1.000000 |
+| ST24 | 9.81 | 9.81 | -0.00% | 1.000000 |
+| ST25 | 2.91 | 2.91 | +0.00% | 1.000000 |
+| ST26 | 581.74 | 581.74 | +0.00% | 1.000000 |
+| ST27 | 2.26 | 2.26 | +0.00% | 1.000000 |
+| ST28 | 1.94 | 1.94 | +0.00% | 1.000000 |
+| ST29 | 0.00 | 0.00 | — | empty — zero rows mirrored |
+| ST30 | 0.00 | 0.00 | — | empty — zero rows mirrored |
+
+### Rows written — before / after (live-verified after the run)
+
+| snapshot_date | before | after | written |
+| --- | ---: | ---: | ---: |
+| 2026-06-21 | 0 | 51 | 51 |
+| 2026-06-28 | 0 | 51 | 51 |
+| 2026-07-05 | 0 | 51 | 51 |
+| 2026-07-12 | 0 | 50 | 50 |
+| 2026-07-19 | 0 | 51 | 51 |
+| 2026-07-23 | 53 | 53 | 0 (stored — untouched) |
+| 2026-07-26 | 53 | 53 | 0 (stored — untouched) |
+| **total set rows** | **106** | **360** | **+254** |
+
+Each clean week = 49 anchored sets + 2 empty (ST29/ST30 zero rows, classified 'empty' —
+mirrors cron semantics). `chg_7d`/`chg_30d` NULL on every row; `region='en'`,
+`price_basis='tcg_market'`, `metric_version=1`, `set_id` resolved by exact code (0 nulls);
+`captured_at` = actual run time. Upsert was `ON CONFLICT (game_id, entity_type,
+entity_key, snapshot_date) DO NOTHING`.
+
+### Skips (16 total)
+
+| set | weeks | reason |
+| --- | --- | --- |
+| EB04 | all 5 | median carried-price staleness 40.5–68.5d > 10d (EB04's history only became dense in mid-July; a backfilled value would be a carry-forward plateau) |
+| OP16 | all 5 | catalog-deleted (0 cards in any region today) — anchor uncomputable; per approved brief |
+| PRB01 | 2026-07-12 only | median staleness 11.2d > 10d |
+| N | all 5 | catalog re-parse artifact code, outside the 53 stored codes — excluded per approved brief |
+
+### Disclosure — backfilled values are anchored, not direct sums
+
+The 5 written weeks carry `index_value = anchor_factor × Σ price_history.tcg_market`
+(as-of), **not** the `Σ price_stats.tcg_market` a real capture run computes. The schema
+has no field to mark this (and no DDL was permitted), so this section is the disclosure
+of record: method, per-set anchor factors (table above), affected rows = all 254 rows
+with `snapshot_date ∈ {2026-06-21, 06-28, 07-05, 07-12, 07-19}`. Rows with
+`snapshot_date ≥ 2026-07-23` are genuine capture output. `card_count`/`priced_count` on
+backfilled rows reflect the reconstruction population (today's catalog), which on OP15
+(146) and P (291) differs from the stored batches' pre-churn basis (147/297) — the
+`index_value` is anchored to the stored basis, the counts are what was actually counted.
+
+### Anomaly worth recording — the cron saw a pre-churn catalog
+
+The stored 07-26 batch (written 23:40 UTC Sunday) carries card/priced counts **identical
+to 07-23 for all 53 codes** — OP16 present (1 card), OP15 147, P 297, no "N" — while this
+repo's live reads on 07-26 daytime (§3) *and* on 07-27 both show the churned catalog
+(OP16 gone, OP15 146, P 291, "N" present with 6 cards). So the catalog was evidently
+restored to its pre-churn state before the cron fired and re-churned afterwards —
+Codex-machine catalog churn is oscillating, not monotonic. Nothing in this backfill
+depends on which state is "right" (the anchor absorbs it, out-of-sample proof above),
+but anything else that joins `cards` should expect this instability.
