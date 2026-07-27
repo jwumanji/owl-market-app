@@ -316,8 +316,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .c-lockup-brand {
   display: block;
-  width: 155px;
-  height: 36px;
+  width: 180px;
+  height: auto;
 }
 
 .c-lockup-mark-mobile {
@@ -478,9 +478,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   display: inline-flex;
   align-items: baseline;
 }
-
-/* The supplied Moon Market wordmark is outlined, so it paints consistently
-   without waiting for a logo-specific webfont. */
 
 .c-nav-links {
   display: inline-flex;

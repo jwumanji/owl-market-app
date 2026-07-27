@@ -15,6 +15,10 @@
 | `moon-mark-{64,128,256,512,1024}.png` | Raster mark, transparent bg |
 | `moon-mark-cream-1024.png` | Raster mark on cream, 1024×1024 |
 | `moon-lockup-1600.png` | Raster lockup, 1600×372 (rendered from the outlined version) |
+| `moon-market-lockup-subtitle.svg` | Light-background lockup with the "TCG Market Intelligence" subtitle |
+| `moon-market-lockup-subtitle-dark.svg` | Dark-background lockup with the subtitle |
+| `moon-market-lockup-subtitle-1600.png` | Font-independent light-background lockup used by the website |
+| `moon-market-lockup-subtitle-dark-1200.png` | Font-independent dark-background lockup |
 | `favicon-{32,512}.png` | Raster favicon |
 
 ## Tokens
