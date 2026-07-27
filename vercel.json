@@ -33,6 +33,10 @@
       "schedule": "30 7 * * *"
     },
     {
+      "path": "/api/sync/promo-products?game=one_piece",
+      "schedule": "15 21 * * *"
+    },
+    {
       "path": "/api/sync/ebay?game=one_piece&cursor=1",
       "schedule": "0 */6 * * *"
     },

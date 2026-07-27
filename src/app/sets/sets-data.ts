@@ -29,7 +29,8 @@ export interface SetData {
   topCards: TopCard[];
   catalogCards?: CatalogSetCard[];
   comingSoon?: boolean;
-  pricingStatus?: "priced" | "catalog_only";
+  pricingStatus?: "priced" | "sealed_market" | "catalog_only";
+  pricingUpdatedAt?: string | null;
 }
 
 export interface CatalogSetCard {
