@@ -70,6 +70,10 @@ database migration would break card queries.
 - Riftbound incremental prices: hourly at minute 15.
 - Riftbound full reconciliation: daily at 04:35 UTC.
 - Lorcana current prices: hourly at minute 45.
+- Lorcana history is intentionally not scheduled: its released adapter declares
+  `price_history: false`, while `/api/sync/justtcg-history` is explicitly scoped
+  to One Piece. The live Lorcana `price_history` count of zero is therefore not
+  evidence of a missing or overwritten cron.
 - Existing One Piece history, eBay, Japanese pricing, character, and summary
   jobs remain intact.
 - Existing warmup and cross-game image-audit jobs remain intact as unmanaged

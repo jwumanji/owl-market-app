@@ -1,5 +1,13 @@
 # Disney Lorcana staged ingestion
 
+> Status (2026-07-27): the exact-ID catalog and current-price promotion has
+> completed. The recovery configuration schedules
+> `/api/sync/justtcg?game=lorcana` hourly and publishes current prices through
+> `price_stats`. The adapter deliberately declares `price_history: false`; the
+> One Piece history route is not compatible with Lorcana. The staging controls
+> below remain the historical promotion baseline, not the current
+> public/private state.
+
 ## Source roles
 
 | Need | Source | Registration | Staging role |
@@ -16,7 +24,7 @@ LorcanaJSON is an unofficial aggregator, so Ravensburger remains the official
 human-review reference. A source image URL is not treated as permission to copy
 or publish the image.
 
-## Safety contract
+## Initial staging safety contract
 
 - The game remains `is_public = false`.
 - LorcanaJSON numeric `id` plus language is the canonical printing identity.
@@ -62,7 +70,7 @@ catalog identity layers, and reconciliation candidates. It does not write
 Apply `supabase/migrations/20260723130000_lorcana_catalog_staging.sql` only after
 reviewing it against the target environment's migration order.
 
-## Promotion gates
+## Historical promotion gates
 
 Before adding a scheduled ingestion route:
 
