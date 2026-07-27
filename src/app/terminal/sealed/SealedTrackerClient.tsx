@@ -20,6 +20,18 @@ const PERIODS = 12;
 const EM = "—"; // em-dash — the only rendering for missing values, never 0
 const VIEW_STORAGE_KEY = "owl-terminal-sealed-view";
 
+// D7 decision 2 (2026-07-27): the VALUE RATIO ranking chip is HIDDEN until a
+// booster-baseline set-value v2 series exists (task: set-value v2 /
+// metric_version=2). The shipped index_value numerator is 6–84% promo/event
+// paper per set, so the CROSS-SET ranking is distorted — 14 of 22 boxes change
+// rank under a clean numerator, 7 move more than 2 positions
+// (docs/investigations/value-ratio-population-audit.md §4.1). Per-row ratio
+// values outside the ranking mode (table columns, cards secondary stat, the
+// detail page's overlay + facts row) stay — the audit found per-product
+// TRENDS honest; it is the cross-set comparison that lies. Revival: flip this
+// to true once the loader reads the metric_version=2 series.
+const RATIO_RANKING_ENABLED = false;
+
 type PeriodKey = "weekly" | "monthly";
 type ViewKey = "grid" | "table" | "cards";
 type ModeKey = "trending" | "ratio" | "price" | "setval" | "offath" | "release";
@@ -316,8 +328,13 @@ export default function SealedTrackerClient({ data }: { data: SealedDashboardDat
   // VALUE and VALUE RATIO do not exist as metrics yet (both read the same
   // service-role-only snapshot table). Hide their chips and columns entirely
   // with a one-line explanation — never a grid of em-dashes.
+  //
+  // Independently, the ratio RANKING mode is gated on RATIO_RANKING_ENABLED
+  // (D7 decision 2) — the mode's code path stays intact for the v2 revival.
   const hasRatio = data.hasSetSnapshots;
-  const effectiveMode: ModeKey = !hasRatio && (mode === "ratio" || mode === "setval") ? "trending" : mode;
+  const ratioMode = hasRatio && RATIO_RANKING_ENABLED;
+  const effectiveMode: ModeKey =
+    (mode === "ratio" && !ratioMode) || (mode === "setval" && !hasRatio) ? "trending" : mode;
   const isRatio = effectiveMode === "ratio";
 
   const cfg = useMemo(() => buildPeriodCfg(period, data), [period, data]);
@@ -375,9 +392,11 @@ export default function SealedTrackerClient({ data }: { data: SealedDashboardDat
   }, [boxes, cfg, isRatio]);
 
   const unit = isRatio ? `RATIO ${cfg.step}` : cfg.step;
-  const visibleModes = (Object.keys(MODE_LABELS) as ModeKey[]).filter(
-    (m) => hasRatio || (m !== "ratio" && m !== "setval")
-  );
+  const visibleModes = (Object.keys(MODE_LABELS) as ModeKey[]).filter((m) => {
+    if (m === "ratio") return ratioMode; // hidden until set-value v2 (D7 #2)
+    if (m === "setval") return hasRatio;
+    return true;
+  });
 
   const onChip = (m: ModeKey) => {
     if (m === "release" && effectiveMode === "release") setRelDesc((d) => !d);

@@ -67,6 +67,24 @@ function lastMoveSub(lastMoveDays: number | null): string {
   return `FLAT ${lastMoveDays}D`;
 }
 
+/** §3.5 PER BOX — expected pulls; trims to the seeded precision (9, 0.5, 271.5). */
+function fmtPerBox(v: number): string {
+  return String(v);
+}
+
+/** §3.5 plain-language premium read — the signed number is counterintuitive
+    alone. Positive = box costs more than its contents (spec sign convention). */
+function premiumRead(premiumPct: number): string {
+  const abs = Math.abs(premiumPct).toFixed(0);
+  if (premiumPct > 0) {
+    return `The box trades ${abs}% above what its cards are worth. Sealed is priced for scarcity, not contents.`;
+  }
+  if (premiumPct < 0) {
+    return `The box trades ${abs}% below what its cards are worth — the expected singles inside outprice the sealed box.`;
+  }
+  return "The box trades exactly at its expected contents value.";
+}
+
 export async function SealedDetailContent({
   slug,
   gameRouteSlug = DEFAULT_PUBLIC_GAME_ROUTE_SLUG,
@@ -112,6 +130,11 @@ export async function SealedDetailContent({
   if (!data) {
     notFound();
   }
+
+  // Local consts so the null-narrowing survives into nested JSX closures
+  // (property narrowing on `data.…` resets inside arrow functions).
+  const boxEv = data.boxEv;
+  const latestPrice = data.latestPrice;
 
   return (
     <section className="terminal-page sealed-detail-page">
@@ -231,8 +254,10 @@ export async function SealedDetailContent({
           </div>
         ) : (
           <>
-            {/* Summary strip — set value and both shares use the SAME
-                snapshot denominator the hero shows (never a card-sum rollup). */}
+            {/* Summary strip (D7 decision 6): SET VALUE stays the OFFICIAL
+                snapshot figure; the share figures are computed against the
+                page-local booster-baseline sum and labeled OF BASELINE VALUE
+                so the two denominators cannot be conflated. */}
             <div className="sd-top10-strip">
               <span>
                 TOP 10 COMBINED <b>{fmtMoney(data.top10Combined)}</b>
@@ -242,13 +267,37 @@ export async function SealedDetailContent({
               </span>
               <span>
                 TOP 10 SHARE{" "}
-                <b>{data.top10Share == null ? EM : `${data.top10Share.toFixed(1)}%`}</b>
+                <b>{data.top10Share == null ? EM : `${data.top10Share.toFixed(1)}%`}</b> OF
+                BASELINE VALUE
               </span>
               <span className="sd-top10-solo">
                 TOP CARD ALONE ={" "}
-                {data.topCardShare == null ? EM : `${data.topCardShare.toFixed(1)}%`} OF SET VALUE
+                {data.topCardShare == null ? EM : `${data.topCardShare.toFixed(1)}%`} OF BASELINE
+                VALUE
               </span>
             </div>
+
+            {/* Promo callout (D7 decision 6): excluded cards that would have
+                placed in the top 10 — labeled as not obtainable in boosters,
+                never rendered as tiles. */}
+            {data.promoCallouts.length > 0 && (
+              <div className="sd-promo-strip">
+                <span className="sd-promo-label">
+                  PROMO / EVENT CARDS {"—"} NOT PULLED FROM BOOSTERS, EXCLUDED FROM THESE TILES
+                </span>
+                {data.promoCallouts.map((p) => (
+                  <Link
+                    key={p.cardImageId}
+                    href={gamePath(gameRouteSlug, `/card/${p.cardImageId}`)}
+                    prefetch={false}
+                    className="sd-promo-card"
+                  >
+                    <span className="sd-promo-name">{p.name}</span>
+                    <span className="sd-promo-price">{fmtMoney2(p.price)}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
 
             <div className="sd-inside">
               {data.topCards.map((c, i) => (
@@ -290,7 +339,8 @@ export async function SealedDetailContent({
                       <span className={deltaCls(c.d7)}>{fmtPct(c.d7)} 7D</span>
                       <span className="sd-ic-share">
                         {" "}
-                        · {c.pctOfSet == null ? EM : `${c.pctOfSet.toFixed(1)}%`} OF SET
+                        · {c.pctOfBaseline == null ? EM : `${c.pctOfBaseline.toFixed(1)}%`} OF
+                        BASELINE
                       </span>
                     </div>
                   </div>
@@ -301,9 +351,149 @@ export async function SealedDetailContent({
         )}
       </section>
 
-      {/* Phase G seam — §3.5 Box EV mounts here as a sibling section, BELOW
-          the top 10 (spec §3.4: top 10 sits above Box EV). Nothing renders
-          for it in Phase F. */}
+      {/* ================= §3.5 · BOX EV =================
+          Renders ONLY when the set has pull_rates rows — no headers, no
+          zeros otherwise (spec §3.5). Static server JSX: no interactivity. */}
+      {boxEv && (
+        <section className="sd-blk">
+          <div className="sd-blk-head">
+            <div>
+              <div className="sd-blk-title">
+                Box <em className="sd-script">EV</em>
+              </div>
+              <div className="sd-blk-sub">
+                EXPECTED SINGLES VALUE OF ONE SEALED BOX · BOOSTER-BASELINE PRICES
+              </div>
+            </div>
+          </div>
+
+          {/* Caution strip — amended trigger (D7 #5): only when the TOP slot
+              by VALUE/BOX contribution is low-confidence. */}
+          {boxEv.caution && (
+            <div className="sd-ev-caution">
+              THIN DATA {"—"} THIS SET&apos;S LARGEST VALUE CONTRIBUTOR RIDES A LOW-CONFIDENCE
+              COMMUNITY ESTIMATE. READ THE TOTAL AS A SKETCH, NOT A MEASUREMENT.
+            </div>
+          )}
+
+          <div className="sd-ev-grid">
+            {/* Left — slot table. */}
+            <div className="sd-card sd-ev-card">
+              <div className="sd-ev-scroll">
+                <table className="sd-ev-table">
+                  <thead>
+                    <tr>
+                      <th>RARITY SLOT</th>
+                      <th className="num">PER BOX</th>
+                      <th className="num">AVG PRICE</th>
+                      <th className="num">VALUE / BOX</th>
+                      <th className="sd-ev-wcol">WEIGHT</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {boxEv.slots.map((slot) => (
+                      <tr key={slot.slotLabel}>
+                        <td>
+                          {/* BULK has no rarity code: plain text, NEVER
+                              RarityBadge (spec §3.5). */}
+                          {slot.rarityCode ? (
+                            <RarityBadge rarity={slot.rarityCode} />
+                          ) : (
+                            <span className="sd-ev-bulk">{slot.slotLabel}</span>
+                          )}
+                        </td>
+                        <td className="num">{fmtPerBox(slot.perBox)}</td>
+                        <td className="num">{fmtMoney2(slot.avgPrice)}</td>
+                        <td className="num">{fmtMoney2(slot.valuePerBox)}</td>
+                        <td className="sd-ev-wcol">
+                          {slot.weightPct == null ? (
+                            <span className="t-flat">{EM}</span>
+                          ) : (
+                            <span className="sd-ev-w">
+                              <span className="sd-ev-wpct">{slot.weightPct.toFixed(1)}%</span>
+                              <span className="sd-ev-wbar" aria-hidden="true">
+                                <i style={{ width: `${Math.min(slot.weightPct, 100)}%` }} />
+                              </span>
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td>OPENING EV</td>
+                      <td className="num" aria-hidden="true"></td>
+                      <td className="num" aria-hidden="true"></td>
+                      <td className="num">{fmtMoney2(boxEv.total)}</td>
+                      <td className="sd-ev-wcol">100.0%</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+
+            {/* Right — summary. */}
+            <aside className="sd-ev-summary">
+              <div className="sd-ev-hero">
+                <div className="sd-ev-hero-label">OPENING EV</div>
+                <div className="sd-ev-hero-value">{fmtMoney2(boxEv.total)}</div>
+                <div className="sd-ev-hero-sub">
+                  EXPECTED SINGLES VALUE PER BOX AT CURRENT MARKET PRICES
+                </div>
+              </div>
+
+              {latestPrice != null && (
+                <div className="sd-ev-bars">
+                  {(() => {
+                    const denom = Math.max(latestPrice, boxEv.total);
+                    const boxPct = denom > 0 ? (latestPrice / denom) * 100 : 0;
+                    const evPct = denom > 0 ? (boxEv.total / denom) * 100 : 0;
+                    return (
+                      <>
+                        <div className="sd-ev-bar-row">
+                          <span className="bl">BOX PRICE</span>
+                          <span className="bv">{fmtMoney2(latestPrice)}</span>
+                          <span className="bt" aria-hidden="true">
+                            <i className="ink" style={{ width: `${boxPct}%` }} />
+                          </span>
+                        </div>
+                        <div className="sd-ev-bar-row">
+                          <span className="bl">OPENING EV</span>
+                          <span className="bv">{fmtMoney2(boxEv.total)}</span>
+                          <span className="bt" aria-hidden="true">
+                            <i className="gain" style={{ width: `${evPct}%` }} />
+                          </span>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {boxEv.premiumPct != null && (
+                <div className="sd-ev-premium">
+                  <div className="sl">SEALED PREMIUM</div>
+                  {/* Positive = box costs more than its contents (spec §3.5
+                      sign convention). Exactly zero renders --ink-3. */}
+                  <div className={`sv ${deltaCls(boxEv.premiumPct)}`}>
+                    {fmtPct(boxEv.premiumPct)}
+                  </div>
+                  <p className="sd-ev-read">{premiumRead(boxEv.premiumPct)}</p>
+                </div>
+              )}
+            </aside>
+          </div>
+
+          {/* Mandatory disclaimer — a PERMANENT property of this data, not a
+              temporary caveat (D7 #5): Bandai publishes no rates, ever. */}
+          <p className="sd-ev-foot">
+            PULL RATES ARE COMMUNITY-ESTIMATED AND UNOFFICIAL {"—"} BANDAI PUBLISHES NONE. EV
+            AVERAGES BOOSTER-OBTAINABLE CARDS AT CURRENT MARKET PRICES AND IS NOT A GUARANTEE OF
+            ANY INDIVIDUAL BOX&apos;S CONTENTS.
+          </p>
+        </section>
+      )}
     </section>
   );
 }
