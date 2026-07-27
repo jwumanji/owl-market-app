@@ -8,6 +8,7 @@ type CharacterIndexSource = {
   name: string;
   indexValue: number;
   chg7d: number | null;
+  chg30d: number | null;
   topCards: CharacterIndexCardSource[];
 };
 
@@ -31,6 +32,7 @@ export function characterIndexMarketRanking(
         image_url_preview: representativeCard?.imageUrlPreview ?? null,
         changes: {
           "7D": character.chg7d,
+          "30D": character.chg30d,
         },
       };
     });

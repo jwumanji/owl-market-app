@@ -10,11 +10,13 @@ const character = (
   imageUrlSmall: string,
   imageUrlPreview: string,
   chg7d = 2.4,
+  chg30d = 8.6,
 ) => ({
   slug: name.toLowerCase().replaceAll(" ", "-"),
   name,
   indexValue,
   chg7d,
+  chg30d,
   topCards: [{ imageUrlSmall, imageUrlPreview }],
 });
 
@@ -43,4 +45,5 @@ test("market characters use the same representative card as the Character Index"
   assert.equal(ranked.image_url_small, "luffy-small.webp");
   assert.equal(ranked.image_url_preview, "luffy-preview.webp");
   assert.equal(ranked.changes["7D"], 2.4);
+  assert.equal(ranked.changes["30D"], 8.6);
 });
