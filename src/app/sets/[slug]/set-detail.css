@@ -46,6 +46,7 @@
 .setd-id-glow { position: absolute; inset: 0; background: radial-gradient(ellipse at center, color-mix(in srgb, var(--set-color) 50%, transparent) 0%, transparent 70%); pointer-events: none; }
 .setd-id-box { width: 110px; height: 152px; border-radius: var(--r-sm); border: 2px solid rgba(255, 245, 228, 0.45); background: var(--set-color-d); display: flex; align-items: center; justify-content: center; font-size: 56px; position: relative; z-index: 1; box-shadow: 0 12px 28px rgba(26, 15, 8, 0.32); overflow: hidden; }
 .setd-id-box img { width: 100%; height: 100%; object-fit: cover; }
+.setd-id-box img.is-product-image { object-fit: contain; padding: 6px; }
 .setd-id-art-label { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); font-family: var(--font-jetbrains-mono), ui-monospace, monospace; font-size: 10px; color: rgba(255, 245, 228, 0.85); letter-spacing: 0.12em; text-transform: uppercase; z-index: 1; font-weight: 600; }
 
 .setd-id-head { padding: 18px 20px 14px; border-bottom: 1px dashed rgba(26, 15, 8, 0.15); position: relative; overflow: hidden; }

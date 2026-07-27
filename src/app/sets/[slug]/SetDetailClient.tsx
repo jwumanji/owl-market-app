@@ -7,19 +7,11 @@ import { lazy, Suspense, useMemo, useState } from "react";
 import { gamePath } from "@/lib/game-routes";
 import FastCardImage from "@/components/ui/FastCardImage";
 import type { CatalogSetCard, SetData, TopCard } from "../sets-data";
+import { getSetImageFile } from "../set-images";
 
 // chart.js only loads when the chart actually renders (L1) — keeps ~65kB
 // out of the route's First Load JS.
 const SetChart = lazy(() => import("./SetChartClient"));
-
-const SET_IMAGE_MAP: Record<string, string> = {
-  op01: "op01.jpg", op02: "op02.jpg", op03: "op03.jpg", op04: "op04.jpg",
-  op05: "op05.jpg", op06: "op06.jpg", op07: "op07.jpg", op08: "op08.jpg",
-  op09: "op09.jpg", op10: "op10.jpg", op11: "op11.jpg", op12: "op12.jpg",
-  op13: "op13.jpg", op14: "op14.jpg",
-  eb01: "eb01.jpg",
-  prb01: "prb01.jpg", prb02: "prb02.webp",
-};
 
 type RangeKey = "7d" | "1m" | "3m" | "1y" | "max";
 const RANGE_DAYS: Record<RangeKey, number> = { "7d": 7, "1m": 30, "3m": 90, "1y": 365, max: 999 };
@@ -171,13 +163,14 @@ export default function SetDetailClient({
   const judges = allSets.filter((s) => (s.type ?? "") === "judge");
 
   const catalogOnly = isCatalogOnly(set);
+  const officialPromoProduct = Boolean(set.officialUrl);
+  const catalogCardCountKnown = set.catalogCardCountKnown !== false;
   const catalogCards = set.catalogCards ?? [];
   const cardCount = setCardCount(set);
   const isLive = !catalogOnly && !set.comingSoon && set.cards > 0;
   const deltaClass = set.chg30d == null || set.chg30d === 0 ? "flat" : set.chg30d > 0 ? "up" : "dn";
 
-  const imgSlug = set.slug.replace(/-/g, "").toLowerCase();
-  const imgFile = SET_IMAGE_MAP[imgSlug];
+  const imgFile = getSetImageFile(set.slug);
 
   function chip(s: SetData) {
     const isActive = s.slug === set.slug;
@@ -281,6 +274,7 @@ export default function SetDetailClient({
                 <Image
                   src={`/sets/${imgFile}`}
                   alt={`${set.code} ${set.name} Booster Box`}
+                  className={imgFile.startsWith("promo-") ? "is-product-image" : undefined}
                   width={110}
                   height={152}
                   sizes="110px"
@@ -297,9 +291,17 @@ export default function SetDetailClient({
             <span className="setd-id-code">{set.code}{set.year ? ` · ${set.year}` : ""}</span>
             <div className="setd-id-name">{set.name}</div>
             <div className="setd-id-desc">
-              {catalogOnly
+              {officialPromoProduct
+                ? `${set.language ? `${set.language} ` : ""}official Bandai promotional release${catalogCardCountKnown ? ` with ${cardCount.toLocaleString()} included cards` : ""}.`
+                : catalogOnly
                 ? `${gameName} ${set.code} - ${cardCount.toLocaleString()} catalog cards imported. Pricing is not enabled yet.`
                 : `${gameName} ${set.code} - ${set.cards} priced cards in this print run.`}
+              {set.officialUrl && (
+                <>
+                  {" "}
+                  <a href={set.officialUrl} target="_blank" rel="noreferrer">View Bandai product page →</a>
+                </>
+              )}
             </div>
           </div>
           <div className="setd-id-rows">
@@ -318,10 +320,10 @@ export default function SetDetailClient({
               <span className="setd-id-val">{isLive ? set.atl : "—"}</span>
             </div>
             <div className="setd-id-row">
-              <span className="setd-id-key">{catalogOnly ? "Cards Imported" : "Cards Priced"}</span>
+              <span className="setd-id-key">{officialPromoProduct ? "Cards Included" : catalogOnly ? "Cards Imported" : "Cards Priced"}</span>
               <span className="setd-id-val">
                 {catalogOnly
-                  ? cardCount.toLocaleString()
+                  ? catalogCardCountKnown ? cardCount.toLocaleString() : "—"
                   : `${set.cards}${set.cardsTotal && set.cardsTotal !== set.cards ? `/${set.cardsTotal}` : ""}`}
               </span>
             </div>
@@ -393,12 +395,20 @@ export default function SetDetailClient({
               {catalogOnly ? "Catalog Cards" : "Top Cards"} in <span>{set.code}</span>
             </div>
             <div className="setd-tc-sub">
-              {catalogOnly
+              {officialPromoProduct
+                ? catalogCardCountKnown
+                  ? `${cardCount.toLocaleString()} cards listed by Bandai · card-level catalog mapping pending`
+                  : "Official Bandai product · card-level catalog mapping pending"
+                : catalogOnly
                 ? `${catalogCards.length.toLocaleString()} preview cards · ${cardCount.toLocaleString()} total imported`
                 : `${set.topCards.length} of ${cardCount.toLocaleString()} cards · sorted by average market price`}
             </div>
           </div>
-          {catalogOnly ? (
+          {officialPromoProduct && set.officialUrl ? (
+            <a href={set.officialUrl} target="_blank" rel="noreferrer" className="setd-tc-link">
+              View official Bandai product →
+            </a>
+          ) : catalogOnly ? (
             <Link href={`${gamePath(gameRouteSlug, "/catalog")}?set=${set.slug}`} className="setd-tc-link">
               View all {cardCount.toLocaleString()} in catalog →
             </Link>

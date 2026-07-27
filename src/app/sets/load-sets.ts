@@ -17,6 +17,7 @@ import { cachedPublicData, CATALOG_DATA_TTL_SECONDS, publicDataCacheKey } from "
 import { firstRelation } from "@/lib/supabase-relations";
 import { buildDistributionSetCodeIndex, distributionSetCode } from "@/lib/set-membership";
 import type { CatalogSetCard } from "./sets-data";
+import { promoCollectionSets } from "./promo-collections";
 
 // ---------------------------------------------------------------------------
 // loadSets() — groups cards by cards.set_id so each physical printing belongs
@@ -680,6 +681,13 @@ async function loadSetsUncached(options: {
         comingSoon: cards.length === 0,
       });
     }
+  }
+
+  const existingSlugs = new Set(sets.map((set) => String(set.slug).toLowerCase()));
+  const existingCodes = new Set(sets.map((set) => String(set.code).toUpperCase()));
+  for (const promoSet of promoCollectionSets()) {
+    if (existingSlugs.has(promoSet.slug.toLowerCase()) || existingCodes.has(promoSet.code.toUpperCase())) continue;
+    sets.push(promoSet as unknown as Record<string, unknown>);
   }
 
   sets.sort((a, b) => {

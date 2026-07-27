@@ -37,6 +37,7 @@ export default function SetThumb({
   const ref = useRef<HTMLSpanElement>(null);
   const [pos, setPos] = useState<{ x: number; y: number; flipLeft: boolean } | null>(null);
   const imgUrl = imageUrl ?? getSetImageUrl(slug);
+  const productImage = imgUrl?.includes("/promo-") ?? false;
   const sz = SIZE[variant];
 
   const showPreview = useCallback(() => {
@@ -67,6 +68,7 @@ export default function SetThumb({
           <Image
             src={imgUrl}
             alt={`${code} box art`}
+            className={productImage ? "is-product-image" : undefined}
             width={sz.w}
             height={sz.h}
             sizes={`${sz.w}px`}

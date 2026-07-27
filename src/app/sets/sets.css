@@ -90,6 +90,12 @@ table.sets-v2-table col.c-spark { width: 124px; }
 .sv2-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .sv2-thumb-placeholder { font-family: var(--font-space-grotesk), system-ui, sans-serif; font-size: 13px; font-weight: 700; color: var(--thumb-color, var(--ink-2)); letter-spacing: 0.04em; }
 
+.sets-v2-hl-thumb img.is-product-image,
+.sv2-thumb img.is-product-image {
+  object-fit: contain;
+  padding: 6px;
+}
+
 /* Hover preview for thumbnails (both table and headline variants) */
 @keyframes sv2ThumbPreviewIn { from { opacity: 0; transform: translateY(-50%) scale(0.94); } to { opacity: 1; transform: translateY(-50%) scale(1); } }
 .sv2-thumb-preview { position: fixed; z-index: 1000; transform: translateY(-50%); width: 232px; pointer-events: none; background: var(--bg-2); border: 1.5px solid var(--ink); border-radius: var(--r-md); padding: 6px; box-shadow: 0 18px 36px rgba(26, 15, 8, 0.22); animation: sv2ThumbPreviewIn .12s ease-out; transform-origin: left center; }

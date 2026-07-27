@@ -5,7 +5,9 @@ export interface SetData {
   name: string;
   imageUrl?: string | null;
   year: number | null;
-  type?: "op" | "eb" | "prb" | "st" | "promo" | "main" | "organized" | "judge";
+  type?: "op" | "eb" | "prb" | "st" | "promo" | "anniversary" | "collection" | "special" | "main" | "organized" | "judge";
+  language?: string;
+  officialUrl?: string;
   color: string;
   colorD: string;
   colorBd: string;
@@ -16,6 +18,7 @@ export interface SetData {
   chgMax: number;
   cards: number;
   cardsTotal?: number;
+  catalogCardCountKnown?: boolean;
   volume: string;
   ath: string;
   atl: string;

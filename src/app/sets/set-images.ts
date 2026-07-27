@@ -13,8 +13,13 @@ export const SET_IMAGE_MAP: Record<string, string> = {
 /** Resolve a slug like "op-13" or "OP13" or "op13" to its image file, or null. */
 export function getSetImageFile(slug: string): string | null {
   if (!slug) return null;
-  const key = slug.replace(/-/g, "").toLowerCase();
-  return SET_IMAGE_MAP[key] ?? null;
+  const rawKey = slug.toLowerCase();
+  const key = rawKey.replace(/-/g, "");
+  if (SET_IMAGE_MAP[key]) return SET_IMAGE_MAP[key];
+  if (/^(anniversary-|pcc-|championship-|special-goods-|heroines-special$|playmat-card-set-|treasure-chest-|admirable-collection-|illustration-box-)/.test(rawKey)) {
+    return `promo-${rawKey}.webp`;
+  }
+  return null;
 }
 
 /** Public URL for the box-art image, or null if no image is available. */

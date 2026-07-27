@@ -19,12 +19,15 @@ const TYPE_LABELS: Record<SetType, string> = {
   prb: "Premium",
   st: "Starter Deck",
   promo: "Promo",
+  anniversary: "Anniversary",
+  collection: "Card Collection",
+  special: "Special Set",
   main: "Main",
   organized: "Organized Play",
   judge: "Judge",
 };
 
-const TYPE_ORDER: SetType[] = ["op", "eb", "prb", "main", "st", "promo", "organized", "judge"];
+const TYPE_ORDER: SetType[] = ["op", "eb", "prb", "main", "st", "anniversary", "collection", "special", "promo", "organized", "judge"];
 
 function classify(code: string): SetType {
   if (["OGN", "SFD", "UNL"].includes(code)) return "main";
@@ -60,6 +63,11 @@ function hasLivePricing(set: SetData) {
 
 function setCardCount(set: SetData) {
   return set.cardsTotal ?? set.cards;
+}
+
+function setCardCountLabel(set: SetData) {
+  if (set.catalogCardCountKnown === false) return "—";
+  return setCardCount(set).toLocaleString();
 }
 
 function SparkSVG({ data, up, w, h }: { data: number[]; up: boolean; w: number; h: number }) {
@@ -202,7 +210,7 @@ export default function SetsClient({
       if (yearFilter !== "all" && String(s.year) !== yearFilter) return false;
       if (search) {
         const q = search.toLowerCase();
-        if (!s.code.toLowerCase().includes(q) && !s.name.toLowerCase().includes(q)) return false;
+        if (!s.code.toLowerCase().includes(q) && !s.name.toLowerCase().includes(q) && !s.language?.toLowerCase().includes(q)) return false;
       }
       return true;
     });
@@ -395,7 +403,6 @@ export default function SetsClient({
               sorted.map((s, i) => {
                 const catalogOnly = isCatalogOnly(s);
                 const empty = !hasLivePricing(s);
-                const cardCount = setCardCount(s);
                 return (
                   <tr key={s.code} onClick={() => router.push(gamePath(gameRouteSlug, `/sets/${s.slug}`))}>
                     <td className="sv2-rank">{i + 1}</td>
@@ -424,7 +431,7 @@ export default function SetsClient({
                     <td>{empty ? <span className="sv2-pct flat">—</span> : fmtPct(s.chg1d)}</td>
                     <td>{empty ? <span className="sv2-pct flat">—</span> : fmtPct(s.chg7d)}</td>
                     <td>{empty ? <span className="sv2-pct flat">—</span> : fmtPct(s.chg30d)}</td>
-                    <td className="sv2-cards">{cardCount.toLocaleString()}</td>
+                    <td className="sv2-cards">{setCardCountLabel(s)}</td>
                     <td className="sv2-spark">
                       {empty ? <span style={{ color: "var(--ink-3)" }}>—</span> : <SparkSVG data={s.spark} up={(s.chg30d ?? s.chg7d ?? 0) >= 0} w={100} h={22} />}
                     </td>
