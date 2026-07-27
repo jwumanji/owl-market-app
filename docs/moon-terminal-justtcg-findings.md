@@ -30,6 +30,12 @@
 >    `investigations/set-value-backfill.md`.
 > 4. **§5 — the sealed table now has a scheduled writer**: `/api/sync/sealed-prices`,
 >    daily 06:10 UTC via `config/game-sync-jobs.json` (Phase C), pending deploy.
+> 5. **§5's open question — "has the cron ever fired?" — answered YES** on
+>    2026-07-27: a second `entity_type='set'` snapshot batch (53 rows,
+>    `snapshot_date=2026-07-26`) appeared after Sunday 2026-07-26 23:40 UTC,
+>    matching pg_cron job 1's schedule exactly. The 07-23 Thursday batch was a
+>    manual invocation; the job itself is healthy. `cron.job_run_details` (the
+>    D2 bundle) remains worth running for the formal record.
 
 This file exists because these results were derived once, in another session's
 scrollback, and would otherwise have to be re-derived. Items 1–3 are from the JustTCG
