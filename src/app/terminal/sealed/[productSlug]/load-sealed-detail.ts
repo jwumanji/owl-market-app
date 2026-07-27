@@ -12,6 +12,11 @@ import {
   publicDataCacheKey,
 } from "@/lib/public-data-cache";
 import { firstRelation } from "@/lib/supabase-relations";
+import {
+  classifyBoosterBaseline,
+  isBulkRarity,
+  type BoosterBaselineExclusionReason,
+} from "@/lib/games/one-piece/booster-baseline";
 
 // ---------------------------------------------------------------------------
 // loadSealedDetail() — all Supabase access for the Terminal sealed detail page
@@ -19,6 +24,13 @@ import { firstRelation } from "@/lib/supabase-relations";
 // market_index_snapshots is revoked for anon/authenticated, so set value and
 // Value Ratio MUST be resolved here and travel to the client as props
 // (spec §6 — load-bearing, not incidental).
+//
+// Population rule (D7 decision 1): the §3.4 top-10 tiles and the §3.5 Box EV
+// rarity averages both run on the BOOSTER-BASELINE population — the shared
+// classifier in @/lib/games/one-piece/booster-baseline, which strips promo /
+// event / non-booster paper out of the printed_set_code population. SET VALUE
+// stays the official snapshot figure; share figures are labeled as shares of
+// the page-local baseline sum so the two cannot be misread as one number.
 //
 // One-source rule (spec §3.1): the range bar's endpoints AND marker all come
 // from OUR OWN sealed_product_price_history rows — never sealed_products.ath /
@@ -87,9 +99,56 @@ export type SealedTopCard = {
   price: number;
   /** price_stats.chg_7d. */
   d7: number | null;
-  /** price / setValue × 100 against the SAME snapshot the hero shows — never
-      a recomputed card-sum rollup (spec §2.2). Null when no snapshot exists. */
-  pctOfSet: number | null;
+  /** price / baselineValue × 100 — share of the page-local booster-baseline
+      sum (D7 decision 6), NOT of the stored set-value rollup. Labeled
+      "OF BASELINE" in the UI so it cannot be misread as a snapshot share. */
+  pctOfBaseline: number | null;
+};
+
+/** §3.4 promo callout — a card excluded from the booster baseline that would
+    have placed in the top 10 had promos been ranked (D7 decision 6). */
+export type SealedPromoCallout = {
+  cardImageId: string;
+  name: string;
+  cardNumber: string | null;
+  price: number;
+  reason: BoosterBaselineExclusionReason;
+};
+
+/** §3.5 · one Box EV slot row (a pull_rates row priced over the baseline). */
+export type BoxEvSlot = {
+  /** pull_rates.slot_label — the ONLY rendering for the BULK row. */
+  slotLabel: string;
+  /** game_rarities.code, null for the BULK slot — null means "render plain
+      text, never RarityBadge" (spec §3.5). */
+  rarityCode: string | null;
+  perBox: number;
+  /** Avg tcg_market over the baseline cards of this slot's class — null when
+      the class resolves zero priced cards (renders an em-dash, never 0). */
+  avgPrice: number | null;
+  /** perBox × avgPrice, rounded to cents BEFORE totalling so the rendered
+      total equals the rendered sum exactly (spec §8: no rounding drift). */
+  valuePerBox: number | null;
+  /** valuePerBox / total × 100. */
+  weightPct: number | null;
+  confidence: "high" | "medium" | "low";
+  /** Baseline cards backing avgPrice. */
+  cardCount: number;
+};
+
+/** §3.5 · Box EV block. Null (section absent) when the set has no pull_rates
+    rows — never headers-with-zeros (spec §3.5). */
+export type BoxEv = {
+  slots: BoxEvSlot[];
+  /** Opening EV — sum of the slots' cents-rounded valuePerBox. */
+  total: number;
+  /** (boxPrice − total) / total × 100; positive = box costs more than its
+      contents (spec §3.5 sign convention). Null without a box price. */
+  premiumPct: number | null;
+  /** D7 decision 5 (amended trigger): true only when the TOP slot by
+      VALUE/BOX contribution has confidence='low' — not merely when any low
+      slot exists. */
+  caution: boolean;
 };
 
 export type SealedRank = {
@@ -139,13 +198,24 @@ export type SealedDetailData = {
   /** latest price / packs_per_unit — null while packs_per_unit is null. */
   pricePerPack: number | null;
   sealedRank: SealedRank | null;
-  /** §3.4 · top 10 priced cards of this product's set, price desc. */
+  /** §3.4 · top 10 BOOSTER-BASELINE cards of this product's set, price desc
+      (D7 decision 6 — promos/event cards never tile). */
   topCards: SealedTopCard[];
   top10Combined: number | null;
-  /** top10Combined / setValue × 100 — snapshot-basis denominator (spec §3.4). */
+  /** Page-local sum of ALL baseline card prices (card_image_id-deduped,
+      prices > 0). Computed per request from the already-fetched cards — NOT a
+      stored rollup (the "no second rollup" rule covers storage; this is a
+      display denominator). */
+  baselineValue: number | null;
+  /** top10Combined / baselineValue × 100 — labeled OF BASELINE VALUE. */
   top10Share: number | null;
-  /** topCards[0].price / setValue × 100. */
+  /** topCards[0].price / baselineValue × 100 — labeled OF BASELINE VALUE. */
   topCardShare: number | null;
+  /** Excluded cards that would have placed in the unfiltered top 10 — the
+      top 1–2, rendered as a clearly-labeled promo strip (D7 decision 6). */
+  promoCallouts: SealedPromoCallout[];
+  /** §3.5 · Box EV — null hides the section entirely. */
+  boxEv: BoxEv | null;
 };
 
 // -- internal row shapes ------------------------------------------------------
@@ -515,13 +585,16 @@ async function loadSealedDetailUncached(options: {
     }
   }
 
-  // 8. §3.4 top 10 — set membership is printed_set_code == the product's set
-  // code (OP05: 137 by set_id vs 287 by printed_set_code — CLAUDE.md §8),
-  // deduped on card_image_id (parallels share card_number, never regex).
-  // Price basis is price_stats.tcg_market — the same figure /sets and
-  // /card/[id] display, and the same per-card basis the set-value snapshot
-  // sums, so % OF SET compares like with like.
-  const topCards: SealedTopCard[] = [];
+  // 8. §3.4 top 10 + §3.5 pricing population — set membership is
+  // printed_set_code == the product's set code (OP05: 137 by set_id vs 287 by
+  // printed_set_code — CLAUDE.md §8), deduped on card_image_id (parallels
+  // share card_number, never regex). Price basis is price_stats.tcg_market —
+  // the same figure /sets and /card/[id] display (identical to Phase F).
+  //
+  // The fetched cards are then split by the SHARED booster-baseline classifier
+  // (D7 decision 1): baseline cards feed the top-10 tiles, the baseline sum,
+  // and the §3.5 rarity averages; excluded cards feed only the promo callout.
+  const allCards: SealedTopCard[] = [];
   if (setRelation?.code) {
     const byImageId = new Map<string, SealedTopCard>();
     let from = 0;
@@ -569,7 +642,7 @@ async function loadSealedDetailUncached(options: {
             (card.image_url_small as string | null) ?? (card.image_url as string | null) ?? null,
           price,
           d7: ps?.chg_7d ?? null,
-          pctOfSet: null, // filled below once against the snapshot basis
+          pctOfBaseline: null, // filled below once against the baseline sum
         };
 
         const cur = byImageId.get(imageId);
@@ -580,25 +653,168 @@ async function loadSealedDetailUncached(options: {
       from += PAGE_SIZE;
     }
 
-    topCards.push(
-      ...Array.from(byImageId.values())
-        .sort((a, b) => b.price - a.price)
-        .slice(0, 10)
-    );
+    allCards.push(...Array.from(byImageId.values()).sort((a, b) => b.price - a.price));
   }
 
-  // % OF SET denominators come from the SAME snapshot value the hero shows —
-  // never a recomputed sum of card prices (spec: no second rollup).
+  // Split by the shared classifier — ONE rule for tiles, shares, and Box EV.
+  const baselineCards: SealedTopCard[] = [];
+  const excludedByReason = new Map<string, BoosterBaselineExclusionReason>();
+  for (const c of allCards) {
+    const verdict = classifyBoosterBaseline({
+      cardImageId: c.cardImageId,
+      name: c.name,
+      rarity: c.rarity,
+    });
+    if (verdict.included) {
+      baselineCards.push(c);
+    } else if (verdict.reason) {
+      excludedByReason.set(c.cardImageId, verdict.reason);
+    }
+  }
+
+  // Tiles: top 10 of the BASELINE population (already price-desc).
+  const topCards: SealedTopCard[] = baselineCards.slice(0, 10);
+
+  // Promo callout: excluded cards that would have placed in the UNFILTERED
+  // top 10 — show the top 1–2 (D7 decision 6).
+  const promoCallouts: SealedPromoCallout[] = allCards
+    .slice(0, 10)
+    .filter((c) => excludedByReason.has(c.cardImageId))
+    .slice(0, 2)
+    .map((c) => ({
+      cardImageId: c.cardImageId,
+      name: c.name,
+      cardNumber: c.cardNumber,
+      price: c.price,
+      reason: excludedByReason.get(c.cardImageId) as BoosterBaselineExclusionReason,
+    }));
+
+  // Share denominators are the page-local baseline sum, labeled OF BASELINE
+  // VALUE in the UI. SET VALUE itself stays the official snapshot figure —
+  // the two numbers coexist and must never be conflated (D7 decision 6).
+  const baselineValue =
+    baselineCards.length > 0 ? baselineCards.reduce((s, c) => s + c.price, 0) : null;
   for (const c of topCards) {
-    c.pctOfSet = setValue != null && setValue > 0 ? (c.price / setValue) * 100 : null;
+    c.pctOfBaseline =
+      baselineValue != null && baselineValue > 0 ? (c.price / baselineValue) * 100 : null;
   }
   const top10Combined =
     topCards.length > 0 ? topCards.reduce((s, c) => s + c.price, 0) : null;
   const top10Share =
-    top10Combined != null && setValue != null && setValue > 0
-      ? (top10Combined / setValue) * 100
+    top10Combined != null && baselineValue != null && baselineValue > 0
+      ? (top10Combined / baselineValue) * 100
       : null;
-  const topCardShare = topCards.length > 0 ? topCards[0].pctOfSet : null;
+  const topCardShare = topCards.length > 0 ? topCards[0].pctOfBaseline : null;
+
+  // 9. §3.5 Box EV — pull_rates slots priced over the baseline population.
+  // No rows → boxEv stays null and the section is absent entirely (no
+  // headers, no zeros). The unique key caps this at one row per slot, so a
+  // single query suffices (no pagination loop needed at ≤ ~10 rows).
+  //
+  // BOX products only: pull_rates carries per-BOX expectations, and the
+  // premium compares the product's own price against the EV. On a
+  // booster_box_case page that comparison would print case price vs box
+  // contents — nonsense — so the section hides for every other product_type
+  // (same clean-hide rule as a set with no rows).
+  let boxEv: BoxEv | null = null;
+  if (productRow.set_id && productRow.product_type === "booster_box") {
+    // Two FKs exist between pull_rates and game_rarities (plain rarity_id +
+    // the v40-style composite), so the embed must name one — same PGRST201
+    // lesson as the sets embed in step 1.
+    const { data: rateRows, error: ratesError } = await supabase
+      .from("pull_rates")
+      .select(
+        `
+        slot_label,
+        per_box,
+        confidence,
+        sort_order,
+        rarity_id,
+        game_rarities!pull_rates_rarity_game_fk ( code )
+      `
+      )
+      .eq("game_id", game.id)
+      .eq("region", "en")
+      .eq("set_id", productRow.set_id)
+      .order("sort_order", { ascending: true });
+
+    if (ratesError) throw new Error(ratesError.message);
+
+    type PullRateRow = {
+      slot_label: string;
+      per_box: number | string;
+      confidence: string;
+      sort_order: number;
+      rarity_id: string | null;
+      game_rarities: { code: string | null } | Array<{ code: string | null }> | null;
+    };
+
+    if (rateRows && rateRows.length > 0) {
+      // Rarity averages over the baseline population, prices > 0 only —
+      // identical price basis and dedupe to the tiles above.
+      const byRarity = new Map<string, { sum: number; n: number }>();
+      const bulk = { sum: 0, n: 0 };
+      for (const c of baselineCards) {
+        if (!c.rarity) continue;
+        if (isBulkRarity(c.rarity)) {
+          bulk.sum += c.price;
+          bulk.n += 1;
+          continue;
+        }
+        const agg = byRarity.get(c.rarity) ?? { sum: 0, n: 0 };
+        agg.sum += c.price;
+        agg.n += 1;
+        byRarity.set(c.rarity, agg);
+      }
+
+      const roundCents = (v: number) => Math.round(v * 100) / 100;
+
+      const slots: BoxEvSlot[] = (rateRows as unknown as PullRateRow[]).map((row) => {
+        const rarityCode =
+          row.rarity_id == null ? null : firstRelation(row.game_rarities)?.code ?? null;
+        const agg = rarityCode == null ? bulk : byRarity.get(rarityCode) ?? { sum: 0, n: 0 };
+        const avgPrice = agg.n > 0 ? agg.sum / agg.n : null;
+        const perBox = Number(row.per_box);
+        // Cents-round each contribution BEFORE totalling — the rendered total
+        // then equals the rendered column sum exactly (spec §8).
+        const valuePerBox = avgPrice != null ? roundCents(perBox * avgPrice) : null;
+        const confidence =
+          row.confidence === "high" || row.confidence === "low" ? row.confidence : "medium";
+        return {
+          slotLabel: row.slot_label,
+          rarityCode,
+          perBox,
+          avgPrice,
+          valuePerBox,
+          weightPct: null, // filled once the total is known
+          confidence,
+          cardCount: agg.n,
+        };
+      });
+
+      const total = roundCents(
+        slots.reduce((s, slot) => s + (slot.valuePerBox ?? 0), 0)
+      );
+      for (const slot of slots) {
+        slot.weightPct =
+          slot.valuePerBox != null && total > 0 ? (slot.valuePerBox / total) * 100 : null;
+      }
+
+      // Amended caution trigger (D7 decision 5): strip only when the TOP slot
+      // by VALUE/BOX contribution is low-confidence.
+      let topSlot: BoxEvSlot | null = null;
+      for (const slot of slots) {
+        if (slot.valuePerBox == null) continue;
+        if (topSlot == null || slot.valuePerBox > (topSlot.valuePerBox ?? 0)) topSlot = slot;
+      }
+      const caution = topSlot?.confidence === "low";
+
+      const premiumPct =
+        latest != null && total > 0 ? ((latest.price - total) / total) * 100 : null;
+
+      boxEv = { slots, total, premiumPct, caution };
+    }
+  }
 
   return {
     game: gameResponsePayload(game),
@@ -639,8 +855,11 @@ async function loadSealedDetailUncached(options: {
     sealedRank,
     topCards,
     top10Combined,
+    baselineValue,
     top10Share,
     topCardShare,
+    promoCallouts,
+    boxEv,
   };
 }
 
@@ -650,10 +869,10 @@ export async function loadSealedDetail(options: {
   publicOnly?: boolean;
 }): Promise<SealedDetailData | null> {
   const publicOnly = options.publicOnly ?? !allowsPrivateGamePreview();
-  // v2: Phase F payload additions (§3.3 stats + §3.4 top cards) — bump on
-  // every shape change or the cache serves the old shape stale.
+  // v3: Phase G payload additions (§3.4 baseline retrofit + §3.5 Box EV) —
+  // bump on every shape change or the cache serves the old shape stale.
   return cachedPublicData(
-    publicDataCacheKey("terminal-sealed-detail-v2", options.game ?? "default", publicOnly, options.slug),
+    publicDataCacheKey("terminal-sealed-detail-v3", options.game ?? "default", publicOnly, options.slug),
     () => loadSealedDetailUncached({ ...options, publicOnly }),
     CATALOG_DATA_TTL_SECONDS
   );

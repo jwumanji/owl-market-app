@@ -802,6 +802,343 @@
   letter-spacing: 0.5px;
 }
 
+/* -- §3.4 promo callout strip (D7 decision 6) — excluded promo/event cards
+      that would have placed in the top 10; clearly not tiles. ---------------- */
+
+.sd-promo-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  border: 1.5px dashed var(--ink-3);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  padding: 9px 14px;
+  margin-bottom: 14px;
+}
+
+.sd-promo-label {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 1px;
+  color: var(--ink-3);
+}
+
+.sd-promo-card {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-pill);
+  background: var(--bg-3);
+  padding: 4px 12px;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.sd-promo-card:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.sd-promo-name {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--ink);
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sd-promo-price {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11.5px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===========================================================================
+   §3.5 · Box EV — two columns 1fr | 330px, stacking below 1080px (spec §3.5).
+   Left: slot table with proportional weight bars. Right: peach hero,
+   comparison bars, sealed premium. BULK renders plain text, never a badge.
+   =========================================================================== */
+
+.sd-ev-caution {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 1px;
+  color: color-mix(in srgb, var(--coral) 70%, var(--ink));
+  background: color-mix(in srgb, var(--coral) 9%, var(--bg-2));
+  border: 1.5px solid var(--coral);
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+
+.sd-ev-grid {
+  display: grid;
+  grid-template-columns: 1fr 330px;
+  gap: 14px;
+  align-items: start;
+}
+
+.sd-ev-scroll {
+  overflow-x: auto; /* internal scroll only — never page-level (spec §8) */
+}
+
+.sd-ev-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  min-width: 520px;
+}
+
+.sd-ev-table thead th {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 1.1px;
+  color: var(--ink-2);
+  text-align: left;
+  padding: 11px 13px;
+  background: var(--bg-3);
+  border-bottom: 1.5px solid var(--ink);
+  white-space: nowrap;
+}
+
+.sd-ev-table thead th.num {
+  text-align: right;
+}
+
+.sd-ev-table tbody td {
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--ink);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-ev-table tbody td.num {
+  text-align: right;
+}
+
+.sd-ev-table tfoot td {
+  padding: 11px 13px;
+  border-top: 1.5px solid var(--ink);
+  background: var(--bg-3);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.6px;
+  color: var(--ink);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-ev-table tfoot td.num {
+  text-align: right;
+}
+
+/* BULK slot label — plain text, never through RarityBadge (spec §3.5). */
+.sd-ev-bulk {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.7px;
+  color: var(--ink-2);
+}
+
+.sd-ev-wcol {
+  width: 168px;
+}
+
+.sd-ev-w {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sd-ev-wpct {
+  min-width: 46px;
+  text-align: right;
+  font-size: 11.5px;
+}
+
+/* Proportional weight bar — --gain-2 fill, ink border (spec §3.5). */
+.sd-ev-wbar {
+  flex: 1;
+  height: 10px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-pill);
+  background: var(--bg-2);
+  overflow: hidden;
+  display: block;
+}
+
+.sd-ev-wbar i {
+  display: block;
+  height: 100%;
+  background: var(--gain-2);
+}
+
+/* -- right summary ----------------------------------------------------------- */
+
+.sd-ev-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Peach hero (spec §3.5). */
+.sd-ev-hero {
+  background: var(--bg-3);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-lg);
+  box-shadow: 4px 4px 0 var(--ink);
+  padding: 16px 18px;
+}
+
+.sd-ev-hero-label {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 1.3px;
+  color: var(--ink-2);
+}
+
+.sd-ev-hero-value {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 34px;
+  letter-spacing: -1px;
+  color: var(--ink);
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-ev-hero-sub {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 0.9px;
+  color: var(--ink-3);
+  margin-top: 6px;
+}
+
+/* Comparison bars — box price in ink, opening EV in --gain-2; both scaled by
+   the larger of the two so the bigger bar always reads 100%. */
+.sd-ev-bars {
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  padding: 13px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.sd-ev-bar-row {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  row-gap: 4px;
+  align-items: baseline;
+}
+
+.sd-ev-bar-row .bl {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 1px;
+  color: var(--ink-3);
+}
+
+.sd-ev-bar-row .bv {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--ink);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-ev-bar-row .bt {
+  grid-column: 1 / -1;
+  display: block;
+  height: 12px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-pill);
+  background: var(--bg-3);
+  overflow: hidden;
+}
+
+.sd-ev-bar-row .bt i {
+  display: block;
+  height: 100%;
+}
+
+.sd-ev-bar-row .bt i.ink {
+  background: var(--ink);
+}
+
+.sd-ev-bar-row .bt i.gain {
+  background: var(--gain-2);
+}
+
+/* Sealed premium + plain-language read. */
+.sd-ev-premium {
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  padding: 13px 15px;
+}
+
+.sd-ev-premium .sl {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 1.1px;
+  color: var(--ink-2);
+}
+
+.sd-ev-premium .sv {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 24px;
+  letter-spacing: -0.5px;
+  margin-top: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-ev-read {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  margin-top: 7px;
+}
+
+/* Mandatory disclaimer — permanent property of community-estimated rates. */
+.sd-ev-foot {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 0.9px;
+  line-height: 1.6;
+  color: var(--ink-3);
+  margin-top: 12px;
+}
+
 /* ===========================================================================
    Responsive — 1280 canvas; facts reflow one breakpoint EARLIER than the
    1460 mockup (1180 here vs its 1080). Mobile 380: no page-level horizontal
@@ -824,6 +1161,13 @@
 
   .sd-inside {
     grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* §3.5 columns stack below 1080 (spec §3.5 — its own breakpoint, not 1180). */
+@media (max-width: 1080px) {
+  .sd-ev-grid {
+    grid-template-columns: 1fr;
   }
 }
 
