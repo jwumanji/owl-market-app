@@ -17,7 +17,11 @@ import { cachedPublicData, CATALOG_DATA_TTL_SECONDS, publicDataCacheKey } from "
 import { firstRelation } from "@/lib/supabase-relations";
 import { buildDistributionSetCodeIndex, distributionSetCode } from "@/lib/set-membership";
 import type { CatalogSetCard } from "./sets-data";
-import { promoCollectionSets } from "./promo-collections";
+import {
+  PROMO_COLLECTION_CATALOG,
+  promoCollectionSets,
+  type PromoProductMarket,
+} from "./promo-collections";
 
 // ---------------------------------------------------------------------------
 // loadSets() — groups cards by cards.set_id so each physical printing belongs
@@ -116,6 +120,43 @@ const CATALOG_TYPE_COLOR: Record<string, string> = {
 };
 const CATALOG_SET_CARD_LIMIT = 24;
 const SET_INDEX_TOP_CARD_LIMIT = 5;
+
+async function loadPromoProductMarkets(
+  supabase: ReturnType<typeof createCachedServiceClient>,
+  gameId: string
+) {
+  const productIds = PROMO_COLLECTION_CATALOG.flatMap((entry) =>
+    entry.tcgplayer ? [String(entry.tcgplayer.productId)] : []
+  );
+  const marketByProductId = new Map<number, PromoProductMarket>();
+  if (productIds.length === 0) return marketByProductId;
+
+  const { data, error } = await supabase
+    .from("sealed_products")
+    .select("tcg_product_id, tcg_price, market_avg, chg_1d, chg_7d, chg_30d, ath, atl, price_updated_at, last_synced_at")
+    .eq("game_id", gameId)
+    .eq("is_active", true)
+    .in("tcg_product_id", productIds);
+
+  if (error) throw new Error(`Promo sealed pricing lookup failed: ${error.message}`);
+
+  for (const row of data ?? []) {
+    const productId = Number(row.tcg_product_id);
+    if (!Number.isFinite(productId)) continue;
+    const price = Number(row.market_avg ?? row.tcg_price);
+    marketByProductId.set(productId, {
+      price: Number.isFinite(price) && price > 0 ? price : null,
+      chg1d: row.chg_1d == null ? null : Number(row.chg_1d),
+      chg7d: row.chg_7d == null ? null : Number(row.chg_7d),
+      chg30d: row.chg_30d == null ? null : Number(row.chg_30d),
+      ath: row.ath == null ? null : Number(row.ath),
+      atl: row.atl == null ? null : Number(row.atl),
+      updatedAt: row.price_updated_at ?? row.last_synced_at ?? null,
+    });
+  }
+
+  return marketByProductId;
+}
 
 type CatalogCardRow = {
   id: string;
@@ -683,9 +724,10 @@ async function loadSetsUncached(options: {
     }
   }
 
+  const promoProductMarkets = await loadPromoProductMarkets(supabase, game.id);
   const existingSlugs = new Set(sets.map((set) => String(set.slug).toLowerCase()));
   const existingCodes = new Set(sets.map((set) => String(set.code).toUpperCase()));
-  for (const promoSet of promoCollectionSets()) {
+  for (const promoSet of promoCollectionSets(promoProductMarkets)) {
     if (existingSlugs.has(promoSet.slug.toLowerCase()) || existingCodes.has(promoSet.code.toUpperCase())) continue;
     sets.push(promoSet as unknown as Record<string, unknown>);
   }

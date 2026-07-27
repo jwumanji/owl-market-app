@@ -67,7 +67,8 @@ function isCatalogOnly(set: SetData) {
 }
 
 function hasLivePricing(set: SetData) {
-  return !isCatalogOnly(set) && !set.comingSoon && set.cards > 0;
+  return set.pricingStatus === "sealed_market" ||
+    (!isCatalogOnly(set) && !set.comingSoon && set.cards > 0);
 }
 
 function setCardCount(set: SetData) {
@@ -194,7 +195,14 @@ export default function SetsClient({
   const sets = initialSets;
   const totalCards = useMemo(() => sets.reduce((acc, s) => acc + (s.cardsTotal ?? s.cards), 0), [sets]);
   const hasPricedSets = useMemo(() => sets.some(hasLivePricing), [sets]);
-  const pricingLabel = hasPricedSets ? <>Pricing via <b>JustTCG</b></> : <>Catalog preview</>;
+  const hasSealedPricing = useMemo(() => sets.some((set) => set.pricingStatus === "sealed_market"), [sets]);
+  const pricingLabel = hasPricedSets
+    ? <>Pricing via <b>{hasSealedPricing ? "JustTCG + TCGCSV" : "JustTCG"}</b></>
+    : <>Catalog preview</>;
+  const promoProductView = typeFilter === "promo_products" ||
+    typeFilter === "anniversary" ||
+    typeFilter === "collection" ||
+    typeFilter === "special";
 
   const typeTabs = useMemo(() => {
     const present = new Set<SetType>();
@@ -391,7 +399,7 @@ export default function SetsClient({
                 Name {sortIndicator("name")}
               </th>
               <th className={`r${sort === "price" ? " sorted" : ""}`} onClick={() => toggleSort("price")}>
-                Index Value {sortIndicator("price")}
+                {promoProductView ? "Sealed Market" : "Index Value"} {sortIndicator("price")}
               </th>
               <th className={`r${sort === "chg1d" ? " sorted" : ""}`} onClick={() => toggleSort("chg1d")}>
                 24H {sortIndicator("chg1d")}
@@ -463,6 +471,8 @@ export default function SetsClient({
         <div>
           {loadError ? (
             loadError
+          ) : promoProductView ? (
+            "Sealed Market is the current TCGplayer market price for one unopened product. It is not the sum of the included cards."
           ) : hasPricedSets ? (
             <>
               Index Value = sum of average market prices for every priced card in the set. Skewed by chase-card concentration.{" "}
