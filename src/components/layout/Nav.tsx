@@ -241,9 +241,10 @@ export default function Nav({ variant }: NavProps) {
 }
 
 function PublicNav({ pathname }: { pathname: string }) {
-  const activeGameRouteSlug = gameRouteSlugFromPath(pathname);
-  const isDefaultPublicGame = activeGameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
-  const hasLiveMarket = isDefaultPublicGame || activeGameRouteSlug === RIFTBOUND_ROUTE_SLUG;
+  const requestedGameRouteSlug = gameRouteSlugFromPath(pathname);
+  const activeGame = getGameDefinitionByRouteSlug(requestedGameRouteSlug) ?? DEFAULT_PUBLIC_GAME;
+  const activeGameRouteSlug = activeGame.routeSlug;
+  const hasLiveMarket = activeGame.capabilities.pricing === "live";
   const links = publicLinks(activeGameRouteSlug);
 
   return (

@@ -317,6 +317,32 @@ test("Lorcana public navigation follows the approved investor hierarchy", () => 
   assert.match(navSource, /PUBLIC_GAME_DEFINITIONS\.map/);
 });
 
+test("Lorcana stays wired into the homepage and canonical production schedule", () => {
+  const homeSource = fs.readFileSync(
+    path.join(process.cwd(), "src/app/page.tsx"),
+    "utf8"
+  );
+  const manifest = JSON.parse(
+    fs.readFileSync(path.join(process.cwd(), "config/game-sync-jobs.json"), "utf8")
+  ) as { jobs: Array<{ id: string; game: string; path: string; schedules: string[] }> };
+  const vercel = JSON.parse(
+    fs.readFileSync(path.join(process.cwd(), "vercel.json"), "utf8")
+  ) as { crons: Array<{ path: string; schedule: string }> };
+
+  assert.match(homeSource, /name: "Disney Lorcana"/);
+  assert.match(homeSource, /fetchGameTileState\("lorcana"\)/);
+
+  const job = manifest.jobs.find((candidate) => candidate.id === "lorcana.justtcg.current_prices");
+  assert.ok(job);
+  assert.equal(job.game, "lorcana");
+  assert.equal(job.path, "/api/sync/justtcg?game=lorcana");
+  assert.deepEqual(job.schedules, ["45 * * * *"]);
+  assert.equal(
+    vercel.crons.some((cron) => cron.path === job.path && cron.schedule === job.schedules[0]),
+    true
+  );
+});
+
 test("Lorcana franchises and promos resolve to filtered catalog views", () => {
   const franchisePage = fs.readFileSync(
     path.join(process.cwd(), "src/app/games/[game]/franchises/page.tsx"),
