@@ -1,18 +1,38 @@
 import Link from "next/link";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
+import { loadSealedDashboard, type SealedDashboardData } from "./load-sealed";
+import SealedTrackerClient from "./SealedTrackerClient";
 import "./terminal.css";
 
-// Phase A ships the shell only — no loader, no Supabase access, no client
-// component yet. The dashboard lands in Phase D on top of migration v46.
+// Server component: calls the loader (service-role — market_index_snapshots is
+// anon-revoked, so set value / Value Ratio resolve HERE and travel down as
+// props, spec §6), then hands everything to the client for interactivity.
 
-export function SealedTrackerContent({
+function metaDate(iso: string | null): string {
+  if (!iso) return "—";
+  const t = Date.parse(`${iso}T00:00:00Z`);
+  if (Number.isNaN(t)) return "—";
+  return new Date(t)
+    .toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "2-digit", year: "numeric" })
+    .toUpperCase();
+}
+
+export async function SealedTrackerContent({
   gameRouteSlug = DEFAULT_PUBLIC_GAME_ROUTE_SLUG,
 }: {
   gameRouteSlug?: string | null;
 } = {}) {
   const isDefaultGame = !gameRouteSlug || gameRouteSlug === DEFAULT_PUBLIC_GAME_ROUTE_SLUG;
   const homeHref = isDefaultGame ? "/" : gamePath(gameRouteSlug);
+
+  let data: SealedDashboardData | null = null;
+  let loadError: string | null = null;
+  try {
+    data = await loadSealedDashboard({ game: gameRouteSlug });
+  } catch {
+    loadError = "Failed to load sealed market data. Try again shortly.";
+  }
 
   return (
     <section className="terminal-page">
@@ -34,14 +54,23 @@ export function SealedTrackerContent({
             Booster box prices tracked week by week, against the value of the singles inside them.
           </p>
         </div>
+        {data && (
+          <div className="terminal-head-meta">
+            DATA: JUSTTCG · DAILY SNAPSHOT
+            <br />
+            LAST UPDATE: {metaDate(data.latestPriceDate)}
+          </div>
+        )}
       </div>
 
-      <div className="terminal-placeholder">
-        <div className="terminal-placeholder-label">Phase A — shell</div>
-        <p className="terminal-placeholder-body">
-          The sealed dashboard lands once migration v46 and the weekly snapshot job are in place.
-        </p>
-      </div>
+      {data ? (
+        <SealedTrackerClient data={data} />
+      ) : (
+        <div className="terminal-placeholder">
+          <div className="terminal-placeholder-label">Data unavailable</div>
+          <p className="terminal-placeholder-body">{loadError}</p>
+        </div>
+      )}
     </section>
   );
 }
