@@ -283,3 +283,138 @@ variant classes (no DB class), DON!! alt-arts (cards not attached to sets).
 - Official structure: https://en.onepiece-cardgame.com/products/boosters/prb01.php · prb02.php
 - TCGplayer case pages: 498735 (OP05), 450087 (OP01), 521162 (EB01), 545400 (PRB01), 628353 (OP13)
 - Repo: `src/app/sets/sets-data.ts:109` `PULL_RATES` — **mockup fiction** (OP01 with "1 MR per box guaranteed", 6-box cases); ignored per spec §2.2
+
+---
+
+## Sensitivity analysis (2026-07-27) — top-slot 2× error
+
+**Method.** Read-only probe against the live DB (PostgREST, service role; no writes). For each of the
+17 seeded sets, per-rarity average prices were computed over the exact population Phase F's
+`load-sealed-detail.ts` uses: `cards` where `game_id = one_piece`, `region = 'en'`,
+`printed_set_code = <set code>`, deduped on `card_image_id` (max price kept), price basis
+`price_stats.tcg_market` via the `price_stats_card_game_fk` embed, only prices > 0 counted. BULK is
+the R/UC/C classes combined, per the draft's slot semantics. EV = Σ `per_box` × avg; per-slot
+contribution `C` and share `S = C/EV`. Sensitivity to a 2× rate error on the **top slot by
+contribution**: if our seeded rate is 2× truth we overstate by `err_over = (C/2)/(EV − C/2)`; if half
+truth we understate by `err_under = C/(EV + C)`; worst = max (algebraically, `err_over` dominates
+whenever the slot's share exceeds 50%). A slot whose rarity resolves zero cards contributes 0 and is
+flagged. Caveat on BULK-top rows: BULK's `per_box` is a derived remainder (288 − hits), so a literal
+2× *rate* error is structurally impossible there — for those rows the worst-case figure is better
+read as sensitivity to the BULK slot's *value* (its average price) being wrong by the same factor,
+which per §S.2 below is precisely the error that is actually present.
+
+### S.1 · Primary table — strict Phase F semantics (what the shipped loader would compute)
+
+Sorted by worst-case error, descending. **Cut** marks sets whose worst-case exceeds Justin's ±30%
+threshold — **15 of 17** under these semantics.
+
+| Set | EV | Top slot | Top share | Worst 2× err | Conf | JP-derived? | Zero-resolving slots | >±30%? |
+|---|---:|---|---:|---:|---|---|---|---|
+| OP02 | $2,605 | BULK | 90.8% | 83.2% | medium | no (derived) | — | CUT |
+| OP09 | $27,947 | BULK | 90.5% | 82.6% | medium | no (derived) | — | CUT |
+| OP14 | $2,850 | SR | 90.3% | 82.3% | low | **yes** | — | CUT |
+| OP13 | $4,851 | BULK | 90.1% | 82.0% | medium | no (derived) | — | CUT |
+| OP04 | $1,015 | BULK | 88.5% | 79.3% | medium | no (derived) | — | CUT |
+| OP08 | $4,480 | BULK | 83.9% | 72.3% | medium | no (derived) | **AA: 0 cards** | CUT |
+| OP10 | $6,426 | BULK | 81.0% | 68.1% | medium | no (derived) | — | CUT |
+| OP01 | $8,689 | BULK | 77.2% | 62.9% | medium | no (derived) | — | CUT |
+| OP03 | $3,770 | BULK | 74.7% | 59.6% | medium | no (derived) | — | CUT |
+| OP06 | $6,698 | BULK | 74.1% | 58.8% | medium | no (derived) | — | CUT |
+| EB01 | $8,721 | BULK | 66.9% | 50.3% | medium | no (derived) | — | CUT |
+| OP12 | $6,250 | BULK | 65.8% | 49.1% | medium | no (derived) | — | CUT |
+| OP05 | $11,944 | BULK | 61.7% | 44.6% | medium | no (derived) | — | CUT |
+| OP07 | $9,800 | BULK | 61.0% | 43.9% | medium | no (derived) | — | CUT |
+| EB02 | $806 | BULK | 58.7% | 41.6% | medium | no (derived) | — | CUT |
+| OP15 | $232 | AA | 35.0% | 25.9% | low | no | — | keep |
+| OP11 | $2,539 | BULK | 30.2% | 23.2% | medium | no (derived) | — | keep |
+
+**Broken populations (>10% of EV in zero-resolving slots): 0 sets** on this basis. Only one
+zero-resolving slot exists anywhere — OP08's AA (2/box seeded, **zero AA-classed cards** under
+`printed_set_code='OP08'`; live inventory shows OP08 parallels retained base rarities:
+SR 28 / R 38 / UC 39 / C 50 / L 12 / SP 7 / SEC 5 / TR 1 / MR 1, **no AA**). Priced at the
+cross-set AA average (~$36) it would add ~$70/box — ~1.7% of OP08's polluted strict EV, but
+**~14% of its honest EV** (§S.3), so on the honest basis OP08 *is* 1 broken-population set.
+This contradicts §3's claim that only non-empty classes were seeded — the OP08 probe was wrong.
+
+### S.2 · The strict table is dominated by a population defect, not by pull-rate risk
+
+BULK is the top slot in 15/17 sets because the `printed_set_code` population **includes promo and
+event reprints that are not pulled from booster boxes**, and they sit in the R/UC/C classes that the
+~271-card BULK multiplier amplifies:
+
+- `P-*` promo ids: e.g. `P-OP09-002` Uta (Treasure Cup 2025) **$8,999, rarity R** → OP09's strict
+  BULK avg is $93.45/card → $25,280 of the $27,947 EV. `P-OP07-119` Ace (Serial Numbered) $9,950.
+- Event ids: `-winner-pack`, `-regional-prize`, `-championship-prize`, `-cs-pack`, `-judge-pack`,
+  `-premium-card-collection`, `-welcome-pack`, `-learn-together`, `-other` — e.g.
+  `OP10-092-cs-pack` Perona **$600, rarity C**; `OP08-020-championship-prize` $249.99, rarity C.
+- Base-rarity parallels: `_p*` ids that kept R/UC/C rather than AA — e.g. OP13's five "St." elder
+  parallels (`OP13-091_p2` etc.) **$400–494 each, all rarity R**; `OP01-016_p1` Nami $404 R; box
+  toppers (`OP02-059_p1` UC $57). §5's line "DB lumps all parallel flavors into AA" is **wrong for
+  many sets** — plenty of parallels retain base rarity. Also singleton misclassifications:
+  `OP06-047` "Charlotte Pudding (SP)" $84 sits in class R with a plain id.
+- One promo in a small hit class does the same damage: OP14's SR class holds `P-OP14-112` Boa
+  Hancock $3,499.78 → SR avg $321.67 vs honest $3.86 → $2,573/box of phantom SR value (90.3% of
+  OP14's strict EV).
+
+Strict EV is therefore inflated ~1×–40× per set (median ≈ 15×; OP15 is the **only** clean set —
+zero promo ids). Against real box prices (~$80–$500) every §3.5 `sealed_premium` would print
+absurdly negative. **The same population feeds the already-shipped §3.4 top-10: in 9 of 17 sets the
+set's #1 "top card" is currently a promo** (OP02, OP03, OP05, OP06, OP07, OP09, OP10, OP12, OP14).
+
+EV per set under three populations (A strict · B minus `P-*`/`-winner-pack` · C booster-baseline —
+B additionally minus event ids everywhere, and BULK membership restricted to vanilla R/UC/C, i.e.
+no `_p*` ids, no "Box Topper" names):
+
+| | OP01 | OP02 | OP03 | OP04 | OP05 | OP06 | OP07 | OP08 | OP09 | OP10 | OP11 | OP12 | OP13 | OP14 | OP15 | EB01 | EB02 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| A | 8,689 | 2,605 | 3,770 | 1,015 | 11,944 | 6,698 | 9,800 | 4,480 | 27,947 | 6,426 | 2,539 | 6,250 | 4,851 | 2,850 | 232 | 8,721 | 806 |
+| B | 3,073 | 399 | 261 | 562 | 561 | 981 | 1,798 | 1,120 | 868 | 2,044 | 259 | 270 | 4,867 | 307 | 232 | 1,207 | 463 |
+| C | 1,409 | 159 | 134 | 582 | 295 | 386 | 699 | 449 | 698 | 302 | 259 | 270 | 439 | 307 | 232 | 355 | 461 |
+
+Promo exclusion alone (B) is not sufficient — OP13 stays at $4,867 because the elder parallels are
+`_p2` ids, not promos. C-level EVs ($134–$1,409) are the plausible ballpark for a box's contents.
+
+### S.3 · Diagnostic table — booster-baseline population (C)
+
+Same math on the cleaned population. This is the table that actually answers "how exposed is the EV
+to a pull-rate error", because the top slot is no longer an artifact. **8 of 17** exceed ±30% here.
+
+| Set | EV | Top slot | Top share | Worst 2× err | Conf | JP-derived? | >±30%? | Note |
+|---|---:|---|---:|---:|---|---|---|---|
+| OP04 | $582 | BULK | 89.3% | 80.6% | medium | no (derived) | CUT | driven by one $201 R (`OP04-015` Zoro) with a plain id — residual pollution, honest bulk avg ≈ $0.13 |
+| OP06 | $386 | BULK | 65.0% | 48.2% | medium | no (derived) | CUT | driven by `OP06-047` "(SP)" $84 classed R |
+| OP01 | $1,409 | L | 61.7% | 44.6% | low | no | CUT | L class includes leader *parallels* (avg $174) — and L is the most contested rate (2–12/box, §6.3) |
+| OP05 | $295 | MR | 55.6% | 38.5% | low | **yes** | CUT | 0.075/box × $2,185 manga avg |
+| EB01 | $355 | BULK | 54.2% | 37.1% | medium | no (derived) | CUT | `EB01-003-regional-prize` $190 still leaks in via plain-suffix id |
+| OP13 | $439 | SAR | 50.6% | 33.8% | low | **yes** | CUT | the intended chase slot — 0.04/box × $5,550 |
+| OP03 | $134 | BULK | 49.5% | 33.1% | medium | no (derived) | CUT | |
+| EB02 | $461 | AA | 43.3% | 30.2% | low | **yes** | CUT (borderline) | AA avg $99.76 — SPR anime leaders folded into AA |
+| OP02 | $159 | AA | 41.7% | 29.4% | medium | no | keep | |
+| OP15 | $232 | AA | 35.0% | 25.9% | low | no | keep | |
+| OP09 | $698 | L | 31.0% | 23.7% | low | no | keep | leader parallels in L again |
+| OP14 | $307 | AA | 30.1% | 23.1% | medium | no | keep | |
+| OP08 | $449 | SP | 30.0% | 23.1% | low | mixed (JP×2 + EN midpoint) | keep | **AA: 0 cards** (~14% of EV missing at proxy price) |
+| OP11 | $259 | AA | 28.7% | 22.3% | medium | no | keep | |
+| OP07 | $699 | TR | 28.5% | 22.2% | low | no (single EN source) | keep | |
+| OP12 | $270 | AA | 25.0% | 20.0% | medium | no | keep | |
+| OP10 | $302 | SR | 21.2% | 17.5% | low | **yes** | keep | |
+
+### S.4 · What this changes for D7
+
+1. **The EV membership join needs an exclusion rule before any seeding matters.** With Phase F
+   semantics as shipped, §3.5 output is promo-driven noise for 16/17 sets regardless of how good the
+   pull rates are. An explicit `includes()` exclusion list (`P-` prefix, `-winner-pack`,
+   `-regional-prize`, `-championship-prize`, `-cs-pack`, `-judge-pack`, `-premium-card-collection`,
+   `-welcome-pack`, `-learn-together`, `-other`) plus a decision on `_p*` base-rarity parallels
+   (they are chase pulls or box toppers, not 271-per-box bulk) is a prerequisite, and it also fixes
+   the live §3.4 top-10 promo contamination. Suffixes are not exhaustive — plain-id leaks exist
+   (`OP04-015`, `EB01-003-regional-prize`-style names on near-plain ids), so a flag column or curated
+   exclusion may age better than string matching.
+2. **On the honest basis, the ±30% cut list is OP04, OP06, OP01, OP05, EB01, OP13, OP03, EB02** —
+   but OP04/OP06/EB01 are there because of residual single-card pollution, not rate risk; the
+   genuinely rate-sensitive sets are **OP01 (L), OP05 (MR), OP13 (SAR), EB02 (AA)** — three of those
+   four top slots are `low`-confidence and JP-derived (OP01's L is `low` EN-contested).
+3. **OP08's AA row should be dropped or the class question resolved** — it can never price
+   (zero-resolving), silently deleting ~14% of the set's honest EV.
+4. The per-set analysis JSON (all three variants, per-slot contributions/shares/populations) was
+   left in the session scratchpad; the numbers above are reproducible from the method note.
