@@ -19,6 +19,9 @@
 | `moon-market-lockup-subtitle-dark.svg` | Dark-background lockup with the subtitle |
 | `moon-market-lockup-subtitle-1600.png` | Font-independent light-background lockup used by the website |
 | `moon-market-lockup-subtitle-dark-1200.png` | Font-independent dark-background lockup |
+| `moon-market-lockup-small.svg` | Compact light-background subtitle lockup for small placements |
+| `moon-market-lockup-small-dark.svg` | Compact dark-background subtitle lockup for small placements |
+| `moon-market-lockup-small-1200.png` | Font-independent compact lockup used in the website nav |
 | `favicon-{32,512}.png` | Raster favicon |
 
 ## Tokens

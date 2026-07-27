@@ -252,7 +252,7 @@ function PublicNav({ pathname }: { pathname: string }) {
       <div className="c-topnav-inner c-public-masthead">
         <div className="c-nav-left">
           <Link href="/" className="c-lockup" aria-label="Moon Market" prefetch={false}>
-            <MoonMarketLogo className="c-lockup-brand" priority />
+            <MoonMarketLogo className="c-lockup-brand" variant="compact" priority />
             <MoonMark className="c-lockup-mark-mobile" size={36} />
           </Link>
 
@@ -320,7 +320,7 @@ function AdminNav({ pathname }: { pathname: string }) {
       <div className="c-topnav-inner is-admin">
         <div className="c-nav-left">
           <Link href="/" className="c-lockup" aria-label="Moon Market" prefetch={false}>
-            <MoonMarketLogo className="c-lockup-brand" priority />
+            <MoonMarketLogo className="c-lockup-brand" variant="compact" priority />
             <MoonMark className="c-lockup-mark-mobile" size={36} />
           </Link>
 
