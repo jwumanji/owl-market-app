@@ -1,4 +1,5 @@
 import { createCachedServiceClient } from "@/lib/supabase-server";
+import { withOnePiecePayloadFallbacks } from "@/lib/game-payload";
 import {
   allowsPrivateGamePreview,
   gameResponsePayload,
@@ -73,6 +74,32 @@ export type SealedDetailProduct = {
   cardsPerPack: number | null;
 };
 
+export type SealedTopCard = {
+  /** Canonical unique key AND the /card/[id] route param (CLAUDE.md §8). */
+  cardImageId: string;
+  name: string;
+  cardNumber: string | null;
+  /** cards.rarity, passed to RarityBadge verbatim — null renders no badge. */
+  rarity: string | null;
+  img: string | null;
+  /** price_stats.tcg_market — the same per-card price /sets and /card display,
+      and the same basis capture_market_index_snapshots sums into set value. */
+  price: number;
+  /** price_stats.chg_7d. */
+  d7: number | null;
+  /** price / setValue × 100 against the SAME snapshot the hero shows — never
+      a recomputed card-sum rollup (spec §2.2). Null when no snapshot exists. */
+  pctOfSet: number | null;
+};
+
+export type SealedRank = {
+  /** Competition rank by latest price among is_tracked products of the same
+      game_id + product_type + region (spec §2.3). */
+  rank: number;
+  /** Products of that cohort that have at least one price row. */
+  of: number;
+};
+
 export type SealedDetailData = {
   game: ReturnType<typeof gameResponsePayload>;
   product: SealedDetailProduct;
@@ -100,6 +127,25 @@ export type SealedDetailData = {
   /** Days since the last day-over-day price change; null when the price never moved. */
   lastMoveDays: number | null;
   latestSnapshotDate: string | null;
+  /** §3.3 · mean of abs(w/w %) over the trailing 12 weeks of OUR rows — null
+      below MIN_VOLATILITY_OBS observations (short series render an em-dash,
+      never NaN). */
+  volatility12w: number | null;
+  /** How many w/w observations volatility12w averaged (0 for 1-point series). */
+  volatilityObs: number;
+  /** packs_per_unit × cards_per_pack — null today (both columns unseeded); the
+      stat card hides on null (spec §9.2 pattern). */
+  cardsPerBox: number | null;
+  /** latest price / packs_per_unit — null while packs_per_unit is null. */
+  pricePerPack: number | null;
+  sealedRank: SealedRank | null;
+  /** §3.4 · top 10 priced cards of this product's set, price desc. */
+  topCards: SealedTopCard[];
+  top10Combined: number | null;
+  /** top10Combined / setValue × 100 — snapshot-basis denominator (spec §3.4). */
+  top10Share: number | null;
+  /** topCards[0].price / setValue × 100. */
+  topCardShare: number | null;
 };
 
 // -- internal row shapes ------------------------------------------------------
@@ -123,6 +169,21 @@ type ProductQueryRow = {
 type HistoryPoint = { day: number; price: number };
 
 type SnapshotPoint = { day: number; value: number };
+
+type TopCardQueryRow = {
+  id: string;
+  card_image_id: string | null;
+  card_number: string | null;
+  name: string;
+  rarity: string | null;
+  image_url: string | null;
+  image_url_small: string | null;
+  game_payload: Record<string, unknown> | null;
+  price_stats:
+    | { tcg_market: number | null; chg_7d: number | null }
+    | Array<{ tcg_market: number | null; chg_7d: number | null }>
+    | null;
+};
 
 // -- derived-value helpers ----------------------------------------------------
 
@@ -166,6 +227,45 @@ function dailyDelta(rows: HistoryPoint[], nDays: number, toleranceDays: number):
   }
   if (!ref || ref.price === 0 || ref.day === latest.day) return null;
   return ((latest.price - ref.price) / ref.price) * 100;
+}
+
+/**
+ * §2.3 volatility_12w: mean of abs(w/w %) over the trailing 12 weeks of OUR
+ * rows, anchored to the product's own last data day (never "today" — same
+ * anchoring rule as every other window on this page).
+ *
+ * 13 weekly anchors sample the last price at or before each anchor day; a
+ * w/w observation needs both ends resolvable, so anchors before the first row
+ * drop out naturally. Fewer than MIN_VOLATILITY_OBS observations → null, and
+ * the stat card renders an em-dash (the 6 provider-stale tracked cases,
+ * terminal-detail-notes §1, include a 1-point series — never NaN). Carried
+ * (unrepriced) weeks contribute honest 0% swings.
+ */
+const MIN_VOLATILITY_OBS = 4;
+
+function volatility12w(rows: HistoryPoint[]): { value: number | null; obs: number } {
+  if (rows.length < 2) return { value: null, obs: 0 };
+  const latestDay = rows[rows.length - 1].day;
+  const samples: Array<number | null> = [];
+  for (let w = 12; w >= 0; w--) {
+    const anchor = latestDay - w * 7 * DAY_MS;
+    let px: number | null = null;
+    for (const r of rows) {
+      if (r.day > anchor) break;
+      px = r.price;
+    }
+    samples.push(px);
+  }
+  const swings: number[] = [];
+  for (let i = 1; i < samples.length; i++) {
+    const prev = samples[i - 1];
+    const cur = samples[i];
+    if (prev != null && cur != null && prev !== 0) {
+      swings.push(Math.abs((cur - prev) / prev) * 100);
+    }
+  }
+  if (swings.length < MIN_VOLATILITY_OBS) return { value: null, obs: swings.length };
+  return { value: swings.reduce((s, v) => s + v, 0) / swings.length, obs: swings.length };
 }
 
 /** Liquidity read from our own rows — no provider field needed at render time. */
@@ -342,6 +442,164 @@ async function loadSealedDetailUncached(options: {
 
   const setRelation = firstRelation(productRow.sets);
 
+  // 6. §3.3 stats — volatility from our own rows; per-pack facts from catalog
+  // columns (null today → the cards hide, spec §9.2).
+  const { value: vol12w, obs: volObs } = volatility12w(history);
+
+  const cardsPerBox =
+    productRow.packs_per_unit != null && productRow.cards_per_pack != null
+      ? productRow.packs_per_unit * productRow.cards_per_pack
+      : null;
+
+  const pricePerPack =
+    latest != null && productRow.packs_per_unit != null && productRow.packs_per_unit > 0
+      ? latest.price / productRow.packs_per_unit
+      : null;
+
+  // 7. SEALED RANK (spec §2.3): rank by latest price among is_tracked products
+  // of the same game_id + product_type + region. Latest = each product's own
+  // last history row, so provider-stale cohort members still rank on their
+  // frozen tail rather than dropping out.
+  let sealedRank: SealedRank | null = null;
+  if (latest != null) {
+    const { data: siblingRows, error: siblingError } = await supabase
+      .from("sealed_products")
+      .select("id")
+      .eq("game_id", game.id)
+      .eq("region", productRow.region)
+      .eq("product_type", productRow.product_type)
+      .eq("is_tracked", true);
+
+    if (siblingError) throw new Error(siblingError.message);
+    const siblingIds = ((siblingRows ?? []) as Array<{ id: string }>).map((r) => r.id);
+
+    const latestBySibling = new Map<string, { day: number; price: number }>();
+    if (siblingIds.length > 0) {
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from("sealed_product_price_history")
+          .select("sealed_product_id, price_date, price")
+          .eq("game_id", game.id)
+          .in("sealed_product_id", siblingIds)
+          .order("price_date", { ascending: true })
+          .order("sealed_product_id", { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
+
+        if (error) throw new Error(error.message);
+        if (!data || data.length === 0) break;
+
+        for (const row of data as Array<{
+          sealed_product_id: string;
+          price_date: string;
+          price: number | null;
+        }>) {
+          if (row.price == null) continue;
+          const day = parseDay(row.price_date);
+          const cur = latestBySibling.get(row.sealed_product_id);
+          if (!cur || day >= cur.day) {
+            latestBySibling.set(row.sealed_product_id, { day, price: row.price });
+          }
+        }
+
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+    }
+
+    const cohort = Array.from(latestBySibling.values());
+    if (cohort.length > 0) {
+      // Competition ranking — ties share a rank.
+      const rank = 1 + cohort.filter((c) => c.price > latest.price).length;
+      sealedRank = { rank, of: cohort.length };
+    }
+  }
+
+  // 8. §3.4 top 10 — set membership is printed_set_code == the product's set
+  // code (OP05: 137 by set_id vs 287 by printed_set_code — CLAUDE.md §8),
+  // deduped on card_image_id (parallels share card_number, never regex).
+  // Price basis is price_stats.tcg_market — the same figure /sets and
+  // /card/[id] display, and the same per-card basis the set-value snapshot
+  // sums, so % OF SET compares like with like.
+  const topCards: SealedTopCard[] = [];
+  if (setRelation?.code) {
+    const byImageId = new Map<string, SealedTopCard>();
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from("cards")
+        .select(
+          `
+          id,
+          card_image_id,
+          card_number,
+          name,
+          rarity,
+          image_url,
+          image_url_small,
+          game_payload,
+          price_stats!price_stats_card_game_fk (
+            tcg_market,
+            chg_7d
+          )
+        `
+        )
+        .eq("game_id", game.id)
+        .eq("region", "en")
+        .eq("printed_set_code", setRelation.code)
+        .order("id", { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
+
+      if (error) throw new Error(error.message);
+      if (!data || data.length === 0) break;
+
+      for (const raw of data as unknown as TopCardQueryRow[]) {
+        const card = withOnePiecePayloadFallbacks(raw as unknown as Record<string, unknown>);
+        const ps = firstRelation(raw.price_stats);
+        const price = ps?.tcg_market ?? null;
+        const imageId = (card.card_image_id as string | null) ?? null;
+        if (price == null || price <= 0 || !imageId) continue;
+
+        const candidate: SealedTopCard = {
+          cardImageId: imageId,
+          name: (card.name as string) ?? "Unknown",
+          cardNumber: (card.card_number as string | null) ?? null,
+          rarity: (card.rarity as string | null) ?? null,
+          img:
+            (card.image_url_small as string | null) ?? (card.image_url as string | null) ?? null,
+          price,
+          d7: ps?.chg_7d ?? null,
+          pctOfSet: null, // filled below once against the snapshot basis
+        };
+
+        const cur = byImageId.get(imageId);
+        if (!cur || candidate.price > cur.price) byImageId.set(imageId, candidate);
+      }
+
+      if (data.length < PAGE_SIZE) break;
+      from += PAGE_SIZE;
+    }
+
+    topCards.push(
+      ...Array.from(byImageId.values())
+        .sort((a, b) => b.price - a.price)
+        .slice(0, 10)
+    );
+  }
+
+  // % OF SET denominators come from the SAME snapshot value the hero shows —
+  // never a recomputed sum of card prices (spec: no second rollup).
+  for (const c of topCards) {
+    c.pctOfSet = setValue != null && setValue > 0 ? (c.price / setValue) * 100 : null;
+  }
+  const top10Combined =
+    topCards.length > 0 ? topCards.reduce((s, c) => s + c.price, 0) : null;
+  const top10Share =
+    top10Combined != null && setValue != null && setValue > 0
+      ? (top10Combined / setValue) * 100
+      : null;
+  const topCardShare = topCards.length > 0 ? topCards[0].pctOfSet : null;
+
   return {
     game: gameResponsePayload(game),
     product: {
@@ -374,6 +632,15 @@ async function loadSealedDetailUncached(options: {
     priceActivity30d: moves30d,
     lastMoveDays,
     latestSnapshotDate,
+    volatility12w: vol12w,
+    volatilityObs: volObs,
+    cardsPerBox,
+    pricePerPack,
+    sealedRank,
+    topCards,
+    top10Combined,
+    top10Share,
+    topCardShare,
   };
 }
 
@@ -383,8 +650,10 @@ export async function loadSealedDetail(options: {
   publicOnly?: boolean;
 }): Promise<SealedDetailData | null> {
   const publicOnly = options.publicOnly ?? !allowsPrivateGamePreview();
+  // v2: Phase F payload additions (§3.3 stats + §3.4 top cards) — bump on
+  // every shape change or the cache serves the old shape stale.
   return cachedPublicData(
-    publicDataCacheKey("terminal-sealed-detail", options.game ?? "default", publicOnly, options.slug),
+    publicDataCacheKey("terminal-sealed-detail-v2", options.game ?? "default", publicOnly, options.slug),
     () => loadSealedDetailUncached({ ...options, publicOnly }),
     CATALOG_DATA_TTL_SECONDS
   );

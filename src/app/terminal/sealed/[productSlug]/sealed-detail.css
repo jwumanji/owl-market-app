@@ -589,6 +589,220 @@
 }
 
 /* ===========================================================================
+   §3.3 · Market stats — 6-up stat rail; 3-up at 1180 (one breakpoint earlier
+   than the 1460 mockup, spec §3.0), 2-up at 720. Hover per spec §3.3:
+   translate(-2px,-2px) + 4px 4px 0 ink shadow.
+   =========================================================================== */
+
+.sd-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 13px;
+}
+
+.sd-stat {
+  background: var(--bg-2);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-md);
+  padding: 14px 15px;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+.sd-stat:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.sd-stat .sl {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 1.1px;
+  color: var(--ink-2);
+  margin-bottom: 7px;
+}
+
+.sd-stat .sv {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 20px;
+  letter-spacing: -0.5px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sd-stat .sn {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10px;
+  color: var(--ink-3);
+  margin-top: 3px;
+}
+
+/* ===========================================================================
+   §3.4 · Top 10 cards — summary strip + tile grid. 5-up × 2 rows; 4-up at
+   1180 · 3-up at 940 · 2-up at 640 (column count falls as width drops so
+   total height stays roughly flat, spec §3.4).
+   =========================================================================== */
+
+.sd-top10-strip {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--ink-2);
+  background: var(--bg-3);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-md);
+  padding: 11px 16px;
+  margin-bottom: 14px;
+}
+
+.sd-top10-strip b {
+  font-size: 17px;
+  color: var(--ink);
+  letter-spacing: -0.3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-top10-strip .sd-top10-solo {
+  margin-left: auto;
+  color: var(--ink-3);
+}
+
+.sd-inside {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 11px;
+}
+
+.sd-icard {
+  display: block;
+  min-width: 0; /* grid child — lets .sd-ic-name actually ellipsize */
+  background: var(--bg-2);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.13s, box-shadow 0.13s;
+}
+
+.sd-icard:hover {
+  transform: translate(-3px, -3px);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
+/* 4:3 art panel (spec §3.4 — deliberately NOT 5:7 portrait). Card art is
+   portrait, so cover-crop biased toward the top of the card where the
+   character art lives. */
+.sd-ic-art {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--bg-3);
+  border-bottom: 1.5px solid var(--ink);
+  overflow: hidden;
+}
+
+.sd-ic-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 18%;
+}
+
+.sd-ic-noart {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--ink-3);
+}
+
+.sd-ic-rank {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 0.6px;
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: var(--r-pill);
+  padding: 2px 6px;
+}
+
+.sd-ic-rar {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+}
+
+.sd-ic-body {
+  padding: 9px 11px;
+}
+
+/* Single line at every breakpoint — §8 criterion: truncate, never wrap. */
+.sd-ic-name {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.15;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sd-ic-meta {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 9px;
+  letter-spacing: 0.7px;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+
+.sd-ic-price {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: -0.4px;
+  color: var(--ink);
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-ic-line {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10.5px;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sd-ic-share {
+  font-size: 9px;
+  color: var(--ink-3);
+  letter-spacing: 0.5px;
+}
+
+/* ===========================================================================
    Responsive — 1280 canvas; facts reflow one breakpoint EARLIER than the
    1460 mockup (1180 here vs its 1080). Mobile 380: no page-level horizontal
    scroll — the table scrolls inside .sd-ph-scroll only.
@@ -602,6 +816,27 @@
 
   .sd-facts-col {
     grid-column: 1 / -1;
+  }
+
+  .sd-stat-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .sd-inside {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 940px) {
+  .sd-inside {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .sd-inside {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 9px;
   }
 }
 
@@ -626,5 +861,9 @@
 
   .sd-chart-canvas {
     height: 250px;
+  }
+
+  .sd-stat-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
