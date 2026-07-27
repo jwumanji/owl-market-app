@@ -241,3 +241,24 @@ Steady-state cost of the cron: **4/day** against the 1,000/day ceiling.
 | backfill run 1 (§8) | `sealed_product_price_history` | 356 | **29,648** |
 | backfill run 2 (§8) | `sealed_product_price_history` | 29,648 | **29,648** |
 | slug backfill (§9) | tracked rows with null `slug` | 44 | **0** |
+
+## 13. Addendum (2026-07-27) — tracked products with short/stale history, classified
+
+Phase E surfaced 6 of 44 tracked products whose history stops before 2026-07-26.
+Probed each against its provider timestamps — all six are provider-side staleness,
+not sync defects, and all are `booster_box_case` (cases trade thinly):
+
+| points | last row | provider lastUpdated | product |
+|---:|---|---|---|
+| 1 | 2026-07-14 | (none in feed) | Romance Dawn Case (Wave 1 - Blue) |
+| 35 | 2026-07-14 | (none in feed) | Memorial Collection Case |
+| 38 | 2026-07-14 | (none in feed) | Pillars of Strength Case |
+| 69 | 2026-07-14 | (none in feed) | Paramount War Case |
+| 35 | 2026-07-14 | (none in feed) | Romance Dawn Case (Wave 2 - White) |
+| 85 | 2026-07-21 | 2026-07-21 | Kingdoms of Intrigue Case |
+
+The five 07-14 rows are the legacy pre-Phase-C writes; the provider's current feed
+returns zero history points for them, so the sync — correctly — wrote nothing.
+This is the honest representation of illiquid products; the detail page's
+PRICE ACTIVITY / LAST MOVE facts exist to surface exactly this. No follow-up needed
+beyond awareness in Phase F (volatility/rank cards must tolerate short series).
