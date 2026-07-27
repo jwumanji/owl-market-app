@@ -767,7 +767,7 @@ function RaritySection({ data, gameRouteSlug }: { data: DashboardData; gameRoute
             value={window}
             onChange={setWindow}
             label="Rarity index"
-            windows={["7D", "30D"]}
+            windows={["7D", "30D", "90D"]}
           />
         )}
       />
