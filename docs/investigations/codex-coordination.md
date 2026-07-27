@@ -474,3 +474,14 @@ Lorcana may be intentionally live. Riftbound, per the audit's own gate, is not.
   Terminal work
 - `docs/moon-terminal-sealed-spec.md` §5.1 — three branches ship three different navs
 - `docs/moon-terminal-sealed-spec.md` §6 — service-role-only access rules
+
+## Game visibility is flipped from outside this repo (2026-07-27)
+
+`games.is_public` is mutated directly in the live DB by the other workstream.
+Observed: `riftbound.is_public` flipped `false → true` between the Phase F and
+Phase G verification sweeps (~2026-07-27) — Justin's instruction, applied out of
+band, later reverted. Consequence: **`audit:game-boundaries` can regress with no
+change from us** — the `riftbound should remain private until launch approval`
+assertion tests live DB state, not code. Before treating that failure as a code
+defect, check `games.is_public` and ask whether a visibility change was
+intentional. Neither direction of a flip leaves any trace in this repo.
