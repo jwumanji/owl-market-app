@@ -137,7 +137,7 @@ export default async function Home() {
         {/* HERO */}
         <section className="c-hero">
           <div className="c-hero-lockup">
-            <MoonMarketLogo className="c-hero-wm" width={516} height={120} priority />
+            <MoonMarketLogo className="c-hero-wm" width={516} height={132} priority />
             <span className="sr-only">Moon Market</span>
           </div>
 

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 476 116" width="476" height="116" role="img" aria-label="Moon Market — TCG Market Intelligence">
+  <defs>
+
+    <linearGradient id="mmd-ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FF6BB8"></stop>
+      <stop offset="50%" stop-color="#FF4936"></stop>
+      <stop offset="100%" stop-color="#E89512"></stop>
+    </linearGradient>
+    <linearGradient id="mmd-wm" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#FF6BB8"></stop>
+      <stop offset="50%" stop-color="#FF4936"></stop>
+      <stop offset="100%" stop-color="#E89512"></stop>
+    </linearGradient>
+    <mask id="mmd-moon">
+      <rect width="476" height="116" fill="white"></rect>
+      <circle cx="70" cy="56" r="20" fill="black"></circle>
+    </mask>
+  </defs>
+  <circle cx="60" cy="60" r="52" fill="url(#mmd-ring)" stroke="#1A0F08" stroke-width="5"></circle>
+  <circle cx="60" cy="60" r="38" fill="#1A0F08"></circle>
+  <circle cx="58" cy="60" r="26" fill="#FFF5E4" mask="url(#mmd-moon)"></circle>
+  <path d="M 80,49 Q 81.65,58.35 91,60 Q 81.65,61.65 80,71 Q 78.35,61.65 69,60 Q 78.35,58.35 80,49 Z" fill="#FFF5E4"></path>
+  <text x="130" y="66" font-family="&#39;Outfit&#39;, system-ui, sans-serif" font-weight="700" font-size="56" letter-spacing="-1.1" fill="#FFF5E4">Moon</text>
+  <text x="274" y="70" font-family="&#39;Caveat&#39;, cursive" font-weight="700" font-size="72" fill="url(#mmd-wm)">Market</text>
+  <text x="132" y="98" font-family="&#39;Outfit&#39;, system-ui, sans-serif" font-weight="500" font-size="16.5" letter-spacing="3.7" fill="#FFF5E4" fill-opacity="0.75">TCG MARKET INTELLIGENCE</text>
+</svg>

@@ -48,7 +48,7 @@ export default function LoginForm() {
     <div className="flex w-full max-w-[440px] flex-col items-center">
       {/* ── Hero lockup ── */}
       <div className="mb-10">
-        <MoonMarketLogo className="h-auto max-w-full" width={387} height={90} priority />
+        <MoonMarketLogo className="h-auto max-w-full" width={387} height={99} priority />
       </div>
 
       {/* ── Auth card ── */}

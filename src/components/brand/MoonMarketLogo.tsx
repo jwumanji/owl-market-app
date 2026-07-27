@@ -5,18 +5,24 @@ type MoonMarketLogoProps = {
   width?: number;
   height?: number;
   priority?: boolean;
+  tone?: "light" | "dark";
 };
 
-/** Font-independent Moon Market lockup from the approved brand bundle. */
+/** Moon Market lockup with the "TCG Market Intelligence" subtitle. */
 export default function MoonMarketLogo({
   className,
-  width = 155,
-  height = 36,
+  width = 180,
+  height = 46,
   priority = false,
+  tone = "light",
 }: MoonMarketLogoProps) {
   return (
     <Image
-      src="/brand/moon-lockup-paths.svg"
+      src={
+        tone === "dark"
+          ? "/brand/moon-market-lockup-subtitle-dark-1200.png"
+          : "/brand/moon-market-lockup-subtitle-1600.png"
+      }
       alt=""
       aria-hidden="true"
       className={className}
