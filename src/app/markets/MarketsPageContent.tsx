@@ -109,6 +109,7 @@ function toDashboardCard(row: Record<string, unknown>): DashboardCard {
     changes: {
       "1D": ps?.chg_1d ?? null,
       "7D": ps?.chg_7d ?? null,
+      "30D": ps?.chg_30d ?? null,
     },
   };
 }
@@ -185,8 +186,10 @@ async function renderMarketsPageContent({
     topValueCardsRes,
     gainers1dRes,
     gainers7dRes,
+    gainers30dRes,
     losers1dRes,
     losers7dRes,
+    losers30dRes,
     rarityIndex,
     characterIndex,
     sealedRes,
@@ -228,6 +231,18 @@ async function renderMarketsPageContent({
         .order("chg_7d", { ascending: false })
         .limit(5)
     ),
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "gainers-30d-100-plus"), async () =>
+      await supabase
+        .from("price_stats")
+        .select(DASHBOARD_PRICE_CARD_SELECT)
+        .eq("game_id", game.id)
+        .eq("cards.region", "en")
+        .gte("market_avg", 100)
+        .not("chg_30d", "is", null)
+        .gt("chg_30d", 0)
+        .order("chg_30d", { ascending: false })
+        .limit(5)
+    ),
     cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "losers-1d-100-plus"), async () =>
       await supabase
         .from("price_stats")
@@ -250,6 +265,18 @@ async function renderMarketsPageContent({
         .not("chg_7d", "is", null)
         .lt("chg_7d", 0)
         .order("chg_7d", { ascending: true })
+        .limit(5)
+    ),
+    cachedMarketData(publicDataCacheKey("markets-quickdash-v2", game.id, "losers-30d-100-plus"), async () =>
+      await supabase
+        .from("price_stats")
+        .select(DASHBOARD_PRICE_CARD_SELECT)
+        .eq("game_id", game.id)
+        .eq("cards.region", "en")
+        .gte("market_avg", 100)
+        .not("chg_30d", "is", null)
+        .lt("chg_30d", 0)
+        .order("chg_30d", { ascending: true })
         .limit(5)
     ),
     loadRarities({ game: game.routeSlug }),
@@ -298,10 +325,14 @@ async function renderMarketsPageContent({
     .sort((a, b) => cardChange(b, "1D") - cardChange(a, "1D"));
   let topGainers7d = mapDashboardCards(gainers7dRes.data)
     .sort((a, b) => cardChange(b, "7D") - cardChange(a, "7D"));
+  let topGainers30d = mapDashboardCards(gainers30dRes.data)
+    .sort((a, b) => cardChange(b, "30D") - cardChange(a, "30D"));
   let topLosers1d = mapDashboardCards(losers1dRes.data)
     .sort((a, b) => cardChange(a, "1D") - cardChange(b, "1D"));
   let topLosers7d = mapDashboardCards(losers7dRes.data)
     .sort((a, b) => cardChange(a, "7D") - cardChange(b, "7D"));
+  let topLosers30d = mapDashboardCards(losers30dRes.data)
+    .sort((a, b) => cardChange(a, "30D") - cardChange(b, "30D"));
   let topEbaySales = mapTopEbaySales(topEbaySalesRes.data);
   let allRarities = marketRarityRanking(
     rarityIndex.rarities,
@@ -314,8 +345,10 @@ async function renderMarketsPageContent({
       ...topValueCards,
       ...topGainers1d,
       ...topGainers7d,
+      ...topGainers30d,
       ...topLosers1d,
       ...topLosers7d,
+      ...topLosers30d,
     ].map((card) => card.id)
       .concat(topEbaySales.map((sale) => sale.card_id))
       .concat(allRarities.flatMap((rarity) => rarity.top_card_id ? [rarity.top_card_id] : []))));
@@ -340,8 +373,10 @@ async function renderMarketsPageContent({
       topValueCards = hydrateRiftboundCardImages(topValueCards, productIdByCardId);
       topGainers1d = hydrateRiftboundCardImages(topGainers1d, productIdByCardId);
       topGainers7d = hydrateRiftboundCardImages(topGainers7d, productIdByCardId);
+      topGainers30d = hydrateRiftboundCardImages(topGainers30d, productIdByCardId);
       topLosers1d = hydrateRiftboundCardImages(topLosers1d, productIdByCardId);
       topLosers7d = hydrateRiftboundCardImages(topLosers7d, productIdByCardId);
+      topLosers30d = hydrateRiftboundCardImages(topLosers30d, productIdByCardId);
       topEbaySales = topEbaySales.map((sale) => {
         if (sale.image_url || sale.image_url_small || sale.image_url_preview) return sale;
         const imageUrl = tcgPlayerProductImageUrl(productIdByCardId.get(sale.card_id));
@@ -417,6 +452,7 @@ async function renderMarketsPageContent({
         changes: {
           "1D": (row.chg_1d as number | null) ?? null,
           "7D": (row.chg_7d as number | null) ?? null,
+          "30D": (row.chg_30d as number | null) ?? null,
         },
       };
     });
@@ -473,14 +509,17 @@ async function renderMarketsPageContent({
     topCards: {
       "1D": topValueCards.slice(0, 10),
       "7D": topValueCards.slice(0, 10),
+      "30D": topValueCards.slice(0, 10),
     },
     topGainers: {
       "1D": topGainers1d.slice(0, 5),
       "7D": topGainers7d.slice(0, 5),
+      "30D": topGainers30d.slice(0, 5),
     },
     topLosers: {
       "1D": topLosers1d.slice(0, 5),
       "7D": topLosers7d.slice(0, 5),
+      "30D": topLosers30d.slice(0, 5),
     },
     topEbaySales,
     rarityRanking: {
@@ -489,10 +528,12 @@ async function renderMarketsPageContent({
     },
     topCharacters: {
       "7D": allCharacters,
+      "30D": allCharacters,
     },
     sealedBoxes: {
       "1D": sealedWithValues,
       "7D": sealedWithValues,
+      "30D": sealedWithValues,
     },
   };
 

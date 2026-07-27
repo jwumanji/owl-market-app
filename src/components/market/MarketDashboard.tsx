@@ -26,7 +26,7 @@ import { formatPct, formatPrice, pctColor } from "@/lib/utils";
 import MarketCardImage from "./MarketCardImage";
 import "./market-dashboard.css";
 
-const WINDOWS: MarketWindow[] = ["1D", "7D", "90D"];
+const WINDOWS: MarketWindow[] = ["1D", "7D", "30D", "90D"];
 type SetRankingMode = "booster_box" | "tsv";
 
 const RIFTBOUND_GUIDES = [
@@ -361,13 +361,13 @@ function TrendThumbnail({
         className="qd-trend-thumbnail-image"
         fallbackTimeoutMs={0}
         fetchPriority="low"
-        height={42}
+        height={59}
         imageUrl={imageUrl}
         imageUrlPreview={imageUrlPreview}
         imageUrlSmall={imageUrlSmall}
         loading="lazy"
         sourceSize="thumbnail"
-        width={30}
+        width={42}
       />
     </span>
   );
@@ -544,7 +544,7 @@ function CardImage({ card, eager = false }: { card: DashboardCard; eager?: boole
 }
 
 function TopCardsSection({ data, gameRouteSlug }: { data: DashboardData; gameRouteSlug?: string | null }) {
-  const [window, setWindow] = useState<MarketWindow>("1D");
+  const [window, setWindow] = useState<MarketWindow>("30D");
   const cards = data.topCards[window] ?? [];
 
   return (
@@ -608,7 +608,7 @@ function SetImage({ item }: { item: SealedRankItem }) {
 }
 
 function SetsSection({ data, gameRouteSlug }: { data: DashboardData; gameRouteSlug?: string | null }) {
-  const [window, setWindow] = useState<MarketWindow>("1D");
+  const [window, setWindow] = useState<MarketWindow>("30D");
   const [rankingMode, setRankingMode] = useState<SetRankingMode>("booster_box");
   const allSets = data.sealedBoxes[window] ?? [];
   const sets = rankingMode === "tsv"
@@ -701,7 +701,7 @@ function CharacterImage({ item }: { item: CharacterRankItem }) {
 }
 
 function CharactersSection({ data, gameRouteSlug }: { data: DashboardData; gameRouteSlug?: string | null }) {
-  const [window, setWindow] = useState<MarketWindow>("7D");
+  const [window, setWindow] = useState<MarketWindow>("30D");
   const characters = data.topCharacters[window] ?? [];
   const isRiftbound = gameRouteSlug === RIFTBOUND_ROUTE_SLUG;
   const indexHref = gamePath(gameRouteSlug, isRiftbound ? "/champions" : "/characters");
@@ -752,7 +752,7 @@ function CharactersSection({ data, gameRouteSlug }: { data: DashboardData; gameR
 }
 
 function RaritySection({ data, gameRouteSlug }: { data: DashboardData; gameRouteSlug?: string | null }) {
-  const [window, setWindow] = useState<MarketWindow>("7D");
+  const [window, setWindow] = useState<MarketWindow>("30D");
   const rarities = data.rarityRanking[window] ?? [];
 
   return (
