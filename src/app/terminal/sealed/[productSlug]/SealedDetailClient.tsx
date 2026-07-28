@@ -1,19 +1,9 @@
 "use client";
 
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
-import {
-  CategoryScale,
-  Chart as ChartJS,
-  Filler,
-  LinearScale,
-  LineElement,
-  PointElement,
-  Tooltip,
-  type ChartData,
-  type ChartOptions,
-} from "chart.js";
-import { Line } from "react-chartjs-2";
+import type { ChartData, ChartOptions } from "chart.js";
 import type { SealedDetailData } from "./load-sealed-detail";
 import "../terminal.css";
 import "./sealed-detail.css";
@@ -27,7 +17,15 @@ import "./sealed-detail.css";
 // module scope with only the elements this chart needs.
 // ---------------------------------------------------------------------------
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip);
+// chart.js is dynamically imported (ssr: false) so its payload leaves this
+// page's initial bundle — hydration was contending with the hero image's
+// decode/paint on throttled mobile (lcp-diagnosis.md cause 2). The container
+// .sd-chart-canvas holds a fixed height, so the late mount cannot shift
+// layout; type-only chart.js imports above erase at compile time.
+const SealedPriceChart = dynamic(() => import("./SealedPriceChart"), {
+  ssr: false,
+  loading: () => <div className="sd-chart-loading" aria-hidden="true" />,
+});
 
 const EM = "—"; // em-dash — the only rendering for missing values, never 0
 const DAY_MS = 86_400_000;
@@ -621,7 +619,7 @@ export default function SealedDetailClient({ data }: { data: SealedDetailData })
             <div className="sd-chart-wrap">
               <div className="sd-axis-label">{axisLabel}</div>
               <div className="sd-chart-canvas">
-                <Line data={chartData} options={chartOptions} />
+                <SealedPriceChart data={chartData} options={chartOptions} />
               </div>
             </div>
             <div className="sd-card-foot">

@@ -28,7 +28,11 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
   variable: "--font-jetbrains-mono",
-  display: "swap",
+  // "optional", not "swap": Terminal is mono-dominant and the swap repaint
+  // re-fired the text LCP ~2.2s in on throttled mobile (lcp-diagnosis.md).
+  // Slow first visits keep ui-monospace for the session; the brand-carrying
+  // faces (Space Grotesk, Caveat) were already optional.
+  display: "optional",
 });
 
 export const metadata: Metadata = {
