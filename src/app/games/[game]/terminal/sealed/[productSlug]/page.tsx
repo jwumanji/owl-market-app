@@ -12,14 +12,21 @@ export const revalidate = 3600;
 // zero tracked products (e.g. Lorcana today) contribute no params; their
 // unknown slugs render on demand and 404 via notFound().
 export async function generateStaticParams() {
-  const games = publicGameStaticParams();
-  const perGame = await Promise.all(
-    games.map(async ({ game }) => {
-      const slugs = await loadTrackedSealedSlugs(game);
-      return slugs.map((productSlug) => ({ game, productSlug }));
-    })
-  );
-  return perGame.flat();
+  try {
+    const games = publicGameStaticParams();
+    const perGame = await Promise.all(
+      games.map(async ({ game }) => {
+        const slugs = await loadTrackedSealedSlugs(game);
+        return slugs.map((productSlug) => ({ game, productSlug }));
+      })
+    );
+    return perGame.flat();
+  } catch (error) {
+    // A build must never fail because the DB was unreachable — the Vercel
+    // build env has no Supabase creds; pages fall back to on-demand rendering.
+    console.warn("generateStaticParams(terminal-sealed/[game]) skipped:", error);
+    return [];
+  }
 }
 
 export async function generateMetadata(
