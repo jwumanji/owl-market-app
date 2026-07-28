@@ -65,9 +65,14 @@ export type SealedDetailPoint = {
   /** ISO date (UTC day). */
   date: string;
   price: number;
-  /** Carry-forward set value at this date (spec §2.3) — null before the first snapshot ever. */
+  /** Carry-forward OFFICIAL set value (v1, entity_type='set') at this date
+      (spec §2.3) — null before the first snapshot ever. */
   setValue: number | null;
-  /** setValue / price. Steps between snapshots — that is correct, not a bug (spec §2.3). */
+  /** Carry-forward BOOSTER-BASELINE value (v2, entity_type='set_baseline') —
+      §2.3 carry-forward rules apply identically. */
+  baselineValue: number | null;
+  /** baselineValue / price — the ratio's numerator is the v2 BASELINE series,
+      never setValue. Steps between snapshots — correct, not a bug (spec §2.3). */
   ratio: number | null;
 };
 
@@ -178,8 +183,11 @@ export type SealedDetailData = {
   offAth: number | null;
   /** (current − msrp) / msrp × 100 — null while msrp_usd is null (today's normal). */
   vsMsrp: number | null;
-  /** Carry-forward set value at latestPriceDate. */
+  /** Carry-forward OFFICIAL set value (v1) at latestPriceDate — the hero fact. */
   setValue: number | null;
+  /** BASELINE RATIO: v2 baseline carry-forward at latestPriceDate ÷ latest
+      price. Labeled BASELINE RATIO in the facts row — not comparable to
+      setValue-based figures. */
   valueRatio: number | null;
   /** Count of day-over-day price changes in the trailing 30 days of our rows. */
   priceActivity30d: number;
@@ -437,12 +445,14 @@ async function loadSealedDetailUncached(options: {
     }
   }
 
-  // 3. Set-value snapshots for this product's set, ascending. Service-role-only
-  // table — this is the only place set value / Value Ratio can be resolved
-  // (spec §6). latestSnapshotDate is asked game-wide so the footer can state
-  // the capture date even when this set has no rows.
-  const snapshots: SnapshotPoint[] = [];
-  if (productRow.set_id) {
+  // 3. Snapshot series for this product's set, ascending — BOTH series, kept
+  // strictly apart (docs/investigations/set-value-v2.md):
+  //   'set'          → snapshots         (official SET VALUE: hero fact + overlay)
+  //   'set_baseline' → baselineSnapshots (v2 — every ratio surface)
+  // Service-role-only table — the only place these can be resolved (spec §6).
+  async function fetchSetSeries(entityType: "set" | "set_baseline"): Promise<SnapshotPoint[]> {
+    const series: SnapshotPoint[] = [];
+    if (!productRow.set_id) return series;
     let from = 0;
     while (true) {
       const { data, error } = await supabase
@@ -450,7 +460,7 @@ async function loadSealedDetailUncached(options: {
         .select("snapshot_date, index_value")
         .eq("game_id", game.id)
         .eq("region", "en")
-        .eq("entity_type", "set")
+        .eq("entity_type", entityType)
         .eq("set_id", productRow.set_id)
         .order("snapshot_date", { ascending: true })
         .range(from, from + PAGE_SIZE - 1);
@@ -460,24 +470,30 @@ async function loadSealedDetailUncached(options: {
 
       for (const row of data as Array<{ snapshot_date: string; index_value: number | null }>) {
         if (row.index_value == null) continue;
-        snapshots.push({ day: parseDay(row.snapshot_date), value: row.index_value });
+        series.push({ day: parseDay(row.snapshot_date), value: row.index_value });
       }
 
       if (data.length < PAGE_SIZE) break;
       from += PAGE_SIZE;
     }
+    return series;
   }
+  const snapshots = await fetchSetSeries("set");
+  const baselineSnapshots = await fetchSetSeries("set_baseline");
   const latestSnapshotDate =
     snapshots.length > 0 ? dayToIso(snapshots[snapshots.length - 1].day) : null;
 
-  // 4. Compose the chart/table series — carry-forward set value per §2.3.
+  // 4. Compose the chart/table series — carry-forward per §2.3 for BOTH
+  // series; the ratio divides the v2 baseline value, never the official one.
   const points: SealedDetailPoint[] = history.map((r) => {
     const setValue = carryForward(snapshots, r.day);
+    const baselineValue = carryForward(baselineSnapshots, r.day);
     return {
       date: dayToIso(r.day),
       price: r.price,
       setValue,
-      ratio: setValue != null && r.price !== 0 ? setValue / r.price : null,
+      baselineValue,
+      ratio: baselineValue != null && r.price !== 0 ? baselineValue / r.price : null,
     };
   });
 
@@ -500,8 +516,12 @@ async function loadSealedDetailUncached(options: {
       : null;
 
   const setValue = latest ? carryForward(snapshots, latest.day) : null;
+  const latestBaselineValue = latest ? carryForward(baselineSnapshots, latest.day) : null;
+  // BASELINE RATIO — v2 numerator only, never setValue.
   const valueRatio =
-    latest && latest.price !== 0 && setValue != null ? setValue / latest.price : null;
+    latest && latest.price !== 0 && latestBaselineValue != null
+      ? latestBaselineValue / latest.price
+      : null;
 
   const vsMsrp =
     latest != null && productRow.msrp_usd != null && productRow.msrp_usd !== 0
@@ -869,10 +889,11 @@ export async function loadSealedDetail(options: {
   publicOnly?: boolean;
 }): Promise<SealedDetailData | null> {
   const publicOnly = options.publicOnly ?? !allowsPrivateGamePreview();
-  // v3: Phase G payload additions (§3.4 baseline retrofit + §3.5 Box EV) —
-  // bump on every shape change or the cache serves the old shape stale.
+  // v4: set-value v2 — points carry baselineValue, ratio/valueRatio switch to
+  // the v2 numerator. Bump on every shape change or the cache serves the old
+  // shape stale.
   return cachedPublicData(
-    publicDataCacheKey("terminal-sealed-detail-v3", options.game ?? "default", publicOnly, options.slug),
+    publicDataCacheKey("terminal-sealed-detail-v4", options.game ?? "default", publicOnly, options.slug),
     () => loadSealedDetailUncached({ ...options, publicOnly }),
     CATALOG_DATA_TTL_SECONDS
   );

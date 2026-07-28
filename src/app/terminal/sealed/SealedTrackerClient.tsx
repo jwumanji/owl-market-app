@@ -20,17 +20,16 @@ const PERIODS = 12;
 const EM = "—"; // em-dash — the only rendering for missing values, never 0
 const VIEW_STORAGE_KEY = "owl-terminal-sealed-view";
 
-// D7 decision 2 (2026-07-27): the VALUE RATIO ranking chip is HIDDEN until a
-// booster-baseline set-value v2 series exists (task: set-value v2 /
-// metric_version=2). The shipped index_value numerator is 6–84% promo/event
-// paper per set, so the CROSS-SET ranking is distorted — 14 of 22 boxes change
-// rank under a clean numerator, 7 move more than 2 positions
-// (docs/investigations/value-ratio-population-audit.md §4.1). Per-row ratio
-// values outside the ranking mode (table columns, cards secondary stat, the
-// detail page's overlay + facts row) stay — the audit found per-product
-// TRENDS honest; it is the cross-set comparison that lies. Revival: flip this
-// to true once the loader reads the metric_version=2 series.
-const RATIO_RANKING_ENABLED = false;
+// D7 decision 2, REVIVED 2026-07-28: the VALUE RATIO ranking chip is back —
+// the loader now feeds every ratio surface from the booster-baseline v2
+// series (entity_type='set_baseline', metric_version=2; writer
+// /api/sync/set-baseline, docs/investigations/set-value-v2.md), which strips
+// the 6–84% promo/event paper that distorted the cross-set ranking
+// (value-ratio-population-audit.md §4.1). Standalone SET VALUE surfaces stay
+// on the official v1 series; ratio surfaces are labeled BASELINE so the two
+// series cannot be confused. The chip additionally hides while the game has
+// zero set_baseline rows (data.hasBaselineSnapshots).
+const RATIO_RANKING_ENABLED = true;
 
 type PeriodKey = "weekly" | "monthly";
 type ViewKey = "grid" | "table" | "cards";
@@ -174,7 +173,9 @@ function metricHeader(mode: ModeKey, cfg: PeriodCfg): string {
     case "trending":
       return cfg.trendCol;
     case "ratio":
-      return "BOX / SET / RATIO";
+      // BASELINE, not SET — the ratio's numerator is the v2 booster-baseline
+      // series, which must never read as the official SET VALUE figure.
+      return "BOX / BASELINE / RATIO";
     case "price":
       return "PRICE";
     case "setval":
@@ -324,17 +325,16 @@ export default function SealedTrackerClient({ data }: { data: SealedDashboardDat
 
   const gameName = data.game.name;
 
-  // Spec §4 second empty state: zero set snapshots for this game means SET
-  // VALUE and VALUE RATIO do not exist as metrics yet (both read the same
-  // service-role-only snapshot table). Hide their chips and columns entirely
-  // with a one-line explanation — never a grid of em-dashes.
-  //
-  // Independently, the ratio RANKING mode is gated on RATIO_RANKING_ENABLED
-  // (D7 decision 2) — the mode's code path stays intact for the v2 revival.
-  const hasRatio = data.hasSetSnapshots;
-  const ratioMode = hasRatio && RATIO_RANKING_ENABLED;
+  // Spec §4 second empty state, now PER SERIES (deliberately decoupled):
+  //   SET VALUE chip/columns hide when the game has zero v1 (entity_type=
+  //   'set') snapshots; VALUE RATIO chip/columns hide when it has zero v2
+  //   (entity_type='set_baseline') snapshots. Each absence gets a one-line
+  //   explanation — never a grid of em-dashes.
+  const hasSetValue = data.hasSetSnapshots;
+  const hasBaseline = data.hasBaselineSnapshots;
+  const ratioMode = hasBaseline && RATIO_RANKING_ENABLED;
   const effectiveMode: ModeKey =
-    (mode === "ratio" && !ratioMode) || (mode === "setval" && !hasRatio) ? "trending" : mode;
+    (mode === "ratio" && !ratioMode) || (mode === "setval" && !hasSetValue) ? "trending" : mode;
   const isRatio = effectiveMode === "ratio";
 
   const cfg = useMemo(() => buildPeriodCfg(period, data), [period, data]);
@@ -393,8 +393,8 @@ export default function SealedTrackerClient({ data }: { data: SealedDashboardDat
 
   const unit = isRatio ? `RATIO ${cfg.step}` : cfg.step;
   const visibleModes = (Object.keys(MODE_LABELS) as ModeKey[]).filter((m) => {
-    if (m === "ratio") return ratioMode; // hidden until set-value v2 (D7 #2)
-    if (m === "setval") return hasRatio;
+    if (m === "ratio") return ratioMode; // v2 series exists for this game
+    if (m === "setval") return hasSetValue; // v1 series exists for this game
     return true;
   });
 
@@ -409,7 +409,7 @@ export default function SealedTrackerClient({ data }: { data: SealedDashboardDat
     if (isRatio) {
       const s = cfg.series(p);
       const box = s.prices[PERIODS - 1];
-      const sv = s.setValues[PERIODS - 1];
+      const bv = s.baselineValues[PERIODS - 1];
       const r = s.ratios[PERIODS - 1];
       const d = s.ratioDeltas[PERIODS - 1];
       return (
@@ -420,8 +420,9 @@ export default function SealedTrackerClient({ data }: { data: SealedDashboardDat
             <b>{fmtMoney(box)}</b>
           </div>
           <div className="t-msrow">
-            <span className="t-mskey">SET</span>
-            <b>{fmtMoney(sv)}</b>
+            {/* BASELINE (v2), never the official SET VALUE figure. */}
+            <span className="t-mskey">BASELINE</span>
+            <b>{fmtMoney(bv)}</b>
           </div>
           <div className="t-msmult">
             <span className="mv">{fmtMult(r)}</span>
@@ -532,7 +533,7 @@ export default function SealedTrackerClient({ data }: { data: SealedDashboardDat
                           </span>
                           {isRatio && (
                             <span className="t-cellsub">
-                              {fmtMoney(s.prices[i])} {"·"} {fmtMoney(s.setValues[i])}
+                              {fmtMoney(s.prices[i])} {"·"} {fmtMoney(s.baselineValues[i])}
                             </span>
                           )}
                         </span>
@@ -577,7 +578,10 @@ export default function SealedTrackerClient({ data }: { data: SealedDashboardDat
                 "PRICE",
                 ...cfg.deltaCols.map((c) => c.h),
                 cfg.trendLabel,
-                ...(hasRatio ? ["SET VALUE", "RATIO", `RATIO ${cfg.step}`] : []),
+                // Decoupled: SET VALUE column needs the v1 series, the ratio
+                // columns (v2 baseline numerator) need the v2 series.
+                ...(hasSetValue ? ["SET VALUE"] : []),
+                ...(hasBaseline ? ["RATIO", `RATIO ${cfg.step}`] : []),
                 "ATH",
                 "OFF ATH",
               ].map((h) => (
@@ -613,9 +617,11 @@ export default function SealedTrackerClient({ data }: { data: SealedDashboardDat
                   <td className="num">
                     <Spark series={s.prices} />
                   </td>
-                  {hasRatio && (
+                  {hasSetValue && (
+                    <td className="num t-dim">{fmtMoney(s.setValues[PERIODS - 1])}</td>
+                  )}
+                  {hasBaseline && (
                     <>
-                      <td className="num t-dim">{fmtMoney(s.setValues[PERIODS - 1])}</td>
                       <td className="num">{fmtMult(ratio)}</td>
                       <td className="num">
                         <Pct v={ratioDelta} />
@@ -651,8 +657,9 @@ export default function SealedTrackerClient({ data }: { data: SealedDashboardDat
         if (isRatio) {
           footPrimary = (
             <div className="t-pc-stat">
-              <div className="t-pc-sl">SET VALUE</div>
-              <div className="t-pc-sv">{fmtMoney(s.setValues[PERIODS - 1])}</div>
+              {/* BASELINE VALUE (v2) — the ratio's numerator, not SET VALUE. */}
+              <div className="t-pc-sl">BASELINE VALUE</div>
+              <div className="t-pc-sv">{fmtMoney(s.baselineValues[PERIODS - 1])}</div>
             </div>
           );
           footSecondary = (
@@ -684,7 +691,7 @@ export default function SealedTrackerClient({ data }: { data: SealedDashboardDat
             }
           })();
           const secondary = (() => {
-            if (effectiveMode === "setval" && hasRatio) {
+            if (effectiveMode === "setval" && hasBaseline) {
               return { label: "RATIO", value: <>{fmtMult(p.valueRatio)}</> };
             }
             if (effectiveMode === "offath") {
@@ -821,10 +828,22 @@ export default function SealedTrackerClient({ data }: { data: SealedDashboardDat
           </button>
         ))}
       </section>
-      {!hasRatio && (
+      {!hasSetValue && !hasBaseline && (
         <p className="terminal-ratio-note">
-          SET VALUE &amp; VALUE RATIO UNAVAILABLE {"—"} NO SET-VALUE SNAPSHOTS EXIST FOR{" "}
+          SET VALUE &amp; VALUE RATIO UNAVAILABLE {"—"} NO SET-VALUE OR BASELINE SNAPSHOTS EXIST
+          FOR {gameName.toUpperCase()} YET.
+        </p>
+      )}
+      {hasSetValue && !hasBaseline && (
+        <p className="terminal-ratio-note">
+          VALUE RATIO UNAVAILABLE {"—"} NO BOOSTER-BASELINE (V2) SNAPSHOTS EXIST FOR{" "}
           {gameName.toUpperCase()} YET.
+        </p>
+      )}
+      {!hasSetValue && hasBaseline && (
+        <p className="terminal-ratio-note">
+          SET VALUE UNAVAILABLE {"—"} NO SET-VALUE SNAPSHOTS EXIST FOR {gameName.toUpperCase()}{" "}
+          YET.
         </p>
       )}
 
@@ -924,7 +943,7 @@ export default function SealedTrackerClient({ data }: { data: SealedDashboardDat
               </span>
               {isRatio && (
                 <span className="terminal-unit-note">
-                  {"·"} CELLS = SET VALUE {"÷"} BOX PRICE
+                  {"·"} CELLS = BASELINE VALUE {"÷"} BOX PRICE
                 </span>
               )}
             </div>
@@ -937,14 +956,24 @@ export default function SealedTrackerClient({ data }: { data: SealedDashboardDat
           <p className="terminal-footnote">
             PRICES = LAST DAILY SNAPSHOT IN EACH {period === "weekly" ? "7-DAY" : "CALENDAR-MONTH"}{" "}
             PERIOD (JUSTTCG), WHOLE DOLLARS. CELL TINT = {isRatio ? "RATIO " : ""}
-            {cfg.step} CHANGE, CAPPED AT {"±"}8%.
-            {hasRatio && (
+            {cfg.step} CHANGE, CAPPED AT {"±"}8%. ATH TRACKED SINCE FIRST SNAPSHOT.
+            {hasSetValue && (
               <>
                 <br />
-                VALUE RATIO = TOTAL SET SINGLES VALUE {"÷"} BOX PRICE. SET VALUE CARRIES THE
-                LATEST SNAPSHOT FORWARD BETWEEN CAPTURES
-                {data.latestSnapshotDate ? ` (LAST SNAPSHOT ${data.latestSnapshotDate})` : ""}. ATH
-                TRACKED SINCE FIRST SNAPSHOT.
+                SET VALUE = OFFICIAL FULL-SET SINGLES ROLLUP (PROMOS INCLUDED), CARRIED FORWARD
+                BETWEEN CAPTURES
+                {data.latestSnapshotDate ? ` (LAST SNAPSHOT ${data.latestSnapshotDate})` : ""}.
+              </>
+            )}
+            {hasBaseline && (
+              <>
+                <br />
+                VALUE RATIO = BOOSTER-BASELINE SINGLES VALUE {"÷"} BOX PRICE {"—"} BASELINE
+                EXCLUDES PROMO/EVENT PAPER AND IS NOT THE SET VALUE FIGURE
+                {data.latestBaselineSnapshotDate
+                  ? ` (LAST BASELINE SNAPSHOT ${data.latestBaselineSnapshotDate})`
+                  : ""}
+                .
               </>
             )}
           </p>

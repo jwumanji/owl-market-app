@@ -220,7 +220,9 @@ export default function SealedDetailClient({ data }: { data: SealedDetailData })
   // -- CSV (decision D8: WATCHLIST is a disabled stub; CSV works client-side) --
 
   const downloadCsv = () => {
-    const lines = ["date,box_price,change_pct,set_value,value_ratio"];
+    // set_value = official v1 series; baseline_value = v2 booster-baseline
+    // series; value_ratio = baseline_value ÷ box_price.
+    const lines = ["date,box_price,change_pct,set_value,baseline_value,value_ratio"];
     for (const r of tableRows) {
       lines.push(
         [
@@ -228,6 +230,7 @@ export default function SealedDetailClient({ data }: { data: SealedDetailData })
           r.price.toFixed(2),
           r.change == null ? "" : r.change.toFixed(2),
           r.setValue == null ? "" : r.setValue.toFixed(2),
+          r.baselineValue == null ? "" : r.baselineValue.toFixed(2),
           r.ratio == null ? "" : r.ratio.toFixed(4),
         ].join(",")
       );
@@ -295,7 +298,8 @@ export default function SealedDetailClient({ data }: { data: SealedDetailData })
 
     if (showRatio) {
       datasets.push({
-        label: "RATIO",
+        // BASELINE RATIO — v2 baseline numerator (load-sealed-detail.ts).
+        label: "BASELINE RATIO",
         data: indexTo100(ratios),
         borderColor: colors.select,
         borderWidth: 2.2,
@@ -342,8 +346,8 @@ export default function SealedDetailClient({ data }: { data: SealedDetailData })
               const p = windowPoints[item.dataIndex];
               if (!p) return "";
               if (item.dataset.label === "SET") return `  SET ${fmtMoney(p.setValue)}`;
-              if (item.dataset.label === "RATIO")
-                return `  RATIO ${p.ratio == null ? EM : `${p.ratio.toFixed(2)}×`}`;
+              if (item.dataset.label === "BASELINE RATIO")
+                return `  B-RATIO ${p.ratio == null ? EM : `${p.ratio.toFixed(2)}×`}`;
               return `  BOX ${fmtMoneyExact(p.price)}`;
             },
           },
@@ -497,11 +501,14 @@ export default function SealedDetailClient({ data }: { data: SealedDetailData })
               </span>
             </div>
             <div className="sd-fact">
+              {/* Official v1 series (entity_type='set') — promo-inclusive. */}
               <span className="fk">SET VALUE</span>
               <span className="fv">{fmtMoney(data.setValue)}</span>
             </div>
             <div className="sd-fact">
-              <span className="fk">VALUE RATIO</span>
+              {/* v2 booster-baseline numerator ÷ box price — labeled BASELINE
+                  so it cannot be read as SET VALUE ÷ price. */}
+              <span className="fk">BASELINE RATIO</span>
               <span className="fv">{fmtMult(data.valueRatio)}</span>
             </div>
             <div className="sd-fact">
@@ -567,7 +574,7 @@ export default function SealedDetailClient({ data }: { data: SealedDetailData })
                   onClick={() => setShowRatio((v) => !v)}
                 >
                   <span className="dash" aria-hidden="true" />
-                  VALUE RATIO
+                  BASELINE RATIO
                 </button>
               </>
             )}
@@ -620,7 +627,7 @@ export default function SealedDetailClient({ data }: { data: SealedDetailData })
             <div className="sd-card-foot">
               <span className="sd-leg price">━━ BOX PRICE</span>
               {showSetValue && <span className="sd-leg sv">╌╌ SET VALUE</span>}
-              {showRatio && <span className="sd-leg rt">╌╌ VALUE RATIO</span>}
+              {showRatio && <span className="sd-leg rt">╌╌ BASELINE RATIO</span>}
               {anyOverlay && (
                 <span>SET VALUE &amp; RATIO STEP BETWEEN SNAPSHOTS · CARRIED FORWARD</span>
               )}
@@ -639,6 +646,9 @@ export default function SealedDetailClient({ data }: { data: SealedDetailData })
                     <th className="num">BOX PRICE</th>
                     <th className="num">CHANGE</th>
                     <th className="num">SET VALUE</th>
+                    {/* BASELINE (v2) sits beside RATIO so RATIO = BASELINE ÷
+                        BOX is verifiable per row; SET VALUE stays official v1. */}
+                    <th className="num">BASELINE</th>
                     <th className="num">RATIO</th>
                   </tr>
                 </thead>
@@ -651,6 +661,7 @@ export default function SealedDetailClient({ data }: { data: SealedDetailData })
                         <span className={deltaCls(r.change)}>{fmtPct(r.change)}</span>
                       </td>
                       <td className="num sd-dim">{fmtMoney(r.setValue)}</td>
+                      <td className="num sd-dim">{fmtMoney(r.baselineValue)}</td>
                       <td className="num">{r.ratio == null ? EM : `${r.ratio.toFixed(2)}×`}</td>
                     </tr>
                   ))}
@@ -659,6 +670,7 @@ export default function SealedDetailClient({ data }: { data: SealedDetailData })
             </div>
             <div className="sd-card-foot">
               <span>{tableRows.length} SNAPSHOTS · NEWEST FIRST</span>
+              <span>RATIO = BASELINE ÷ BOX</span>
               <span>{windowSpan}</span>
               <span className="right">{tfCfg.resolution} RESOLUTION</span>
             </div>

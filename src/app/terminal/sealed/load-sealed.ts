@@ -18,6 +18,18 @@ import { firstRelation } from "@/lib/supabase-relations";
 // for anon/authenticated, so set value and Value Ratio MUST be resolved here
 // and travel to the client as props (spec §6 — load-bearing, not incidental).
 //
+// TWO snapshot series coexist in market_index_snapshots and mean DIFFERENT
+// populations (migration 20260728100000, docs/investigations/set-value-v2.md):
+//   entity_type='set'           OFFICIAL series — full printed_set_code
+//                               population, PROMO-INCLUSIVE. Feeds every
+//                               standalone SET VALUE surface.
+//   entity_type='set_baseline'  metric_version=2 — booster-baseline population
+//                               only (src/lib/games/one-piece/booster-baseline).
+//                               Feeds every VALUE RATIO surface; the promo-
+//                               inclusive numerator distorted cross-set ratio
+//                               ranking (value-ratio-population-audit.md §4).
+// The two figures are NOT comparable and must never share a label.
+//
 // Storage is daily rows; WEEKLY | MONTHLY is a query-time rollup computed
 // here — last price in each period — never a second storage format (spec §2.2).
 // ---------------------------------------------------------------------------
@@ -55,9 +67,11 @@ export type SealedPeriodSeries = {
   prices: (number | null)[];
   /** Step delta % vs the immediately previous period (null when either side is missing). */
   deltas: (number | null)[];
-  /** Carry-forward set value at each period's end (spec §2.3). */
+  /** Carry-forward OFFICIAL set value (entity_type='set') at each period's end (spec §2.3). */
   setValues: (number | null)[];
-  /** setValues[i] / prices[i]. */
+  /** Carry-forward BOOSTER-BASELINE value (entity_type='set_baseline', v2) — §2.3 rules identically. */
+  baselineValues: (number | null)[];
+  /** baselineValues[i] / prices[i] — the Value Ratio (v2 numerator, never setValues). */
   ratios: (number | null)[];
   /** Step delta % of the ratio vs the previous period. */
   ratioDeltas: (number | null)[];
@@ -89,8 +103,11 @@ export type SealedProductRow = {
   atAth: boolean;
   /** (current − ath) / ath × 100 — 0 at ATH, negative below. */
   offAth: number | null;
-  /** Carry-forward set value at latestPriceDate. */
+  /** Carry-forward OFFICIAL set value (v1, entity_type='set') at latestPriceDate. */
   setValue: number | null;
+  /** Carry-forward BOOSTER-BASELINE value (v2, entity_type='set_baseline') at latestPriceDate. */
+  baselineValue: number | null;
+  /** baselineValue / latestPrice — Value Ratio on the v2 numerator only. */
   valueRatio: number | null;
   /** Rank by latest price among is_tracked, same game + product_type + region (spec §2.3). */
   sealedRank: number | null;
@@ -110,13 +127,22 @@ export type SealedDashboardData = {
   /** 12 calendar-month labels, oldest → newest ("AUG 25" …). */
   monthlyLabels: string[];
   /**
-   * Whether entity_type='set' snapshots exist for this game AT ALL. False is
-   * the spec §4 second empty state: hide the VALUE RATIO chip and columns
-   * entirely — the metric does not exist for this game yet.
+   * Whether OFFICIAL (v1, entity_type='set') snapshots exist for this game AT
+   * ALL. False hides the SET VALUE chip/columns — that metric does not exist
+   * for this game yet (spec §4 second empty state, v1 axis).
    */
   hasSetSnapshots: boolean;
+  /**
+   * Whether BOOSTER-BASELINE (v2, entity_type='set_baseline') snapshots exist
+   * for this game AT ALL. False hides the VALUE RATIO chip/columns — the hide
+   * conditions of the two series are DELIBERATELY decoupled.
+   */
+  hasBaselineSnapshots: boolean;
   latestPriceDate: string | null;
+  /** Latest v1 (entity_type='set') snapshot date. */
   latestSnapshotDate: string | null;
+  /** Latest v2 (entity_type='set_baseline') snapshot date. */
+  latestBaselineSnapshotDate: string | null;
 };
 
 // -- internal row shapes ------------------------------------------------------
@@ -253,18 +279,23 @@ function rollupMonthly(rows: HistoryPoint[], windows: Array<{ start: number; end
 function buildSeries(
   prices: (number | null)[],
   periodEndDays: number[],
-  snapshots: SnapshotPoint[] | undefined
+  snapshots: SnapshotPoint[] | undefined,
+  baselineSnapshots: SnapshotPoint[] | undefined
 ): SealedPeriodSeries {
   const setValues = periodEndDays.map((end) => carryForward(snapshots, end));
+  const baselineValues = periodEndDays.map((end) => carryForward(baselineSnapshots, end));
+  // Value Ratio divides the BASELINE (v2) numerator — never the official
+  // promo-inclusive setValues (value-ratio-population-audit.md §4).
   const ratios = prices.map((p, i) => {
-    const sv = setValues[i];
-    if (p == null || p === 0 || sv == null) return null;
-    return sv / p;
+    const bv = baselineValues[i];
+    if (p == null || p === 0 || bv == null) return null;
+    return bv / p;
   });
   return {
     prices,
     deltas: prices.map((_, i) => stepDelta(prices, i)),
     setValues,
+    baselineValues,
     ratios,
     ratioDeltas: ratios.map((_, i) => stepDelta(ratios, i)),
   };
@@ -380,10 +411,14 @@ async function loadSealedDashboardUncached(options: {
     }
   }
 
-  // 3. Set-value snapshots for the tracked products' sets. Service-role-only
-  // table — this is the only place Value Ratio can be resolved (spec §6).
-  const snapshotsBySet = new Map<string, SnapshotPoint[]>();
-  if (setIds.length > 0) {
+  // 3. Snapshot series for the tracked products' sets — BOTH series, kept
+  // strictly apart. Service-role-only table — this is the only place set value
+  // and Value Ratio can be resolved (spec §6).
+  //   'set'          → snapshotsBySet     (official SET VALUE surfaces)
+  //   'set_baseline' → baselineBySet      (every VALUE RATIO surface)
+  async function fetchSnapshotsBySet(entityType: "set" | "set_baseline") {
+    const bySet = new Map<string, SnapshotPoint[]>();
+    if (setIds.length === 0) return bySet;
     let from = 0;
     while (true) {
       const { data, error } = await supabase
@@ -391,7 +426,7 @@ async function loadSealedDashboardUncached(options: {
         .select("set_id, snapshot_date, index_value")
         .eq("game_id", game.id)
         .eq("region", "en")
-        .eq("entity_type", "set")
+        .eq("entity_type", entityType)
         .in("set_id", setIds)
         .order("snapshot_date", { ascending: true })
         .range(from, from + PAGE_SIZE - 1);
@@ -401,33 +436,40 @@ async function loadSealedDashboardUncached(options: {
 
       for (const row of data as Array<{ set_id: string | null; snapshot_date: string; index_value: number | null }>) {
         if (!row.set_id || row.index_value == null) continue;
-        const list = snapshotsBySet.get(row.set_id) ?? [];
+        const list = bySet.get(row.set_id) ?? [];
         list.push({ day: parseDay(row.snapshot_date), value: row.index_value });
-        snapshotsBySet.set(row.set_id, list);
+        bySet.set(row.set_id, list);
       }
 
       if (data.length < PAGE_SIZE) break;
       from += PAGE_SIZE;
     }
+    return bySet;
   }
+  const snapshotsBySet = await fetchSnapshotsBySet("set");
+  const baselineBySet = await fetchSnapshotsBySet("set_baseline");
 
-  // 4. Does this game have set snapshots AT ALL? Asked game-wide (not just the
-  // tracked products' sets) so the spec §4 second empty state fires only when
-  // the metric genuinely does not exist for the game yet. One snapshot date is
-  // the normal launch state — carry-forward handles it; this flag is only
-  // about zero.
-  const { data: anySnapshot, error: anySnapshotError } = await supabase
-    .from("market_index_snapshots")
-    .select("snapshot_date")
-    .eq("game_id", game.id)
-    .eq("region", "en")
-    .eq("entity_type", "set")
-    .order("snapshot_date", { ascending: false })
-    .limit(1);
-
-  if (anySnapshotError) throw new Error(anySnapshotError.message);
-  const latestSnapshotDate = anySnapshot?.[0]?.snapshot_date ?? null;
+  // 4. Does this game have snapshots AT ALL — asked game-wide (not just the
+  // tracked products' sets) and PER SERIES, so each empty state fires only
+  // when its metric genuinely does not exist for the game yet. One snapshot
+  // date is the normal launch state — carry-forward handles it; these flags
+  // are only about zero.
+  async function latestSnapshotDateOf(entityType: "set" | "set_baseline") {
+    const { data, error } = await supabase
+      .from("market_index_snapshots")
+      .select("snapshot_date")
+      .eq("game_id", game.id)
+      .eq("region", "en")
+      .eq("entity_type", entityType)
+      .order("snapshot_date", { ascending: false })
+      .limit(1);
+    if (error) throw new Error(error.message);
+    return data?.[0]?.snapshot_date ?? null;
+  }
+  const latestSnapshotDate = await latestSnapshotDateOf("set");
   const hasSetSnapshots = latestSnapshotDate != null;
+  const latestBaselineSnapshotDate = await latestSnapshotDateOf("set_baseline");
+  const hasBaselineSnapshots = latestBaselineSnapshotDate != null;
 
   // 5. Period scaffolding, anchored to the last day WITH data — never "today"
   // (the daily cron is not deployed; assuming today has a row would shift
@@ -441,12 +483,13 @@ async function loadSealedDashboardUncached(options: {
   const rows: SealedProductRow[] = products.map((p) => {
     const history = historyByProduct.get(p.id) ?? [];
     const snapshots = p.set_id ? snapshotsBySet.get(p.set_id) : undefined;
+    const baselineSnapshots = p.set_id ? baselineBySet.get(p.set_id) : undefined;
     const latest = history.length > 0 ? history[history.length - 1] : null;
 
     const weeklyPrices = rollupWeekly(history, weekEnds);
     const monthlyPrices = rollupMonthly(history, monthWindows);
-    const weekly = buildSeries(weeklyPrices, weekEnds, snapshots);
-    const monthly = buildSeries(monthlyPrices, monthEnds, snapshots);
+    const weekly = buildSeries(weeklyPrices, weekEnds, snapshots, baselineSnapshots);
+    const monthly = buildSeries(monthlyPrices, monthEnds, snapshots, baselineSnapshots);
 
     let ath: number | null = null;
     for (const r of history) {
@@ -456,7 +499,10 @@ async function loadSealedDashboardUncached(options: {
     const offAth = latest != null && ath != null && ath !== 0 ? ((latest.price - ath) / ath) * 100 : null;
 
     const setValue = latest ? carryForward(snapshots, latest.day) : null;
-    const valueRatio = latest && latest.price !== 0 && setValue != null ? setValue / latest.price : null;
+    const baselineValue = latest ? carryForward(baselineSnapshots, latest.day) : null;
+    // Value Ratio on the v2 numerator ONLY — never setValue.
+    const valueRatio =
+      latest && latest.price !== 0 && baselineValue != null ? baselineValue / latest.price : null;
 
     const { moves30d, lastMoveDays } = priceActivity(history);
 
@@ -485,6 +531,7 @@ async function loadSealedDashboardUncached(options: {
       atAth,
       offAth,
       setValue,
+      baselineValue,
       valueRatio,
       sealedRank: null, // assigned below, needs the full population
       priceActivity30d: moves30d,
@@ -517,8 +564,10 @@ async function loadSealedDashboardUncached(options: {
     weeklyLabels: weekEnds.map(weekLabel),
     monthlyLabels: monthEnds.map(monthLabel),
     hasSetSnapshots,
+    hasBaselineSnapshots,
     latestPriceDate: latestPriceDay != null ? dayToIso(latestPriceDay) : null,
     latestSnapshotDate,
+    latestBaselineSnapshotDate,
   };
 }
 
@@ -535,8 +584,10 @@ export async function loadSealedDashboard(options: {
   publicOnly?: boolean;
 } = {}): Promise<SealedDashboardData> {
   const publicOnly = options.publicOnly ?? !allowsPrivateGamePreview();
+  // v2: baseline (set_baseline) series + decoupled hide flags — key bumped so
+  // the cache never serves the pre-v2 payload shape stale.
   return cachedPublicData(
-    publicDataCacheKey("terminal-sealed-dashboard", options.game ?? "default", publicOnly),
+    publicDataCacheKey("terminal-sealed-dashboard-v2", options.game ?? "default", publicOnly),
     () => loadSealedDashboardUncached({ ...options, publicOnly }),
     CATALOG_DATA_TTL_SECONDS
   );
