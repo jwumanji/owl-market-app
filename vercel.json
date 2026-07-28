@@ -17,6 +17,10 @@
       "schedule": "0 18 * * *"
     },
     {
+      "path": "/api/sync/sealed-prices?game=one_piece",
+      "schedule": "10 6 * * *"
+    },
+    {
       "path": "/api/sync/justtcg?game=riftbound&mode=incremental&maxSets=50",
       "schedule": "15 * * * *"
     },
