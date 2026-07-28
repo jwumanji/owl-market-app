@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { PROMO_COLLECTION_CATALOG } from "@/app/sets/promo-collections";
 import { resolveOnePieceSyncGame } from "@/lib/games/one-piece/sync-scope";
 import { fetchTcgCsvPromoProducts } from "@/lib/tcgcsv-promo-products";
+import { historicalPriceChange } from "@/lib/sealed-price-history";
 import { createServiceClient } from "@/lib/supabase-server";
 
 export const maxDuration = 60;
@@ -52,22 +53,6 @@ type HistoryRow = {
   price: number;
   price_date: string;
 };
-
-function historicalChange(
-  currentPrice: number,
-  rows: HistoryRow[],
-  days: number,
-  now: Date
-) {
-  const target = new Date(now.getTime() - days * 86_400_000).getTime();
-  const tolerance = (days === 1 ? 0.75 : 2) * 86_400_000;
-  const closest = rows
-    .map((row) => ({ row, distance: Math.abs(new Date(`${row.price_date}T00:00:00Z`).getTime() - target) }))
-    .filter(({ row, distance }) => distance <= tolerance && finite(row.price) != null && Number(row.price) > 0)
-    .sort((a, b) => a.distance - b.distance)[0]?.row;
-  if (!closest || Number(closest.price) <= 0) return null;
-  return +(((currentPrice - Number(closest.price)) / Number(closest.price)) * 100).toFixed(2);
-}
 
 async function syncPromoProducts(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
@@ -159,9 +144,9 @@ async function syncPromoProducts(request: Request) {
       product_type: prior?.product_type ?? productType(product.slug),
       tcg_price: currentPrice,
       market_avg: currentPrice,
-      chg_1d: reportedPrice == null ? prior?.chg_1d ?? null : historicalChange(reportedPrice, productHistory, 1, syncedAt),
-      chg_7d: reportedPrice == null ? prior?.chg_7d ?? null : historicalChange(reportedPrice, productHistory, 7, syncedAt),
-      chg_30d: reportedPrice == null ? prior?.chg_30d ?? null : historicalChange(reportedPrice, productHistory, 30, syncedAt),
+      chg_1d: reportedPrice == null ? prior?.chg_1d ?? null : historicalPriceChange(reportedPrice, productHistory, 1, syncedAt),
+      chg_7d: reportedPrice == null ? prior?.chg_7d ?? null : historicalPriceChange(reportedPrice, productHistory, 7, syncedAt),
+      chg_30d: reportedPrice == null ? prior?.chg_30d ?? null : historicalPriceChange(reportedPrice, productHistory, 30, syncedAt),
       ath: historicalPrices.length > 0 ? Math.max(...historicalPrices) : prior?.ath ?? null,
       atl: historicalPrices.length > 0 ? Math.min(...historicalPrices) : prior?.atl ?? null,
       image_url: prior?.image_url ?? product.imageUrl,
