@@ -7,8 +7,15 @@ export const revalidate = 3600;
 // Prerender every tracked product for the default game. Unknown slugs render
 // on demand and 404 via notFound() in SealedDetailContent.
 export async function generateStaticParams() {
-  const slugs = await loadTrackedSealedSlugs();
-  return slugs.map((productSlug) => ({ productSlug }));
+  try {
+    const slugs = await loadTrackedSealedSlugs();
+    return slugs.map((productSlug) => ({ productSlug }));
+  } catch (error) {
+    // A build must never fail because the DB was unreachable — the Vercel
+    // build env has no Supabase creds; pages fall back to on-demand rendering.
+    console.warn("generateStaticParams(terminal-sealed) skipped:", error);
+    return [];
+  }
 }
 
 export async function generateMetadata(
