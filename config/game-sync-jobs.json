@@ -50,6 +50,14 @@
       "schedules": ["30 7 * * *"]
     },
     {
+      "id": "one_piece.tcgcsv.promo_products",
+      "game": "one_piece",
+      "provider": "tcgcsv",
+      "kind": "pricing",
+      "path": "/api/sync/promo-products?game=one_piece",
+      "schedules": ["15 21 * * *"]
+    },
+    {
       "id": "one_piece.ebay.completed_sales",
       "game": "one_piece",
       "provider": "ebay",
