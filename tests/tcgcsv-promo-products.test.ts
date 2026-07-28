@@ -4,6 +4,8 @@ import test from "node:test";
 // @ts-ignore -- Node's native TypeScript test runner requires explicit extensions.
 import { PROMO_COLLECTION_CATALOG, promoCollectionSets } from "../src/app/sets/promo-collections.ts";
 // @ts-ignore -- Node's native TypeScript test runner requires explicit extensions.
+import { hasLiveSetPricing, hasSetPricing } from "../src/app/sets/sets-data.ts";
+// @ts-ignore -- Node's native TypeScript test runner requires explicit extensions.
 import { fetchTcgCsvPromoProducts } from "../src/lib/tcgcsv-promo-products.ts";
 
 test("promo catalog maps only verified TCGplayer sealed products", () => {
@@ -75,4 +77,23 @@ test("priced promo rows use sealed-market semantics", () => {
   assert.equal(row?.price, 78.06);
   assert.equal(row?.cardsTotal, 1);
   assert.equal(row?.perf.d7, "+4.5%");
+  assert.equal(row ? hasLiveSetPricing(row) : null, true);
+});
+
+test("priced preorders remain coming soon until release", () => {
+  const market = new Map([[694874, {
+    price: 59.99,
+    chg1d: null,
+    chg7d: null,
+    chg30d: null,
+    ath: 59.99,
+    atl: 59.99,
+    updatedAt: "2026-07-28T00:00:00Z",
+  }]]);
+  const row = promoCollectionSets(market).find((entry) => entry.slug === "pcc-best-selection-6");
+
+  assert.equal(row?.pricingStatus, "sealed_market");
+  assert.equal(row?.comingSoon, true);
+  assert.equal(row ? hasSetPricing(row) : null, true);
+  assert.equal(row ? hasLiveSetPricing(row) : null, false);
 });

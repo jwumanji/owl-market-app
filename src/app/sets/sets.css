@@ -109,12 +109,14 @@ table.sets-v2-table col.c-spark { width: 124px; }
 .sv2-name { font-family: var(--font-space-grotesk), system-ui, sans-serif; font-size: 14px; color: var(--ink); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; }
 .sv2-val { font-family: var(--font-jetbrains-mono), ui-monospace, monospace; font-size: 14px; font-weight: 600; color: var(--ink); text-align: right; letter-spacing: -0.01em; }
 .sv2-val.muted { color: var(--ink-3); }
+.sv2-price-kind { display: block; margin-top: 2px; color: var(--ink-3); font-size: 8.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .sv2-pct { font-family: var(--font-jetbrains-mono), ui-monospace, monospace; font-size: 13px; font-weight: 600; text-align: right; letter-spacing: -0.01em; display: block; }
 .sv2-pct.up { color: var(--gain-2); }
 .sv2-pct.dn { color: var(--loss-2); }
 .sv2-pct.flat { color: var(--ink-3); }
 .sv2-cards { font-family: var(--font-jetbrains-mono), ui-monospace, monospace; font-size: 14px; color: var(--ink-2); text-align: right; font-weight: 600; }
 .sv2-spark { display: flex; justify-content: flex-end; align-items: center; }
+.sv2-spark-pending { color: var(--ink-3); font-family: var(--font-jetbrains-mono), ui-monospace, monospace; font-size: 9px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
 .sv2-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; border: 1px solid rgba(26, 15, 8, 0.18); }
 table.sets-v2-table tbody tr:hover .sv2-name { color: var(--coral); }
 .sv2-row-arrow { opacity: 0; transition: all .14s; color: var(--ink-3); font-family: var(--font-jetbrains-mono), ui-monospace, monospace; font-size: 12px; margin-left: 6px; }

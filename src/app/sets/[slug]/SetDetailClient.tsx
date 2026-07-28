@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { lazy, Suspense, useMemo, useState } from "react";
 import { gamePath } from "@/lib/game-routes";
 import FastCardImage from "@/components/ui/FastCardImage";
-import type { CatalogSetCard, SetData, TopCard } from "../sets-data";
+import { hasSetPricing, type CatalogSetCard, type SetData, type TopCard } from "../sets-data";
 import { getSetImageFile } from "../set-images";
 
 // chart.js only loads when the chart actually renders (L1) — keeps ~65kB
@@ -163,11 +163,12 @@ export default function SetDetailClient({
   const judges = allSets.filter((s) => (s.type ?? "") === "judge");
 
   const catalogOnly = isCatalogOnly(set);
+  const sealedMarket = set.pricingStatus === "sealed_market";
   const officialPromoProduct = Boolean(set.officialUrl);
   const catalogCardCountKnown = set.catalogCardCountKnown !== false;
   const catalogCards = set.catalogCards ?? [];
   const cardCount = setCardCount(set);
-  const isLive = !catalogOnly && !set.comingSoon && set.cards > 0;
+  const hasPricing = hasSetPricing(set);
   const deltaClass = set.chg30d == null || set.chg30d === 0 ? "flat" : set.chg30d > 0 ? "up" : "dn";
 
   const imgFile = getSetImageFile(set.slug);
@@ -306,23 +307,23 @@ export default function SetDetailClient({
           </div>
           <div className="setd-id-rows">
             <div className="setd-id-row">
-              <span className="setd-id-key">Index Value</span>
+              <span className="setd-id-key">{sealedMarket ? "Sealed Market" : "Index Value"}</span>
               <span className="setd-id-val" style={{ color: "var(--set-color)" }}>
-                {isLive ? fmtUsd(set.price) : "—"}
+                {hasPricing ? fmtUsd(set.price) : "—"}
               </span>
             </div>
             <div className="setd-id-row">
               <span className="setd-id-key">All-Time High</span>
-              <span className="setd-id-val">{isLive ? set.ath : "—"}</span>
+              <span className="setd-id-val">{hasPricing ? set.ath : "—"}</span>
             </div>
             <div className="setd-id-row">
               <span className="setd-id-key">All-Time Low</span>
-              <span className="setd-id-val">{isLive ? set.atl : "—"}</span>
+              <span className="setd-id-val">{hasPricing ? set.atl : "—"}</span>
             </div>
             <div className="setd-id-row">
               <span className="setd-id-key">{officialPromoProduct ? "Cards Included" : catalogOnly ? "Cards Imported" : "Cards Priced"}</span>
               <span className="setd-id-val">
-                {catalogOnly
+                {sealedMarket || catalogOnly
                   ? catalogCardCountKnown ? cardCount.toLocaleString() : "—"
                   : `${set.cards}${set.cardsTotal && set.cardsTotal !== set.cards ? `/${set.cardsTotal}` : ""}`}
               </span>
@@ -341,17 +342,23 @@ export default function SetDetailClient({
         <div className="setd-chart-card">
           <div className="setd-cc-head">
             <div>
-              <div className="setd-cc-eyebrow">Index Performance</div>
-              <div className="setd-cc-title">{set.code} {set.name} Index</div>
+              <div className="setd-cc-eyebrow">{sealedMarket ? "Sealed Market Performance" : "Index Performance"}</div>
+              <div className="setd-cc-title">{set.code} {set.name} {sealedMarket ? "Sealed Market" : "Index"}</div>
               <div className="setd-cc-price-row">
-                <span className="setd-cc-price">{isLive ? fmtUsd(set.price) : "—"}</span>
+                <span className="setd-cc-price">{hasPricing ? fmtUsd(set.price) : "—"}</span>
                 <span className={`setd-cc-delta ${deltaClass}`}>
                   {set.chg30d == null ? "—" : `${set.chg30d > 0 ? "+" : ""}${set.chg30d}%`}{" "}
                   <span style={{ color: "inherit", opacity: 0.75, fontSize: 10, marginLeft: 3 }}>30D</span>
                 </span>
               </div>
               <div className="setd-cc-sub">
-                {isLive ? `Total card value · ${set.cards} cards tracked · USD` : `${cardCount.toLocaleString()} catalog cards tracked`}
+                {hasPricing
+                  ? sealedMarket
+                    ? set.comingSoon
+                      ? "Upcoming release · TCGplayer preorder market · USD"
+                      : "One unopened product · TCGplayer market · USD"
+                    : `Total card value · ${set.cards} cards tracked · USD`
+                  : `${cardCount.toLocaleString()} catalog cards tracked`}
               </div>
             </div>
             <div className="setd-cc-times">
@@ -368,7 +375,7 @@ export default function SetDetailClient({
             </div>
           </div>
           <div className="setd-cc-chart">
-            {isLive ? (
+            {hasPricing ? (
               <Suspense fallback={<div className="setd-cc-empty">Loading price history...</div>}>
                 <SetChart points={chartPoints} color={set.color} />
               </Suspense>
@@ -377,12 +384,12 @@ export default function SetDetailClient({
             )}
           </div>
           <div className="setd-perf-strip">
-            <PerfCell period="1H" v={isLive ? 0 : null} />
-            <PerfCell period="24H" v={isLive ? set.chg1d : null} />
-            <PerfCell period="7D" v={isLive ? set.chg7d : null} />
-            <PerfCell period="30D" v={isLive ? set.chg30d : null} />
-            <PerfCell period="1Y" v={isLive ? set.chgMax : null} />
-            <PerfCell period="MAX" v={isLive ? set.chgMax : null} />
+            <PerfCell period="1H" v={hasPricing ? 0 : null} />
+            <PerfCell period="24H" v={hasPricing ? set.chg1d : null} />
+            <PerfCell period="7D" v={hasPricing ? set.chg7d : null} />
+            <PerfCell period="30D" v={hasPricing ? set.chg30d : null} />
+            <PerfCell period="1Y" v={hasPricing ? set.chgMax : null} />
+            <PerfCell period="MAX" v={hasPricing ? set.chgMax : null} />
           </div>
         </div>
       </div>

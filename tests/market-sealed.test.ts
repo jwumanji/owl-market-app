@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 // @ts-ignore -- Node's native TypeScript test runner requires the explicit extension.
-import { attachCasePrices, rankBoosterBoxesByPrice, rankBoosterBoxesByTotalSetValue, representativeSealedImageBySet, sealedValueMultiple, tcgPlayerProductImageUrl } from "../src/lib/market-sealed.ts";
+import { attachCasePrices, rankBoosterBoxesByPrice, rankBoosterBoxesByTotalSetValue, rankSetsByTotalValue, representativeSealedImageBySet, sealedValueMultiple, tcgPlayerProductImageUrl } from "../src/lib/market-sealed.ts";
 
 const candidate = (
   name: string,
@@ -61,6 +61,17 @@ test("box sets can be ranked by total set value", () => {
   ]);
 
   assert.deepEqual(ranked.map((item) => item.name), ["OP-05", "OP-01"]);
+});
+
+test("set values are ranked even when sealed products are unavailable", () => {
+  const ranked = rankSetsByTotalValue([
+    { name: "Origins", total_set_value: 17761.59 },
+    { name: "Spiritforged", total_set_value: 13770.62 },
+    { name: "Unleashed", total_set_value: 10404.89 },
+    { name: "Missing", total_set_value: 0 },
+  ], 2);
+
+  assert.deepEqual(ranked.map((item) => item.name), ["Origins", "Spiritforged"]);
 });
 
 test("sealed value multiple is total set value divided by booster box price", () => {

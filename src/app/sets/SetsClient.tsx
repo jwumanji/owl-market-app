@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { gamePath } from "@/lib/game-routes";
-import type { SetData } from "./sets-data";
+import { hasLiveSetPricing, hasSetPricing, type SetData } from "./sets-data";
 import SetThumb from "./SetThumb";
 import "./sets.css";
 
@@ -64,11 +64,6 @@ function fmtPct(v: number | null) {
 
 function isCatalogOnly(set: SetData) {
   return set.pricingStatus === "catalog_only";
-}
-
-function hasLivePricing(set: SetData) {
-  return set.pricingStatus === "sealed_market" ||
-    (!isCatalogOnly(set) && !set.comingSoon && set.cards > 0);
 }
 
 function setCardCount(set: SetData) {
@@ -168,7 +163,9 @@ function HeadlineCard({
         {footer}
       </div>
       <div className="sets-v2-hl-spark">
-        <SparkSVG data={set.spark} up={(set.chg30d ?? set.chg7d ?? 0) >= 0} w={260} h={32} />
+        {set.pricingStatus === "sealed_market"
+          ? <span className="sv2-spark-pending">Price history building</span>
+          : <SparkSVG data={set.spark} up={(set.chg30d ?? set.chg7d ?? 0) >= 0} w={260} h={32} />}
       </div>
     </Link>
   );
@@ -194,7 +191,8 @@ export default function SetsClient({
 
   const sets = initialSets;
   const totalCards = useMemo(() => sets.reduce((acc, s) => acc + (s.cardsTotal ?? s.cards), 0), [sets]);
-  const hasPricedSets = useMemo(() => sets.some(hasLivePricing), [sets]);
+  const hasPricedSets = useMemo(() => sets.some(hasSetPricing), [sets]);
+  const hasReleasedPricing = useMemo(() => sets.some(hasLiveSetPricing), [sets]);
   const hasSealedPricing = useMemo(() => sets.some((set) => set.pricingStatus === "sealed_market"), [sets]);
   const pricingLabel = hasPricedSets
     ? <>Pricing via <b>{hasSealedPricing ? "JustTCG + TCGCSV" : "JustTCG"}</b></>
@@ -203,6 +201,7 @@ export default function SetsClient({
     typeFilter === "anniversary" ||
     typeFilter === "collection" ||
     typeFilter === "special";
+  const mixedPricingView = typeFilter === "all" && hasSealedPricing;
 
   const typeTabs = useMemo(() => {
     const present = new Set<SetType>();
@@ -257,7 +256,7 @@ export default function SetsClient({
 
   const headlineCards = useMemo(() => {
     if (sets.length === 0) return null;
-    const live = sets.filter(hasLivePricing);
+    const live = sets.filter(hasLiveSetPricing);
     const pool = live.length > 0 ? live : sets;
     const bigMover = [...pool].sort((a, b) => {
       if (live.length === 0) return setCardCount(b) - setCardCount(a);
@@ -319,16 +318,16 @@ export default function SetsClient({
         <div className="sets-v2-hl-row">
           <HeadlineCard
             set={headlineCards.bigMover}
-            label={hasPricedSets ? "Biggest Mover · 30D" : "Largest Catalog"}
+            label={hasReleasedPricing ? "Biggest Mover · 30D" : "Largest Catalog"}
             icon="📈"
-            metric={hasPricedSets ? "30d" : "cards"}
+            metric={hasReleasedPricing ? "30d" : "cards"}
             gameRouteSlug={gameRouteSlug}
           />
           <HeadlineCard
             set={headlineCards.mostValuable}
-            label={hasPricedSets ? "Highest Index Value" : "Most Cards"}
+            label={hasReleasedPricing ? mixedPricingView ? "Highest Market Value" : "Highest Index Value" : "Most Cards"}
             icon="💎"
-            metric={hasPricedSets ? "val" : "cards"}
+            metric={hasReleasedPricing ? "val" : "cards"}
             gameRouteSlug={gameRouteSlug}
           />
           <HeadlineCard set={headlineCards.newest} label="Newest Release" icon="🆕" metric="year" gameRouteSlug={gameRouteSlug} />
@@ -399,7 +398,7 @@ export default function SetsClient({
                 Name {sortIndicator("name")}
               </th>
               <th className={`r${sort === "price" ? " sorted" : ""}`} onClick={() => toggleSort("price")}>
-                {promoProductView ? "Sealed Market" : "Index Value"} {sortIndicator("price")}
+                {promoProductView ? "Sealed Market" : mixedPricingView ? "Market Value" : "Index Value"} {sortIndicator("price")}
               </th>
               <th className={`r${sort === "chg1d" ? " sorted" : ""}`} onClick={() => toggleSort("chg1d")}>
                 24H {sortIndicator("chg1d")}
@@ -426,7 +425,7 @@ export default function SetsClient({
             ) : (
               sorted.map((s, i) => {
                 const catalogOnly = isCatalogOnly(s);
-                const empty = !hasLivePricing(s);
+                const empty = !hasSetPricing(s);
                 return (
                   <tr key={s.code} onClick={() => router.push(gamePath(gameRouteSlug, `/sets/${s.slug}`))}>
                     <td className="sv2-rank">{i + 1}</td>
@@ -443,21 +442,30 @@ export default function SetsClient({
                     <td>
                       <div className="sv2-name">
                         {s.name}
-                        {catalogOnly ? (
+                        {s.comingSoon ? (
+                          <span className="sv2-coming-soon">Coming Soon</span>
+                        ) : catalogOnly ? (
                           <span className="sv2-coming-soon">Catalog only</span>
-                        ) : (
-                          empty && <span className="sv2-coming-soon">Coming Soon</span>
-                        )}
+                        ) : null}
                         <span className="sv2-row-arrow">→</span>
                       </div>
                     </td>
-                    <td className={`sv2-val${empty ? " muted" : ""}`}>{empty ? "—" : fmtUsd(s.price)}</td>
+                    <td className={`sv2-val${empty ? " muted" : ""}`}>
+                      {empty ? "—" : fmtUsd(s.price)}
+                      {mixedPricingView && !empty && (
+                        <span className="sv2-price-kind">
+                          {s.pricingStatus === "sealed_market" ? "sealed" : "index"}
+                        </span>
+                      )}
+                    </td>
                     <td>{empty ? <span className="sv2-pct flat">—</span> : fmtPct(s.chg1d)}</td>
                     <td>{empty ? <span className="sv2-pct flat">—</span> : fmtPct(s.chg7d)}</td>
                     <td>{empty ? <span className="sv2-pct flat">—</span> : fmtPct(s.chg30d)}</td>
                     <td className="sv2-cards">{setCardCountLabel(s)}</td>
                     <td className="sv2-spark">
-                      {empty ? <span style={{ color: "var(--ink-3)" }}>—</span> : <SparkSVG data={s.spark} up={(s.chg30d ?? s.chg7d ?? 0) >= 0} w={100} h={22} />}
+                      {empty || s.pricingStatus === "sealed_market"
+                        ? <span className="sv2-spark-pending">—</span>
+                        : <SparkSVG data={s.spark} up={(s.chg30d ?? s.chg7d ?? 0) >= 0} w={100} h={22} />}
                     </td>
                   </tr>
                 );
@@ -473,6 +481,8 @@ export default function SetsClient({
             loadError
           ) : promoProductView ? (
             "Sealed Market is the current TCGplayer market price for one unopened product. It is not the sum of the included cards."
+          ) : mixedPricingView ? (
+            "Market Value includes two labeled metrics: Index is the sum of priced cards in a set; Sealed is the market price of one unopened product."
           ) : hasPricedSets ? (
             <>
               Index Value = sum of average market prices for every priced card in the set. Skewed by chase-card concentration.{" "}
