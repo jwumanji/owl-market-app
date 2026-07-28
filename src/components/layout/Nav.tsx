@@ -35,6 +35,7 @@ type PublicNavLink = {
   exact?: boolean;
   status?: "coming-soon";
   divider?: boolean;
+  chip?: string;
 };
 
 function publicLinks(gameRouteSlug: string): PublicNavLink[] {
@@ -56,6 +57,7 @@ function publicLinks(gameRouteSlug: string): PublicNavLink[] {
     ),
     capabilityLink(game, "eBay Sales", "/sales", game.capabilities.sales),
     capabilityLink(game, "All Cards", "/catalog", game.capabilities.catalog, true),
+    terminalLink(game),
   ];
 
   return links.filter((link): link is PublicNavLink => link !== null);
@@ -74,6 +76,20 @@ function capabilityLink(
     href: isNavigableCapability(status) ? gamePath(game.routeSlug, path) : undefined,
     status: status === "planned" ? "coming-soon" : undefined,
     divider,
+  };
+}
+
+// Terminal is the paid product surface, driven by capabilities.sealedProducts.
+// Unlike capabilityLink there is no "coming soon" teaser: games whose sealed
+// coverage isn't navigable yet hide the link entirely (moon-terminal spec §5.1).
+// Terminal has no index route — SEALED is the only section that ships, so the
+// nav points straight at it.
+function terminalLink(game: GameDefinition): PublicNavLink | null {
+  if (!isNavigableCapability(game.capabilities.sealedProducts)) return null;
+  return {
+    label: "Terminal",
+    href: gamePath(game.routeSlug, "/terminal/sealed"),
+    chip: "PRO",
   };
 }
 
@@ -286,9 +302,10 @@ function PublicNav({ pathname }: { pathname: string }) {
                 <Link
                   href={link.href}
                   prefetch={false}
-                  className={`c-nav-link${isActivePath(pathname, link.href, link.exact) ? " active" : ""}`}
+                  className={`c-nav-link${link.chip ? " c-nav-link-pro" : ""}${isActivePath(pathname, link.href, link.exact) ? " active" : ""}`}
                 >
                   {link.label}
+                  {link.chip ? <span className="c-nav-pro-chip">{link.chip}</span> : null}
                 </Link>
               ) : (
                 <span className="c-nav-link is-disabled" aria-disabled="true">
