@@ -17,6 +17,7 @@ import {
 import { catalogCardDescription } from "@/lib/game-catalog-copy";
 import FastCardImage from "@/components/ui/FastCardImage";
 import { tcgPlayerProductImageUrl } from "@/lib/market-sealed";
+import { cardDisplayName } from "@/lib/card-market-names";
 import "../catalog.css";
 
 // Keep in sync with CATALOG_DATA_TTL_SECONDS (Next 15 requires a literal).
@@ -35,6 +36,7 @@ type CardRow = {
   card_image_id: string | null;
   card_number: string | null;
   name: string;
+  market_name: string | null;
   name_base: string | null;
   rarity: string | null;
   rarity_id: string | null;
@@ -118,6 +120,7 @@ async function loadCardDetail(gameRouteSlug: string, rawId: string): Promise<Det
         card_image_id,
         card_number,
         name,
+        market_name,
         name_base,
         rarity,
         rarity_id,
@@ -243,7 +246,8 @@ export default async function GameCatalogCardPage(
         </div>
         <div>
           <div className="catalog-kicker">Catalog card</div>
-          <h1>{card.name}</h1>
+          <h1>{cardDisplayName(card)}</h1>
+          {card.market_name ? <p className="catalog-card-official-name">Official name: {card.name}</p> : null}
           <div className="catalog-card-meta">
             <span>{card.card_number ?? card.card_image_id ?? "No number"}</span>
             <span>{set?.code ?? "No set"}</span>

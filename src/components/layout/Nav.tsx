@@ -103,6 +103,7 @@ function adminLinks(gameSlug: string): NavLink[] {
     { label: "Orders", href: `/admin/orders?game=${game}` },
     { label: "Lens", href: "/admin/lens" },
     { label: "PSA", href: `/admin/psa-submissions?game=${game}` },
+    { label: "Market Names", href: "/admin/market-names" },
   ];
 }
 

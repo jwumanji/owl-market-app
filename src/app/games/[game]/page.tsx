@@ -44,6 +44,7 @@ type CardSampleRow = {
   card_image_id: string | null;
   card_number: string | null;
   name: string;
+  market_name: string | null;
   rarity: string | null;
   variant_label: string | null;
   card_type: string | null;
@@ -184,6 +185,7 @@ async function loadGameOverviewUncached(gameRouteSlug: string, publicOnly: boole
           card_image_id,
           card_number,
           name,
+          market_name,
           rarity,
           variant_label,
           card_type,
@@ -449,7 +451,8 @@ export default async function GameOverviewPage(
               <Link className="game-card-row" key={card.id} href={gamePath(game.routeSlug, `/catalog/${card.id}`)}>
                 <span>
                   <b>{card.card_number ?? card.card_image_id ?? "No number"}</b>
-                  {card.name}
+                  {card.market_name ?? card.name}
+                  {card.market_name ? <small>{card.name}</small> : null}
                 </span>
                 <span>{set?.code ?? "No set"}</span>
                 <span>{card.rarity ?? "Unknown"}</span>

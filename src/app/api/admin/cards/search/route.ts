@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentAdminUser } from "@/lib/admin-user";
+import { normalizeMarketAlias } from "@/lib/card-market-names";
 import { findCardAliasMatches, loadCardMatchAliases } from "@/lib/card-match-aliases";
 import {
   PRIVATE_CUSTOM_CARD_SELECT,
@@ -14,6 +15,7 @@ export const dynamic = "force-dynamic";
 type CardSearchRow = {
   id: string;
   name: string | null;
+  market_name: string | null;
   card_number: string | null;
   rarity: string | null;
   image_url: string | null;
@@ -24,7 +26,7 @@ type CardSearchRow = {
 };
 
 const SEARCH_SELECT = `
-  id, name, card_number, rarity, image_url, image_url_small, set_id,
+  id, name, market_name, card_number, rarity, image_url, image_url_small, set_id,
   sets!cards_set_game_fk (code, name)
 `;
 
@@ -58,16 +60,18 @@ function searchTokens(query: string) {
 function scoreCard(card: CardSearchRow, query: string, tokens: string[]) {
   const set = Array.isArray(card.sets) ? card.sets[0] : card.sets;
   const name = normalizeSearchText(card.name);
+  const marketName = normalizeSearchText(card.market_name);
   const number = normalizeSearchText(card.card_number);
   const setCode = normalizeSearchText(set?.code);
   const setName = normalizeSearchText(set?.name);
-  const haystack = `${name} ${number} ${setCode} ${setName}`;
+  const haystack = `${marketName} ${name} ${number} ${setCode} ${setName}`;
   const normalizedQuery = normalizeSearchText(query);
   let score = 0;
 
   if (normalizedQuery && haystack.includes(normalizedQuery)) score += 80;
   for (const token of tokens) {
     if (number.includes(token)) score += /^\d+$/.test(token) ? 35 : 18;
+    if (marketName.includes(token)) score += 28;
     if (name.includes(token)) score += 18;
     if (setName.includes(token)) score += 14;
     if (setCode === token) score += 20;
@@ -88,6 +92,7 @@ function customCardToSearchRow(card: PrivateCustomCardRow): CardSearchRow {
   return {
     id: card.id,
     name: card.name,
+    market_name: null,
     card_number: card.card_number,
     rarity: "Private",
     image_url: card.image_url,
@@ -120,6 +125,35 @@ export async function GET(request: Request) {
   const aliasResult = await loadCardMatchAliases(supabase, game.id);
   const aliasMatches = findCardAliasMatches({ rawName: query, sourceType: "psa_import" }, aliasResult.aliases, 60).slice(0, 12);
   const aliasCardIds = Array.from(new Set(aliasMatches.map(({ alias }) => alias.card_id)));
+  const marketAliasQuery = normalizeMarketAlias(query);
+  const marketAliasResult = marketAliasQuery.length >= 2
+    ? await supabase
+        .from("card_market_aliases")
+        .select("card_id")
+        .eq("game_id", game.id)
+        .ilike("normalized_alias", `%${marketAliasQuery}%`)
+        .limit(100)
+    : { data: [], error: null };
+
+  if (marketAliasResult.error) {
+    return NextResponse.json({ error: marketAliasResult.error.message }, { status: 500 });
+  }
+
+  const marketAliasCardIds = Array.from(new Set((marketAliasResult.data ?? []).map((row) => row.card_id)));
+  if (marketAliasCardIds.length > 0) {
+    const { data, error } = await supabase
+      .from("cards")
+      .select(SEARCH_SELECT)
+      .eq("game_id", game.id)
+      .in("id", marketAliasCardIds);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    for (const card of (data ?? []) as unknown as CardSearchRow[]) {
+      const catalogCard = { ...card, source: "catalog" as const };
+      candidates.set(searchKey(catalogCard), catalogCard);
+      aliasBoosts.set(catalogCard.id, 240);
+    }
+  }
 
   if (aliasCardIds.length > 0) {
     const { data, error } = await supabase
@@ -147,7 +181,7 @@ export async function GET(request: Request) {
       .from("cards")
       .select(SEARCH_SELECT)
       .eq("game_id", game.id)
-      .or(`name.ilike.%${token}%,card_number.ilike.%${token}%`)
+      .or(`market_name.ilike.%${token}%,name.ilike.%${token}%,card_number.ilike.%${token}%`)
       .limit(60);
 
     if (error) {

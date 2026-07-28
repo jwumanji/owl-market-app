@@ -5,11 +5,13 @@ import FastCardImage from "@/components/ui/FastCardImage";
 import { DEFAULT_PUBLIC_GAME_ROUTE_SLUG } from "@/lib/game-scope";
 import { gamePath } from "@/lib/game-routes";
 import { formatPct } from "@/lib/utils";
+import { cardDisplayName, cardOfficialIdentity } from "@/lib/card-market-names";
 
 export type TeaserCard = {
   id: string;
   card_image_id: string | null;
   name: string;
+  market_name: string | null;
   rarity: string | null;
   image_url: string | null;
   image_url_small: string | null;
@@ -44,10 +46,11 @@ function deltaState(chg: number | null | undefined): "up" | "down" | "flat" {
 }
 
 function CardThumb({ card }: { card: TeaserCard }) {
+  const displayName = cardDisplayName(card);
   const imageSrc = card.image_url_small ?? card.image_url;
   if (imageSrc) {
     return (
-      <CardHoverZoom src={imageSrc} previewSrc={card.image_url_preview ?? card.image_url ?? imageSrc} alt={card.name}>
+      <CardHoverZoom src={imageSrc} previewSrc={card.image_url_preview ?? card.image_url ?? imageSrc} alt={displayName}>
         <FastCardImage
           src={imageSrc}
           alt=""
@@ -61,11 +64,11 @@ function CardThumb({ card }: { card: TeaserCard }) {
       </CardHoverZoom>
     );
   }
-  const initial = card.name.trim().charAt(0).toUpperCase() || "?";
+  const initial = displayName.trim().charAt(0).toUpperCase() || "?";
   return (
     <div
       className="c-teaser-thumb"
-      style={{ background: thumbBg(card.name), color: "var(--bg)" }}
+      style={{ background: thumbBg(displayName), color: "var(--bg)" }}
       aria-hidden="true"
     >
       {initial}
@@ -96,7 +99,8 @@ export default function HomeTeaserTable({
         <div className="c-teaser-empty">Market data loading…</div>
       ) : (
         cards.map((card, i) => {
-          const setLine = [card.set_code, card.set_name].filter(Boolean).join(" ");
+          const officialName = cardOfficialIdentity(card);
+          const setLine = [officialName, card.set_code, card.set_name].filter(Boolean).join(" · ");
           const cardNum = card.card_number ? ` · #${card.card_number}` : "";
           const state = deltaState(card.chg_1d);
           return (
@@ -110,7 +114,7 @@ export default function HomeTeaserTable({
               <div className="c-teaser-card-cell">
                 <CardThumb card={card} />
                 <div className="c-teaser-card-meta">
-                  <div className="c-teaser-card-name">{card.name}</div>
+                  <div className="c-teaser-card-name">{cardDisplayName(card)}</div>
                   <div className="c-teaser-card-set">
                     {setLine}
                     {cardNum}

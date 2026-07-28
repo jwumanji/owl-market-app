@@ -38,6 +38,7 @@ export function cachedPublicData<T>(
 
   const loadWithNextCache = unstable_cache(load, ["public-data", key], {
     revalidate: ttlSeconds,
+    tags: ["public-data"],
   });
   const promise = Promise.resolve()
     .then(loadWithNextCache)

@@ -5,6 +5,7 @@ import { gamePath } from "@/lib/game-routes";
 import { formatPrice, formatPct } from "@/lib/utils";
 import RarityBadge from "@/components/ui/RarityBadge";
 import FastCardImage from "@/components/ui/FastCardImage";
+import { cardDisplayName, cardOfficialIdentity } from "@/lib/card-market-names";
 
 function changeVariant(pct: number | null | undefined): "up" | "down" | "flat" {
   if (pct == null || pct === 0) return "flat";
@@ -24,6 +25,7 @@ export default function MarketGrid({
         const ps = card.price_stats;
         const rank = String(i + 1).padStart(2, "0");
         const imageSrc = card.image_url_preview ?? card.image_url_small ?? card.image_url;
+        const officialName = cardOfficialIdentity(card);
         return (
           <Link
             key={card.id}
@@ -38,7 +40,7 @@ export default function MarketGrid({
               {imageSrc ? (
                 <FastCardImage
                   src={imageSrc}
-                  alt={card.name}
+                  alt={cardDisplayName(card)}
                   width={256}
                   height={358}
                   loading={i === 0 ? "eager" : "lazy"}
@@ -51,7 +53,8 @@ export default function MarketGrid({
             </div>
 
             <div className="mgrid-info">
-              <p className="mgrid-name" title={card.name}>{card.name}</p>
+              <p className="mgrid-name" title={cardDisplayName(card)}>{cardDisplayName(card)}</p>
+              {officialName ? <p className="mgrid-series">{officialName}</p> : null}
               <p className="mgrid-series">{card.sets?.name ?? "Unknown Set"}</p>
               <p className="mgrid-price">{formatPrice(ps?.market_avg)}</p>
             </div>
