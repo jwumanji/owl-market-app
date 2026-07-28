@@ -74,6 +74,14 @@
       "schedules": ["45 23 * * *"]
     },
     {
+      "id": "one_piece.internal.set_baseline",
+      "game": "one_piece",
+      "provider": "internal",
+      "kind": "index",
+      "path": "/api/sync/set-baseline?game=one_piece",
+      "schedules": ["50 23 * * 0"]
+    },
+    {
       "id": "one_piece.summaries.public",
       "game": "one_piece",
       "provider": "internal",
