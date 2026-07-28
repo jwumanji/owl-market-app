@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createCachedServiceClient } from "@/lib/supabase-server";
 import { withOnePiecePayloadFallbacks } from "@/lib/game-payload";
 import {
@@ -43,11 +44,21 @@ type CardRow = {
   card_image_id: string;
   card_number: string | null;
   name: string;
+  market_name: string | null;
   name_base: string | null;
   variant_label: string | null;
   rarity: string | null;
   card_type: string | null;
   color: string[] | string | null;
+  power: number | null;
+  counter: number | null;
+  life: number | null;
+  cost: number | null;
+  attribute: string | null;
+  types: string[] | string | null;
+  effect: string | null;
+  trigger: string | null;
+  artist: string | null;
   game_payload: Record<string, unknown> | null;
   image_url: string | null;
   image_url_small: string | null;
@@ -62,8 +73,54 @@ interface SynthPoint {
   recorded_at: string;
 }
 
+let marketNameColumnAvailable: boolean | null = null;
+let marketNameColumnProbe: Promise<boolean> | null = null;
+
+function isMissingMarketNameColumn(error: { code?: string; message?: string } | null) {
+  return error?.code === "42703" && error.message?.includes("market_name");
+}
+
+async function supportsMarketNameColumn(supabase: SupabaseClient): Promise<boolean> {
+  if (marketNameColumnAvailable != null) return marketNameColumnAvailable;
+
+  if (!marketNameColumnProbe) {
+    marketNameColumnProbe = Promise.resolve(
+      supabase.from("cards").select("market_name").limit(1)
+    )
+      .then(({ error }) => {
+        if (isMissingMarketNameColumn(error)) return false;
+        if (error) throw error;
+        return true;
+      })
+      .then((available) => {
+        marketNameColumnAvailable = available;
+        return available;
+      })
+      .finally(() => {
+        marketNameColumnProbe = null;
+      });
+  }
+
+  return marketNameColumnProbe!;
+}
+
 function firstRelation<T>(relation: JoinedRelation<T>): T | null {
   return Array.isArray(relation) ? relation[0] ?? null : relation;
+}
+
+function gameplayDetailScore(row: Record<string, unknown>): number {
+  let score = 0;
+  if (typeof row.effect === "string" && row.effect.trim()) score += 8;
+  if (typeof row.trigger === "string" && row.trigger.trim()) score += 4;
+  if (typeof row.card_type === "string" && row.card_type.trim()) score += 2;
+  if (typeof row.attribute === "string" && row.attribute.trim()) score += 1;
+  if (typeof row.power === "number") score += 1;
+  if (typeof row.life === "number") score += 1;
+  if (typeof row.cost === "number") score += 1;
+  if (typeof row.counter === "number") score += 1;
+  if (Array.isArray(row.color) && row.color.length > 0) score += 1;
+  if (Array.isArray(row.types) && row.types.length > 0) score += 1;
+  return score;
 }
 
 async function loadCardCoreUncached(options: {
@@ -83,18 +140,26 @@ async function loadCardCoreUncached(options: {
   const { game } = gameResult;
   const id = decodeURIComponent(options.id);
 
-  const { data: card, error: cardErr } = await supabase
-    .from("cards")
-    .select(`
+  const cardSelect = (includeMarketName: boolean) => `
       id,
       card_image_id,
       card_number,
       name,
+      ${includeMarketName ? "market_name," : ""}
       name_base,
       variant_label,
       rarity,
       card_type,
       color,
+      power,
+      counter,
+      life,
+      cost,
+      attribute,
+      types,
+      effect,
+      trigger,
+      artist,
       game_payload,
       image_url,
       image_url_small,
@@ -129,12 +194,28 @@ async function loadCardCoreUncached(options: {
         color,
         year
       )
-    `)
-    .eq("game_id", game.id)
-    .eq("region", "en")
-    .eq("card_image_id", id)
-    .limit(1)
-    .single();
+    `;
+  const queryCard = (includeMarketName: boolean) =>
+    supabase
+      .from("cards")
+      .select(cardSelect(includeMarketName))
+      .eq("game_id", game.id)
+      .eq("region", "en")
+      .eq("card_image_id", id)
+      .limit(1)
+      .single();
+
+  let includeMarketName = await supportsMarketNameColumn(supabase);
+  let { data: card, error: cardErr } = await queryCard(includeMarketName);
+
+  // Keep public card pages available while the market-name migration rolls
+  // through environments. Cache the capability so static generation does not
+  // repeat a failed schema probe for every card page.
+  if (includeMarketName && isMissingMarketNameColumn(cardErr)) {
+    includeMarketName = false;
+    marketNameColumnAvailable = false;
+    ({ data: card, error: cardErr } = await queryCard(false));
+  }
 
   if (cardErr || !card) {
     throw new CardDetailLoadError("Card not found", 404);
@@ -144,7 +225,46 @@ async function loadCardCoreUncached(options: {
   const priceStats = firstRelation(cardRow.price_stats);
   const set = firstRelation(cardRow.sets);
   const payloadCard = withOnePiecePayloadFallbacks(cardRow as unknown as Record<string, unknown>);
-  const payloadColor = payloadCard.color;
+  let detailCard = payloadCard;
+
+  // Alternate-art and special-printing rows can omit gameplay fields even
+  // though the base printing with the same collector number has them. Reuse
+  // only those shared gameplay details; identity, artwork, and market data stay
+  // attached to the exact printing requested above.
+  if (gameplayDetailScore(detailCard) < 8 && cardRow.card_number) {
+    const { data: detailRows } = await supabase
+      .from("cards")
+      .select(`
+        card_type,
+        color,
+        power,
+        counter,
+        life,
+        cost,
+        attribute,
+        types,
+        effect,
+        trigger,
+        artist,
+        game_payload
+      `)
+      .eq("game_id", game.id)
+      .eq("region", "en")
+      .eq("card_number", cardRow.card_number)
+      .limit(12);
+
+    for (const detailRow of detailRows ?? []) {
+      const candidate = withOnePiecePayloadFallbacks(
+        detailRow as unknown as Record<string, unknown>
+      );
+      if (gameplayDetailScore(candidate) > gameplayDetailScore(detailCard)) {
+        detailCard = candidate;
+      }
+    }
+  }
+
+  const payloadColor = detailCard.color;
+  const payloadTypes = detailCard.types;
 
   return {
     game: gameResponsePayload(game),
@@ -153,15 +273,29 @@ async function loadCardCoreUncached(options: {
       card_image_id: cardRow.card_image_id,
       card_number: cardRow.card_number,
       name: cardRow.name,
+      market_name: cardRow.market_name ?? null,
       name_base: cardRow.name_base,
       variant_label: cardRow.variant_label,
       rarity: cardRow.rarity,
-      card_type: typeof payloadCard.card_type === "string" ? payloadCard.card_type : null,
+      card_type: typeof detailCard.card_type === "string" ? detailCard.card_type : null,
       color: Array.isArray(payloadColor)
         ? payloadColor.filter((c): c is string => typeof c === "string")
         : typeof payloadColor === "string"
           ? [payloadColor]
           : [],
+      power: typeof detailCard.power === "number" ? detailCard.power : null,
+      counter: typeof detailCard.counter === "number" ? detailCard.counter : null,
+      life: typeof detailCard.life === "number" ? detailCard.life : null,
+      cost: typeof detailCard.cost === "number" ? detailCard.cost : null,
+      attribute: typeof detailCard.attribute === "string" ? detailCard.attribute : null,
+      types: Array.isArray(payloadTypes)
+        ? payloadTypes.filter((type): type is string => typeof type === "string")
+        : typeof payloadTypes === "string"
+          ? [payloadTypes]
+          : [],
+      effect: typeof detailCard.effect === "string" ? detailCard.effect : null,
+      trigger: typeof detailCard.trigger === "string" ? detailCard.trigger : null,
+      artist: typeof detailCard.artist === "string" ? detailCard.artist : null,
       image_url: cardRow.image_url,
       image_url_small: cardRow.image_url_small,
       image_url_preview: cardRow.image_url_preview,
@@ -365,7 +499,7 @@ export async function loadCardCore(options: {
   try {
     const publicOnly = publicOnlyForCatalogPreview();
     const data = await cachedPublicData(
-      publicDataCacheKey("card-core-v1", options.game ?? "default", options.id, publicOnly),
+      publicDataCacheKey("card-core-v3", options.game ?? "default", options.id, publicOnly),
       () => loadCardCoreUncached(options),
       CATALOG_DATA_TTL_SECONDS
     );

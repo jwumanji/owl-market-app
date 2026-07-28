@@ -3,8 +3,9 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { formatPct, pctColor, spreadPct, timeAgo } from "@/lib/utils";
+import { formatPct, pctColor, spreadPct } from "@/lib/utils";
 import RarityBadge from "@/components/ui/RarityBadge";
+import { cardDisplayName, cardOfficialIdentity } from "@/lib/card-market-names";
 import { gamePath, gameQueryValue } from "@/lib/game-routes";
 import type {
   CardCorePayload,
@@ -158,6 +159,25 @@ function formatMarketPrice(value: number | null | undefined): string {
   })}`;
 }
 
+function formatSignedUsd(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "USD move unavailable";
+  const sign = value > 0 ? "+" : value < 0 ? "−" : "";
+  return `${sign}$${Math.abs(value).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} USD`;
+}
+
+function usdMoveFromReturn(
+  currentPrice: number | null,
+  returnPct: number | null
+): number | null {
+  if (currentPrice == null || returnPct == null) return null;
+  const multiplier = 1 + returnPct / 100;
+  if (!Number.isFinite(multiplier) || multiplier <= 0) return null;
+  return currentPrice - currentPrice / multiplier;
+}
+
 function formatJpy(value: number): string {
   return `¥${Math.round(value).toLocaleString("en-US")}`;
 }
@@ -174,12 +194,6 @@ function formatDate(dateStr: string | null): string {
 
 function formatGrade(grade: number): string {
   return grade % 1 === 0 ? String(grade) : grade.toFixed(1);
-}
-
-function TimeAgoLabel({ date }: { date: string }) {
-  const [clientLabel, setClientLabel] = useState<string | null>(null);
-  useEffect(() => setClientLabel(timeAgo(date)), [date]);
-  return <span suppressHydrationWarning>{clientLabel ?? timeAgo(date)}</span>;
 }
 
 export default function CardDetailClient({
@@ -271,27 +285,68 @@ export default function CardDetailClient({
   const recordedHighAt = priceStats?.ath_date ?? overview.highAt;
   const recordedLow = priceStats?.atl ?? overview.low;
   const recordedLowAt = priceStats?.atl_date ?? overview.lowAt;
+  const currentRangePosition =
+    currentPrice != null && recordedLow != null && recordedHigh != null
+      ? recordedHigh > recordedLow
+        ? Math.max(
+            0,
+            Math.min(100, ((currentPrice - recordedLow) / (recordedHigh - recordedLow)) * 100)
+          )
+        : 50
+      : null;
+  const currentRangeLabelTranslate =
+    currentRangePosition == null
+      ? "-50%"
+      : currentRangePosition < 22
+        ? "0%"
+        : currentRangePosition > 78
+          ? "-100%"
+          : "-50%";
   const growthFromLow =
     currentPrice != null && recordedLow != null && recordedLow > 0
       ? ((currentPrice - recordedLow) / recordedLow) * 100
       : overview.growthFromLow;
   const verifiedSales = extras?.ebayRecent.length ?? 0;
   const hasWeeklyEbayRaw = (extras?.ebayWeekStats.rawCount ?? 0) > 0;
-  const ebayRawAverage = hasWeeklyEbayRaw
-    ? extras?.ebayWeekStats.rawAvg ?? null
-    : extras?.ebayStats.rawAvg ?? null;
-  const ebayRawCount = hasWeeklyEbayRaw
-    ? extras?.ebayWeekStats.rawCount ?? 0
-    : extras?.ebayStats.rawCount ?? 0;
+  const ebayMarketPrice =
+    (hasWeeklyEbayRaw ? extras?.ebayWeekStats.rawAvg : null) ??
+    priceStats?.ebay_avg ??
+    extras?.ebayStats.rawAvg ??
+    extras?.ebayRecent[0]?.sale_price ??
+    null;
   const jpMarketPrice = extras?.jpPrice ?? null;
-  const jpUsd = jpMarketPrice ? jpMarketPrice.price_jpy / JPY_PER_USD : null;
-  const marketConfidence = getMarketConfidence({
+  const jpMarketUsd = jpMarketPrice ? jpMarketPrice.price_jpy / JPY_PER_USD : null;
+  const confidenceLevel = getMarketConfidence({
     observedAt,
     sampleCount: overview.sampleCount,
     verifiedSales,
     listingsCount: priceStats?.tcg_listings_count ?? 0,
     synthetic: history?.priceHistorySynthetic ?? false,
   });
+  const cardColors = Array.from(
+    new Set(
+      card.color.flatMap((color) =>
+        color
+          .split(/[\s/,+]+/)
+          .map((value) => value.trim())
+          .filter(Boolean)
+      )
+    )
+  ).join(" / ");
+  const cardProfileSummary = [
+    [cardColors || null, card.card_type].filter(Boolean).join(" ") || null,
+    card.cost != null ? `${card.cost} cost` : null,
+    card.power != null ? `${card.power.toLocaleString("en-US")} power` : null,
+    card.life != null ? `${card.life} life` : null,
+    card.counter != null ? `${card.counter.toLocaleString("en-US")} counter` : null,
+  ].filter((detail): detail is string => Boolean(detail));
+  const printedSetCode = card.card_number?.split("-")[0]?.trim().toUpperCase() ?? null;
+  const isReprint = Boolean(set?.code && printedSetCode && set.code !== printedSetCode);
+  const cardTraits = [
+    card.attribute,
+    card.types.length > 0 ? card.types.join(" · ") : null,
+    card.artist ? `Art by ${card.artist}` : null,
+  ].filter((detail): detail is string => Boolean(detail));
 
   return (
     <section className="mx-auto max-w-[1220px] px-5 pb-24 pt-7 text-ink sm:px-8">
@@ -314,7 +369,7 @@ export default function CardDetailClient({
         <span className="text-ink">Market dossier</span>
       </div>
 
-      {/* 01 — investor snapshot */}
+      {/* Card market snapshot */}
       <section className="relative overflow-hidden rounded-[28px] border-[1.5px] border-ink/15 bg-[linear-gradient(135deg,#FFFDF8_0%,#FFEBDD_52%,#FFF4D7_100%)] text-ink shadow-[0_24px_60px_rgba(91,52,25,0.12)]">
         <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-coral/10 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-gold/15 blur-3xl" />
@@ -324,7 +379,7 @@ export default function CardDetailClient({
               <Image
                 src={cardImageSrc}
                 sizes="(max-width: 1023px) 230px, 230px"
-                alt={card.name}
+                alt={cardDisplayName(card)}
                 width={300}
                 height={420}
                 quality={68}
@@ -344,111 +399,107 @@ export default function CardDetailClient({
           <div className="flex min-w-0 flex-col">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-ink/15 bg-white/65 px-3 py-1 font-mono-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-2">
-                01 / Market snapshot
+                Market snapshot
               </span>
-              <ConfidenceBadge confidence={marketConfidence.level} />
+              <ConfidenceBadge confidence={confidenceLevel} />
             </div>
 
             <h1 className="mt-5 max-w-[760px] font-grotesk text-[30px] font-bold leading-[1.06] tracking-[-0.03em] text-ink sm:text-[38px] lg:text-[44px]">
-              {card.name}
+              {cardDisplayName(card)}
             </h1>
+            {cardOfficialIdentity(card) && (
+              <p className="mt-2 max-w-[760px] font-grotesk text-[15px] font-semibold text-ink-2">
+                Official card name: {card.name}
+              </p>
+            )}
             <div className="mt-4 flex flex-wrap items-center gap-2.5">
               <RarityBadge rarity={card.rarity} />
-              {card.variant_label && (
-                <DarkChip>{card.variant_label}</DarkChip>
-              )}
+              {card.variant_label && <DarkChip>{card.variant_label}</DarkChip>}
               {set && <DarkChip>{set.code} {set.name}</DarkChip>}
             </div>
 
-            <div className="mt-8 grid gap-px overflow-hidden rounded-[18px] bg-ink/10 sm:grid-cols-3">
-              <MarketQuoteCard
-                eyebrow="TCGplayer"
-                label="Market price"
-                value={formatMarketPrice(currentPrice)}
-                detail={observedAt ? `Observed ${formatDate(observedAt)}` : "No quote timestamp"}
-                accent="yellow"
-              />
-              <MarketQuoteCard
-                eyebrow="eBay"
-                label={hasWeeklyEbayRaw ? "7D sold average" : "Recent sold average"}
-                value={extrasLoaded ? formatMarketPrice(ebayRawAverage) : "Checking…"}
-                detail={
-                  extrasLoaded
-                    ? ebayRawCount > 0
-                      ? `${ebayRawCount} exact-printing raw sold${ebayRawCount === 1 ? "" : "s"}`
-                      : "No exact-printing raw solds"
-                    : "Loading verified solds"
-                }
-                accent="blue"
-              />
-              <MarketQuoteCard
-                eyebrow="Japan"
-                label="Yuyu-tei price"
-                value={extrasLoaded && jpMarketPrice ? formatJpy(jpMarketPrice.price_jpy) : extrasLoaded ? "—" : "Checking…"}
-                detail={
-                  extrasLoaded && jpMarketPrice
-                    ? `≈ ${formatMarketPrice(jpUsd)} USD · ${formatDate(jpMarketPrice.snapshot_date)}`
-                    : extrasLoaded
-                      ? "No verified counterpart"
-                      : "Loading Japanese market"
-                }
-                accent="red"
-              />
-            </div>
+            <div className="mt-7 grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(320px,1.1fr)]">
+              <div className="rounded-[18px] border border-ink/10 bg-white/65 p-5">
+                <div className="font-mono-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-3">
+                  Card profile
+                </div>
+                <p className="mt-3 font-grotesk text-[17px] font-bold leading-[1.45] tracking-[-0.01em] text-ink sm:text-[18px]">
+                  {cardProfileSummary.length > 0
+                    ? cardProfileSummary.join(" · ")
+                    : "Gameplay profile not reported"}
+                </p>
 
-            <div className="mt-5 flex flex-wrap items-start justify-between gap-4 border-b border-ink/15 pb-5">
-              <div className="font-mono-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-3">
-                Market read
+                <div className="mt-4 grid gap-3 border-t border-ink/10 pt-4 sm:grid-cols-2">
+                  <div>
+                    <div className="font-mono-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-ink-3">
+                      This printing
+                    </div>
+                    <div className="mt-1 font-grotesk text-[13px] font-semibold leading-snug text-ink">
+                      {set
+                        ? `${card.variant_label ?? card.rarity ?? "Card"}${isReprint ? " reprint" : ""} in ${set.code}`
+                        : card.variant_label ?? card.rarity ?? "Not reported"}
+                    </div>
+                    {set && (
+                      <div className="mt-1 font-grotesk text-[11px] leading-snug text-ink-3">
+                        {set.name}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="font-mono-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-ink-3">
+                      Original printing
+                    </div>
+                    <div className="mt-1 font-grotesk text-[13px] font-semibold leading-snug text-ink">
+                      {printedSetCode ? `Originally printed in ${printedSetCode}` : "Not reported"}
+                    </div>
+                    {card.card_number && (
+                      <div className="mt-1 font-mono-2 text-[10px] uppercase tracking-[0.08em] text-ink-3">
+                        Card {card.card_number}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {cardTraits.length > 0 && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {cardTraits.map((detail) => (
+                      <span
+                        key={detail}
+                        className="rounded-full border border-ink/10 bg-bg-2 px-3 py-1 font-mono-2 text-[9px] font-semibold uppercase tracking-[0.08em] text-ink-2"
+                      >
+                        {detail}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
-              <p className="max-w-[600px] font-grotesk text-[13px] font-medium leading-relaxed text-ink-2 sm:text-right">
-                {marketConfidence.summary}
-              </p>
-            </div>
 
-            <div className="grid gap-px overflow-hidden rounded-[16px] bg-ink/10 sm:grid-cols-3">
-              <HeroFact
-                label="Last observed"
-                value={observedAt ? <TimeAgoLabel date={observedAt} /> : "Unavailable"}
-                foot={formatDate(observedAt)}
-              />
-              <HeroFact
-                label="Price evidence"
-                value={`${overview.sampleCount} snapshots`}
-                foot={overview.firstAt ? `Since ${formatDate(overview.firstAt)}` : "No history yet"}
-              />
-              <HeroFact
-                label="Verified sales"
-                value={extrasLoaded ? String(verifiedSales) : "Checking…"}
-                foot={verifiedSales > 0 ? "Exact-printing eBay comps" : "Exact printing only"}
-              />
+              <div className="rounded-[18px] border border-ink/10 bg-white/40 p-5">
+                <div className="font-mono-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-3">
+                  Official effect
+                </div>
+                <p className="mt-3 font-grotesk text-[13px] font-medium leading-[1.65] text-ink-2">
+                  {card.effect ?? "Official gameplay text is not available for this printing."}
+                </p>
+                {card.trigger && (
+                  <p className="mt-3 border-l-[3px] border-coral pl-3 font-grotesk text-[12px] leading-[1.55] text-ink-2">
+                    <span className="font-semibold text-ink">Trigger:</span> {card.trigger}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <ReturnCard label="24H return" metric={change1d} />
-        <ReturnCard label="7D return" metric={change7d} />
-        <ReturnCard label="30D return" metric={change30d} />
-        <MetricCard
-          label="From recorded low"
-          value={formatPct(growthFromLow)}
-          valueClass={pctColor(growthFromLow)}
-          foot={recordedLowAt ? `Low set ${formatDate(recordedLowAt)}` : "Waiting for history"}
-        />
-      </div>
+      {/* Market graph */}
+      <section className="mt-4">
+        <h2 className="font-grotesk text-[30px] font-bold leading-none tracking-[-0.035em] sm:text-[38px]">
+          Market Graph
+        </h2>
 
-      {/* 02 — performance canvas */}
-      <section className="mt-14">
-        <SectionHeading
-          index="02"
-          eyebrow="Performance canvas"
-          title="Price behavior, without the false precision."
-          description="Quote history and rolling market average are separated. Sparse windows stay unavailable instead of becoming artificial zeroes."
-        />
-
-        <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_310px]">
-          <div className="rounded-[22px] border-[1.5px] border-ink bg-bg-2 p-4 shadow-[0_10px_30px_rgba(55,31,14,0.06)] sm:p-6">
+        <div className="mt-6 grid gap-5 lg:grid-cols-[310px_minmax(0,1fr)]">
+          <div className="rounded-[22px] border-[1.5px] border-ink bg-bg-2 p-4 shadow-[0_10px_30px_rgba(55,31,14,0.06)] sm:p-6 lg:order-2">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h2 className="font-grotesk text-[20px] font-bold tracking-[-0.02em]">Market record</h2>
@@ -486,7 +537,7 @@ export default function CardDetailClient({
             </MountNearViewport>
           </div>
 
-          <aside className="rounded-[22px] bg-[#FCE6BE] p-5 sm:p-6">
+          <aside className="rounded-[22px] bg-[#FCE6BE] p-5 sm:p-6 lg:order-1">
             <div className="font-mono-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-2">
               Recorded range
             </div>
@@ -500,54 +551,100 @@ export default function CardDetailClient({
                 <div className="mt-1 font-mono-2 text-[18px] font-semibold">{formatMarketPrice(recordedHigh)}</div>
               </div>
             </div>
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/70">
-              <div
-                className="h-full rounded-full bg-[linear-gradient(90deg,#FF6BB8,#FF4936,#E89512)]"
-                style={{ width: `${Math.max(0, Math.min(100, overview.rangePosition ?? 0))}%` }}
-              />
+            <div className="relative mt-10">
+              {currentRangePosition != null && currentPrice != null && (
+                <div
+                  className="absolute -top-8 z-10 whitespace-nowrap rounded-full bg-ink px-2.5 py-1 font-mono-2 text-[9px] font-semibold uppercase tracking-[0.08em] text-white shadow-sm"
+                  style={{
+                    left: `${currentRangePosition}%`,
+                    transform: `translateX(${currentRangeLabelTranslate})`,
+                  }}
+                >
+                  TCGplayer now · {formatMarketPrice(currentPrice)}
+                </div>
+              )}
+              <div className="h-2 overflow-hidden rounded-full bg-white/70">
+                <div
+                  className="h-full rounded-full bg-[linear-gradient(90deg,#FF6BB8,#FF4936,#E89512)]"
+                  style={{ width: `${currentRangePosition ?? 0}%` }}
+                />
+              </div>
+              {currentRangePosition != null && (
+                <span
+                  aria-hidden="true"
+                  className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-[#FCE6BE] bg-ink shadow-[0_2px_6px_rgba(35,18,8,0.3)]"
+                  style={{ left: `${currentRangePosition}%` }}
+                />
+              )}
             </div>
             <div className="mt-2 flex justify-between font-mono-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-3">
               <span>{formatDate(recordedLowAt)}</span>
               <span>{formatDate(recordedHighAt)}</span>
             </div>
 
-            <div className="mt-7 space-y-3 border-t border-ink/20 pt-5">
-              <EvidenceRow label="TCG low" value={formatMarketPrice(priceStats?.tcg_low)} />
-              <EvidenceRow label="TCG midpoint" value={formatMarketPrice(priceStats?.tcg_mid)} />
-              <EvidenceRow label="TCG high" value={formatMarketPrice(priceStats?.tcg_high)} />
-              <EvidenceRow
-                label="Listings"
-                value={priceStats?.tcg_listings_count != null ? String(priceStats.tcg_listings_count) : "Not reported"}
+            <div className="mt-7 space-y-2 border-t border-ink/20 pt-5">
+              <MarketPriceRow
+                label="TCGplayer"
+                value={formatMarketPrice(currentPrice)}
+                tone="yellow"
               />
-              <EvidenceRow
-                label="30D volume"
-                value={priceStats?.volume_30d != null ? String(priceStats.volume_30d) : "Not reported"}
+              <MarketPriceRow
+                label="eBay"
+                value={formatMarketPrice(ebayMarketPrice)}
+                tone="blue"
+              />
+              <MarketPriceRow
+                label="Japanese price"
+                value={
+                  jpMarketPrice && jpMarketUsd != null
+                    ? `${formatJpy(jpMarketPrice.price_jpy)} · ${formatMarketPrice(jpMarketUsd)}`
+                    : "Not reported"
+                }
+                tone="red"
+              />
+              <MarketPriceRow
+                label="All-time high"
+                value={formatMarketPrice(priceStats?.ath ?? recordedHigh)}
+                tone="neutral"
               />
             </div>
             <p className="mt-5 rounded-[12px] bg-white/50 p-3 font-grotesk text-[12px] leading-relaxed text-ink-2">
-              High and low refer to this recorded dataset. They are not presented as lifetime records unless the provider supplies verified all-time statistics.
+              All-time high uses a provider lifetime record when available; otherwise it shows the highest quote in this recorded dataset.
             </p>
           </aside>
         </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <ReturnCard label="24H return" metric={change1d} currentPrice={currentPrice} />
+          <ReturnCard label="7D return" metric={change7d} currentPrice={currentPrice} />
+          <ReturnCard label="30D return" metric={change30d} currentPrice={currentPrice} />
+          <MetricCard
+            label="From recorded low"
+            value={formatPct(growthFromLow)}
+            valueClass={pctColor(growthFromLow)}
+            usdValue={formatSignedUsd(
+              currentPrice != null && recordedLow != null ? currentPrice - recordedLow : null
+            )}
+            foot={recordedLowAt ? `Low set ${formatDate(recordedLowAt)}` : "Waiting for history"}
+          />
+        </div>
       </section>
 
-      {/* 03 — cross-market evidence */}
-      <section className="mt-14">
-        <SectionHeading
-          index="03"
-          eyebrow="Markets & evidence"
-          title="What buyers are actually paying elsewhere."
-          description="TCGplayer quotes, exact-printing eBay solds, and Japanese pricing stay separate so every number keeps its market context."
-        />
-        <MarketEvidence
-          extras={extras}
-          loaded={extrasLoaded}
-          enMarketPrice={currentPrice}
-          priceStats={priceStats}
-          priceHistory={priceHistory}
-          observedAt={observedAt}
-          syntheticHistory={history?.priceHistorySynthetic ?? false}
-        />
+      {/* Markets */}
+      <section className="mt-10" aria-label="Marketplace pricing">
+        <h2 className="font-grotesk text-[30px] font-bold leading-none tracking-[-0.035em] sm:text-[38px]">
+          Markets
+        </h2>
+        <div className="mt-6">
+          <MarketEvidence
+            extras={extras}
+            loaded={extrasLoaded}
+            enMarketPrice={currentPrice}
+            observedAt={observedAt}
+            priceStats={priceStats}
+            priceHistory={priceHistory}
+          />
+        </div>
       </section>
     </section>
   );
@@ -574,64 +671,15 @@ function ConfidenceBadge({ confidence }: { confidence: "high" | "medium" | "low"
   );
 }
 
-function HeroFact({
+function ReturnCard({
   label,
-  value,
-  foot,
+  metric,
+  currentPrice,
 }: {
   label: string;
-  value: React.ReactNode;
-  foot: string;
+  metric: WindowMetric;
+  currentPrice: number | null;
 }) {
-  return (
-    <div className="bg-white/60 p-4">
-      <div className="font-mono-2 text-[9px] font-semibold uppercase tracking-[0.13em] text-ink-3">{label}</div>
-      <div className="mt-2 font-mono-2 text-[15px] font-semibold text-ink">{value}</div>
-      <div className="mt-1 font-grotesk text-[11px] text-ink-3">{foot}</div>
-    </div>
-  );
-}
-
-function MarketQuoteCard({
-  eyebrow,
-  label,
-  value,
-  detail,
-  accent,
-}: {
-  eyebrow: string;
-  label: string;
-  value: string;
-  detail: string;
-  accent: "yellow" | "blue" | "red";
-}) {
-  const headerClass = {
-    yellow: "bg-[#F2C94C] text-[#352509]",
-    blue: "bg-[#2F66B0] text-white",
-    red: "bg-[#D85045] text-white",
-  }[accent];
-
-  return (
-    <div className="bg-white/65">
-      <div className={`px-4 py-3 font-mono-2 text-[9px] font-bold uppercase tracking-[0.16em] sm:px-5 ${headerClass}`}>
-        {eyebrow}
-      </div>
-      <div className="p-4 sm:p-5">
-        <div className="font-mono-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-2">
-          {label}
-        </div>
-        <div className="mt-2 font-mono-2 text-[25px] font-semibold leading-none tracking-[-0.035em] text-ink sm:text-[28px]">
-          {value}
-        </div>
-        <div className="mt-3 min-h-[30px] font-grotesk text-[11px] leading-snug text-ink-3">
-          {detail}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ReturnCard({ label, metric }: { label: string; metric: WindowMetric }) {
   const available = metric.value != null;
   const sourceLabel =
     metric.source === "provider"
@@ -644,6 +692,7 @@ function ReturnCard({ label, metric }: { label: string; metric: WindowMetric }) 
       label={label}
       value={available ? formatPct(metric.value) : "Not reliable"}
       valueClass={available ? pctColor(metric.value) : "text-ink-3"}
+      usdValue={formatSignedUsd(usdMoveFromReturn(currentPrice, metric.value))}
       foot={sourceLabel}
       compact={!available}
     />
@@ -654,12 +703,14 @@ function MetricCard({
   label,
   value,
   foot,
+  usdValue,
   valueClass = "text-ink",
   compact = false,
 }: {
   label: string;
   value: string;
   foot: string;
+  usdValue: string;
   valueClass?: string;
   compact?: boolean;
 }) {
@@ -669,33 +720,8 @@ function MetricCard({
       <div className={`mt-3 font-mono-2 font-semibold leading-none ${compact ? "text-[16px]" : "text-[25px]"} ${valueClass}`}>
         {value}
       </div>
-      <div className="mt-2 font-grotesk text-[11px] text-ink-3">{foot}</div>
-    </div>
-  );
-}
-
-function SectionHeading({
-  index,
-  eyebrow,
-  title,
-  description,
-}: {
-  index: string;
-  eyebrow: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_430px] md:items-end">
-      <div>
-        <div className="font-mono-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-coral-text">
-          {index} / {eyebrow}
-        </div>
-        <h2 className="mt-2 max-w-[680px] font-grotesk text-[30px] font-bold leading-[1.05] tracking-[-0.035em] sm:text-[38px]">
-          {title}
-        </h2>
-      </div>
-      <p className="font-grotesk text-[14px] leading-relaxed text-ink-2">{description}</p>
+      <div className="mt-2 font-mono-2 text-[13px] font-semibold text-ink">{usdValue}</div>
+      <div className="mt-1.5 font-grotesk text-[11px] text-ink-3">{foot}</div>
     </div>
   );
 }
@@ -777,22 +803,46 @@ function EvidenceRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function MarketPriceRow({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "yellow" | "blue" | "red" | "neutral";
+}) {
+  const styles = {
+    yellow: "border-[#D28A0A] bg-[#FFF1D2] text-[#8F5B00]",
+    blue: "border-[#2F66B1] bg-[#E8F0FC] text-[#2F66B1]",
+    red: "border-[#D94C45] bg-[#FCE5E3] text-[#B73A34]",
+    neutral: "border-ink/30 bg-white/60 text-ink-2",
+  };
+
+  return (
+    <div className={`rounded-[11px] border-l-[4px] px-3 py-3 ${styles[tone]}`}>
+      <div className="flex items-center justify-between gap-3 font-mono-2 text-[10px] font-semibold">
+        <span className="uppercase tracking-[0.08em]">{label}</span>
+        <span className="text-right text-ink">{value}</span>
+      </div>
+    </div>
+  );
+}
+
 function MarketEvidence({
   extras,
   loaded,
   enMarketPrice,
+  observedAt,
   priceStats,
   priceHistory,
-  observedAt,
-  syntheticHistory,
 }: {
   extras: CardMarketExtrasPayload | null;
   loaded: boolean;
   enMarketPrice: number | null;
+  observedAt: string | null;
   priceStats: PriceStatsData | null;
   priceHistory: PricePoint[];
-  observedAt: string | null;
-  syntheticHistory: boolean;
 }) {
   const jpPrice = extras?.jpPrice ?? null;
   const ebayRecent = extras?.ebayRecent ?? [];
@@ -800,27 +850,28 @@ function MarketEvidence({
   const ebayStats = extras?.ebayStats ?? null;
 
   return (
-    <div className="mt-6 grid gap-5 lg:grid-cols-3">
-      <TcgMarketCard
-        marketPrice={enMarketPrice}
-        priceStats={priceStats}
-        history={priceHistory}
-        observedAt={observedAt}
-        syntheticHistory={syntheticHistory}
-      />
-      {loaded ? (
-        <>
-          <EbayMarketCard recent={ebayRecent} weekStats={ebayWeekStats} stats={ebayStats} />
-          <JapanMarketCard jp={jpPrice} enMarketPrice={enMarketPrice} />
-        </>
-      ) : (
-        <>
-          <EvidenceSkeleton />
-          <EvidenceSkeleton />
-        </>
-      )}
+    <div>
+      <div className="grid items-stretch gap-5 lg:grid-cols-3">
+        <TcgPlayerMarketCard
+          currentPrice={enMarketPrice}
+          observedAt={observedAt}
+          priceStats={priceStats}
+          priceHistory={priceHistory}
+        />
+        {loaded ? (
+          <>
+            <EbayMarketCard recent={ebayRecent} weekStats={ebayWeekStats} stats={ebayStats} />
+            <JapanMarketCard jp={jpPrice} enMarketPrice={enMarketPrice} />
+          </>
+        ) : (
+          <>
+            <EvidenceSkeleton accent="ebay" />
+            <EvidenceSkeleton accent="japan" />
+          </>
+        )}
+      </div>
       {loaded && ebayRecent.length > 0 && (
-        <div className="lg:col-span-3">
+        <div className="mt-5">
           <EbaySalesTape recent={ebayRecent} />
         </div>
       )}
@@ -828,86 +879,87 @@ function MarketEvidence({
   );
 }
 
-function EvidenceSkeleton() {
-  return (
-    <div className="h-[270px] animate-pulse rounded-[22px] border-[1.5px] border-ink bg-bg-2 p-6">
-      <div className="h-3 w-28 rounded bg-bg-3" />
-      <div className="mt-8 h-10 w-44 rounded bg-bg-3" />
-      <div className="mt-5 h-20 rounded bg-bg-3" />
-    </div>
-  );
-}
-
-function TcgMarketCard({
-  marketPrice,
-  priceStats,
-  history,
+function TcgPlayerMarketCard({
+  currentPrice,
   observedAt,
-  syntheticHistory,
+  priceStats,
+  priceHistory,
 }: {
-  marketPrice: number | null;
-  priceStats: PriceStatsData | null;
-  history: PricePoint[];
+  currentPrice: number | null;
   observedAt: string | null;
-  syntheticHistory: boolean;
+  priceStats: PriceStatsData | null;
+  priceHistory: PricePoint[];
 }) {
-  const recentRecords = history
-    .map((point) => ({ point, price: pointPrice(point) }))
-    .filter((entry): entry is { point: PricePoint; price: number } => entry.price != null)
+  const recentRecords = [...priceHistory]
+    .filter((point) => pointPrice(point) != null)
     .sort(
       (a, b) =>
-        new Date(b.point.recorded_at).getTime() - new Date(a.point.recorded_at).getTime()
+        new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime()
     )
     .slice(0, 3);
 
   return (
-    <div className="rounded-[22px] border-[1.5px] border-ink bg-bg-2 p-6">
-      <div className="flex items-center justify-between gap-3">
-        <div className="font-mono-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-2">
-          TCGplayer / market
-        </div>
-        <span className="rounded-full bg-coral/10 px-2.5 py-1 font-mono-2 text-[9px] font-semibold uppercase tracking-[0.1em] text-coral-text">
+    <div className="h-full rounded-[22px] border-[1.5px] border-[#2F66B1]/45 border-t-[5px] border-t-[#2F66B1] bg-[#E8F0FC] p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="rounded-full bg-[#2F66B1] px-3 py-1 font-mono-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-white">
+          TCGplayer
+        </span>
+        <span className="font-mono-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-ink-3">
           Quote feed
         </span>
       </div>
-      <div className="mt-5 font-mono-2 text-[38px] font-semibold leading-none tracking-[-0.04em]">
-        {formatMarketPrice(marketPrice)}
+      <div className="mt-6 font-mono-2 text-[36px] font-semibold leading-none tracking-[-0.04em] text-[#2F66B1]">
+        {formatMarketPrice(currentPrice)}
       </div>
       <div className="mt-2 font-grotesk text-[12px] text-ink-3">
-        Current market price {observedAt ? `· ${formatDate(observedAt)}` : ""}
+        Current market price · {formatDate(observedAt)}
       </div>
-
-      <div className="mt-5 space-y-3 border-t border-ink/20 pt-4">
+      <div className="mt-5 space-y-3 border-t border-ink/15 pt-4">
         <EvidenceRow label="Low" value={formatMarketPrice(priceStats?.tcg_low)} />
         <EvidenceRow label="Mid" value={formatMarketPrice(priceStats?.tcg_mid)} />
         <EvidenceRow
           label="Listings"
-          value={priceStats?.tcg_listings_count != null ? String(priceStats.tcg_listings_count) : "Not reported"}
+          value={
+            priceStats?.tcg_listings_count != null
+              ? String(priceStats.tcg_listings_count)
+              : "Not reported"
+          }
         />
       </div>
-
-      <div className="mt-5 rounded-[14px] bg-bg-3 p-4">
-        <div className="font-mono-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-ink-3">
-          Recent price records
-        </div>
-        <div className="mt-3 space-y-2">
-          {recentRecords.length > 0 ? (
-            recentRecords.map(({ point, price }) => (
-              <div key={point.recorded_at} className="flex items-center justify-between gap-3 font-mono-2 text-[10px] font-semibold">
+      {recentRecords.length > 0 && (
+        <div className="mt-5 rounded-[14px] bg-white/55 p-4">
+          <div className="font-mono-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#2F66B1]">
+            Recent price records
+          </div>
+          <div className="mt-3 space-y-2">
+            {recentRecords.map((point) => (
+              <div
+                key={point.recorded_at}
+                className="flex items-center justify-between gap-4 font-mono-2 text-[10px]"
+              >
                 <span className="text-ink-3">{formatDate(point.recorded_at)}</span>
-                <span>{formatMarketPrice(price)}</span>
+                <span className="font-semibold text-ink">
+                  {formatMarketPrice(pointPrice(point))}
+                </span>
               </div>
-            ))
-          ) : (
-            <div className="font-grotesk text-[11px] text-ink-3">No quote history yet.</div>
-          )}
+            ))}
+          </div>
         </div>
-      </div>
-      <p className="mt-4 font-grotesk text-[10px] leading-relaxed text-ink-3">
-        {syntheticHistory
-          ? "Estimated quote history; not transaction-level sold listings."
-          : "TCGplayer supplies market quotes here, not transaction-level last-sold records."}
-      </p>
+      )}
+    </div>
+  );
+}
+
+function EvidenceSkeleton({ accent }: { accent: "ebay" | "japan" }) {
+  const accentClass =
+    accent === "ebay"
+      ? "border-[#D94C45]/45 border-t-[#D94C45] bg-[#FCE5E3]"
+      : "border-[#D28A0A]/45 border-t-[#D28A0A] bg-[#FFF1D2]";
+  return (
+    <div className={`h-[270px] animate-pulse rounded-[22px] border-[1.5px] border-t-[5px] p-6 ${accentClass}`}>
+      <div className="h-3 w-28 rounded bg-white/70" />
+      <div className="mt-8 h-10 w-44 rounded bg-white/70" />
+      <div className="mt-5 h-20 rounded bg-white/70" />
     </div>
   );
 }
@@ -925,6 +977,7 @@ function JapanMarketCard({
         eyebrow="Japan / Yuyu-tei"
         title="No verified counterpart"
         body="A Japanese price will appear only after the collector number and treatment both match this printing."
+        accent="japan"
       />
     );
   }
@@ -932,32 +985,32 @@ function JapanMarketCard({
   const jpUsd = jp.price_jpy / JPY_PER_USD;
   const spread = spreadPct(enMarketPrice, jpUsd);
   return (
-    <div className="relative overflow-hidden rounded-[22px] bg-[#1F47A1] p-6 text-white shadow-[0_12px_34px_rgba(31,71,161,0.18)]">
-      <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
-      <div className="relative">
+    <div className="relative h-full overflow-hidden rounded-[22px] border-[1.5px] border-[#D28A0A]/45 border-t-[5px] border-t-[#D28A0A] bg-[#FFF1D2] p-6">
+      <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[#F4B43A]/10 blur-2xl" />
+      <div className="relative flex h-full flex-col">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="font-mono-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/60">
+          <div className="rounded-full bg-[#D28A0A] px-3 py-1 font-mono-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-white">
             Japan / Yuyu-tei
           </div>
-          <span className={`rounded-full px-2.5 py-1 font-mono-2 text-[9px] font-semibold uppercase tracking-[0.1em] ${jp.in_stock ? "bg-[#9DE8BF]/20 text-[#B9F4D0]" : "bg-white/10 text-white/60"}`}>
+          <span className={`rounded-full px-2.5 py-1 font-mono-2 text-[9px] font-semibold uppercase tracking-[0.1em] ${jp.in_stock ? "bg-[#DDF3E7] text-[#1F6F47]" : "bg-bg-3 text-ink-3"}`}>
             {jp.in_stock ? "In stock" : "Out of stock"}
           </span>
         </div>
         <div className="mt-6 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <div className="font-mono-2 text-[35px] font-semibold leading-none tracking-[-0.04em]">{formatJpy(jp.price_jpy)}</div>
-            <div className="mt-2 font-mono-2 text-[13px] text-white/60">≈ {formatMarketPrice(jpUsd)} USD</div>
+            <div className="font-mono-2 text-[35px] font-semibold leading-none tracking-[-0.04em] text-[#A96D00]">{formatJpy(jp.price_jpy)}</div>
+            <div className="mt-2 font-mono-2 text-[13px] text-ink-3">≈ {formatMarketPrice(jpUsd)} USD</div>
           </div>
           <div className="text-right">
-            <div className="font-mono-2 text-[9px] uppercase tracking-[0.12em] text-white/50">EN premium</div>
-            <div className="mt-1 font-mono-2 text-[22px] font-semibold">{formatPct(spread)}</div>
+            <div className="font-mono-2 text-[9px] uppercase tracking-[0.12em] text-ink-3">EN premium</div>
+            <div className="mt-1 font-mono-2 text-[22px] font-semibold text-[#A96D00]">{formatPct(spread)}</div>
           </div>
         </div>
-        <div className="mt-6 rounded-[14px] bg-black/20 p-4">
-          <div className="font-grotesk text-[13px] font-medium text-white/80">
+        <div className="mt-6 rounded-[14px] bg-white/55 p-4">
+          <div className="font-grotesk text-[13px] font-medium text-ink-2">
             {jp.card_name ?? "Japanese market counterpart"}
           </div>
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono-2 text-[9px] font-semibold uppercase tracking-[0.08em] text-white/50">
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono-2 text-[9px] font-semibold uppercase tracking-[0.08em] text-ink-3">
             <span>Snapshot {formatDate(jp.snapshot_date)}</span>
             <span>{jp.comparison_match === "counterpart" ? "Treatment-matched counterpart" : "Directly linked printing"}</span>
             <span>FX estimate ¥{JPY_PER_USD}/USD</span>
@@ -968,7 +1021,7 @@ function JapanMarketCard({
             href={jp.source_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-5 inline-flex font-mono-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/75 underline decoration-white/30 underline-offset-4 hover:text-white"
+            className="mt-5 inline-flex font-mono-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#A96D00] underline decoration-[#A96D00]/30 underline-offset-4 hover:text-ink"
           >
             Inspect source ↗
           </a>
@@ -1009,18 +1062,18 @@ function EbayMarketCard({
         eyebrow="eBay / verified solds"
         title="No exact-printing comps"
         body="Sales for cards sharing this collector number are excluded when the treatment differs. That absence is a liquidity signal, not an empty-state bug."
-        accent="coral"
+        accent="ebay"
       />
     );
   }
 
   return (
-    <div className="rounded-[22px] border-[1.5px] border-ink bg-bg-2 p-6">
-      <div className="flex items-center justify-between gap-3">
-        <div className="font-mono-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-2">eBay / verified solds</div>
-        <span className="rounded-full bg-gain-2 px-2.5 py-1 font-mono-2 text-[9px] font-semibold uppercase tracking-[0.1em] text-white">Exact printing</span>
+    <div className="h-full rounded-[22px] border-[1.5px] border-[#D94C45]/45 border-t-[5px] border-t-[#D94C45] bg-[#FCE5E3] p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="rounded-full bg-[#D94C45] px-3 py-1 font-mono-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-white">eBay</div>
+        <span className="rounded-full bg-[#FCE5E3] px-2.5 py-1 font-mono-2 text-[9px] font-semibold uppercase tracking-[0.1em] text-[#A52F2A]">Exact printing</span>
       </div>
-      <div className="mt-5 font-mono-2 text-[38px] font-semibold leading-none tracking-[-0.04em]">{formatMarketPrice(rawAverage)}</div>
+      <div className="mt-6 font-mono-2 text-[38px] font-semibold leading-none tracking-[-0.04em] text-[#B73A34]">{formatMarketPrice(rawAverage)}</div>
       <div className="mt-2 font-grotesk text-[12px] text-ink-3">
         {rawCount > 0 ? `${averageWindow} raw sold average · n=${rawCount}` : "No raw sold average"}
       </div>
@@ -1045,17 +1098,29 @@ function EmptyEvidenceCard({
   eyebrow,
   title,
   body,
-  accent = "gold",
+  accent,
 }: {
   eyebrow: string;
   title: string;
   body: string;
-  accent?: "gold" | "coral";
+  accent: "ebay" | "japan";
 }) {
+  const styles =
+    accent === "ebay"
+      ? {
+          border: "border-[#D94C45]/45 border-t-[#D94C45] bg-[#FCE5E3]",
+          pill: "bg-[#D94C45]",
+          icon: "bg-white/60 text-[#B73A34]",
+        }
+      : {
+          border: "border-[#D28A0A]/45 border-t-[#D28A0A] bg-[#FFF1D2]",
+          pill: "bg-[#D28A0A]",
+          icon: "bg-white/60 text-[#A96D00]",
+        };
   return (
-    <div className="rounded-[22px] border-[1.5px] border-ink bg-bg-2 p-6">
-      <div className="font-mono-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-2">{eyebrow}</div>
-      <div className={`mt-6 inline-flex h-11 w-11 items-center justify-center rounded-full font-mono-2 text-[17px] font-semibold ${accent === "coral" ? "bg-coral/10 text-coral-text" : "bg-gold/20 text-gold"}`}>
+    <div className={`h-full rounded-[22px] border-[1.5px] border-t-[5px] p-6 ${styles.border}`}>
+      <div className={`flex w-fit rounded-full px-3 py-1 font-mono-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-white ${styles.pill}`}>{eyebrow}</div>
+      <div className={`mt-6 flex h-11 w-11 items-center justify-center rounded-full font-mono-2 text-[17px] font-semibold ${styles.icon}`}>
         —
       </div>
       <h3 className="mt-5 font-grotesk text-[24px] font-bold tracking-[-0.025em]">{title}</h3>
@@ -1108,21 +1173,21 @@ function getMarketConfidence({
   verifiedSales: number;
   listingsCount: number;
   synthetic: boolean;
-}): { level: "high" | "medium" | "low"; summary: string } {
+}): "high" | "medium" | "low" {
   if (synthetic) {
-    return { level: "low", summary: "Estimated history with no direct transaction evidence." };
+    return "low";
   }
   const ageDays = observedAt
     ? Math.max(0, (Date.now() - new Date(observedAt).getTime()) / DAY_MS)
     : Number.POSITIVE_INFINITY;
   if (ageDays <= 2 && sampleCount >= 12 && verifiedSales >= 3) {
-    return { level: "high", summary: "Fresh quote supported by repeat observations and verified sales." };
+    return "high";
   }
   if (ageDays <= 7 && sampleCount >= 6 && (verifiedSales > 0 || listingsCount > 0)) {
-    return { level: "medium", summary: "Usable quote, but transaction depth remains limited." };
+    return "medium";
   }
   if (verifiedSales === 0) {
-    return { level: "low", summary: "Thin market: no verified sales for this exact printing." };
+    return "low";
   }
-  return { level: "low", summary: "Sparse or stale observations limit price confidence." };
+  return "low";
 }
