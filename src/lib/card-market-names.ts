@@ -10,7 +10,6 @@ export function cleanMarketName(value: unknown) {
   if (typeof value !== "string") return "";
   return value.replace(/\s+/g, " ").trim().slice(0, MAX_MARKET_NAME_LENGTH);
 }
-
 export function normalizeMarketAlias(value: string | null | undefined) {
   return (value ?? "")
     .toLowerCase()

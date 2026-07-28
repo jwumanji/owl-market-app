@@ -9,6 +9,7 @@ import FilterBar from "./FilterBar";
 import RarityBadge from "../ui/RarityBadge";
 import ChangeCell from "../ui/ChangeCell";
 import MarketCardImage from "./MarketCardImage";
+import { cardDisplayName, cardOfficialIdentity } from "@/lib/card-market-names";
 
 interface MarketTableProps {
   cards: CardRow[];
@@ -55,7 +56,11 @@ export default function MarketTable({ cards: initialCards, sets, gameRouteSlug }
 
     if (search.trim()) {
       const q = search.toLowerCase();
-      result = result.filter((c) => c.name?.toLowerCase().includes(q));
+      result = result.filter((card) => {
+        const aliases = card.card_market_aliases?.map((entry) => entry.alias).join(" ") ?? "";
+        return [card.name, card.market_name, card.card_number, aliases]
+          .some((value) => value?.toLowerCase().includes(q));
+      });
     }
 
     if (selectedRarities.length > 0) {
@@ -96,6 +101,7 @@ export default function MarketTable({ cards: initialCards, sets, gameRouteSlug }
           </thead>
           <tbody className={loading ? "opacity-50 transition-opacity" : "transition-opacity"}>
             {filtered.map((card, i) => {
+              const officialName = cardOfficialIdentity(card);
               return (
                 <tr
                   key={card.id}
@@ -110,7 +116,7 @@ export default function MarketTable({ cards: initialCards, sets, gameRouteSlug }
                 {/* Thumbnail */}
                 <td className="py-2 px-1">
                   <MarketCardImage
-                    alt={card.name ?? ""}
+                    alt={cardDisplayName(card)}
                     className="h-[73px] w-[52px] rounded-[4px] object-cover"
                     fetchPriority="low"
                     height={73}
@@ -126,8 +132,13 @@ export default function MarketTable({ cards: initialCards, sets, gameRouteSlug }
                 <td className="py-3 px-3 overflow-hidden">
                   <div className="flex flex-col gap-1">
                     <span className="text-sm font-grotesk font-semibold text-ink truncate">
-                      {card.name}
+                      {cardDisplayName(card)}
                     </span>
+                    {officialName ? (
+                      <span className="truncate text-[11px] font-grotesk font-medium text-ink-2">
+                        {officialName}
+                      </span>
+                    ) : null}
                     <div className="flex items-center gap-1.5">
                       {card.sets?.code && (
                         <span className="text-[9px] font-mono-2 font-semibold text-ink-2 bg-bg-3 px-1.5 py-0.5 rounded tracking-[0.04em]">

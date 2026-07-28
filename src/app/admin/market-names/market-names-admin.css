@@ -1,0 +1,144 @@
+.market-name-review-list {
+  display: grid;
+  gap: 18px;
+}
+.market-name-review-card {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.85fr) minmax(320px, 1fr) minmax(300px, 0.9fr);
+  gap: 24px;
+  padding: 22px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+}
+
+.market-name-review-identity {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 18px;
+}
+
+.market-name-review-image {
+  width: 112px;
+  aspect-ratio: 5 / 7;
+  overflow: hidden;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-sm);
+  background: var(--bg-3);
+}
+
+.market-name-review-editor,
+.market-name-review-evidence {
+  min-width: 0;
+}
+
+.market-name-alias-input {
+  width: 100%;
+  resize: vertical;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  padding: 12px 14px;
+  color: var(--ink);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  outline: none;
+}
+
+.market-name-alias-input:focus {
+  box-shadow: 0 0 0 3px rgba(255, 73, 54, 0.14);
+}
+
+.market-name-confidence,
+.market-name-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 23px;
+  border-radius: var(--r-pill);
+  padding: 3px 9px;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.market-name-confidence.is-high,
+.market-name-confidence.is-medium_high {
+  background: #DCF1E6;
+  color: var(--gain-2);
+}
+
+.market-name-confidence.is-medium,
+.market-name-confidence.is-research_required {
+  background: #FFF0C9;
+  color: #8C5300;
+}
+
+.market-name-status {
+  border: 1px solid currentColor;
+  color: var(--ink-2);
+}
+
+.market-name-status.is-approved { color: var(--gain-2); }
+.market-name-status.is-rejected { color: var(--coral); }
+
+.market-name-source {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid rgba(29, 20, 12, 0.18);
+  border-radius: var(--r-sm);
+  padding: 11px 12px;
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color 0.13s ease, background 0.13s ease;
+}
+
+.market-name-source:hover {
+  border-color: var(--coral);
+  background: var(--bg-3);
+}
+
+.market-name-source span {
+  color: var(--coral-text);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.market-name-source strong {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.market-name-source small {
+  color: var(--ink-2);
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+@media (max-width: 1180px) {
+  .market-name-review-card {
+    grid-template-columns: minmax(300px, 0.85fr) minmax(320px, 1fr);
+  }
+
+  .market-name-review-evidence {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .market-name-review-card {
+    grid-template-columns: 1fr;
+  }
+
+  .market-name-review-evidence {
+    grid-column: auto;
+  }
+}

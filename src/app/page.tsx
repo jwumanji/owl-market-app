@@ -75,7 +75,7 @@ async function fetchTopCards(): Promise<TeaserCard[]> {
         .select(
           `market_avg, chg_1d,
            cards!price_stats_card_game_fk!inner (
-             id, card_image_id, card_number, name, rarity, image_url, image_url_small, image_url_preview,
+             id, card_image_id, card_number, name, market_name, rarity, image_url, image_url_small, image_url_preview,
              sets!cards_set_game_fk (code, name)
            )`,
         )
@@ -96,6 +96,7 @@ async function fetchTopCards(): Promise<TeaserCard[]> {
             id: row.id as string,
             card_image_id: (row.card_image_id as string | null) ?? null,
             name: row.name as string,
+            market_name: (row.market_name as string | null) ?? null,
             rarity: (row.rarity as string | null) ?? null,
             image_url: (row.image_url as string | null) ?? null,
             image_url_small: (row.image_url_small as string | null) ?? null,

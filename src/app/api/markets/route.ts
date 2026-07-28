@@ -48,6 +48,7 @@ export async function GET(request: Request) {
         card_image_id,
         card_number,
         name,
+        market_name,
         name_base,
         variant_label,
         rarity,
@@ -57,6 +58,7 @@ export async function GET(request: Request) {
         image_url,
         image_url_small,
         image_url_preview,
+        card_market_aliases!card_market_aliases_card_game_fk (alias),
         sets!cards_set_game_fk (
           id,
           slug,

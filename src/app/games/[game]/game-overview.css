@@ -369,6 +369,15 @@
   color: var(--coral);
 }
 
+.game-card-row small {
+  overflow: hidden;
+  color: var(--ink-2);
+  font-size: 10px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .game-overview-error {
   margin-top: 36px;
   padding: 24px;
