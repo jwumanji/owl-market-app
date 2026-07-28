@@ -44,3 +44,22 @@ its initial bundle.**
 
 Fast-connection users are barely affected (fonts ~100ms); this is the
 throttled-mobile cold tail the standing PSI rule targets.
+
+## Post-fix measurements (2026-07-28, dpl_EdALBDTAdFzW1NmdC6V4kKnBrK8S)
+
+| Page | Before | After | LCP element |
+|---|---|---|---|
+| Detail (OP09) | 87 · LCP 3.5s · renderDelay 2151ms | **97 · LCP 2.5s · renderDelay 272ms** | unchanged — hero box art |
+| Dashboard | 94 · LCP 2.6s · renderDelay 2244ms | **94 · LCP 2.6s · renderDelay 2451ms** | unchanged — text node |
+
+**Cause 2 (chart hydration contention): CONFIRMED and fixed** — the dynamic
+split removed 87% of the detail page's render delay; TBT 100→40ms.
+
+**Cause 1 (mono swap re-fire) for the dashboard: FALSIFIED by the experiment.**
+With `display: optional` there is no swap, yet the dashboard's text LCP still
+paints ~2.4s in. The remaining cause is main-thread render scheduling — the
+dashboard's grid client bundle hydrating under 4× CPU throttle — not fonts.
+The font change stays (it removes the swap-re-fire class globally and cost
+nothing: score held at 94), but the dashboard needs its own profiling pass
+(trace-based node identification, possibly a bundle split of the grid) if the
+2.6s is worth chasing. Not pursued — diagnosis boundary respected.
