@@ -10,7 +10,9 @@ Everything here was learned the hard way — most entries exist because an assum
 
 **`main` is not trunk, and not production.** Production is deployed by CLI from `codex/*` branches. `main` has been days-to-weeks behind. Recon performed against `main` will report a stale migration head and non-existent tables as greenfield. Always check what production actually runs before writing a spec.
 
-**Production deploys via `vercel --prod` from local working trees.** Not git. There is no reproducible relationship between a git ref and what's running. A git-triggered deploy is therefore an *unannounced revert of unknown scope* — this has caused at least two incidents (07-19, 07-25).
+**Two Vercel projects exist and the names are crossed.** The project named `owl-market-app` is an **empty shell** — zero env vars, serves `owl-market-app-lime.vercel.app`, nobody's URL. The project named **`moon-market-app` is real production**, serving `owl-market-app.vercel.app`. **A working tree may be linked (`.vercel/project.json`) to the wrong one by default** — `vercel --prod` from this repo deployed to the shell on 2026-07-28 believing it was production. Check the link before any deploy.
+
+**Production deploys via `vercel --prod` from local working trees.** Not git. There is no reproducible relationship between a git ref and what's running. A git-triggered deploy is therefore an *unannounced revert of unknown scope* — this has caused at least two incidents (07-19, 07-25). *(Correction 2026-07-28: production on `moon-market-app` is currently a **git deploy from `codex/promo-pricing-live`** — Codex has moved to git-triggered deploys from codex branches; the guard below still cancels `main` only. Verify the serving deployment's source rather than assuming either mechanism.)*
 
 A guard is in place in Vercel project settings:
 ```sh
@@ -39,7 +41,7 @@ Root numbering collided historically — two each of v14, v22, v24, v25, v34, v4
 
 **`supabase db push` runs from a machine that is not in this repo's history.** The newest tracked version, `20260726110000`, exists in no branch — it created `public.articles`, which no ref references in SQL or TypeScript. Schema changes reach production with no corresponding commit.
 
-**The same machine deploys application code, not just migrations.** Neither the file list nor the branch list is a record of what production runs — `/games/one-piece/news` and its detail route are live and exist in none of the 81 remote refs. Grepping the repo answers *"does anything in git use this"*; for production, probe the deployed site. A local `npm run build` passing says nothing about routes the repo lacks. See `docs/investigations/codex-coordination.md`.
+**The same machine deploys application code, not just migrations.** Neither the file list nor the branch list is a record of what production runs — `/games/one-piece/news` and its detail route were live while existing in none of the then-81 remote refs. *(Update 2026-07-28: News now exists in git — `origin/codex/promo-pricing-live` and siblings, pushed later. The lesson stands: refs appear after the fact; probe the deployed site.)* Grepping the repo answers *"does anything in git use this"*; for production, probe the deployed site. A local `npm run build` passing says nothing about routes the repo lacks. See `docs/investigations/codex-coordination.md`.
 
 ### Before writing a migration
 
