@@ -11,7 +11,7 @@ import { RIFTBOUND_DB_SLUG } from "@/lib/games/registry";
 import { characterIndexMarketRanking } from "@/lib/market-characters";
 import { marketRarityRanking } from "@/lib/market-rarities";
 import { riftboundChampionSpotlights } from "@/lib/market-riftbound-dashboard";
-import { attachCasePrices, rankBoosterBoxesByPrice, rankSetsByTotalValue, tcgPlayerProductImageUrl } from "@/lib/market-sealed";
+import { attachCasePrices, currentCardMarketPrice, rankBoosterBoxesByPrice, rankSetsByTotalValue, tcgPlayerProductImageUrl } from "@/lib/market-sealed";
 import {
   DEFAULT_PUBLIC_GAME_ROUTE_SLUG,
   publicOnlyForCatalogPreview,
@@ -39,6 +39,7 @@ export const metadata = {
 
 type PriceChangeStats = {
   market_avg: number | null;
+  tcg_market: number | null;
   chg_1d: number | null;
   chg_7d: number | null;
   chg_30d: number | null;
@@ -152,7 +153,7 @@ function buildRiftboundSetValueRankings(input: SetValueInput): SealedRankItem[] 
   for (const card of input.cards) {
     if (!card.set_id) continue;
     const stats = firstRelation(card.price_stats);
-    if (stats?.market_avg == null || stats.market_avg <= 0) continue;
+    if (currentCardMarketPrice(stats) <= 0) continue;
     const cards = pricedCardsBySetId.get(card.set_id) ?? [];
     cards.push(card);
     pricedCardsBySetId.set(card.set_id, cards);
@@ -167,7 +168,7 @@ function buildRiftboundSetValueRankings(input: SetValueInput): SealedRankItem[] 
     const sourceSet = providerSetId ? sourceSetByExternalId.get(providerSetId) : null;
     const stagedValue = Number(sourceSet?.set_value_usd);
     const calculatedValue = cards.reduce(
-      (total, card) => total + (firstRelation(card.price_stats)?.market_avg ?? 0),
+      (total, card) => total + currentCardMarketPrice(firstRelation(card.price_stats)),
       0,
     );
     const totalSetValue = Number.isFinite(stagedValue) && stagedValue > 0
@@ -175,8 +176,8 @@ function buildRiftboundSetValueRankings(input: SetValueInput): SealedRankItem[] 
       : calculatedValue;
     const topCard = [...cards].sort(
       (left, right) =>
-        (firstRelation(right.price_stats)?.market_avg ?? 0)
-        - (firstRelation(left.price_stats)?.market_avg ?? 0),
+        currentCardMarketPrice(firstRelation(right.price_stats))
+        - currentCardMarketPrice(firstRelation(left.price_stats)),
     )[0];
 
     const weightedChange = (field: "chg_1d" | "chg_7d" | "chg_30d") => {
@@ -184,9 +185,10 @@ function buildRiftboundSetValueRankings(input: SetValueInput): SealedRankItem[] 
       let weight = 0;
       for (const card of cards) {
         const stats = firstRelation(card.price_stats);
-        if (stats?.market_avg == null || stats[field] == null) continue;
-        weighted += stats.market_avg * stats[field];
-        weight += stats.market_avg;
+        const currentPrice = currentCardMarketPrice(stats);
+        if (currentPrice <= 0 || stats?.[field] == null) continue;
+        weighted += currentPrice * stats[field];
+        weight += currentPrice;
       }
       return weight > 0 ? +(weighted / weight).toFixed(1) : null;
     };
@@ -427,7 +429,7 @@ async function renderMarketsPageContent({
               .from("cards")
               .select(`
                 set_id, image_url, image_url_small, image_url_preview, tcg_product_id,
-                price_stats!price_stats_card_game_fk!inner (market_avg, chg_1d, chg_7d, chg_30d)
+                price_stats!price_stats_card_game_fk!inner (tcg_market, market_avg, chg_1d, chg_7d, chg_30d)
               `)
               .eq("game_id", game.id)
               .eq("region", "en")

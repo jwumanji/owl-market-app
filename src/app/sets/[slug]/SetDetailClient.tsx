@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { lazy, Suspense, useMemo, useState } from "react";
 import { gamePath } from "@/lib/game-routes";
 import FastCardImage from "@/components/ui/FastCardImage";
-import { hasSetPricing, type CatalogSetCard, type SetData, type TopCard } from "../sets-data";
+import { hasSetChartData, hasSetPricing, type CatalogSetCard, type SetData, type TopCard } from "../sets-data";
 import { getSetImageFile } from "../set-images";
 
 // chart.js only loads when the chart actually renders (L1) — keeps ~65kB
@@ -151,7 +151,10 @@ export default function SetDetailClient({
     ["--set-color-bd" as string]: hexToRgba(set.color, 0.32),
   } as React.CSSProperties), [set.color]);
 
-  const chartPoints = useMemo(() => generateChartData(set, range, chartSeed), [set, range, chartSeed]);
+  const chartPoints = useMemo(
+    () => hasSetChartData(set) ? generateChartData(set, range, chartSeed) : [],
+    [set, range, chartSeed],
+  );
 
   const boosters = allSets.filter((s) => (s.type ?? "") === "op");
   const mains = allSets.filter((s) => (s.type ?? "") === "main");
@@ -169,6 +172,7 @@ export default function SetDetailClient({
   const catalogCards = set.catalogCards ?? [];
   const cardCount = setCardCount(set);
   const hasPricing = hasSetPricing(set);
+  const chartReady = hasSetChartData(set);
   const deltaClass = set.chg30d == null || set.chg30d === 0 ? "flat" : set.chg30d > 0 ? "up" : "dn";
 
   const imgFile = getSetImageFile(set.slug);
@@ -368,6 +372,7 @@ export default function SetDetailClient({
                   type="button"
                   className={`setd-cc-time ${range === r ? "on" : ""}`}
                   onClick={() => changeRange(r)}
+                  disabled={!chartReady}
                 >
                   {r.toUpperCase()}
                 </button>
@@ -375,10 +380,12 @@ export default function SetDetailClient({
             </div>
           </div>
           <div className="setd-cc-chart">
-            {hasPricing ? (
+            {chartReady ? (
               <Suspense fallback={<div className="setd-cc-empty">Loading price history...</div>}>
                 <SetChart points={chartPoints} color={set.color} />
               </Suspense>
+            ) : sealedMarket ? (
+              <div className="setd-cc-empty">Sealed price history is building.</div>
             ) : (
               <div className="setd-cc-empty">No price history yet for this set.</div>
             )}

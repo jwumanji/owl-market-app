@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 // @ts-ignore -- Node's native TypeScript test runner requires the explicit extension.
-import { attachCasePrices, rankBoosterBoxesByPrice, rankBoosterBoxesByTotalSetValue, rankSetsByTotalValue, representativeSealedImageBySet, sealedValueMultiple, tcgPlayerProductImageUrl } from "../src/lib/market-sealed.ts";
+import { attachCasePrices, currentCardMarketPrice, rankBoosterBoxesByPrice, rankBoosterBoxesByTotalSetValue, rankSetsByTotalValue, representativeSealedImageBySet, sealedValueMultiple, tcgPlayerProductImageUrl } from "../src/lib/market-sealed.ts";
 
 const candidate = (
   name: string,
@@ -72,6 +72,12 @@ test("set values are ranked even when sealed products are unavailable", () => {
   ], 2);
 
   assert.deepEqual(ranked.map((item) => item.name), ["Origins", "Spiritforged"]);
+});
+
+test("current card market price prefers TCG market over the 30-day average", () => {
+  assert.equal(currentCardMarketPrice({ tcg_market: 125, market_avg: 100 }), 125);
+  assert.equal(currentCardMarketPrice({ tcg_market: null, market_avg: 100 }), 100);
+  assert.equal(currentCardMarketPrice(null), 0);
 });
 
 test("sealed value multiple is total set value divided by booster box price", () => {

@@ -4,7 +4,7 @@ import test from "node:test";
 // @ts-ignore -- Node's native TypeScript test runner requires explicit extensions.
 import { PROMO_COLLECTION_CATALOG, promoCollectionSets } from "../src/app/sets/promo-collections.ts";
 // @ts-ignore -- Node's native TypeScript test runner requires explicit extensions.
-import { hasLiveSetPricing, hasSetPricing } from "../src/app/sets/sets-data.ts";
+import { hasLiveSetPricing, hasSetChartData, hasSetPricing } from "../src/app/sets/sets-data.ts";
 // @ts-ignore -- Node's native TypeScript test runner requires explicit extensions.
 import { fetchTcgCsvPromoProducts } from "../src/lib/tcgcsv-promo-products.ts";
 
@@ -78,6 +78,7 @@ test("priced promo rows use sealed-market semantics", () => {
   assert.equal(row?.cardsTotal, 1);
   assert.equal(row?.perf.d7, "+4.5%");
   assert.equal(row ? hasLiveSetPricing(row) : null, true);
+  assert.equal(row ? hasSetChartData(row) : null, false);
 });
 
 test("priced preorders remain coming soon until release", () => {
@@ -96,4 +97,5 @@ test("priced preorders remain coming soon until release", () => {
   assert.equal(row?.comingSoon, true);
   assert.equal(row ? hasSetPricing(row) : null, true);
   assert.equal(row ? hasLiveSetPricing(row) : null, false);
+  assert.equal(row ? hasSetChartData(row) : null, false);
 });

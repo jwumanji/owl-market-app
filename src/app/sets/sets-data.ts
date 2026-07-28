@@ -38,6 +38,10 @@ export function hasSetPricing(set: SetData) {
   return set.pricingStatus !== "catalog_only" && set.cards > 0;
 }
 
+export function hasSetChartData(set: SetData) {
+  return set.pricingStatus !== "sealed_market" && hasSetPricing(set);
+}
+
 export function hasLiveSetPricing(set: SetData) {
   return !set.comingSoon && hasSetPricing(set);
 }
