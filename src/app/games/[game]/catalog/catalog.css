@@ -294,6 +294,21 @@
   color: var(--coral);
 }
 
+.catalog-card-name strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.catalog-card-name small {
+  overflow: hidden;
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .catalog-card-detail-hero {
   display: grid;
   grid-template-columns: 190px minmax(0, 1fr);
@@ -338,6 +353,13 @@
   font-weight: 700;
   letter-spacing: 0;
   color: var(--ink);
+}
+
+.catalog-card-detail-hero .catalog-card-official-name {
+  margin-top: 8px;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .catalog-card-detail-hero p {

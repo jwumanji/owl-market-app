@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import ArticleCard from "@/components/articles/ArticleCard";
 import type { ArticleSummary } from "@/lib/articles";
+import { cardDisplayName, cardOfficialIdentity } from "@/lib/card-market-names";
 import { gamePath } from "@/lib/game-routes";
 import { ONE_PIECE_ROUTE_SLUG } from "@/lib/games/one-piece";
 import { RIFTBOUND_ROUTE_SLUG } from "@/lib/games/registry";
@@ -384,6 +385,8 @@ function TrendRow({
   window: MarketWindow;
   gameRouteSlug?: string | null;
 }) {
+  const displayName = cardDisplayName(card);
+  const officialName = cardOfficialIdentity(card);
   return (
     <Link
       href={gamePath(gameRouteSlug, `/card/${card.card_image_id}`)}
@@ -392,14 +395,14 @@ function TrendRow({
     >
       <span className="qd-trend-rank">{rank}</span>
       <TrendThumbnail
-        alt={card.name}
+        alt={displayName}
         imageUrl={card.image_url}
         imageUrlPreview={card.image_url_preview}
         imageUrlSmall={card.image_url_small}
       />
       <span className="qd-trend-name">
-        {card.name}
-        <span>{card.card_number ?? card.set_code}</span>
+        {displayName}
+        <span>{[officialName, card.card_number ?? card.set_code].filter(Boolean).join(" · ")}</span>
       </span>
       <span className="qd-trend-price">{formatPrice(card.market_avg)}</span>
       <DeltaChip value={card.changes[window]} />
@@ -527,7 +530,7 @@ function CardImage({ card, eager = false }: { card: DashboardCard; eager?: boole
   return (
     <div className="qd-market-image tall">
       <MarketCardImage
-        alt={card.name}
+        alt={cardDisplayName(card)}
         className="qd-image"
         fallbackTimeoutMs={0}
         fetchPriority={eager ? "high" : "low"}
@@ -566,10 +569,13 @@ function TopCardsSection({ data, gameRouteSlug }: { data: DashboardData; gameRou
           >
             <div className="qd-card-head">
               <span className="qd-rank">#{index + 1}</span>
-              <span className="qd-card-name">{card.name}</span>
+              <span className="qd-card-name">{cardDisplayName(card)}</span>
             </div>
             <CardImage card={card} eager={index < 2} />
-            <div className="qd-card-id">{card.card_number ?? card.set_code ?? "—"}</div>
+            <div className="qd-card-id">
+              {cardOfficialIdentity(card) ? <span className="qd-card-official">{card.name}</span> : null}
+              <span>{card.card_number ?? card.set_code ?? "—"}</span>
+            </div>
             <div className="qd-stats">
               <div className="qd-stat">
                 <span>Market value</span>

@@ -13,6 +13,7 @@ import {
   catalogCardType,
 } from "@/lib/catalog-card-fields";
 import { catalogPageDescription } from "@/lib/game-catalog-copy";
+import { normalizeMarketAlias } from "@/lib/card-market-names";
 import { cachedPublicData, publicDataCacheKey } from "@/lib/public-data-cache";
 import { LORCANA_DB_SLUG } from "@/lib/games/lorcana";
 import { RIFTBOUND_CARD_TYPES, RIFTBOUND_DOMAINS } from "@/lib/games/riftbound-catalog";
@@ -61,6 +62,7 @@ type CardRow = {
   card_image_id: string | null;
   card_number: string | null;
   name: string;
+  market_name: string | null;
   rarity: string | null;
   variant_label: string | null;
   variant_id: string | null;
@@ -179,6 +181,19 @@ async function loadCatalogUncached(gameRouteSlug: string, searchParams: CatalogS
       ? (searchParams.franchise ?? "").trim().slice(0, 100) || null
       : null;
     const query = cleanSearch(searchParams.q);
+    let aliasWarning: string | null = null;
+    let aliasCardIds: string[] = [];
+    const normalizedAliasQuery = normalizeMarketAlias(query);
+    if (normalizedAliasQuery.length >= 2) {
+      const aliasResult = await supabase
+        .from("card_market_aliases")
+        .select("card_id")
+        .eq("game_id", game.id)
+        .ilike("normalized_alias", `%${normalizedAliasQuery}%`)
+        .limit(200);
+      if (aliasResult.error) aliasWarning = `market aliases: ${aliasResult.error.message}`;
+      else aliasCardIds = Array.from(new Set((aliasResult.data ?? []).map((row) => row.card_id)));
+    }
     const currentPage = pageIndex(searchParams.page);
     const from = currentPage * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
@@ -199,6 +214,7 @@ async function loadCatalogUncached(gameRouteSlug: string, searchParams: CatalogS
         card_image_id,
         card_number,
         name,
+        market_name,
         rarity,
         variant_label,
         variant_id,
@@ -219,7 +235,11 @@ async function loadCatalogUncached(gameRouteSlug: string, searchParams: CatalogS
     if (selectedDomain) cardsQuery = cardsQuery.contains("color", [selectedDomain]);
     if (selectedType) cardsQuery = cardsQuery.eq("card_type", selectedType);
     if (selectedFranchise) cardsQuery = cardsQuery.eq("attribute", selectedFranchise);
-    if (query) cardsQuery = cardsQuery.or(`name.ilike.%${query}%,card_number.ilike.%${query}%`);
+    if (query) {
+      const filters = [`name.ilike.%${query}%`, `market_name.ilike.%${query}%`, `card_number.ilike.%${query}%`];
+      if (aliasCardIds.length > 0) filters.push(`id.in.(${aliasCardIds.join(",")})`);
+      cardsQuery = cardsQuery.or(filters.join(","));
+    }
 
     const cardsRes = await cardsQuery
       .order("card_number", { ascending: true })
@@ -230,6 +250,7 @@ async function loadCatalogUncached(gameRouteSlug: string, searchParams: CatalogS
     const warnings = [
       raritiesRes.error ? `rarities: ${raritiesRes.error.message}` : null,
       variantsRes.error ? `variants: ${variantsRes.error.message}` : null,
+      aliasWarning,
     ].filter(Boolean);
 
     return {
@@ -433,7 +454,8 @@ export default async function GameCatalogPage(
               <Link className="catalog-row" key={card.id} href={gamePath(data.game.routeSlug, `/catalog/${card.id}`)}>
                 <span className="catalog-card-name">
                   <b>{card.card_number ?? card.card_image_id ?? "No number"}</b>
-                  {card.name}
+                  <strong>{card.market_name ?? card.name}</strong>
+                  {card.market_name ? <small>{card.name}</small> : null}
                 </span>
                 <span>{set?.code ?? "No set"}</span>
                 <span>{card.rarity ?? "Unknown"}</span>

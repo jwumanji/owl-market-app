@@ -22,6 +22,7 @@ export interface CardRow {
   card_image_id: string;
   card_number: string | null;
   name: string;
+  market_name?: string | null;
   name_base: string | null;
   variant_label: string | null;
   rarity: string | null;
@@ -34,6 +35,7 @@ export interface CardRow {
   image_url_preview?: string | null;
   price_stats: PriceStats | null;
   sets: SetInfo | null;
+  card_market_aliases?: Array<{ alias: string }>;
 }
 
 export type Rarity = "C" | "UC" | "R" | "SR" | "SEC" | "L" | "SP" | "MR" | "TR" | "AA";
@@ -51,6 +53,7 @@ export interface DashboardCard {
   card_image_id: string;
   card_number: string | null;
   name: string;
+  market_name?: string | null;
   rarity: string | null;
   image_url: string | null;
   image_url_small: string | null;

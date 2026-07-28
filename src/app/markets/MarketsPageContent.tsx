@@ -104,7 +104,7 @@ type ExternalProductIdRow = {
 const DASHBOARD_PRICE_CARD_SELECT = `
   market_avg, chg_1d, chg_7d, chg_30d,
   cards!price_stats_card_game_fk!inner (
-    id, card_image_id, card_number, name, rarity,
+    id, card_image_id, card_number, name, market_name, rarity,
     image_url, image_url_small, image_url_preview,
     sets!cards_set_game_fk (code)
   )
@@ -123,6 +123,7 @@ function toDashboardCard(row: Record<string, unknown>): DashboardCard {
     card_image_id: row.card_image_id as string,
     card_number: (row.card_number as string | null) ?? null,
     name: row.name as string,
+    market_name: (row.market_name as string | null) ?? null,
     rarity: (row.rarity as string | null) ?? null,
     image_url: (row.image_url as string | null) ?? null,
     image_url_small: (row.image_url_small as string | null) ?? null,
