@@ -10,6 +10,16 @@ type ValuedBoosterBoxCandidate = BoosterBoxCandidate & {
   total_set_value: number;
 };
 
+type SetValueCandidate = {
+  name: string;
+  total_set_value: number;
+};
+
+type CardMarketPriceCandidate = {
+  tcg_market: number | null;
+  market_avg: number | null;
+};
+
 type SealedImageCandidate = {
   set_id: string | null;
   product_type: string | null;
@@ -117,6 +127,22 @@ export function rankBoosterBoxesByTotalSetValue<T extends ValuedBoosterBoxCandid
       return true;
     })
     .slice(0, limit);
+}
+
+export function rankSetsByTotalValue<T extends SetValueCandidate>(
+  items: T[],
+  limit = 5,
+) {
+  return [...items]
+    .filter((item) => Number.isFinite(item.total_set_value) && item.total_set_value > 0)
+    .sort((a, b) => b.total_set_value - a.total_set_value || a.name.localeCompare(b.name))
+    .slice(0, limit);
+}
+
+export function currentCardMarketPrice(
+  stats: CardMarketPriceCandidate | null | undefined,
+) {
+  return stats?.tcg_market ?? stats?.market_avg ?? 0;
 }
 
 export function sealedValueMultiple(

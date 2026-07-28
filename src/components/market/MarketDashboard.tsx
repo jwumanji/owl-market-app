@@ -10,7 +10,7 @@ import { ONE_PIECE_ROUTE_SLUG } from "@/lib/games/one-piece";
 import { RIFTBOUND_ROUTE_SLUG } from "@/lib/games/registry";
 import {
   rankBoosterBoxesByPrice,
-  rankBoosterBoxesByTotalSetValue,
+  rankSetsByTotalValue,
   sealedValueMultiple,
 } from "@/lib/market-sealed";
 import type {
@@ -610,10 +610,12 @@ function SetImage({ item }: { item: SealedRankItem }) {
 function SetsSection({ data, gameRouteSlug }: { data: DashboardData; gameRouteSlug?: string | null }) {
   const [window, setWindow] = useState<MarketWindow>("30D");
   const [rankingMode, setRankingMode] = useState<SetRankingMode>("booster_box");
-  const allSets = data.sealedBoxes[window] ?? [];
+  const rankingData = rankingMode === "tsv" ? data.setValues : data.sealedBoxes;
+  const allSets = rankingData[window] ?? [];
   const sets = rankingMode === "tsv"
-    ? rankBoosterBoxesByTotalSetValue(allSets, 5)
+    ? rankSetsByTotalValue(allSets, 5)
     : rankBoosterBoxesByPrice(allSets, 5);
+  const isStandaloneTsv = rankingMode === "tsv" && gameRouteSlug === RIFTBOUND_ROUTE_SLUG;
 
   return (
     <section className="qd-section" aria-labelledby="quickdash-sets">
@@ -622,14 +624,18 @@ function SetsSection({ data, gameRouteSlug }: { data: DashboardData; gameRouteSl
         title="Box"
         emphasis="sets"
         titleAddon={<SetRankingToggle value={rankingMode} onChange={setRankingMode} />}
-        selector={<WindowSelector data={data.sealedBoxes} value={window} onChange={setWindow} label="Box sets" />}
+        selector={<WindowSelector data={rankingData} value={window} onChange={setWindow} label="Box sets" />}
       />
       <h2 id="quickdash-sets" className="sr-only">Box sets</h2>
       <div className="qd-card-grid">
         {sets.length === 0 ? (
           <div className="qd-section-empty">
-            <strong>Sealed pricing is coming online.</strong>
-            <span>Explore the set library while booster box coverage fills in.</span>
+            <strong>{rankingMode === "tsv" ? "Set values are coming online." : "Sealed pricing is coming online."}</strong>
+            <span>
+              {rankingMode === "tsv"
+                ? "Explore the set library while card pricing coverage fills in."
+                : "Explore the set library while booster box coverage fills in."}
+            </span>
           </div>
         ) : sets.map((item, index) => {
           const valueMultiple = sealedValueMultiple(item.total_set_value, item.market_avg);
@@ -650,22 +656,37 @@ function SetsSection({ data, gameRouteSlug }: { data: DashboardData; gameRouteSl
               </div>
               <SetImage item={item} />
               <div className="qd-stats qd-stats-wide">
-                <div className="qd-stat">
-                  <span>Booster box</span>
-                  <strong>{formatPrice(item.market_avg)}</strong>
-                </div>
-                <div className="qd-stat">
-                  <span>Case price</span>
-                  <b>{formatPrice(item.case_market_avg)}</b>
-                </div>
-                <div className="qd-stat">
-                  <span>Total set value</span>
-                  <b>{formatPrice(item.total_set_value)}</b>
-                </div>
-                <div className="qd-value-formula" title={valueFormula} aria-label={valueFormula}>
-                  <span>TSV ÷ box</span>
-                  <b>{valueMultiple == null ? "—" : `= ${valueMultiple.toFixed(1)}×`}</b>
-                </div>
+                {isStandaloneTsv ? (
+                  <>
+                    <div className="qd-stat">
+                      <span>Total set value</span>
+                      <strong>{formatPrice(item.total_set_value)}</strong>
+                    </div>
+                    <div className="qd-stat">
+                      <span>Cards tracked</span>
+                      <b>{item.card_count?.toLocaleString() ?? "—"}</b>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="qd-stat">
+                      <span>Booster box</span>
+                      <strong>{formatPrice(item.market_avg)}</strong>
+                    </div>
+                    <div className="qd-stat">
+                      <span>Case price</span>
+                      <b>{formatPrice(item.case_market_avg)}</b>
+                    </div>
+                    <div className="qd-stat">
+                      <span>Total set value</span>
+                      <b>{formatPrice(item.total_set_value)}</b>
+                    </div>
+                    <div className="qd-value-formula" title={valueFormula} aria-label={valueFormula}>
+                      <span>TSV ÷ box</span>
+                      <b>{valueMultiple == null ? "—" : `= ${valueMultiple.toFixed(1)}×`}</b>
+                    </div>
+                  </>
+                )}
                 <div className="qd-stat">
                   <span>{window}</span>
                   <DeltaChip value={item.changes[window]} />

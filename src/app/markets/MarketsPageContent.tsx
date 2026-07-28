@@ -11,7 +11,7 @@ import { RIFTBOUND_DB_SLUG } from "@/lib/games/registry";
 import { characterIndexMarketRanking } from "@/lib/market-characters";
 import { marketRarityRanking } from "@/lib/market-rarities";
 import { riftboundChampionSpotlights } from "@/lib/market-riftbound-dashboard";
-import { attachCasePrices, rankBoosterBoxesByPrice, tcgPlayerProductImageUrl } from "@/lib/market-sealed";
+import { attachCasePrices, currentCardMarketPrice, rankBoosterBoxesByPrice, rankSetsByTotalValue, tcgPlayerProductImageUrl } from "@/lib/market-sealed";
 import {
   DEFAULT_PUBLIC_GAME_ROUTE_SLUG,
   publicOnlyForCatalogPreview,
@@ -39,6 +39,7 @@ export const metadata = {
 
 type PriceChangeStats = {
   market_avg: number | null;
+  tcg_market: number | null;
   chg_1d: number | null;
   chg_7d: number | null;
   chg_30d: number | null;
@@ -49,6 +50,28 @@ type SetRelation = {
   slug?: string | null;
   code?: string | null;
   name?: string | null;
+};
+
+type SetValueInput = {
+  sets: Array<{
+    id: string;
+    slug: string;
+    code: string | null;
+    name: string;
+    card_count: number | null;
+    set_type_id: string | null;
+  }>;
+  setTypes: Array<{ id: string; code: string | null }>;
+  mappings: Array<{ set_id: string; external_id: string }>;
+  sources: Array<{ external_id: string; payload: Record<string, unknown> | null }>;
+  cards: Array<{
+    set_id: string | null;
+    image_url: string | null;
+    image_url_small: string | null;
+    image_url_preview: string | null;
+    tcg_product_id: string | null;
+    price_stats: PriceChangeStats | PriceChangeStats[] | null;
+  }>;
 };
 
 type EbaySaleCardRelation = {
@@ -119,6 +142,84 @@ function mapDashboardCards(data: unknown) {
     .map(flattenPriceStatsCardRow)
     .filter((row): row is Record<string, unknown> => row != null)
     .map(toDashboardCard);
+}
+
+function buildRiftboundSetValueRankings(input: SetValueInput): SealedRankItem[] {
+  const setTypeCodeById = new Map(input.setTypes.map((row) => [row.id, row.code]));
+  const providerSetIdBySetId = new Map(input.mappings.map((row) => [row.set_id, row.external_id]));
+  const sourceSetByExternalId = new Map(input.sources.map((row) => [row.external_id, row.payload]));
+  const pricedCardsBySetId = new Map<string, SetValueInput["cards"]>();
+
+  for (const card of input.cards) {
+    if (!card.set_id) continue;
+    const stats = firstRelation(card.price_stats);
+    if (currentCardMarketPrice(stats) <= 0) continue;
+    const cards = pricedCardsBySetId.get(card.set_id) ?? [];
+    cards.push(card);
+    pricedCardsBySetId.set(card.set_id, cards);
+  }
+
+  return rankSetsByTotalValue(input.sets.flatMap((set): SealedRankItem[] => {
+    const setTypeCode = set.set_type_id ? setTypeCodeById.get(set.set_type_id) : null;
+    if (!setTypeCode || !["MAIN_SET", "PROVING_GROUNDS"].includes(setTypeCode)) return [];
+
+    const cards = pricedCardsBySetId.get(set.id) ?? [];
+    const providerSetId = providerSetIdBySetId.get(set.id);
+    const sourceSet = providerSetId ? sourceSetByExternalId.get(providerSetId) : null;
+    const stagedValue = Number(sourceSet?.set_value_usd);
+    const calculatedValue = cards.reduce(
+      (total, card) => total + currentCardMarketPrice(firstRelation(card.price_stats)),
+      0,
+    );
+    const totalSetValue = Number.isFinite(stagedValue) && stagedValue > 0
+      ? stagedValue
+      : calculatedValue;
+    const topCard = [...cards].sort(
+      (left, right) =>
+        currentCardMarketPrice(firstRelation(right.price_stats))
+        - currentCardMarketPrice(firstRelation(left.price_stats)),
+    )[0];
+
+    const weightedChange = (field: "chg_1d" | "chg_7d" | "chg_30d") => {
+      let weighted = 0;
+      let weight = 0;
+      for (const card of cards) {
+        const stats = firstRelation(card.price_stats);
+        const currentPrice = currentCardMarketPrice(stats);
+        if (currentPrice <= 0 || stats?.[field] == null) continue;
+        weighted += currentPrice * stats[field];
+        weight += currentPrice;
+      }
+      return weight > 0 ? +(weighted / weight).toFixed(1) : null;
+    };
+
+    const setImageUrl = getSetImageUrl(set.slug);
+    const topCardImageUrl = topCard
+      ? topCard.image_url_preview
+        ?? topCard.image_url_small
+        ?? topCard.image_url
+        ?? tcgPlayerProductImageUrl(topCard.tcg_product_id)
+      : null;
+
+    return [{
+      set_id: set.id,
+      set_slug: set.slug,
+      name: set.name,
+      set_code: set.code,
+      product_type: null,
+      market_avg: null,
+      case_market_avg: null,
+      total_set_value: +totalSetValue.toFixed(2),
+      card_count: Number(sourceSet?.cards_count ?? set.card_count ?? cards.length),
+      image_url: topCardImageUrl ?? setImageUrl,
+      image_url_fallback: setImageUrl,
+      changes: {
+        "1D": weightedChange("chg_1d"),
+        "7D": weightedChange("chg_7d"),
+        "30D": weightedChange("chg_30d"),
+      },
+    }];
+  }), 5);
 }
 
 function hydrateRiftboundCardImages(
@@ -193,6 +294,7 @@ async function renderMarketsPageContent({
     rarityIndex,
     characterIndex,
     sealedRes,
+    setValueRes,
     topEbaySalesRes,
     catalogCountRes,
     newsRes,
@@ -291,6 +393,63 @@ async function renderMarketsPageContent({
         .eq("game_id", game.id)
         .limit(1000)
     ),
+    game.slug === RIFTBOUND_DB_SLUG
+      ? cachedMarketData(publicDataCacheKey("markets-riftbound-set-values-v1", game.id), async () => {
+          const [setsResult, setTypesResult, mappingsResult, sourcesResult] = await Promise.all([
+            supabase
+              .from("sets")
+              .select("id,slug,code,name,card_count,set_type_id")
+              .eq("game_id", game.id),
+            supabase
+              .from("game_set_types")
+              .select("id,code")
+              .eq("game_id", game.id),
+            supabase
+              .from("set_external_ids")
+              .select("set_id,external_id")
+              .eq("game_id", game.id)
+              .eq("provider", "justtcg")
+              .eq("external_type", "set_id"),
+            supabase
+              .from("tcg_source_records")
+              .select("external_id,payload")
+              .eq("game_id", game.id)
+              .eq("provider", "justtcg")
+              .eq("record_type", "set"),
+          ]);
+
+          for (const result of [setsResult, setTypesResult, mappingsResult, sourcesResult]) {
+            if (result.error) throw new Error(result.error.message);
+          }
+
+          const cards: SetValueInput["cards"] = [];
+          const pageSize = 1000;
+          for (let from = 0; ; from += pageSize) {
+            const { data, error } = await supabase
+              .from("cards")
+              .select(`
+                set_id, image_url, image_url_small, image_url_preview, tcg_product_id,
+                price_stats!price_stats_card_game_fk!inner (tcg_market, market_avg, chg_1d, chg_7d, chg_30d)
+              `)
+              .eq("game_id", game.id)
+              .eq("region", "en")
+              .order("id")
+              .range(from, from + pageSize - 1);
+            if (error) throw new Error(error.message);
+            if (!data || data.length === 0) break;
+            cards.push(...data as unknown as SetValueInput["cards"]);
+            if (data.length < pageSize) break;
+          }
+
+          return buildRiftboundSetValueRankings({
+            sets: setsResult.data ?? [],
+            setTypes: setTypesResult.data ?? [],
+            mappings: mappingsResult.data ?? [],
+            sources: sourcesResult.data ?? [],
+            cards,
+          } as SetValueInput);
+        })
+      : Promise.resolve([] as SealedRankItem[]),
     cachedMarketData(publicDataCacheKey("markets-quickdash-v5", game.id, "top-ebay-sales-90d-en"), async () =>
       await supabase
         .from("ebay_sales")
@@ -534,6 +693,11 @@ async function renderMarketsPageContent({
       "1D": sealedWithValues,
       "7D": sealedWithValues,
       "30D": sealedWithValues,
+    },
+    setValues: {
+      "1D": game.slug === RIFTBOUND_DB_SLUG ? setValueRes : sealedWithValues,
+      "7D": game.slug === RIFTBOUND_DB_SLUG ? setValueRes : sealedWithValues,
+      "30D": game.slug === RIFTBOUND_DB_SLUG ? setValueRes : sealedWithValues,
     },
   };
 

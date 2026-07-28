@@ -33,6 +33,19 @@ export interface SetData {
   pricingUpdatedAt?: string | null;
 }
 
+export function hasSetPricing(set: SetData) {
+  if (set.pricingStatus === "sealed_market") return set.price > 0;
+  return set.pricingStatus !== "catalog_only" && set.cards > 0;
+}
+
+export function hasSetChartData(set: SetData) {
+  return set.pricingStatus !== "sealed_market" && hasSetPricing(set);
+}
+
+export function hasLiveSetPricing(set: SetData) {
+  return !set.comingSoon && hasSetPricing(set);
+}
+
 export interface CatalogSetCard {
   id: string;
   cardImageId?: string | null;

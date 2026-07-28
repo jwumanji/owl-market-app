@@ -94,6 +94,7 @@ export interface SealedRankItem {
   market_avg: number | null;
   case_market_avg: number | null;
   total_set_value: number;
+  card_count?: number | null;
   image_url: string | null;
   image_url_fallback: string | null;
   changes: MarketWindowPayload<number | null>;
@@ -124,4 +125,5 @@ export interface DashboardData {
   rarityRanking: MarketWindowPayload<RarityRankItem[]>;
   topCharacters: MarketWindowPayload<CharacterRankItem[]>;
   sealedBoxes: MarketWindowPayload<SealedRankItem[]>;
+  setValues: MarketWindowPayload<SealedRankItem[]>;
 }
