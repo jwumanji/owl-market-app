@@ -280,9 +280,25 @@ async function main() {
   if (!riftbound) launchGateIssues.push("Missing riftbound game row");
   if (!lorcana) launchGateIssues.push("Missing lorcana game row");
   if (onePiece && onePiece.is_active === false) launchGateIssues.push("one_piece is not active");
-  if (onePiece && onePiece.is_public === false) launchGateIssues.push("one_piece is not public");
   if (riftbound && riftbound.is_active === false) launchGateIssues.push("riftbound is not active");
-  if (riftbound && riftbound.is_public === false) launchGateIssues.push("riftbound is not public");
+
+  // Visibility is asserted as DRIFT against this tree's declared expectation,
+  // not as a per-game rule. Red here means games.is_public was flipped
+  // OUT-OF-BAND (see docs/investigations/codex-coordination.md — visibility is
+  // mutated directly in the live DB by the other workstream), never a standing
+  // disagreement to live with; a permanently-red audit stops being read.
+  // This map MIRRORS src/lib/games/registry.ts isPublic — update both together
+  // (the registry itself can't be imported here: "@/lib" path aliases don't
+  // resolve under plain node).
+  const EXPECTED_VISIBILITY = { one_piece: true, riftbound: true, lorcana: true };
+  for (const [slug, expected] of Object.entries(EXPECTED_VISIBILITY)) {
+    const row = gameBySlug.get(slug);
+    if (row && Boolean(row.is_public) !== expected) {
+      launchGateIssues.push(
+        `${slug} visibility drift: DB is_public=${row.is_public} but this tree declares ${expected} — out-of-band flip, reconcile with the other workstream`
+      );
+    }
+  }
   if (riftbound && riftbound.is_public !== false && !riftboundCatalogPreviewApproved) {
     launchGateIssues.push("riftbound is public without an approved catalog-preview and pricing gate");
   }
