@@ -126,20 +126,35 @@ export async function GET(request: Request) {
   const aliasMatches = findCardAliasMatches({ rawName: query, sourceType: "psa_import" }, aliasResult.aliases, 60).slice(0, 12);
   const aliasCardIds = Array.from(new Set(aliasMatches.map(({ alias }) => alias.card_id)));
   const marketAliasQuery = normalizeMarketAlias(query);
-  const marketAliasResult = marketAliasQuery.length >= 2
-    ? await supabase
+  let marketSearchMatches: Array<{ card_id: string; match_rank: number }> = [];
+  if (marketAliasQuery.length >= 2) {
+    const termSearchResult = await supabase.rpc("search_card_ids_by_terms", {
+      p_game_id: game.id,
+      p_query: query,
+      p_limit: 100,
+    });
+
+    if (!termSearchResult.error) {
+      marketSearchMatches = (termSearchResult.data ?? []) as Array<{ card_id: string; match_rank: number }>;
+    } else {
+      const fallbackResult = await supabase
         .from("card_market_aliases")
         .select("card_id")
         .eq("game_id", game.id)
         .ilike("normalized_alias", `%${marketAliasQuery}%`)
-        .limit(100)
-    : { data: [], error: null };
+        .limit(100);
 
-  if (marketAliasResult.error) {
-    return NextResponse.json({ error: marketAliasResult.error.message }, { status: 500 });
+      if (fallbackResult.error) {
+        return NextResponse.json({ error: termSearchResult.error.message }, { status: 500 });
+      }
+      marketSearchMatches = (fallbackResult.data ?? []).map((row) => ({
+        card_id: row.card_id,
+        match_rank: 240,
+      }));
+    }
   }
 
-  const marketAliasCardIds = Array.from(new Set((marketAliasResult.data ?? []).map((row) => row.card_id)));
+  const marketAliasCardIds = Array.from(new Set(marketSearchMatches.map((row) => row.card_id)));
   if (marketAliasCardIds.length > 0) {
     const { data, error } = await supabase
       .from("cards")
@@ -151,7 +166,8 @@ export async function GET(request: Request) {
     for (const card of (data ?? []) as unknown as CardSearchRow[]) {
       const catalogCard = { ...card, source: "catalog" as const };
       candidates.set(searchKey(catalogCard), catalogCard);
-      aliasBoosts.set(catalogCard.id, 240);
+      const matchRank = marketSearchMatches.find((match) => match.card_id === catalogCard.id)?.match_rank ?? 240;
+      aliasBoosts.set(catalogCard.id, Math.max(aliasBoosts.get(catalogCard.id) ?? 0, matchRank));
     }
   }
 

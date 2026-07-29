@@ -9,7 +9,7 @@ import FilterBar from "./FilterBar";
 import RarityBadge from "../ui/RarityBadge";
 import ChangeCell from "../ui/ChangeCell";
 import MarketCardImage from "./MarketCardImage";
-import { cardDisplayName, cardOfficialIdentity } from "@/lib/card-market-names";
+import { cardDisplayName, cardOfficialIdentity, matchesMarketSearch } from "@/lib/card-market-names";
 
 interface MarketTableProps {
   cards: CardRow[];
@@ -55,12 +55,7 @@ export default function MarketTable({ cards: initialCards, sets, gameRouteSlug }
     let result = cards;
 
     if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter((card) => {
-        const aliases = card.card_market_aliases?.map((entry) => entry.alias).join(" ") ?? "";
-        return [card.name, card.market_name, card.card_number, aliases]
-          .some((value) => value?.toLowerCase().includes(q));
-      });
+      result = result.filter((card) => matchesMarketSearch(card, search));
     }
 
     if (selectedRarities.length > 0) {
