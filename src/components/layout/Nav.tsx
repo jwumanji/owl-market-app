@@ -363,9 +363,11 @@ function AdminNav({ pathname }: { pathname: string }) {
           <Link href={viewSiteHref} className="c-nav-view">
             View site ↗
           </Link>
-          <Link href="/logout" className="c-signin-btn">
-            Sign out
-          </Link>
+          <form action="/logout" method="post">
+            <button type="submit" className="c-signin-btn">
+              Sign out
+            </button>
+          </form>
         </div>
       </div>
     </nav>
