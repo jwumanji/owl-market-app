@@ -10,6 +10,14 @@
       "schedules": ["0 0 * * *", "0 6 * * *", "0 12 * * *", "0 18 * * *"]
     },
     {
+      "id": "one_piece.justtcg.sealed_prices",
+      "game": "one_piece",
+      "provider": "justtcg",
+      "kind": "pricing",
+      "path": "/api/sync/sealed-prices?game=one_piece",
+      "schedules": ["10 6 * * *"]
+    },
+    {
       "id": "riftbound.justtcg.incremental",
       "game": "riftbound",
       "provider": "justtcg",
@@ -72,6 +80,14 @@
       "kind": "taxonomy",
       "path": "/api/sync/characters?game=one_piece",
       "schedules": ["45 23 * * *"]
+    },
+    {
+      "id": "one_piece.internal.set_baseline",
+      "game": "one_piece",
+      "provider": "internal",
+      "kind": "index",
+      "path": "/api/sync/set-baseline?game=one_piece",
+      "schedules": ["50 23 * * 0"]
     },
     {
       "id": "one_piece.summaries.public",

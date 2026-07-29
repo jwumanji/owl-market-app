@@ -13,6 +13,7 @@
     "golden:cards": "node scripts/card-api-golden.mjs",
     "golden:gate4-expected-diffs": "node scripts/capture-gate4-expected-diffs.mjs",
     "audit:game-boundaries": "node scripts/audit-game-boundaries.mjs",
+    "audit:booster-baseline": "node scripts/audit-booster-baseline.mjs",
     "audit:public-performance": "node scripts/audit-public-performance.mjs",
     "audit:set-membership": "node scripts/audit-set-membership.mjs",
     "test:image-health": "node --test tests/card-image-health.test.ts",

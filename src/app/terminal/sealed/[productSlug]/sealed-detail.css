@@ -1,0 +1,1213 @@
+/* Moon Terminal — sealed product detail (Phase E: §3.1 hero + §3.2 history).
+   C1.5 tokens only; the page shell (.terminal-page, breadcrumb, placeholder,
+   t-up/t-down/t-flat) comes from ../terminal.css. Canvas stays at 1280, so the
+   hero's facts panel reflows full-width at 1180px — one breakpoint EARLIER
+   than the 1460-canvas mockup (spec §3.0). */
+
+/* ===========================================================================
+   §3.1 · Hero rail
+   =========================================================================== */
+
+.sd-hero {
+  display: grid;
+  grid-template-columns: 200px 1fr 300px;
+  gap: 28px;
+  align-items: start;
+  padding: 4px 0 30px;
+}
+
+/* -- box art: 5:6, 1.5px ink border, 6px 6px 0 hard shadow ------------------ */
+
+.sd-art {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 5 / 6;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-lg);
+  background: var(--bg-3);
+  box-shadow: 6px 6px 0 var(--ink);
+  overflow: hidden;
+}
+
+.sd-art-img {
+  object-fit: cover;
+}
+
+.sd-art-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--grad-brand);
+  color: var(--bg-2);
+  text-shadow: 0 2px 6px rgba(26, 15, 8, 0.35);
+}
+
+.sd-art-code {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 26px;
+  letter-spacing: 1px;
+}
+
+.sd-art-kind {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 1.6px;
+  opacity: 0.9;
+  padding: 0 10px;
+  text-align: center;
+}
+
+/* -- main column ------------------------------------------------------------ */
+
+.sd-eyebrow {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 1.6px;
+  color: var(--ink-2);
+  margin-bottom: 7px;
+}
+
+.sd-title {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.9px;
+  line-height: 1.06;
+  color: var(--ink);
+}
+
+/* Caveat gradient script — padding-right required: Caveat clips its tail
+   under background-clip:text (spec §3.1 / CLAUDE.md §6). */
+.sd-script {
+  font-family: var(--font-caveat), cursive;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 1.19em;
+  display: inline-block;
+  padding-right: 13px;
+  padding-bottom: 4px;
+  background: var(--grad-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.sd-price-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.sd-big-price {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 48px;
+  letter-spacing: -1.8px;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-dchips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-bottom: 5px;
+}
+
+.sd-dchip {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11.5px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-pill);
+  padding: 4px 11px;
+  background: var(--bg-2);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-dchip small {
+  color: var(--ink-3);
+  font-size: 9px;
+  letter-spacing: 0.9px;
+  margin-right: 5px;
+}
+
+/* -- range bar --------------------------------------------------------------- */
+
+.sd-range {
+  margin-top: 26px;
+  max-width: 520px;
+}
+
+.sd-range-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 1.1px;
+  color: var(--ink-3);
+  margin-bottom: 6px;
+}
+
+.sd-range-track {
+  position: relative;
+  height: 12px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-pill);
+  /* Token-derived gradient: loss tint → neutral → gain tint. */
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--loss-2) 14%, var(--bg-2)) 0%,
+    var(--bg-3) 55%,
+    color-mix(in srgb, var(--gain-2) 16%, var(--bg-2)) 100%
+  );
+  overflow: visible;
+}
+
+.sd-range-marker {
+  position: absolute;
+  top: -5px;
+  width: 4px;
+  height: 20px;
+  margin-left: -2px; /* center the 4px marker on its percentage */
+  background: var(--ink);
+  border-radius: 2px;
+}
+
+.sd-range-v {
+  position: absolute;
+  top: -19px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10px;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+/* Edge clamping: keep the value label inside the track at 0% / 100%. */
+.sd-range-v.lo {
+  left: 0;
+  transform: none;
+}
+
+.sd-range-v.hi {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+.sd-range-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--ink-2);
+  margin-top: 7px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-range-foot .hi {
+  text-align: right;
+}
+
+.sd-range-foot em {
+  font-style: normal;
+  color: var(--ink-3);
+  font-size: 9.5px;
+  letter-spacing: 0.8px;
+  display: block;
+}
+
+/* -- key facts panel --------------------------------------------------------- */
+
+.sd-facts {
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-lg);
+  background: var(--bg-2);
+  overflow: hidden;
+}
+
+.sd-facts-head {
+  background: var(--bg-3);
+  border-bottom: 1.5px solid var(--ink);
+  padding: 9px 14px;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 1.3px;
+  color: var(--ink-2);
+}
+
+.sd-fact {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sd-fact:last-child {
+  border-bottom: none;
+}
+
+.sd-fact .fk {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--ink-3);
+}
+
+.sd-fact .fv {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-btn-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.sd-btn {
+  flex: 1;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.9px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-pill);
+  padding: 9px 12px;
+  background: var(--bg-2);
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.sd-btn:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.sd-btn.primary {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.sd-btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* ===========================================================================
+   §3.2 · Price history
+   =========================================================================== */
+
+.sd-blk {
+  margin-bottom: 30px;
+}
+
+.sd-blk-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.sd-blk-title {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  color: var(--ink);
+}
+
+.sd-blk-sub {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 1px;
+  color: var(--ink-3);
+  margin-top: 4px;
+}
+
+/* -- controls: overlays + timeframe + view ----------------------------------- */
+
+.sd-ctl-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sd-ov-label {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  color: var(--ink-3);
+}
+
+.sd-ov {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 0.8px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-pill);
+  padding: 6px 12px;
+  background: var(--bg-2);
+  color: var(--ink-2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sd-ov .dash {
+  width: 14px;
+  height: 0;
+  border-top: 2.5px dashed currentColor;
+  opacity: 0.55;
+}
+
+.sd-ov.on.sv {
+  background: color-mix(in srgb, var(--gold) 16%, var(--bg-2));
+  border-color: var(--gold);
+  color: color-mix(in srgb, var(--gold) 55%, var(--ink));
+}
+
+.sd-ov.on.rt {
+  background: color-mix(in srgb, var(--select) 10%, var(--bg-2));
+  border-color: var(--select);
+  color: var(--select);
+}
+
+.sd-seg {
+  display: flex;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  background: var(--bg-2);
+}
+
+.sd-seg button {
+  border: none;
+  background: none;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  padding: 8px 14px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.sd-seg button.on {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.sd-seg.tf {
+  border-color: var(--coral);
+}
+
+.sd-seg.tf button.on {
+  background: var(--coral);
+  color: var(--bg-2);
+}
+
+/* Cobalt CHART | TABLE toggle (spec §3.2). */
+.sd-seg.pv {
+  border-color: var(--select);
+}
+
+.sd-seg.pv button.on {
+  background: var(--select);
+  color: var(--bg-2);
+}
+
+/* -- chart card --------------------------------------------------------------- */
+
+.sd-card {
+  background: var(--bg-2);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+
+.sd-chart-wrap {
+  padding: 14px 10px 8px;
+}
+
+.sd-axis-label {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 1px;
+  color: var(--ink-3);
+  padding: 0 8px 4px;
+}
+
+.sd-chart-canvas {
+  position: relative;
+  height: 320px;
+}
+
+.sd-chart-empty {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  color: var(--ink-3);
+  text-align: center;
+  padding: 64px 20px;
+}
+
+.sd-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  border-top: 1.5px solid var(--ink);
+  background: var(--bg-3);
+  padding: 8px 16px;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.9px;
+  color: var(--ink-2);
+}
+
+.sd-card-foot .right {
+  margin-left: auto;
+  color: var(--ink-3);
+}
+
+.sd-leg.price {
+  color: var(--gain-2);
+}
+
+.sd-leg.sv {
+  color: var(--gold);
+}
+
+.sd-leg.rt {
+  color: var(--select);
+}
+
+/* -- table view --------------------------------------------------------------- */
+
+.sd-ph-scroll {
+  max-height: 452px;
+  overflow: auto; /* internal scroll only — never page-level (spec §8) */
+}
+
+.sd-ph-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  min-width: 560px;
+}
+
+.sd-ph-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 1.1px;
+  color: var(--ink-2);
+  text-transform: uppercase;
+  text-align: left;
+  padding: 11px 13px;
+  background: var(--bg-3);
+  border-bottom: 1.5px solid var(--ink);
+  white-space: nowrap;
+}
+
+.sd-ph-table thead th.num {
+  text-align: right;
+}
+
+.sd-ph-table tbody td {
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--ink);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-ph-table tbody td:first-child {
+  color: var(--ink-2);
+  font-size: 12px;
+  letter-spacing: 0.6px;
+}
+
+.sd-ph-table tbody td.num {
+  text-align: right;
+}
+
+.sd-ph-table tbody td.sd-dim {
+  color: var(--ink-2);
+}
+
+.sd-ph-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.sd-ph-table tbody tr:hover td {
+  background: var(--bg-3);
+}
+
+/* ===========================================================================
+   §3.3 · Market stats — 6-up stat rail; 3-up at 1180 (one breakpoint earlier
+   than the 1460 mockup, spec §3.0), 2-up at 720. Hover per spec §3.3:
+   translate(-2px,-2px) + 4px 4px 0 ink shadow.
+   =========================================================================== */
+
+.sd-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 13px;
+}
+
+.sd-stat {
+  background: var(--bg-2);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-md);
+  padding: 14px 15px;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+.sd-stat:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.sd-stat .sl {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 1.1px;
+  color: var(--ink-2);
+  margin-bottom: 7px;
+}
+
+.sd-stat .sv {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 20px;
+  letter-spacing: -0.5px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sd-stat .sn {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10px;
+  color: var(--ink-3);
+  margin-top: 3px;
+}
+
+/* ===========================================================================
+   §3.4 · Top 10 cards — summary strip + tile grid. 5-up × 2 rows; 4-up at
+   1180 · 3-up at 940 · 2-up at 640 (column count falls as width drops so
+   total height stays roughly flat, spec §3.4).
+   =========================================================================== */
+
+.sd-top10-strip {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--ink-2);
+  background: var(--bg-3);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-md);
+  padding: 11px 16px;
+  margin-bottom: 14px;
+}
+
+.sd-top10-strip b {
+  font-size: 17px;
+  color: var(--ink);
+  letter-spacing: -0.3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-top10-strip .sd-top10-solo {
+  margin-left: auto;
+  color: var(--ink-3);
+}
+
+.sd-inside {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 11px;
+}
+
+.sd-icard {
+  display: block;
+  min-width: 0; /* grid child — lets .sd-ic-name actually ellipsize */
+  background: var(--bg-2);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.13s, box-shadow 0.13s;
+}
+
+.sd-icard:hover {
+  transform: translate(-3px, -3px);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
+/* 4:3 art panel (spec §3.4 — deliberately NOT 5:7 portrait). Card art is
+   portrait, so cover-crop biased toward the top of the card where the
+   character art lives. */
+.sd-ic-art {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--bg-3);
+  border-bottom: 1.5px solid var(--ink);
+  overflow: hidden;
+}
+
+.sd-ic-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 18%;
+}
+
+.sd-ic-noart {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--ink-3);
+}
+
+.sd-ic-rank {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 0.6px;
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: var(--r-pill);
+  padding: 2px 6px;
+}
+
+.sd-ic-rar {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+}
+
+.sd-ic-body {
+  padding: 9px 11px;
+}
+
+/* Single line at every breakpoint — §8 criterion: truncate, never wrap. */
+.sd-ic-name {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.15;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sd-ic-meta {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 9px;
+  letter-spacing: 0.7px;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+
+.sd-ic-price {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: -0.4px;
+  color: var(--ink);
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-ic-line {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10.5px;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sd-ic-share {
+  font-size: 9px;
+  color: var(--ink-3);
+  letter-spacing: 0.5px;
+}
+
+/* -- §3.4 promo callout strip (D7 decision 6) — excluded promo/event cards
+      that would have placed in the top 10; clearly not tiles. ---------------- */
+
+.sd-promo-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  border: 1.5px dashed var(--ink-3);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  padding: 9px 14px;
+  margin-bottom: 14px;
+}
+
+.sd-promo-label {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 1px;
+  color: var(--ink-3);
+}
+
+.sd-promo-card {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-pill);
+  background: var(--bg-3);
+  padding: 4px 12px;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.sd-promo-card:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.sd-promo-name {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--ink);
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sd-promo-price {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11.5px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===========================================================================
+   §3.5 · Box EV — two columns 1fr | 330px, stacking below 1080px (spec §3.5).
+   Left: slot table with proportional weight bars. Right: peach hero,
+   comparison bars, sealed premium. BULK renders plain text, never a badge.
+   =========================================================================== */
+
+.sd-ev-caution {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 1px;
+  color: color-mix(in srgb, var(--coral) 70%, var(--ink));
+  background: color-mix(in srgb, var(--coral) 9%, var(--bg-2));
+  border: 1.5px solid var(--coral);
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+
+.sd-ev-grid {
+  display: grid;
+  grid-template-columns: 1fr 330px;
+  gap: 14px;
+  align-items: start;
+}
+
+.sd-ev-scroll {
+  overflow-x: auto; /* internal scroll only — never page-level (spec §8) */
+}
+
+.sd-ev-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  min-width: 520px;
+}
+
+.sd-ev-table thead th {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 1.1px;
+  color: var(--ink-2);
+  text-align: left;
+  padding: 11px 13px;
+  background: var(--bg-3);
+  border-bottom: 1.5px solid var(--ink);
+  white-space: nowrap;
+}
+
+.sd-ev-table thead th.num {
+  text-align: right;
+}
+
+.sd-ev-table tbody td {
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--ink);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-ev-table tbody td.num {
+  text-align: right;
+}
+
+.sd-ev-table tfoot td {
+  padding: 11px 13px;
+  border-top: 1.5px solid var(--ink);
+  background: var(--bg-3);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.6px;
+  color: var(--ink);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-ev-table tfoot td.num {
+  text-align: right;
+}
+
+/* BULK slot label — plain text, never through RarityBadge (spec §3.5). */
+.sd-ev-bulk {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.7px;
+  color: var(--ink-2);
+}
+
+.sd-ev-wcol {
+  width: 168px;
+}
+
+.sd-ev-w {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sd-ev-wpct {
+  min-width: 46px;
+  text-align: right;
+  font-size: 11.5px;
+}
+
+/* Proportional weight bar — --gain-2 fill, ink border (spec §3.5). */
+.sd-ev-wbar {
+  flex: 1;
+  height: 10px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-pill);
+  background: var(--bg-2);
+  overflow: hidden;
+  display: block;
+}
+
+.sd-ev-wbar i {
+  display: block;
+  height: 100%;
+  background: var(--gain-2);
+}
+
+/* -- right summary ----------------------------------------------------------- */
+
+.sd-ev-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Peach hero (spec §3.5). */
+.sd-ev-hero {
+  background: var(--bg-3);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-lg);
+  box-shadow: 4px 4px 0 var(--ink);
+  padding: 16px 18px;
+}
+
+.sd-ev-hero-label {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 1.3px;
+  color: var(--ink-2);
+}
+
+.sd-ev-hero-value {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 34px;
+  letter-spacing: -1px;
+  color: var(--ink);
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-ev-hero-sub {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 0.9px;
+  color: var(--ink-3);
+  margin-top: 6px;
+}
+
+/* Comparison bars — box price in ink, opening EV in --gain-2; both scaled by
+   the larger of the two so the bigger bar always reads 100%. */
+.sd-ev-bars {
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  padding: 13px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.sd-ev-bar-row {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  row-gap: 4px;
+  align-items: baseline;
+}
+
+.sd-ev-bar-row .bl {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 1px;
+  color: var(--ink-3);
+}
+
+.sd-ev-bar-row .bv {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--ink);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-ev-bar-row .bt {
+  grid-column: 1 / -1;
+  display: block;
+  height: 12px;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-pill);
+  background: var(--bg-3);
+  overflow: hidden;
+}
+
+.sd-ev-bar-row .bt i {
+  display: block;
+  height: 100%;
+}
+
+.sd-ev-bar-row .bt i.ink {
+  background: var(--ink);
+}
+
+.sd-ev-bar-row .bt i.gain {
+  background: var(--gain-2);
+}
+
+/* Sealed premium + plain-language read. */
+.sd-ev-premium {
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-md);
+  background: var(--bg-2);
+  padding: 13px 15px;
+}
+
+.sd-ev-premium .sl {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 1.1px;
+  color: var(--ink-2);
+}
+
+.sd-ev-premium .sv {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 24px;
+  letter-spacing: -0.5px;
+  margin-top: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-ev-read {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  margin-top: 7px;
+}
+
+/* Mandatory disclaimer — permanent property of community-estimated rates. */
+.sd-ev-foot {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 0.9px;
+  line-height: 1.6;
+  color: var(--ink-3);
+  margin-top: 12px;
+}
+
+/* ===========================================================================
+   Responsive — 1280 canvas; facts reflow one breakpoint EARLIER than the
+   1460 mockup (1180 here vs its 1080). Mobile 380: no page-level horizontal
+   scroll — the table scrolls inside .sd-ph-scroll only.
+   =========================================================================== */
+
+@media (max-width: 1180px) {
+  .sd-hero {
+    grid-template-columns: 170px 1fr;
+    gap: 22px;
+  }
+
+  .sd-facts-col {
+    grid-column: 1 / -1;
+  }
+
+  .sd-stat-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .sd-inside {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* §3.5 columns stack below 1080 (spec §3.5 — its own breakpoint, not 1180). */
+@media (max-width: 1080px) {
+  .sd-ev-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 940px) {
+  .sd-inside {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .sd-inside {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 9px;
+  }
+}
+
+@media (max-width: 720px) {
+  .sd-hero {
+    grid-template-columns: 1fr;
+    gap: 18px;
+    padding-bottom: 22px;
+  }
+
+  .sd-art {
+    max-width: 150px;
+  }
+
+  .sd-title {
+    font-size: 27px;
+  }
+
+  .sd-big-price {
+    font-size: 38px;
+  }
+
+  .sd-chart-canvas {
+    height: 250px;
+  }
+
+  .sd-stat-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

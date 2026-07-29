@@ -1,0 +1,1002 @@
+/* Moon Terminal — page-scoped shell (Phase A).
+   No .container class exists in this repo; the canvas stays at 1280 to match
+   every other public page. See docs/moon-terminal-sealed-spec.md §3.0. */
+
+.terminal-page {
+  padding: 24px;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-bottom: 96px;
+}
+
+.terminal-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  color: var(--breadcrumb-accent);
+  margin-bottom: 20px;
+}
+
+.terminal-breadcrumb a {
+  color: var(--breadcrumb-accent);
+  text-decoration: none;
+  transition: color 0.14s ease;
+}
+
+.terminal-breadcrumb a:hover {
+  color: var(--breadcrumb-active);
+}
+
+.terminal-breadcrumb .here {
+  color: var(--breadcrumb-active);
+}
+
+.terminal-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.terminal-head-eyebrow {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin-bottom: 10px;
+}
+
+.terminal-head-title {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+.terminal-head-title em {
+  font-family: var(--font-caveat), cursive;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 52px;
+  /* Tail-clip fix — Caveat's descender clips under background-clip:text. */
+  padding-right: 13px;
+  padding-bottom: 4px;
+  display: inline-block;
+  background: var(--grad-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.terminal-head-sub {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--ink-2);
+  max-width: 560px;
+  line-height: 1.6;
+}
+
+.terminal-head-meta {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  text-align: right;
+  line-height: 1.7;
+  flex-shrink: 0;
+}
+
+/* Phase A placeholder — replaced by the dashboard in Phase D. */
+.terminal-placeholder {
+  background: var(--bg-2);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-lg);
+  padding: 40px 28px;
+  text-align: center;
+}
+
+.terminal-placeholder-label {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 8px;
+}
+
+.terminal-placeholder-body {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-size: 15px;
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+
+@media (max-width: 900px) {
+  .terminal-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .terminal-head-meta {
+    text-align: left;
+  }
+
+  .terminal-head-title {
+    font-size: 32px;
+  }
+
+  .terminal-head-title em {
+    font-size: 38px;
+  }
+}
+
+/* ===========================================================================
+   Phase D — sealed dashboard (spec §4). C1.5 tokens only; canvas stays 1280.
+   Horizontal scroll lives INSIDE .terminal-scroll with sticky metric+product
+   columns — designed behavior (spec §3.0), never page-level scroll.
+   =========================================================================== */
+
+.terminal-dash {
+  --w-metric: 112px;
+  --w-prod: 248px;
+}
+
+/* -- delta colors: --gain-2 above zero, --loss-2 below, --ink-3 at zero ----- */
+
+.terminal-page .t-up { color: var(--gain-2); }
+.terminal-page .t-down { color: var(--loss-2); }
+.terminal-page .t-flat { color: var(--ink-3); }
+.terminal-page .t-dim { color: var(--ink-2); }
+
+/* -- stat rail -------------------------------------------------------------- */
+
+.terminal-stat-rail {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin: 4px 0 20px;
+}
+
+.terminal-stat {
+  background: var(--bg-2);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-md);
+  padding: 15px 17px;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+.terminal-stat:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.terminal-stat-label {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 1.2px;
+  color: var(--ink-2);
+  margin-bottom: 7px;
+}
+
+.terminal-stat-value {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 26px;
+  letter-spacing: -0.5px;
+  color: var(--ink);
+}
+
+.terminal-stat-delta {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+/* -- ranking chips ---------------------------------------------------------- */
+
+.terminal-rank-bar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.terminal-ctl-label {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 1.2px;
+  color: var(--ink-2);
+}
+
+.terminal-chip {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  background: var(--bg-2);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-pill);
+  padding: 7px 14px;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.terminal-chip:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.terminal-chip.on {
+  background: var(--ink);
+  color: var(--bg);
+  box-shadow: none;
+  transform: none;
+}
+
+.terminal-chip .dir { color: var(--gold); }
+.terminal-chip.on .dir { color: var(--bg-3); }
+
+.terminal-ratio-note {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 0.6px;
+  color: var(--ink-3);
+  margin: -2px 0 12px;
+}
+
+/* -- controls --------------------------------------------------------------- */
+
+.terminal-controls {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.terminal-controls.second {
+  margin-bottom: 16px;
+}
+
+.terminal-search {
+  flex: 0 1 220px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-2);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-pill);
+  padding: 8px 14px;
+}
+
+.terminal-search .t-search-glyph {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.terminal-search input {
+  border: none;
+  outline: none;
+  background: none;
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-size: 13.5px;
+  color: var(--ink);
+  width: 100%;
+}
+
+.terminal-search input::placeholder {
+  color: var(--ink-3);
+}
+
+.terminal-seg {
+  display: flex;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  background: var(--bg-2);
+}
+
+.terminal-seg button {
+  border: none;
+  background: none;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  padding: 8px 14px;
+  color: var(--ink-2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.terminal-seg button.on {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.terminal-seg button:disabled {
+  color: var(--ink-3);
+  cursor: default;
+}
+
+.terminal-soon {
+  font-size: 8.5px;
+  letter-spacing: 0.5px;
+  color: var(--gold);
+}
+
+.terminal-seg.period {
+  border-color: var(--gold);
+  box-shadow: 2px 2px 0 var(--gold);
+}
+
+.terminal-seg.period button.on {
+  background: var(--gold);
+  color: var(--bg-2);
+}
+
+.terminal-seg.view {
+  border-color: var(--coral);
+  box-shadow: 2px 2px 0 var(--coral);
+}
+
+.terminal-seg.view button.on {
+  background: var(--coral);
+  color: var(--bg-2);
+}
+
+.terminal-view-label {
+  margin-left: auto;
+}
+
+/* -- legend ------------------------------------------------------------------ */
+
+.terminal-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.9px;
+  color: var(--ink-2);
+  padding: 0 4px 8px;
+}
+
+.terminal-swatches {
+  display: flex;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.terminal-sw {
+  width: 26px;
+  height: 16px;
+}
+
+.terminal-unit-note {
+  color: var(--ink-3);
+}
+
+/* -- table shell (shared by grid + table views) ------------------------------ */
+
+.terminal-table-card {
+  background: var(--bg-2);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.terminal-scroll {
+  overflow-x: auto;
+}
+
+.terminal-table-card table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+}
+
+.terminal-table-card thead th {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11.5px;
+  letter-spacing: 1.1px;
+  color: var(--ink-2);
+  text-transform: uppercase;
+  text-align: left;
+  padding: 11px 13px;
+  background: var(--bg-3);
+  border-bottom: 1.5px solid var(--ink);
+  white-space: nowrap;
+}
+
+.terminal-table-card tbody td {
+  padding: 0;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 14.5px;
+  white-space: nowrap;
+}
+
+.terminal-table-card tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* metric column */
+.t-mhead,
+.t-mcell {
+  width: var(--w-metric);
+  min-width: var(--w-metric);
+  text-align: left;
+}
+
+.t-mhead {
+  color: var(--ink);
+  border-right: 1px solid var(--line);
+  box-shadow: inset 0 -3px 0 var(--gold);
+}
+
+.t-mcell {
+  padding: 10px 13px !important;
+  background: var(--bg);
+  border-right: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+
+.t-mrank {
+  display: block;
+  font-size: 10.5px;
+  color: var(--ink-3);
+  letter-spacing: 0.8px;
+}
+
+.t-mval {
+  display: block;
+  font-size: 16px;
+  margin-top: 2px;
+}
+
+/* ratio-mode metric stack */
+.t-msrow {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--ink-2);
+  margin-top: 3px;
+}
+
+.t-msrow b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.t-mskey {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--ink-3);
+  align-self: center;
+}
+
+.t-msmult {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+.t-msmult .mv {
+  font-size: 19px;
+  letter-spacing: -0.4px;
+}
+
+.t-msmult .md {
+  font-size: 12px;
+}
+
+/* product column */
+.t-phead,
+.t-pcell {
+  width: var(--w-prod);
+  min-width: var(--w-prod);
+  text-align: left;
+}
+
+.t-pcell {
+  padding: 10px 13px !important;
+  background: var(--bg-2);
+  border-right: 1.5px solid var(--ink);
+}
+
+.t-prod {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.t-boxthumb {
+  width: 30px;
+  height: 40px;
+  border: 1.5px solid var(--ink);
+  border-radius: 5px;
+  background: var(--bg-3);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+span.t-thumb-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 7.5px;
+  color: var(--ink-2);
+}
+
+.t-prodname {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 13.5px;
+  line-height: 1.2;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 172px;
+}
+
+.t-prodmeta {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10px;
+  color: var(--ink-3);
+  letter-spacing: 0.6px;
+  margin-top: 2px;
+}
+
+.t-athchip {
+  display: inline-block;
+  font-size: 8.5px;
+  letter-spacing: 0.8px;
+  background: var(--gain-2);
+  color: var(--bg-2);
+  border-radius: var(--r-pill);
+  padding: 2px 6px;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+
+/* -- grid view --------------------------------------------------------------- */
+
+.terminal-grid-view table {
+  min-width: 1330px;
+}
+
+.terminal-grid-view.ratio-mode {
+  --w-metric: 198px;
+}
+
+.terminal-grid-view.ratio-mode table {
+  min-width: 1430px;
+}
+
+.terminal-grid-view .t-mhead,
+.terminal-grid-view .t-mcell {
+  position: sticky;
+  left: 0;
+  z-index: 20;
+}
+
+.terminal-grid-view .t-mhead {
+  background: var(--bg-3);
+}
+
+.terminal-grid-view .t-phead,
+.terminal-grid-view .t-pcell {
+  position: sticky;
+  left: var(--w-metric);
+  z-index: 19;
+}
+
+.terminal-grid-view .t-phead {
+  background: var(--bg-3);
+}
+
+.terminal-grid-view thead th.t-wk {
+  text-align: right;
+  padding: 11px 10px;
+}
+
+.terminal-grid-view thead th.t-wk small {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  color: var(--ink-3);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.terminal-grid-view thead th.t-wk.now {
+  color: var(--ink);
+  box-shadow: inset 0 -3px 0 var(--gold);
+}
+
+.t-cell {
+  display: block;
+  padding: 12px 10px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.t-cell.now {
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+}
+
+.t-celld {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 1px;
+  opacity: 0.85;
+}
+
+.t-cellsub {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-3);
+  letter-spacing: 0.3px;
+  margin-top: 2px;
+}
+
+/* -- table view -------------------------------------------------------------- */
+
+.terminal-table-view table {
+  min-width: 1300px;
+}
+
+.terminal-table-view thead th.num {
+  text-align: right;
+}
+
+.terminal-table-view tbody td.num {
+  padding: 12px 13px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.terminal-table-view thead th.sorted {
+  color: var(--ink);
+  box-shadow: inset 0 -3px 0 var(--gold);
+}
+
+.terminal-table-view .t-sort-arrow {
+  color: var(--coral);
+}
+
+.terminal-table-view tbody tr:hover td {
+  background: var(--bg-3);
+}
+
+.t-spark {
+  width: 92px;
+  height: 26px;
+  display: block;
+  margin-left: auto;
+}
+
+/* -- cards view -------------------------------------------------------------- */
+
+.terminal-cards-view {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.terminal-pcard {
+  background: var(--bg-2);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.13s, box-shadow 0.13s;
+}
+
+.terminal-pcard:hover {
+  transform: translate(-3px, -3px);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
+.t-pc-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg-3);
+  border-bottom: 1.5px solid var(--ink);
+}
+
+.t-pc-rank {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.8px;
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: var(--r-pill);
+  padding: 3px 9px;
+}
+
+.t-pc-rel {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.9px;
+  color: var(--ink-2);
+}
+
+.t-pc-body {
+  padding: 16px 16px 12px;
+  display: flex;
+  gap: 14px;
+}
+
+.t-pc-art {
+  width: 60px;
+  height: 80px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-sm);
+  background: var(--bg-3);
+  object-fit: cover;
+}
+
+span.t-pc-art {
+  font-size: 11px;
+}
+
+.t-pc-name {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 15.5px;
+  line-height: 1.2;
+  letter-spacing: -0.2px;
+  color: var(--ink);
+}
+
+.t-pc-code {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--ink-3);
+  margin-top: 3px;
+}
+
+.t-pc-price {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 30px;
+  letter-spacing: -0.8px;
+  margin-top: 9px;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.t-pc-delta {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 13px;
+  margin-top: 5px;
+}
+
+.t-pc-sparklabel {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 8.5px;
+  letter-spacing: 1px;
+  color: var(--ink-3);
+  padding: 0 14px 2px;
+}
+
+.t-pc-spark {
+  padding: 0 12px 4px;
+}
+
+.t-pc-spark svg {
+  width: 100%;
+  height: 52px;
+  display: block;
+}
+
+.t-pc-range {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 0.9px;
+  color: var(--ink-3);
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0 14px 8px;
+}
+
+.t-pc-ath {
+  color: var(--ink-2);
+}
+
+.terminal-pcard.at-ath .t-pc-ath {
+  color: var(--gain-2);
+}
+
+.t-pc-foot {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-top: 1.5px solid var(--ink);
+}
+
+.t-pc-stat {
+  padding: 9px 14px;
+}
+
+.t-pc-stat + .t-pc-stat {
+  border-left: 1px solid var(--line);
+}
+
+.t-pc-stat.active {
+  background: var(--bg);
+}
+
+.t-pc-sl {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--ink-2);
+}
+
+.t-pc-sv {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 16px;
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* -- footnote / empty state --------------------------------------------------- */
+
+.terminal-footnote {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 10.5px;
+  color: var(--ink-3);
+  letter-spacing: 0.4px;
+  padding: 0 4px 8px;
+  line-height: 1.9;
+}
+
+.terminal-empty {
+  background: var(--bg-2);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--r-lg);
+  padding: 40px 28px;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.terminal-empty-label {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 8px;
+}
+
+.terminal-empty-body {
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-size: 15px;
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+
+/* -- responsive --------------------------------------------------------------
+   Canvas is 1280; the mockup's 1460 grid reflows one breakpoint earlier here.
+   Mobile 380: no page-level horizontal scroll — wide tables scroll inside
+   .terminal-scroll only. */
+
+@media (max-width: 1200px) {
+  .terminal-cards-view {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .terminal-stat-rail {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .terminal-cards-view {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .terminal-view-label {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .terminal-dash {
+    --w-metric: 86px;
+    --w-prod: 186px;
+  }
+
+  .terminal-grid-view.ratio-mode {
+    --w-metric: 158px;
+  }
+
+  .t-prodname {
+    font-size: 12px;
+    max-width: 126px;
+  }
+
+  .t-boxthumb {
+    width: 24px;
+    height: 32px;
+  }
+
+  .terminal-search {
+    flex: 1 1 100%;
+  }
+
+  .terminal-cards-view {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .terminal-page {
+    padding: 14px;
+    padding-bottom: 72px;
+  }
+
+  .terminal-stat-rail {
+    gap: 10px;
+  }
+}
