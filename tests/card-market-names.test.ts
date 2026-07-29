@@ -84,3 +84,18 @@ test("order-independent search uses a maintained GIN document", () => {
   assert.match(migration, /create trigger card_market_aliases_search_document_sync/i);
   assert.match(migration, /revoke all on function public\.search_card_ids_by_terms/i);
 });
+
+test("second curation batch targets exact high-value printings without auto-approval", () => {
+  const migration = readFileSync(
+    new URL("../supabase/migrations/20260730120000_card_market_names_batch_2.sql", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(migration, /'P-OP07-119', 'Serial Ace'/);
+  assert.match(migration, /'OP09-051_p2', 'Manga Buggy'/);
+  assert.doesNotMatch(migration, /'OP09-051', 'Manga Buggy'/);
+  assert.match(migration, /'P-OP09-070', 'Gengar Nami'/);
+  assert.doesNotMatch(migration, /Serial Yamato/);
+  assert.doesNotMatch(migration, /status\s*[,)]/i);
+  assert.match(migration, /on conflict \(card_id, proposed_market_name\) do nothing/i);
+});
