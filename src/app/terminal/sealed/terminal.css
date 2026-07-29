@@ -417,6 +417,79 @@
   overflow-x: auto;
 }
 
+.terminal-period-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px 8px 13px;
+  background: var(--bg-3);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.terminal-period-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 10px;
+  letter-spacing: 0.8px;
+  color: var(--ink-3);
+}
+
+.terminal-period-range b {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminal-period-pager {
+  display: flex;
+  border: 1px solid var(--ink);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  background: var(--bg-2);
+  flex-shrink: 0;
+}
+
+.terminal-period-pager button {
+  border: 0;
+  border-right: 1px solid var(--ink);
+  background: transparent;
+  padding: 6px 10px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 9.5px;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+}
+
+.terminal-period-pager button:last-child {
+  border-right: 0;
+}
+
+.terminal-period-pager button:hover:not(:disabled) {
+  background: var(--ink);
+  color: var(--bg-2);
+}
+
+.terminal-period-pager button:focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: -2px;
+}
+
+.terminal-period-pager button:disabled {
+  color: var(--ink-3);
+  cursor: default;
+  opacity: 0.55;
+}
+
 .terminal-table-card table {
   border-collapse: separate;
   border-spacing: 0;
@@ -601,7 +674,7 @@ span.t-thumb-fallback {
 /* -- grid view --------------------------------------------------------------- */
 
 .terminal-grid-view table {
-  min-width: 1330px;
+  min-width: 900px;
 }
 
 .terminal-grid-view.ratio-mode {
@@ -609,7 +682,7 @@ span.t-thumb-fallback {
 }
 
 .terminal-grid-view.ratio-mode table {
-  min-width: 1430px;
+  min-width: 1020px;
 }
 
 .terminal-grid-view .t-mhead,
