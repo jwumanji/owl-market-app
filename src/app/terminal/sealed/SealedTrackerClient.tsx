@@ -17,6 +17,7 @@ import "./terminal.css";
 // ---------------------------------------------------------------------------
 
 const PERIODS = 12;
+const VISIBLE_PERIODS = 6;
 const EM = "—"; // em-dash — the only rendering for missing values, never 0
 const VIEW_STORAGE_KEY = "owl-terminal-sealed-view";
 
@@ -298,6 +299,7 @@ export default function SealedTrackerClient({ data }: { data: SealedDashboardDat
   const [mode, setMode] = useState<ModeKey>("trending");
   const [relDesc, setRelDesc] = useState(true);
   const [period, setPeriod] = useState<PeriodKey>("weekly");
+  const [periodOffset, setPeriodOffset] = useState(0);
   const [view, setViewState] = useState<ViewKey>("grid"); // grid is default and stays default
   const [query, setQuery] = useState("");
 
@@ -338,6 +340,22 @@ export default function SealedTrackerClient({ data }: { data: SealedDashboardDat
   const isRatio = effectiveMode === "ratio";
 
   const cfg = useMemo(() => buildPeriodCfg(period, data), [period, data]);
+  const visiblePeriods = useMemo(
+    () =>
+      cfg.labels
+        .map((label, sourceIndex) => ({ label, sourceIndex }))
+        .reverse()
+        .slice(periodOffset, periodOffset + VISIBLE_PERIODS),
+    [cfg.labels, periodOffset]
+  );
+  const maxPeriodOffset = Math.max(0, cfg.labels.length - VISIBLE_PERIODS);
+  const periodPageSize = visiblePeriods.length;
+  const periodName = period === "weekly" ? "weeks" : "months";
+
+  const changePeriod = (nextPeriod: PeriodKey) => {
+    setPeriod(nextPeriod);
+    setPeriodOffset(0);
+  };
 
   // Only booster boxes ship in v1 — CASES / DECKS / JP are disabled with SOON.
   const boxes = useMemo(
@@ -490,16 +508,49 @@ export default function SealedTrackerClient({ data }: { data: SealedDashboardDat
 
   const gridView = (
     <div className={`terminal-table-card terminal-grid-view${isRatio ? " ratio-mode" : ""}`}>
+      <div className="terminal-period-nav">
+        <div className="terminal-period-range" aria-live="polite">
+          <span>SHOWING</span>
+          <b>
+            {periodOffset === 0
+              ? `LATEST ${periodPageSize} ${periodName}`
+              : `${cfg.pre}${periodOffset + 1}–${cfg.pre}${periodOffset + periodPageSize} ${periodName}`}
+          </b>
+        </div>
+        <div className="terminal-period-pager" aria-label={`${periodName} history navigation`}>
+          <button
+            type="button"
+            disabled={periodOffset === 0}
+            onClick={() => setPeriodOffset((offset) => Math.max(0, offset - VISIBLE_PERIODS))}
+            aria-label={`Show newer ${periodName}`}
+          >
+            ← NEWER
+          </button>
+          <button
+            type="button"
+            disabled={periodOffset >= maxPeriodOffset}
+            onClick={() =>
+              setPeriodOffset((offset) => Math.min(maxPeriodOffset, offset + VISIBLE_PERIODS))
+            }
+            aria-label={`Show older ${periodName}`}
+          >
+            OLDER →
+          </button>
+        </div>
+      </div>
       <div className="terminal-scroll">
         <table>
           <thead>
             <tr>
               <th className="t-mhead">{metricHeader(effectiveMode, cfg)}</th>
               <th className="t-phead">PRODUCT</th>
-              {cfg.labels.map((label, i) => (
-                <th key={label} className={`t-wk${i === PERIODS - 1 ? " now" : ""}`}>
+              {visiblePeriods.map(({ label, sourceIndex }) => (
+                <th
+                  key={label}
+                  className={`t-wk${sourceIndex === cfg.labels.length - 1 ? " now" : ""}`}
+                >
                   {cfg.pre}
-                  {i + 1}
+                  {cfg.labels.length - sourceIndex}
                   <small>{label}</small>
                 </th>
               ))}
@@ -514,26 +565,32 @@ export default function SealedTrackerClient({ data }: { data: SealedDashboardDat
                 <tr key={p.id}>
                   {metricCell(p, idx)}
                   {productCell(p)}
-                  {series.map((v, i) => {
+                  {visiblePeriods.map(({ sourceIndex }) => {
+                    const v = series[sourceIndex];
                     if (v == null) {
                       // Missing periods are em-dashes, never zeros (spec §4).
                       return (
-                        <td key={i}>
+                        <td key={sourceIndex}>
                           <span className="t-cell t-flat">{EM}</span>
                         </td>
                       );
                     }
-                    const d = deltas[i];
+                    const d = deltas[sourceIndex];
                     return (
-                      <td key={i} style={tintStyle(d)}>
-                        <span className={`t-cell${i === PERIODS - 1 ? " now" : ""}`}>
+                      <td key={sourceIndex} style={tintStyle(d)}>
+                        <span
+                          className={`t-cell${
+                            sourceIndex === cfg.labels.length - 1 ? " now" : ""
+                          }`}
+                        >
                           {isRatio ? fmtMult(v) : fmtMoney(v)}
                           <span className={`t-celld ${deltaCls(d)}`}>
                             {d == null ? "·" : fmtPct(d)}
                           </span>
                           {isRatio && (
                             <span className="t-cellsub">
-                              {fmtMoney(s.prices[i])} {"·"} {fmtMoney(s.baselineValues[i])}
+                              {fmtMoney(s.prices[sourceIndex])} {"·"}{" "}
+                              {fmtMoney(s.baselineValues[sourceIndex])}
                             </span>
                           )}
                         </span>
@@ -888,14 +945,14 @@ export default function SealedTrackerClient({ data }: { data: SealedDashboardDat
           <button
             type="button"
             className={period === "weekly" ? "on" : ""}
-            onClick={() => setPeriod("weekly")}
+            onClick={() => changePeriod("weekly")}
           >
             WEEKLY
           </button>
           <button
             type="button"
             className={period === "monthly" ? "on" : ""}
-            onClick={() => setPeriod("monthly")}
+            onClick={() => changePeriod("monthly")}
           >
             MONTHLY
           </button>
