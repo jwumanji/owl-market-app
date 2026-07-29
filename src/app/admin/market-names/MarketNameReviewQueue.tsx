@@ -42,6 +42,7 @@ function ReviewCard({ suggestion }: { suggestion: MarketNameSuggestion }) {
       const response = await fetch(`/api/admin/market-names/${suggestion.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({
           action,
           marketName,
@@ -50,6 +51,11 @@ function ReviewCard({ suggestion }: { suggestion: MarketNameSuggestion }) {
         }),
       });
       const result = await response.json().catch(() => null) as { error?: string } | null;
+      if (response.status === 401) {
+        const redirectTo = `${window.location.pathname}${window.location.search}`;
+        window.location.assign(`/login?redirect=${encodeURIComponent(redirectTo)}`);
+        return;
+      }
       if (!response.ok) throw new Error(result?.error ?? "The review could not be saved.");
       router.refresh();
     } catch (reviewError) {
