@@ -181,18 +181,31 @@ async function loadCatalogUncached(gameRouteSlug: string, searchParams: CatalogS
       ? (searchParams.franchise ?? "").trim().slice(0, 100) || null
       : null;
     const query = cleanSearch(searchParams.q);
-    let aliasWarning: string | null = null;
-    let aliasCardIds: string[] = [];
+    let searchWarning: string | null = null;
+    let searchCardIds: string[] | null = null;
+    let fallbackAliasCardIds: string[] = [];
     const normalizedAliasQuery = normalizeMarketAlias(query);
     if (normalizedAliasQuery.length >= 2) {
-      const aliasResult = await supabase
-        .from("card_market_aliases")
-        .select("card_id")
-        .eq("game_id", game.id)
-        .ilike("normalized_alias", `%${normalizedAliasQuery}%`)
-        .limit(200);
-      if (aliasResult.error) aliasWarning = `market aliases: ${aliasResult.error.message}`;
-      else aliasCardIds = Array.from(new Set((aliasResult.data ?? []).map((row) => row.card_id)));
+      const termSearchResult = await supabase.rpc("search_card_ids_by_terms", {
+        p_game_id: game.id,
+        p_query: query,
+        p_limit: 200,
+      });
+
+      if (!termSearchResult.error) {
+        searchCardIds = Array.from(new Set(
+          ((termSearchResult.data ?? []) as Array<{ card_id: string }>).map((row) => row.card_id),
+        ));
+      } else {
+        const aliasResult = await supabase
+          .from("card_market_aliases")
+          .select("card_id")
+          .eq("game_id", game.id)
+          .ilike("normalized_alias", `%${normalizedAliasQuery}%`)
+          .limit(200);
+        if (aliasResult.error) searchWarning = `card search: ${termSearchResult.error.message}`;
+        else fallbackAliasCardIds = Array.from(new Set((aliasResult.data ?? []).map((row) => row.card_id)));
+      }
     }
     const currentPage = pageIndex(searchParams.page);
     const from = currentPage * PAGE_SIZE;
@@ -236,9 +249,15 @@ async function loadCatalogUncached(gameRouteSlug: string, searchParams: CatalogS
     if (selectedType) cardsQuery = cardsQuery.eq("card_type", selectedType);
     if (selectedFranchise) cardsQuery = cardsQuery.eq("attribute", selectedFranchise);
     if (query) {
-      const filters = [`name.ilike.%${query}%`, `market_name.ilike.%${query}%`, `card_number.ilike.%${query}%`];
-      if (aliasCardIds.length > 0) filters.push(`id.in.(${aliasCardIds.join(",")})`);
-      cardsQuery = cardsQuery.or(filters.join(","));
+      if (searchCardIds !== null) {
+        cardsQuery = searchCardIds.length > 0
+          ? cardsQuery.in("id", searchCardIds)
+          : cardsQuery.eq("id", "00000000-0000-0000-0000-000000000000");
+      } else {
+        const filters = [`name.ilike.%${query}%`, `market_name.ilike.%${query}%`, `card_number.ilike.%${query}%`];
+        if (fallbackAliasCardIds.length > 0) filters.push(`id.in.(${fallbackAliasCardIds.join(",")})`);
+        cardsQuery = cardsQuery.or(filters.join(","));
+      }
     }
 
     const cardsRes = await cardsQuery
@@ -250,7 +269,7 @@ async function loadCatalogUncached(gameRouteSlug: string, searchParams: CatalogS
     const warnings = [
       raritiesRes.error ? `rarities: ${raritiesRes.error.message}` : null,
       variantsRes.error ? `variants: ${variantsRes.error.message}` : null,
-      aliasWarning,
+      searchWarning,
     ].filter(Boolean);
 
     return {
