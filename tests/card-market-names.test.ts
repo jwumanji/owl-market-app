@@ -99,3 +99,18 @@ test("second curation batch targets exact high-value printings without auto-appr
   assert.doesNotMatch(migration, /status\s*[,)]/i);
   assert.match(migration, /on conflict \(card_id, proposed_market_name\) do nothing/i);
 });
+
+test("third curation batch distinguishes manga reprints, portrait SPs, and gold leaders", () => {
+  const migration = readFileSync(
+    new URL("../supabase/migrations/20260730190000_card_market_names_batch_3.sql", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(migration, /'OP13-119_p2', 'Base Manga Ace'/);
+  assert.match(migration, /'OP03-122_p2', 'Manga Sogeking', array\['Manga Usopp'/);
+  assert.match(migration, /'EB03-053_p2', 'Portrait SP Nami'/);
+  assert.match(migration, /'OP08-058_sp_eb02', 'Gold Pudding Leader'/);
+  assert.match(migration, /'OP09-051_p5', 'Silver SP Buggy'/);
+  assert.doesNotMatch(migration, /status\s*[,)]/i);
+  assert.match(migration, /on conflict \(card_id, proposed_market_name\) do nothing/i);
+});
