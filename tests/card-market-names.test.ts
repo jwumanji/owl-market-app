@@ -129,3 +129,17 @@ test("EB03 SP rename migration preserves portrait aliases and approved state", (
   assert.match(migration, /where updated_suggestions\.status = 'approved'/i);
   assert.match(migration, /unnest\(updated_suggestions\.proposed_aliases\)/i);
 });
+
+test("fourth curation batch adds concise prize-card names without auto-approval", () => {
+  const migration = readFileSync(
+    new URL("../supabase/migrations/20260730210000_card_market_names_batch_4.sql", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(migration, /'P-OP05-091', 'Championship Rebecca'/);
+  assert.match(migration, /'P-ST01-013', 'Treasure Cup Zoro', array\['TC Zoro'/);
+  assert.match(migration, /'P-ST01-007', 'New Year Winner Nami'/);
+  assert.match(migration, /'P-001-store-championship', 'Store Championship Luffy'/);
+  assert.doesNotMatch(migration, /status\s*[,)]/i);
+  assert.match(migration, /on conflict \(card_id, proposed_market_name\) do nothing/i);
+});
