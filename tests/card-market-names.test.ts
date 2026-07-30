@@ -108,9 +108,24 @@ test("third curation batch distinguishes manga reprints, portrait SPs, and gold 
 
   assert.match(migration, /'OP13-119_p2', 'Base Manga Ace'/);
   assert.match(migration, /'OP03-122_p2', 'Manga Sogeking', array\['Manga Usopp'/);
-  assert.match(migration, /'EB03-053_p2', 'Portrait SP Nami'/);
+  assert.match(migration, /'EB03-053_p2', 'EB03 SP Nami'/);
+  assert.match(migration, /'EB03-026_p2', 'EB03 SP Boa'/);
+  assert.match(migration, /'EB03-055_p2', 'EB03 SP Nico Robin'/);
   assert.match(migration, /'OP08-058_sp_eb02', 'Gold Pudding Leader'/);
   assert.match(migration, /'OP09-051_p5', 'Silver SP Buggy'/);
   assert.doesNotMatch(migration, /status\s*[,)]/i);
   assert.match(migration, /on conflict \(card_id, proposed_market_name\) do nothing/i);
+});
+
+test("EB03 SP rename migration preserves portrait aliases and approved state", () => {
+  const migration = readFileSync(
+    new URL("../supabase/migrations/20260730200000_rename_eb03_sp_market_names.sql", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(migration, /'Portrait SP Nami', 'EB03 SP Nami'/);
+  assert.match(migration, /'Portrait SP Boa', 'EB03 SP Boa'/);
+  assert.match(migration, /'Portrait SP Robin', 'EB03 SP Nico Robin'/);
+  assert.match(migration, /where updated_suggestions\.status = 'approved'/i);
+  assert.match(migration, /unnest\(updated_suggestions\.proposed_aliases\)/i);
 });
