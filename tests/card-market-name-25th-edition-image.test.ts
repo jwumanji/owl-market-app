@@ -32,9 +32,11 @@ test("image mirroring can safely target one exact card printing", () => {
   assert.match(script, /readArg\("--card-image-ids"\)/);
   assert.match(script, /query\.eq\("card_image_id", CARD_IMAGE_IDS\[0\]\)/);
   assert.match(script, /query\.in\("card_image_id", CARD_IMAGE_IDS\)/);
+  assert.match(script, /const MIRROR_RUN_VERSION = Date\.now\(\)\.toString\(36\)/);
+  assert.match(script, /\?v=\$\{MIRROR_RUN_VERSION\}/);
 });
 
-test("all ten 25th Edition printings use Bandai's exact ordered artwork", () => {
+test("collection repair covers all ten 25th Edition IDs and official images", () => {
   const migration = readFileSync(
     new URL(
       "../supabase/migrations/20260731104000_fix_25th_edition_collection_images.sql",
@@ -43,23 +45,44 @@ test("all ten 25th Edition printings use Bandai's exact ordered artwork", () => 
     "utf8",
   );
 
-  const expectedImages = [
-    ["P-001-alt-art-promo", "card_01.png"],
-    ["P-OP01-001", "card_02.png"],
-    ["OP01-013-25th-edition", "card_03.png"],
-    ["P-ST01-002", "card_04.png"],
-    ["OP01-016-25th-edition", "card_05.png"],
-    ["ST01-006-alt-art-promo", "card_06.png"],
-    ["P-ST01-008", "card_07.png"],
-    ["ST01-010-alt-art-promo", "card_08.png"],
-    ["P-OP01-022", "card_09.png"],
-    ["P-ST01-005", "card_10.png"],
+  const expectedCardImageIds = [
+    "P-001-alt-art-promo",
+    "P-OP01-001",
+    "OP01-013-25th-edition",
+    "P-ST01-002",
+    "OP01-016-25th-edition",
+    "ST01-006-alt-art-promo",
+    "P-ST01-008",
+    "ST01-010-alt-art-promo",
+    "P-OP01-022",
+    "P-ST01-005",
   ];
 
-  for (const [cardImageId, filename] of expectedImages) {
-    assert.match(migration, new RegExp(`'${cardImageId}'.*?${filename.replace(".", "\\.")}`));
+  for (const cardImageId of expectedCardImageIds) {
+    assert.match(migration, new RegExp(`'${cardImageId}'`));
+  }
+
+  for (let index = 1; index <= 10; index += 1) {
+    const filename = `card_${String(index).padStart(2, "0")}\\.png`;
+    assert.match(migration, new RegExp(filename));
   }
 
   assert.match(migration, /image_mirror_status = 'external'/);
   assert.match(migration, /25th_edition_collection_exact_artwork/);
+});
+
+test("25th Edition Chopper and Robin use the card numbers printed on Bandai artwork", () => {
+  const migration = readFileSync(
+    new URL(
+      "../supabase/migrations/20260731105000_correct_25th_edition_chopper_robin_images.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+
+  assert.match(migration, /\('P-ST01-008', '[^'\n]*card_06\.png\?v2'\)/);
+  assert.match(migration, /\('ST01-006-alt-art-promo', '[^'\n]*card_07\.png\?v2'\)/);
+  assert.doesNotMatch(migration, /\('P-ST01-008', '[^'\n]*card_07\.png\?v2'\)/);
+  assert.doesNotMatch(migration, /\('ST01-006-alt-art-promo', '[^'\n]*card_06\.png\?v2'\)/);
+  assert.match(migration, /25th_edition_chopper_robin_exact_artwork/);
 });

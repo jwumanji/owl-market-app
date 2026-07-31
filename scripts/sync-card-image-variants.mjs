@@ -36,6 +36,7 @@ const DELAY_MS = parsePositiveInt(readArg("--delay-ms"), 100);
 const DOWNLOAD_TIMEOUT_MS = parsePositiveInt(readArg("--download-timeout-ms"), 15000);
 const CONCURRENCY = parsePositiveInt(readArg("--concurrency"), 1);
 const CACHE_CONTROL = "31536000";
+const MIRROR_RUN_VERSION = Date.now().toString(36);
 
 const APPROVED_ASSET_STATUSES = new Set([
   "approved",
@@ -404,7 +405,7 @@ async function uploadVariant(path, body) {
   });
   if (error) throw new Error(`Upload failed for ${path}: ${error.message}`);
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  return `${data.publicUrl}?v=${MIRROR_RUN_VERSION}`;
 }
 
 async function patchCard(game, cardId, patch) {
