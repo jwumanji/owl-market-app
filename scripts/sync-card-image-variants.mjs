@@ -4,6 +4,8 @@
 // Usage:
 //   node scripts/sync-card-image-variants.mjs --game=one_piece --limit=50
 //   node scripts/sync-card-image-variants.mjs --game=one_piece --limit=50 --apply
+//   node scripts/sync-card-image-variants.mjs --game=one_piece --card-image-id=P-001-alt-art-promo --apply
+//   node scripts/sync-card-image-variants.mjs --game=one_piece --card-image-ids=P-001-alt-art-promo,P-OP01-001 --apply
 //   node scripts/sync-card-image-variants.mjs --game=one_piece --retry-errors --retry-reason=storage_upload --apply
 //
 // Games with unapproved asset status are blocked unless explicitly overridden
@@ -21,11 +23,20 @@ const RETRY_ERRORS = process.argv.includes("--retry-errors");
 const RETRY_REASON = readArg("--retry-reason");
 const ALLOW_UNAPPROVED = process.argv.includes("--allow-unapproved-assets");
 const GAME_SLUG = readArg("--game") ?? process.env.OWL_GAME_SLUG ?? "one_piece";
+const CARD_IMAGE_ID = readArg("--card-image-id");
+const CARD_IMAGE_IDS = Array.from(new Set([
+  ...(CARD_IMAGE_ID ? [CARD_IMAGE_ID] : []),
+  ...(readArg("--card-image-ids") ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean),
+]));
 const LIMIT = parsePositiveInt(readArg("--limit"), 50);
 const DELAY_MS = parsePositiveInt(readArg("--delay-ms"), 100);
 const DOWNLOAD_TIMEOUT_MS = parsePositiveInt(readArg("--download-timeout-ms"), 15000);
 const CONCURRENCY = parsePositiveInt(readArg("--concurrency"), 1);
 const CACHE_CONTROL = "31536000";
+const MIRROR_RUN_VERSION = Date.now().toString(36);
 
 const APPROVED_ASSET_STATUSES = new Set([
   "approved",
@@ -294,6 +305,12 @@ async function runCardQuery(game, { statuses, excludeMirrored = false, errorLike
     .order("id", { ascending: true })
     .limit(limit);
 
+  if (CARD_IMAGE_IDS.length === 1) {
+    query = query.eq("card_image_id", CARD_IMAGE_IDS[0]);
+  } else if (CARD_IMAGE_IDS.length > 1) {
+    query = query.in("card_image_id", CARD_IMAGE_IDS);
+  }
+
   if (statuses) {
     query = query.in("image_mirror_status", statuses);
   }
@@ -388,7 +405,7 @@ async function uploadVariant(path, body) {
   });
   if (error) throw new Error(`Upload failed for ${path}: ${error.message}`);
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  return `${data.publicUrl}?v=${MIRROR_RUN_VERSION}`;
 }
 
 async function patchCard(game, cardId, patch) {
