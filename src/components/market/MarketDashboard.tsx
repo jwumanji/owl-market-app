@@ -474,7 +474,7 @@ function EbaySaleRow({
 }
 
 function TrendingSection({ data, gameRouteSlug }: { data: DashboardData; gameRouteSlug?: string | null }) {
-  const [window, setWindow] = useState<MarketWindow>("1D");
+  const [window, setWindow] = useState<MarketWindow>("7D");
   const gainers = data.topGainers[window] ?? [];
   const losers = data.topLosers[window] ?? [];
 
