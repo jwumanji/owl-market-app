@@ -143,3 +143,18 @@ test("fourth curation batch adds concise prize-card names without auto-approval"
   assert.doesNotMatch(migration, /status\s*[,)]/i);
   assert.match(migration, /on conflict \(card_id, proposed_market_name\) do nothing/i);
 });
+
+test("EB02 gold-leader completion adds the five missing review candidates", () => {
+  const migration = readFileSync(
+    new URL("../supabase/migrations/20260801100000_complete_eb02_gold_leaders.sql", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(migration, /'OP07-059_sp_eb02', 'Gold Foxy Leader'/);
+  assert.match(migration, /'OP06-020_sp_eb02', 'Gold Hody Jones Leader'/);
+  assert.match(migration, /'OP08-098_sp_eb02', 'Gold Kalgara Leader'/);
+  assert.match(migration, /'EB01-040_sp_eb02', 'Gold Kyros Leader'/);
+  assert.match(migration, /'EB01-021_sp_eb02', 'Gold Hannyabal Leader'/);
+  assert.doesNotMatch(migration, /status\s*[,)]/i);
+  assert.match(migration, /on conflict \(card_id, proposed_market_name\) do nothing/i);
+});
